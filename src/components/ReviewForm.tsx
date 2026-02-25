@@ -344,7 +344,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
                       ? "The Super Star is a premium 6th star that costs $5. It's a special way to show exceptional appreciation for a business. Super Stars are displayed prominently on business profiles and help them stand out."
                       : language === 'fr'
                       ? "La Super Étoile est une 6ème étoile premium qui coûte 5$. C'est une façon spéciale de montrer une appréciation exceptionnelle."
-                      : 'Super Star hem i wan premium 6th sta we i kostem $5. Hem i wan spesel wei blong soem se bisnis i nambawan tumas.'}
+                      : 'Super Star hem i wan spesel namba 6 sta we i kostem 500 Vatu ($5 AUD). Hem i wan gudfala wei blong leftemap nem blong wan bisnis mo soem se sevis i nambawan tumas.'}
                   </p>
                 </div>
               </div>
