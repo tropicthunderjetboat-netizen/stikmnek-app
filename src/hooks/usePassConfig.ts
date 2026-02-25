@@ -38,16 +38,14 @@ export interface PassConfig {
   descriptionBi: string;
   maxRedemptionsPerDay: number;
   sortOrder: number;
-  // Group structure
   adults: number;
   kids: number;
-  totalPeople: number | null; // null means use adults+kids, number means a flat total
+  totalPeople: number | null; 
   baseDays: number;
-  fullDays: number; // days after share bonus
+  fullDays: number; 
   shareBonus: ShareBonus;
 }
 
-// ─── Pass name helpers ───
 export const PASS_NAMES: Record<string, { en: string; fr: string; bi: string; short: string }> = {
   daily: {
     en: 'Family Explorer Pass',
@@ -95,22 +93,22 @@ const DEFAULT_PASSES: PassConfig[] = [
     shadowColor: 'sky-200',
     icon: 'zap',
     features: [
-      { id: 'f1', text: 'Valid for 2 adults & 2 kids', textFr: 'Valable pour 2 adultes et 2 enfants', textBi: '2 bigman mo 2 pikinini' },
+      { id: 'f1', text: 'Valid for 4 people', textFr: 'Valable pour 4 personnes', textBi: 'Hem i go blong 4 pipol' },
       { id: 'f2', text: 'Access all deals for 1 day', textFr: 'Accès à toutes les offres pendant 1 jour', textBi: 'Akses olgeta dils blong 1 dei' },
       { id: 'f3', text: 'QR code coupons', textFr: 'Coupons QR code', textBi: 'QR kod kupons' },
       { id: 'f4', text: 'Map navigation', textFr: 'Navigation carte', textBi: 'Map navigesen' },
-      { id: 'f5', text: 'Share app to add 2 more people', textFr: 'Partagez l\'app pour ajouter 2 personnes', textBi: 'Serem app blong ademap 2 moa man' },
+      { id: 'f5', text: 'Share app to add 2 more people', textFr: 'Partagez l\'app pour ajouter 2 personnes', textBi: 'Sherem app blong ademap 2 moa pipol' },
     ],
     popular: false,
     active: true,
-    description: 'Perfect for families exploring for a day',
-    descriptionFr: 'Parfait pour les familles qui explorent pendant une journée',
-    descriptionBi: 'Gud blong famili we i eksplor blong wan dei',
+    description: 'Perfect for groups of 4 exploring for a day',
+    descriptionFr: 'Parfait pour les groupes de 4 explorant pendant une journée',
+    descriptionBi: 'Gud blong grup blong 4 pipol we i eksplor blong wan dei',
     maxRedemptionsPerDay: 5,
     sortOrder: 1,
-    adults: 2,
-    kids: 2,
-    totalPeople: null,
+    adults: 4,
+    kids: 0,
+    totalPeople: 4,
     baseDays: 1,
     fullDays: 1,
     shareBonus: {
@@ -119,7 +117,7 @@ const DEFAULT_PASSES: PassConfig[] = [
       extraKids: 0,
       description: 'Share the app to add 2 more people to your pass',
       descriptionFr: 'Partagez l\'application pour ajouter 2 personnes à votre pass',
-      descriptionBi: 'Serem app blong ademap 2 moa man long pas blong yu',
+      descriptionBi: 'Sherem app blong ademap 2 moa pipol long pas blong yu',
     },
   },
   {
@@ -137,13 +135,12 @@ const DEFAULT_PASSES: PassConfig[] = [
     shadowColor: 'teal-200',
     icon: 'star',
     features: [
-      { id: 'f1', text: 'Valid for 2 adults & 2 kids', textFr: 'Valable pour 2 adultes et 2 enfants', textBi: '2 bigman mo 2 pikinini' },
+      { id: 'f1', text: 'Valid for 4 people', textFr: 'Valable pour 4 personnes', textBi: 'Hem i go blong 4 pipol' },
       { id: 'f2', text: '6 days of unlimited deals', textFr: '6 jours d\'offres illimitées', textBi: '6 dei blong dils we i no gat limit' },
       { id: 'f3', text: 'QR code coupons', textFr: 'Coupons QR code', textBi: 'QR kod kupons' },
       { id: 'f4', text: 'Map navigation', textFr: 'Navigation carte', textBi: 'Map navigesen' },
-      { id: 'f7', text: 'Share app: +1 free day & +2 kids', textFr: 'Partagez: +1 jour gratuit et +2 enfants', textBi: 'Serem: +1 fri dei mo +2 pikinini' },
+      { id: 'f7', text: 'Share app: +1 free day & +2 people', textFr: 'Partagez: +1 jour gratuit et +2 personnes', textBi: 'Sherem app: +1 fri dei mo +2 pipol' },
     ],
-
     popular: true,
     active: true,
     description: 'Best value for group adventures over 6 days',
@@ -151,18 +148,18 @@ const DEFAULT_PASSES: PassConfig[] = [
     descriptionBi: 'Beswan valu blong grup advenija blong 6 dei',
     maxRedemptionsPerDay: 10,
     sortOrder: 2,
-    adults: 2,
-    kids: 2,
-    totalPeople: null,
+    adults: 4,
+    kids: 0,
+    totalPeople: 4,
     baseDays: 6,
     fullDays: 7,
     shareBonus: {
       extraDays: 1,
-      extraPeople: 0,
-      extraKids: 2,
-      description: 'Share the app to get 1 extra day free (7 total) and add 2 more kids',
-      descriptionFr: 'Partagez l\'app pour obtenir 1 jour gratuit (7 au total) et ajouter 2 enfants',
-      descriptionBi: 'Serem app blong kasem 1 fri dei (7 totol) mo ademap 2 moa pikinini',
+      extraPeople: 2,
+      extraKids: 0,
+      description: 'Share the app to get 1 extra day free (7 total) and add 2 more people',
+      descriptionFr: 'Partagez l\'app pour obtenir 1 jour gratuit (7 au total) et ajouter 2 personnes',
+      descriptionBi: 'Sherem app blong kasem 1 fri dei (7 totol) mo ademap 2 moa pipol',
     },
   },
   {
@@ -172,7 +169,6 @@ const DEFAULT_PASSES: PassConfig[] = [
     nameFr: 'Pass Expérience Ultime Équipe',
     nameBi: 'Ultimet Kru Eksperiens Pas',
     price: 99,
-
     period: '/6 days',
     periodFr: '/6 jours',
     periodBi: '/6 dei',
@@ -181,18 +177,17 @@ const DEFAULT_PASSES: PassConfig[] = [
     shadowColor: 'orange-200',
     icon: 'crown',
     features: [
-      { id: 'f1', text: 'Valid for 7 people', textFr: 'Valable pour 7 personnes', textBi: '7 man' },
+      { id: 'f1', text: 'Valid for 7 people', textFr: 'Valable pour 7 personnes', textBi: 'Hem i go blong 7 pipol' },
       { id: 'f2', text: '6 days of unlimited deals', textFr: '6 jours d\'offres illimitées', textBi: '6 dei blong dils we i no gat limit' },
       { id: 'f3', text: 'QR code coupons', textFr: 'Coupons QR code', textBi: 'QR kod kupons' },
       { id: 'f4', text: 'Map navigation', textFr: 'Navigation carte', textBi: 'Map navigesen' },
-      { id: 'f8', text: 'Share app: +1 free day & +1 person', textFr: 'Partagez: +1 jour gratuit et +1 personne', textBi: 'Serem: +1 fri dei mo +1 man' },
+      { id: 'f8', text: 'Share app: +1 free day & +1 person', textFr: 'Partagez: +1 jour gratuit et +1 personne', textBi: 'Sherem: +1 fri dei mo +1 pipol' },
     ],
-
     popular: false,
     active: true,
     description: 'Ultimate experience for crews of 7 over 6 days',
     descriptionFr: 'Expérience ultime pour des équipes de 7 sur 6 jours',
-    descriptionBi: 'Ultimet eksperiens blong 7 man blong 6 dei',
+    descriptionBi: 'Ultimet eksperiens blong 7 pipol blong 6 dei',
     maxRedemptionsPerDay: 999,
     sortOrder: 3,
     adults: 7,
@@ -206,18 +201,17 @@ const DEFAULT_PASSES: PassConfig[] = [
       extraKids: 0,
       description: 'Share the app to get 1 extra day free (7 total) and add 1 more person',
       descriptionFr: 'Partagez l\'app pour obtenir 1 jour gratuit (7 au total) et ajouter 1 personne',
-      descriptionBi: 'Serem app blong kasem 1 fri dei (7 totol) mo ademap 1 moa man',
+      descriptionBi: 'Sherem app blong kasem 1 fri dei (7 totol) mo ademap 1 moa pipol',
     },
   },
 ];
 
 const STORAGE_KEY = 'stikmnek-pass-config';
-const CONFIG_VERSION = 2; // Bump this when default features change
+const CONFIG_VERSION = 3; // UPDATED VERSION TO FORCE REFRESH
 const VERSION_KEY = 'stikmnek-pass-config-version';
 
 function loadFromStorage(): PassConfig[] {
   try {
-    // If config version changed, reset to defaults to pick up feature changes
     const storedVersion = localStorage.getItem(VERSION_KEY);
     if (storedVersion !== String(CONFIG_VERSION)) {
       localStorage.removeItem(STORAGE_KEY);
@@ -229,24 +223,19 @@ function loadFromStorage(): PassConfig[] {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Migrate old configs that don't have the new fields
-        const migrated = parsed.map((p: any, idx: number) => {
+        return parsed.map((p: any, idx: number) => {
           const defaultPass = DEFAULT_PASSES.find(d => d.id === p.id) || DEFAULT_PASSES[idx];
           return {
             ...defaultPass,
             ...p,
-            adults: p.adults ?? defaultPass?.adults ?? 2,
-            kids: p.kids ?? defaultPass?.kids ?? 2,
-            totalPeople: p.totalPeople !== undefined ? p.totalPeople : (defaultPass?.totalPeople ?? null),
+            adults: p.adults ?? defaultPass?.adults ?? 4,
+            kids: p.kids ?? defaultPass?.kids ?? 0,
+            totalPeople: p.totalPeople !== undefined ? p.totalPeople : (defaultPass?.totalPeople ?? 4),
             baseDays: p.baseDays ?? defaultPass?.baseDays ?? 1,
             fullDays: p.fullDays ?? defaultPass?.fullDays ?? 1,
-            shareBonus: p.shareBonus ?? defaultPass?.shareBonus ?? {
-              extraDays: 0, extraPeople: 0, extraKids: 0,
-              description: '', descriptionFr: '', descriptionBi: '',
-            },
+            shareBonus: p.shareBonus ?? defaultPass?.shareBonus,
           };
         });
-        return migrated;
       }
     }
   } catch (err) {
@@ -263,11 +252,9 @@ function saveToStorage(configs: PassConfig[]) {
   }
 }
 
-
 export function usePassConfig() {
   const [passes, setPasses] = useState<PassConfig[]>(loadFromStorage);
 
-  // Sync across tabs
   useEffect(() => {
     const handler = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY && e.newValue) {
