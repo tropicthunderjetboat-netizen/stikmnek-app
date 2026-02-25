@@ -31,8 +31,8 @@ const PASS_LABELS: Record<string, string> = {
 };
 
 const PASS_GROUPS: Record<string, string> = {
-  daily: '2 adults & 2 kids',
-  weekly: '2 adults & 2 kids',
+  daily: '4 people',
+  weekly: '4 people',
   monthly: '7 people',
 };
 
