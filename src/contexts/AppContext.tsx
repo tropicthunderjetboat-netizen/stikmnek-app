@@ -48,7 +48,8 @@ interface AppContextType {
   setSelectedBusiness: (business: Business | null) => void;
 }
 
-// 1. HARDENED DEFAULTS: This prevents the .length crash if hook is called early
+// PRO FIX: Initialize the context with a full default object. 
+// This prevents any ".length" crashes in components before the Provider mounts.
 const AppContext = createContext<AppContextType>({
   language: 'en',
   setLanguage: () => {},
@@ -85,36 +86,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
 
   const loadUserPass = useCallback(async (userId: string) => {
-    try {
-      const { data } = await supabase
-        .from('user_passes')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      setUserPass(data || null);
-    } catch (e) {
-      console.error("Error loading pass:", e);
-    }
+    const { data } = await supabase
+      .from('user_passes')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setUserPass(data || null);
   }, []);
 
   const loadUserProfile = useCallback(async (userId: string) => {
-    try {
-      const { data } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-      if (data) {
-        setUserProfile(data);
-        setUser({ id: userId, email: data.email || '', role: data.role || 'tourist' });
-        await loadUserPass(userId);
-      }
-    } catch (e) {
-      console.error("Error loading profile:", e);
+    if (data) {
+      setUserProfile(data);
+      setUser({ id: userId, email: data.email || '', role: data.role || 'tourist' });
+      await loadUserPass(userId);
     }
   }, [loadUserPass]);
 
@@ -172,8 +165,4 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 };
 
-export const useAppContext = () => {
-  const context = useContext(AppContext);
-  if (!context) throw new Error('useAppContext must be used within AppProvider');
-  return context;
-};
+export const useAppContext = () => useContext(AppContext);
