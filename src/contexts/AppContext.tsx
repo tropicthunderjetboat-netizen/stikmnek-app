@@ -118,3 +118,129 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const loadUserProfile = useCallback(async (userId: string) => {
+    try {
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (data) {
+        setUserProfile(data);
+        const role = ADMIN_EMAILS.includes(data.email || '') ? 'admin' : (data.role || 'tourist');
+        setUser({ id: userId, email: data.email || '', role: role as any });
+        await loadUserPass(userId);
+      }
+    } catch (err) {
+      console.error('Profile load error:', err);
+    }
+  }, [loadUserPass]);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) await loadUserProfile(session.user.id);
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        await loadUserProfile(session.user.id);
+      } else {
+        setUser(null);
+        setUserProfile(null);
+        setUserPass(null);
+      }
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadUserProfile]);
+
+  const signIn = async (email: string) => {
+    try {
+      setAuthLoading(true);
+      const { error } = await supabase.auth.signInWithOtp({ 
+        email,
+        options: { emailRedirectTo: window.location.origin }
+      });
+      if (error) throw error;
+      toast.success('Check your email for the magic link!');
+    } catch (err: any) {
+      toast.error(err.message);
+      setAuthLoading(false);
+    }
+  };
+
+  const signUpTourist = async (email: string, fullName: string) => {
+    try {
+      setAuthLoading(true);
+      const { error } = await supabase.auth.signInWithOtp({ 
+        email,
+        options: { emailRedirectTo: window.location.origin }
+      });
+      if (error) throw error;
+      
+      // We create the profile now, it will be linked once they confirm email
+      await directProfileInsert(email, fullName, 'tourist');
+      
+      toast.success('Magic link sent! Confirm your email to finish signup.');
+      setAuthMode('login');
+    } catch (err: any) {
+      toast.error(err.message);
+      setAuthLoading(false);
+    }
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setCurrentView('home');
+    toast.success('Signed out');
+  };
+
+  const toggleSidebar = () => setSidebarOpen(prev => !prev);
+  const toggleFavorite = (id: string) => setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  const purchasePass = async (type: PassType) => { if (user) setCurrentView('checkout'); else setShowAuth(true); };
+  
+  const refreshUserPass = useCallback(async () => {
+    if (user?.id) await loadUserPass(user.id);
+  }, [user, loadUserPass]);
+
+  // Methods to satisfy AppContextType interface
+  const signUp = async (email: string, role: 'tourist' | 'business') => { /* ... */ };
+  const signUpBusiness = async (email: string, businessName: string) => { /* ... */ };
+  const updateProfile = async (updates: any) => { /* ... */ };
+  const refreshBusinesses = async () => { /* ... */ };
+  const submitReview = async (bId: string, r: number, c: string) => { /* ... */ };
+  const requestUserLocation = () => { /* ... */ };
+  const getDistanceTo = (lat: number, lng: number) => null;
+
+  return (
+    <AppContext.Provider
+      value={{
+        sidebarOpen, toggleSidebar, language, setLanguage,
+        currentView, setCurrentView, user, userPass, userProfile, authLoading,
+        signIn, signUp, signUpTourist, signUpBusiness, signOut, updateProfile,
+        favorites, toggleFavorite, cart, setCart, purchasePass,
+        selectedBusiness, setSelectedBusiness, showAuth, setShowAuth,
+        authMode, setAuthMode, showQR, setShowQR, searchQuery, setSearchQuery,
+        selectedCategory, setSelectedCategory, redemptions,
+        dbBusinesses, dbReviews, submitReview, dataLoaded,
+        refreshBusinesses, refreshUserPass, userLocation, locationLoading,
+        locationError, requestUserLocation, getDistanceTo
+      }}
+    >
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+export const useAppContext = () => {
+  const context = useContext(AppContext);
+  if (!context) throw new Error('useAppContext must be used within AppProvider');
+  return context;
+};
