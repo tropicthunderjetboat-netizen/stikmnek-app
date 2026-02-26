@@ -136,6 +136,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [loadUserPass]);
 
+  // CORE AUTH LOGIC
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -147,9 +148,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth Event:", event);
       if (session?.user) {
         await loadUserProfile(session.user.id);
+        if (event === 'SIGNED_IN') {
+          setCurrentView('dashboard');
+          setShowAuth(false);
+        }
       } else {
         setUser(null);
         setUserProfile(null);
@@ -172,6 +178,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast.success('Check your email for the magic link!');
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
       setAuthLoading(false);
     }
   };
@@ -185,13 +192,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       if (error) throw error;
       
-      // We create the profile now, it will be linked once they confirm email
+      // Keep profile creation tied to the email
       await directProfileInsert(email, fullName, 'tourist');
       
-      toast.success('Magic link sent! Confirm your email to finish signup.');
+      toast.success('Confirmation email sent!');
       setAuthMode('login');
     } catch (err: any) {
       toast.error(err.message);
+    } finally {
       setAuthLoading(false);
     }
   };
@@ -199,7 +207,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const signOut = async () => {
     await supabase.auth.signOut();
     setCurrentView('home');
-    toast.success('Signed out');
+    window.location.reload(); // Hard reset for session cleanup
   };
 
   const toggleSidebar = () => setSidebarOpen(prev => !prev);
@@ -210,13 +218,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (user?.id) await loadUserPass(user.id);
   }, [user, loadUserPass]);
 
-  // Methods to satisfy AppContextType interface
-  const signUp = async (email: string, role: 'tourist' | 'business') => { /* ... */ };
-  const signUpBusiness = async (email: string, businessName: string) => { /* ... */ };
-  const updateProfile = async (updates: any) => { /* ... */ };
-  const refreshBusinesses = async () => { /* ... */ };
-  const submitReview = async (bId: string, r: number, c: string) => { /* ... */ };
-  const requestUserLocation = () => { /* ... */ };
+  const signUp = async (e: string, r: any) => {};
+  const signUpBusiness = async (e: string, b: string) => {};
+  const updateProfile = async (u: any) => {};
+  const refreshBusinesses = async () => {};
+  const submitReview = async (b: any, r: any, c: any) => {};
+  const requestUserLocation = () => {};
   const getDistanceTo = (lat: number, lng: number) => null;
 
   return (
@@ -241,6 +248,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 export const useAppContext = () => {
   const context = useContext(AppContext);
-  if (!context) throw new Error('useAppContext must be used within AppProvider');
+  if (!context) throw new Error('useAppContext error');
   return context;
 };
