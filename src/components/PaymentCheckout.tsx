@@ -67,40 +67,6 @@ function luhnCheck(num: string): boolean {
   return sum % 10 === 0;
 }
 
-const CardBrandIcon: React.FC<{ brand: string; className?: string }> = ({ brand, className = 'w-8 h-5' }) => {
-  if (brand === 'visa') {
-    return (
-      <svg className={className} viewBox="0 0 48 32" fill="none">
-        <rect width="48" height="32" rx="4" fill="#1A1F71" />
-        <path d="M19.5 21H17L18.7 11H21.2L19.5 21ZM15.3 11L12.9 18L12.6 16.5L11.7 12C11.7 12 11.6 11 10.3 11H6.1L6 11.2C6 11.2 7.5 11.5 9.2 12.5L11.4 21H14L18 11H15.3ZM35.2 21H37.5L35.5 11H33.5C32.4 11 32.1 11.8 32.1 11.8L28.3 21H30.9L31.4 19.5H34.6L34.9 21H35.2ZM32.1 17.5L33.5 13.5L34.3 17.5H32.1ZM28.5 13.3L28.9 11.2C28.9 11.2 27.6 10.8 26.2 10.8C24.7 10.8 21.3 11.5 21.3 14.3C21.3 16.9 24.9 16.9 24.9 18.3C24.9 19.6 21.7 19.3 20.5 18.4L20.1 20.6C20.1 20.6 21.4 21.2 23.3 21.2C25.2 21.2 28.5 20.1 28.5 17.5C28.5 14.8 24.8 14.6 24.8 13.4C24.8 12.2 27.2 12.4 28.5 13.3Z" fill="white" />
-      </svg>
-    );
-  }
-  if (brand === 'mastercard') {
-    return (
-      <svg className={className} viewBox="0 0 48 32" fill="none">
-        <rect width="48" height="32" rx="4" fill="#252525" />
-        <circle cx="19" cy="16" r="8" fill="#EB001B" />
-        <circle cx="29" cy="16" r="8" fill="#F79E1B" />
-        <path d="M24 10.3C25.8 11.7 27 13.7 27 16C27 18.3 25.8 20.3 24 21.7C22.2 20.3 21 18.3 21 16C21 13.7 22.2 11.7 24 10.3Z" fill="#FF5F00" />
-      </svg>
-    );
-  }
-  if (brand === 'amex') {
-    return (
-      <svg className={className} viewBox="0 0 48 32" fill="none">
-        <rect width="48" height="32" rx="4" fill="#2E77BC" />
-        <text x="24" y="19" textAnchor="middle" fill="white" fontSize="9" fontWeight="bold" fontFamily="Arial">AMEX</text>
-      </svg>
-    );
-  }
-  return (
-    <div className={`${className} rounded bg-gray-200 flex items-center justify-center`}>
-      <CreditCard className="w-4 h-3 text-gray-400" />
-    </div>
-  );
-};
-
 const PaymentCheckout: React.FC = () => {
   const { user, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass } = useAppContext();
   const [processing, setProcessing] = useState(false);
@@ -119,8 +85,6 @@ const PaymentCheckout: React.FC = () => {
   const [paymentResult, setPaymentResult] = useState<any>(null);
 
   const cardNumberRef = useRef<HTMLInputElement>(null);
-  const expiryRef = useRef<HTMLInputElement>(null);
-  const cvvRef = useRef<HTMLInputElement>(null);
 
   const selectedPass = cart ? PASSES[cart.passType as keyof typeof PASSES] : null;
 
@@ -130,9 +94,6 @@ const PaymentCheckout: React.FC = () => {
     start.setDate(start.getDate() + selectedPass.days);
     return start.toISOString().split('T')[0];
   }, [startDate, selectedPass]);
-
-  const daysCount = selectedPass?.days || 0;
-  const cardType = detectCardType(cardNumber);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -203,21 +164,32 @@ const PaymentCheckout: React.FC = () => {
         throw new Error('Session expired');
       }
 
-      // ═══ PLACEHOLDER LOGIC FOR DEMO ═══
-      // In production, this would call your payment gateway
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) throw new Error('User not found');
+
+      // ═══ SAVE TO SUPABASE ═══
+      const { error } = await supabase
+        .from('user_passes')
+        .insert([
+          {
+            user_id: currentUser.id,
+            pass_type: cart.passType,
+            valid_from: startDate,
+            valid_until: endDate,
+            is_active: true
+          }
+        ]);
+
+      if (error) throw error;
+
       const mockResult = {
         success: true,
         receiptNumber: 'SN-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-        passType: cart.passType,
-        amount: selectedPass.price,
         cardLast4: cardNumber.slice(-4),
-        validFrom: startDate,
-        validUntil: endDate
       };
 
       setPaymentResult(mockResult);
-      localStorage.setItem('lastPayment', JSON.stringify(mockResult));
-      toast.success('Payment successful!');
+      toast.success('Pass activated!');
       setStep('success');
 
       setTimeout(() => {
@@ -233,7 +205,6 @@ const PaymentCheckout: React.FC = () => {
     }
   };
 
-  const Icon = selectedPass.icon;
   const currentStepIndex = step === 'dates' ? 0 : step === 'payment' ? 1 : 2;
 
   return (
@@ -278,47 +249,28 @@ const PaymentCheckout: React.FC = () => {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-teal-600" />
-                      Discounts Valid From (Start Date)
-                    </label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Start Date</label>
                     <input
                       type="date"
                       value={startDate}
                       min={todayStr}
                       max={maxStartDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer hover:border-teal-300"
+                      className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 focus:ring-2 focus:ring-teal-500 outline-none transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-orange-500" />
-                      Discounts Valid Until (End Date)
-                    </label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">End Date</label>
                     <div className="relative">
                       <input
                         type="date"
                         value={endDate}
                         readOnly
-                        className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-100 bg-gray-50 text-sm font-medium text-gray-600 cursor-not-allowed"
+                        className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-100 bg-gray-50 text-gray-600 cursor-not-allowed"
                       />
                       <div className="absolute right-3 top-1/2 -translate-y-1/2">
                         <Lock className="w-4 h-4 text-gray-300" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-white rounded-lg p-3 border border-teal-200">
-                        <p className="text-[10px] text-gray-400 font-medium uppercase">Start</p>
-                        <p className="text-sm font-bold text-gray-900">{formatDate(startDate)}</p>
-                      </div>
-                      <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200">
-                        <p className="text-[10px] text-gray-400 font-medium uppercase">End</p>
-                        <p className="text-sm font-bold text-gray-900">{formatDate(endDate)}</p>
                       </div>
                     </div>
                   </div>
@@ -336,12 +288,10 @@ const PaymentCheckout: React.FC = () => {
 
             {step === 'payment' && (
               <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <CreditCard className="w-5 h-5 text-teal-600" />
-                    Enter Card Details
-                  </h3>
-                </div>
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-teal-600" />
+                  Enter Card Details
+                </h3>
 
                 {paymentError && (
                   <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3 text-red-800 text-sm font-medium">
