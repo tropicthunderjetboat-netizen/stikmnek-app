@@ -4,12 +4,6 @@ import { Language } from '@/data/translations';
 import { Business } from '@/data/businesses';
 import { supabase } from '@/lib/supabase';
 
-export type PassType = 
-  | 'Family Explorer Pass' 
-  | 'Extended Group Adventure Pass' 
-  | 'Ultimate Crew Experience Pass' 
-  | null;
-
 export type ViewMode = 'home' | 'deals' | 'map' | 'passes' | 'dashboard' | 'admin' | 'business-detail' | 'checkout' | 'business-dashboard';
 
 export interface UserProfile {
@@ -48,9 +42,8 @@ interface AppContextType {
   setSelectedBusiness: (business: Business | null) => void;
 }
 
-// PRO FIX: Initialize the context with a full default object. 
-// This prevents any ".length" crashes in components before the Provider mounts.
-const AppContext = createContext<AppContextType>({
+// 1. Define the default state explicitly
+const defaultContext: AppContextType = {
   language: 'en',
   setLanguage: () => {},
   currentView: 'home',
@@ -70,7 +63,9 @@ const AppContext = createContext<AppContextType>({
   dbBusinesses: [],
   selectedBusiness: null,
   setSelectedBusiness: () => {},
-});
+};
+
+const AppContext = createContext<AppContextType>(defaultContext);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('en');
@@ -86,29 +81,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
 
   const loadUserPass = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('user_passes')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    setUserPass(data || null);
+    try {
+      const { data } = await supabase
+        .from('user_passes')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setUserPass(data || null);
+    } catch (e) { console.error(e); }
   }, []);
 
   const loadUserProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (data) {
-      setUserProfile(data);
-      setUser({ id: userId, email: data.email || '', role: data.role || 'tourist' });
-      await loadUserPass(userId);
-    }
+    try {
+      const { data } = await supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle();
+      if (data) {
+        setUserProfile(data);
+        setUser({ id: userId, email: data.email || '', role: data.role || 'tourist' });
+        await loadUserPass(userId);
+      }
+    } catch (e) { console.error(e); }
   }, [loadUserPass]);
 
   useEffect(() => {
@@ -129,15 +123,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUserProfile(null);
       }
     });
-
     return () => subscription.unsubscribe();
   }, [loadUserProfile]);
 
   const signIn = async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({ 
-      email, 
-      options: { emailRedirectTo: window.location.origin } 
-    });
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } });
     if (error) toast.error(error.message);
     else toast.success('Check your email!');
   };
@@ -154,11 +144,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
+      ...defaultContext, // Fallback base
       language, setLanguage, currentView, setCurrentView, user, userPass, 
-      userProfile, authLoading, signIn, signOut, favorites, 
+      userProfile, authLoading, signIn, signOut, 
+      favorites: favorites ?? [], 
+      redemptions: redemptions ?? [], 
+      dbBusinesses: dbBusinesses ?? [],
       toggleFavorite: (id) => setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]),
-      showQR, setShowQR, refreshUserPass, redemptions, dbBusinesses, 
-      selectedBusiness, setSelectedBusiness
+      showQR, setShowQR, refreshUserPass, selectedBusiness, setSelectedBusiness
     }}>
       {children}
     </AppContext.Provider>
