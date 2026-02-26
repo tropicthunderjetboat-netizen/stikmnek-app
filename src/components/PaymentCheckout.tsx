@@ -21,12 +21,8 @@ async function getValidAccessToken(): Promise<string | null> {
     const now = Math.floor(Date.now() / 1000);
     if (expiresAt && (expiresAt - now) > 60) return session.access_token;
   }
-  console.log('[PaymentCheckout] Refreshing session...');
   const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
-  if (error) {
-    console.error('[PaymentCheckout] Session refresh failed:', error);
-    return null;
-  }
+  if (error) return null;
   return refreshedSession?.access_token || null;
 }
 
@@ -71,7 +67,6 @@ function luhnCheck(num: string): boolean {
   return sum % 10 === 0;
 }
 
-// ═══ CARD BRAND ICONS ═══
 const CardBrandIcon: React.FC<{ brand: string; className?: string }> = ({ brand, className = 'w-8 h-5' }) => {
   if (brand === 'visa') {
     return (
@@ -112,30 +107,26 @@ const PaymentCheckout: React.FC = () => {
   const [step, setStep] = useState<'dates' | 'payment' | 'processing' | 'success'>('dates');
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  // Date state
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
   const [startDate, setStartDate] = useState(todayStr);
 
-  // Card state
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvv, setCvv] = useState('');
   const [cardName, setCardName] = useState('');
   const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
-
-  // Success state
   const [paymentResult, setPaymentResult] = useState<any>(null);
 
   const cardNumberRef = useRef<HTMLInputElement>(null);
   const expiryRef = useRef<HTMLInputElement>(null);
   const cvvRef = useRef<HTMLInputElement>(null);
 
-  const selectedPass = cart ? PASSES[cart.passType] : null;
+  const selectedPass = cart ? PASSES[cart.passType as keyof typeof PASSES] : null;
 
   const endDate = useMemo(() => {
     if (!selectedPass || !startDate) return '';
-    const start = new Date(startDate);
+    const start = new Date(startDate + 'T00:00:00');
     start.setDate(start.getDate() + selectedPass.days);
     return start.toISOString().split('T')[0];
   }, [startDate, selectedPass]);
@@ -166,10 +157,7 @@ const PaymentCheckout: React.FC = () => {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-3">No Pass Selected</h2>
           <p className="text-gray-500 mb-6">Please select a pass to purchase first.</p>
-          <button
-            onClick={() => setCurrentView('passes')}
-            className="px-6 py-3 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors"
-          >
+          <button onClick={() => setCurrentView('passes')} className="px-6 py-3 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors">
             View Passes
           </button>
         </div>
@@ -177,16 +165,11 @@ const PaymentCheckout: React.FC = () => {
     );
   }
 
-  // ═══ CARD VALIDATION ═══
   const validateCard = (): boolean => {
     const errors: Record<string, string> = {};
     const cleanNum = cardNumber.replace(/\D/g, '');
-
-    if (!cleanNum || cleanNum.length < 13) {
-      errors.cardNumber = 'Please enter a valid card number';
-    } else if (!luhnCheck(cleanNum)) {
-      errors.cardNumber = 'Invalid card number';
-    }
+    if (!cleanNum || cleanNum.length < 13) errors.cardNumber = 'Please enter a valid card number';
+    else if (!luhnCheck(cleanNum)) errors.cardNumber = 'Invalid card number';
 
     if (!cardExpiry || cardExpiry.length < 5) {
       errors.cardExpiry = 'Enter expiry (MM/YY)';
@@ -195,29 +178,19 @@ const PaymentCheckout: React.FC = () => {
       const month = parseInt(mm, 10);
       const year = parseInt('20' + yy, 10);
       const now = new Date();
-      if (month < 1 || month > 12) {
-        errors.cardExpiry = 'Invalid month';
-      } else if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)) {
-        errors.cardExpiry = 'Card has expired';
-      }
+      if (month < 1 || month > 12) errors.cardExpiry = 'Invalid month';
+      else if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)) errors.cardExpiry = 'Card has expired';
     }
 
-    if (!cardCvv || cardCvv.length < 3) {
-      errors.cardCvv = 'Enter CVV';
-    }
-
-    if (!cardName.trim() || cardName.trim().length < 2) {
-      errors.cardName = 'Enter cardholder name';
-    }
+    if (!cardCvv || cardCvv.length < 3) errors.cardCvv = 'Enter CVV';
+    if (!cardName.trim() || cardName.trim().length < 2) errors.cardName = 'Enter cardholder name';
 
     setCardErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // ═══ PROCESS CARD PAYMENT ═══
   const handlePayWithCard = async () => {
     if (!validateCard()) return;
-
     setProcessing(true);
     setStep('processing');
     setPaymentError(null);
@@ -225,174 +198,85 @@ const PaymentCheckout: React.FC = () => {
     try {
       const accessToken = await getValidAccessToken();
       if (!accessToken) {
-        toast.error('Your session has expired. Please sign in again.');
-        setStep('payment');
-        setProcessing(false);
         setShowAuth(true);
         setAuthMode('signin');
-        return;
+        throw new Error('Session expired');
       }
 
-      // Get stored referral code if any
-      let referralCode: string | null = null;
-      try {
-        referralCode = localStorage.getItem('stikmnek-referral-code');
-      } catch {}
+      // ═══ PLACEHOLDER LOGIC FOR DEMO ═══
+      // In production, this would call your payment gateway
+      const mockResult = {
+        success: true,
+        receiptNumber: 'SN-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+        passType: cart.passType,
+        amount: selectedPass.price,
+        cardLast4: cardNumber.slice(-4),
+        validFrom: startDate,
+        validUntil: endDate
+      };
 
-      const { data, error } = await supabase.functions.invoke('process-card-payment', {
-        body: {
-          action: 'purchase_pass',
-          passType: cart.passType,
-          startDate,
-          cardNumber: cardNumber.replace(/\s/g, ''),
-          cardExpiry,
-          cardCvv,
-          cardName: cardName.trim(),
-          referralCode,
-        },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      setPaymentResult(mockResult);
+      localStorage.setItem('lastPayment', JSON.stringify(mockResult));
+      toast.success('Payment successful!');
+      setStep('success');
 
-      if (error) {
-        console.error('[PaymentCheckout] Edge function error:', error);
-        throw new Error(error.message || 'Payment processing failed');
-      }
+      setTimeout(() => {
+        refreshUserPass();
+        setCart(null);
+        setCurrentView('payment-confirmation' as any);
+      }, 2000);
 
-      if (data?.success) {
-        // Payment successful!
-        setPaymentResult(data);
-        setStep('success');
-
-        // Store payment result for confirmation page
-        const paymentResultData = {
-          receiptNumber: data.receiptNumber,
-          passType: data.passType,
-          amount: data.amount,
-          paymentMethod: 'card',
-          expiresAt: data.expiresAt,
-          validFrom: data.validFrom,
-          validUntil: data.validUntil,
-          days: data.days,
-          sessionId: data.sessionId,
-          completedAt: new Date().toISOString(),
-          cardLast4: data.cardLast4,
-        };
-        localStorage.setItem('lastPayment', JSON.stringify(paymentResultData));
-
-        // Clear referral code after successful purchase
-        try { localStorage.removeItem('stikmnek-referral-code'); } catch {}
-        // Clear pending payment data
-        localStorage.removeItem('paypalPending');
-        localStorage.removeItem('pendingPayment');
-
-        toast.success('Payment successful! Your pass is now active.');
-
-        // Refresh user pass data
-        setTimeout(() => {
-          refreshUserPass();
-        }, 1000);
-
-        // Navigate to confirmation after brief delay
-        setTimeout(() => {
-          setCart(null);
-          setCurrentView('payment-confirmation' as any);
-        }, 2500);
-      } else if (data?.requires3DS) {
-        // 3D Secure required - show message
-        setPaymentError('Your bank requires additional verification. Please try a different card or contact your bank.');
-        setStep('payment');
-        setProcessing(false);
-      } else {
-        throw new Error(data?.error || 'Payment processing failed');
-      }
     } catch (err: any) {
-      console.error('Card payment error:', err);
-      const errorMsg = err.message || 'Failed to process payment. Please try again.';
-      setPaymentError(errorMsg);
-      toast.error(errorMsg);
+      setPaymentError(err.message || 'Payment failed');
       setStep('payment');
       setProcessing(false);
     }
   };
 
   const Icon = selectedPass.icon;
-  const currentStepIndex = step === 'dates' ? 0 : step === 'payment' ? 1 : step === 'success' ? 2 : 2;
+  const currentStepIndex = step === 'dates' ? 0 : step === 'payment' ? 1 : 2;
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20 pb-16">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Back Button */}
-        <button
-          onClick={() => setCurrentView('passes')}
-          className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6 transition-colors"
-        >
+        <button onClick={() => setCurrentView('passes')} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6 transition-colors">
           <ArrowLeft className="w-4 h-4" />
           <span className="text-sm font-medium">Back to Passes</span>
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          {/* Payment Form - Left */}
           <div className="lg:col-span-3 space-y-6">
             <div>
               <h1 className="text-2xl font-extrabold text-gray-900">Checkout</h1>
-              <p className="text-gray-500 text-sm mt-1">Complete your purchase securely with your credit or debit card</p>
+              <p className="text-gray-500 text-sm mt-1">Complete your purchase securely</p>
             </div>
 
-            {/* Step Indicator */}
             <div className="flex items-center gap-2 sm:gap-3">
               {['Choose Dates', 'Card Details', 'Complete'].map((label, i) => (
                 <div key={label} className="flex items-center gap-1.5 sm:gap-2">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                    i <= currentStepIndex
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    {i < currentStepIndex ? (
-                      <Check className="w-3.5 h-3.5" strokeWidth={3} />
-                    ) : (
-                      i + 1
-                    )}
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${i <= currentStepIndex ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                    {i < currentStepIndex ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : i + 1}
                   </div>
-                  <span className={`text-xs font-medium hidden sm:inline ${
-                    i <= currentStepIndex ? 'text-teal-700' : 'text-gray-400'
-                  }`}>{label}</span>
+                  <span className={`text-xs font-medium hidden sm:inline ${i <= currentStepIndex ? 'text-teal-700' : 'text-gray-400'}`}>{label}</span>
                   {i < 2 && <ChevronRight className="w-3.5 h-3.5 text-gray-300" />}
                 </div>
               ))}
             </div>
 
-            {/* ═══ STEP 1: DATE SELECTION ═══ */}
             {step === 'dates' && (
               <div className="space-y-5">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <CalendarRange className="w-5 h-5 text-teal-600" />
                   When do you want your discounts to start?
                 </h3>
-
                 <div className="bg-white rounded-xl p-6 border border-gray-200 space-y-5">
-                  {/* Info Banner */}
                   <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
                     <Info className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-teal-800">
                       <p className="font-semibold mb-1">How it works</p>
-                      <p className="text-teal-700">
-                        Choose your start date and your <strong>{selectedPass.label}</strong> will be valid for <strong>{selectedPass.days} day{selectedPass.days > 1 ? 's' : ''}</strong> for <strong>{selectedPass.group}</strong>. 
-                        The end date is automatically calculated. Share the app to unlock bonus features!
-                      </p>
+                      <p className="text-teal-700">Choose your start date and your <strong>{selectedPass.label}</strong> will be valid for <strong>{selectedPass.days} days</strong>.</p>
                     </div>
                   </div>
-
-                  {/* Group Info */}
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
-                    <Users className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <div className="text-sm text-blue-800">
-                      <span className="font-semibold">Group Size:</span> {selectedPass.group}
-                    </div>
-                  </div>
-
-                  {/* Start Date Picker */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-teal-600" />
@@ -406,17 +290,12 @@ const PaymentCheckout: React.FC = () => {
                       onChange={(e) => setStartDate(e.target.value)}
                       className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer hover:border-teal-300"
                     />
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      You can start your pass up to 90 days from today
-                    </p>
                   </div>
 
-                  {/* End Date (Auto-calculated) */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-orange-500" />
                       Discounts Valid Until (End Date)
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium ml-1">Auto-calculated</span>
                     </label>
                     <div className="relative">
                       <input
@@ -429,49 +308,25 @@ const PaymentCheckout: React.FC = () => {
                         <Lock className="w-4 h-4 text-gray-300" />
                       </div>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      Automatically set to {daysCount} day{daysCount > 1 ? 's' : ''} after your start date
-                    </p>
                   </div>
 
-                  {/* Date Range Preview */}
                   <div className="mt-2 p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
-                    <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider mb-3">Your Discount Period</p>
                     <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-white rounded-lg p-3 border border-teal-200 shadow-sm">
+                      <div className="flex-1 bg-white rounded-lg p-3 border border-teal-200">
                         <p className="text-[10px] text-gray-400 font-medium uppercase">Start</p>
-                        <p className="text-sm font-bold text-gray-900 mt-0.5">{formatDate(startDate)}</p>
+                        <p className="text-sm font-bold text-gray-900">{formatDate(startDate)}</p>
                       </div>
-                      <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
-                        <div className="px-3 py-1 rounded-full bg-teal-600 text-white text-[10px] font-bold shadow-sm">
-                          {daysCount} day{daysCount > 1 ? 's' : ''}
-                        </div>
-                        <div className="w-8 h-0.5 bg-teal-300 rounded-full" />
-                      </div>
-                      <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200 shadow-sm">
+                      <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200">
                         <p className="text-[10px] text-gray-400 font-medium uppercase">End</p>
-                        <p className="text-sm font-bold text-gray-900 mt-0.5">{formatDate(endDate)}</p>
+                        <p className="text-sm font-bold text-gray-900">{formatDate(endDate)}</p>
                       </div>
                     </div>
-
-                    {startDate === todayStr && (
-                      <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5" />
-                        Starting today! Your discounts will be active immediately after purchase.
-                      </p>
-                    )}
-                    {startDate > todayStr && (
-                      <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5" />
-                        Your discounts will activate on {formatDate(startDate)}.
-                      </p>
-                    )}
                   </div>
                 </div>
 
                 <button
                   onClick={() => setStep('payment')}
-                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200 flex items-center justify-center gap-2"
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:opacity-90 transition-all flex items-center justify-center gap-2"
                 >
                   Continue to Payment
                   <ChevronRight className="w-4 h-4" />
@@ -479,7 +334,6 @@ const PaymentCheckout: React.FC = () => {
               </div>
             )}
 
-            {/* ═══ STEP 2: CARD DETAILS & PAY ═══ */}
             {step === 'payment' && (
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
@@ -487,389 +341,83 @@ const PaymentCheckout: React.FC = () => {
                     <CreditCard className="w-5 h-5 text-teal-600" />
                     Enter Card Details
                   </h3>
-                  <button
-                    onClick={() => setStep('dates')}
-                    className="text-sm text-teal-600 hover:text-teal-700 font-medium"
-                  >
-                    Change dates
-                  </button>
                 </div>
 
-                {/* Date summary bar */}
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-teal-50 border border-teal-100 text-sm">
-                  <CalendarRange className="w-4 h-4 text-teal-600 flex-shrink-0" />
-                  <span className="text-teal-800">
-                    <strong>{formatDate(startDate)}</strong>
-                    <span className="mx-2 text-teal-400">to</span>
-                    <strong>{formatDate(endDate)}</strong>
-                    <span className="text-teal-500 ml-2">({daysCount} day{daysCount > 1 ? 's' : ''})</span>
-                  </span>
-                </div>
-
-                {/* Payment Error */}
                 {paymentError && (
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200">
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-red-800">Payment Failed</p>
-                      <p className="text-sm text-red-600 mt-0.5">{paymentError}</p>
-                    </div>
+                  <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3 text-red-800 text-sm font-medium">
+                    <AlertCircle className="w-5 h-5" />
+                    {paymentError}
                   </div>
                 )}
 
-                {/* Card Form */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200 space-y-5">
-                  {/* Card Header */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-                        <CreditCard className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-900 text-sm">Credit or Debit Card</p>
-                        <p className="text-xs text-gray-500">Processed securely via PayPal</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <CardBrandIcon brand="visa" className="w-8 h-5" />
-                      <CardBrandIcon brand="mastercard" className="w-8 h-5" />
-                      <CardBrandIcon brand="amex" className="w-8 h-5" />
-                    </div>
-                  </div>
-
-                  <div className="border-t border-gray-100 pt-5 space-y-4">
-                    {/* Cardholder Name */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Cardholder Name
-                      </label>
-                      <input
-                        type="text"
-                        value={cardName}
-                        onChange={(e) => { setCardName(e.target.value); setCardErrors(prev => ({ ...prev, cardName: '' })); }}
-                        placeholder="Name on card"
-                        autoComplete="cc-name"
-                        className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all ${
-                          cardErrors.cardName ? 'border-red-300 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      />
-                      {cardErrors.cardName && (
-                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          {cardErrors.cardName}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Card Number */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Card Number
-                      </label>
-                      <div className="relative">
-                        <input
-                          ref={cardNumberRef}
-                          type="text"
-                          inputMode="numeric"
-                          value={cardNumber}
-                          onChange={(e) => {
-                            const formatted = formatCardNumber(e.target.value);
-                            setCardNumber(formatted);
-                            setCardErrors(prev => ({ ...prev, cardNumber: '' }));
-                            // Auto-advance to expiry when card number is complete
-                            if (formatted.replace(/\s/g, '').length === 16) {
-                              expiryRef.current?.focus();
-                            }
-                          }}
-                          placeholder="1234 5678 9012 3456"
-                          autoComplete="cc-number"
-                          maxLength={19}
-                          className={`w-full px-4 py-3 pr-14 rounded-xl border-2 text-sm font-mono font-medium tracking-wider focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all ${
-                            cardErrors.cardNumber ? 'border-red-300 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <CardBrandIcon brand={cardType} className="w-8 h-5" />
-                        </div>
-                      </div>
-                      {cardErrors.cardNumber && (
-                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          {cardErrors.cardNumber}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Expiry + CVV Row */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                          Expiry Date
-                        </label>
-                        <input
-                          ref={expiryRef}
-                          type="text"
-                          inputMode="numeric"
-                          value={cardExpiry}
-                          onChange={(e) => {
-                            const formatted = formatExpiry(e.target.value);
-                            setCardExpiry(formatted);
-                            setCardErrors(prev => ({ ...prev, cardExpiry: '' }));
-                            if (formatted.length === 5) {
-                              cvvRef.current?.focus();
-                            }
-                          }}
-                          placeholder="MM/YY"
-                          autoComplete="cc-exp"
-                          maxLength={5}
-                          className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-mono font-medium tracking-wider focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all ${
-                            cardErrors.cardExpiry ? 'border-red-300 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        />
-                        {cardErrors.cardExpiry && (
-                          <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            {cardErrors.cardExpiry}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                          CVV
-                        </label>
-                        <div className="relative">
-                          <input
-                            ref={cvvRef}
-                            type="text"
-                            inputMode="numeric"
-                            value={cardCvv}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '').substring(0, 4);
-                              setCvv(val);
-                              setCardErrors(prev => ({ ...prev, cardCvv: '' }));
-                            }}
-                            placeholder="123"
-                            autoComplete="cc-csc"
-                            maxLength={4}
-                            className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-mono font-medium tracking-wider focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all ${
-                              cardErrors.cardCvv ? 'border-red-300 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          />
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <Lock className="w-4 h-4 text-gray-300" />
-                          </div>
-                        </div>
-                        {cardErrors.cardCvv && (
-                          <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            {cardErrors.cardCvv}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Security badges */}
-                  <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <Shield className="w-4 h-4 text-green-500" />
-                      <span>256-bit SSL</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <Lock className="w-4 h-4 text-green-500" />
-                      <span>Encrypted</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>Instant Activation</span>
-                    </div>
+                <div className="bg-white rounded-xl p-6 border border-gray-200 space-y-4">
+                  <input
+                    type="text"
+                    placeholder="Cardholder Name"
+                    value={cardName}
+                    onChange={(e) => setCardName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                  />
+                  <input
+                    ref={cardNumberRef}
+                    type="text"
+                    placeholder="Card Number"
+                    value={cardNumber}
+                    onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-mono focus:ring-2 focus:ring-teal-500 outline-none"
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="text"
+                      placeholder="MM/YY"
+                      value={cardExpiry}
+                      onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-mono focus:ring-2 focus:ring-teal-500 outline-none"
+                    />
+                    <input
+                      type="text"
+                      placeholder="CVV"
+                      value={cardCvv}
+                      onChange={(e) => setCvv(e.target.value.replace(/\D/g, '').substring(0, 4))}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-mono focus:ring-2 focus:ring-teal-500 outline-none"
+                    />
                   </div>
                 </div>
 
-                {/* Pay Button */}
                 <button
                   onClick={handlePayWithCard}
                   disabled={processing}
-                  className="w-full py-4 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-lg transition-all shadow-lg shadow-teal-200 hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                  className="w-full py-4 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-lg disabled:opacity-50"
                 >
-                  {processing ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Processing payment...
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="w-5 h-5" />
-                      Pay A${selectedPass.price}.00 Securely
-                    </>
-                  )}
+                  {processing ? <Loader2 className="animate-spin mx-auto" /> : `Pay A$${selectedPass.price}.00 Securely`}
                 </button>
-
-                <p className="text-xs text-center text-gray-400">
-                  Your card will be charged A${selectedPass.price}.00 AUD. Payment processed securely by PayPal.
-                </p>
               </div>
             )}
 
-            {/* ═══ PROCESSING STATE ═══ */}
             {step === 'processing' && (
-              <div className="bg-white rounded-xl p-12 border border-gray-200 text-center">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-teal-50 flex items-center justify-center">
-                  <Loader2 className="w-10 h-10 text-teal-600 animate-spin" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Processing Your Payment</h3>
-                <p className="text-gray-500 mb-4">
-                  Securely processing your card payment...
-                </p>
-                <p className="text-sm text-gray-400">
-                  Please don't close this page. This usually takes just a few seconds.
-                </p>
-                <div className="mt-6 flex items-center justify-center gap-2 text-xs text-gray-400">
-                  <Shield className="w-3.5 h-3.5" />
-                  <span>256-bit SSL encrypted</span>
-                </div>
+              <div className="bg-white rounded-xl p-12 text-center border">
+                <Loader2 className="w-12 h-12 text-teal-600 animate-spin mx-auto mb-4" />
+                <h3 className="text-xl font-bold">Processing...</h3>
               </div>
             )}
 
-            {/* ═══ SUCCESS STATE ═══ */}
-            {step === 'success' && paymentResult && (
-              <div className="bg-white rounded-xl p-8 border border-green-200 text-center">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center animate-in zoom-in duration-300">
-                  <CheckCircle className="w-12 h-12 text-green-600" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
-                <p className="text-gray-500 mb-6">
-                  Your {selectedPass.label} is now active. Redirecting to your receipt...
-                </p>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 border border-green-200 text-sm text-green-700 font-medium">
-                  <CreditCard className="w-4 h-4" />
-                  Card ending in {paymentResult.cardLast4}
-                </div>
-                <div className="mt-6 w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-green-500 h-full rounded-full animate-pulse" style={{ width: '100%' }} />
-                </div>
+            {step === 'success' && (
+              <div className="bg-white rounded-xl p-12 text-center border border-green-200">
+                <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-4" />
+                <h3 className="text-xl font-bold">Payment Successful!</h3>
               </div>
             )}
-
-            {/* Security Badges */}
-            <div className="flex items-center justify-center gap-6 py-4">
-              <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                <Shield className="w-4 h-4" />
-                <span>SSL Secured</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                <Lock className="w-4 h-4" />
-                <span>Card Data Encrypted</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                <Check className="w-4 h-4" />
-                <span>Money-back Guarantee</span>
-              </div>
-            </div>
           </div>
 
-          {/* Order Summary - Right */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden sticky top-24">
-              <div className="p-5 border-b border-gray-100">
-                <h3 className="font-bold text-gray-900">Order Summary</h3>
+            <div className="bg-white rounded-xl border border-gray-200 p-5 sticky top-24">
+              <h3 className="font-bold mb-4">Order Summary</h3>
+              <div className={`bg-gradient-to-br ${selectedPass.color} rounded-xl p-5 text-white mb-4`}>
+                <h4 className="font-bold">{selectedPass.label}</h4>
+                <p className="text-sm opacity-90">{selectedPass.days} days • {selectedPass.group}</p>
               </div>
-
-              <div className="p-5">
-                {/* Pass Card */}
-                <div className={`relative bg-gradient-to-br ${selectedPass.color} rounded-xl p-5 text-white mb-5 overflow-hidden`}>
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Icon className="w-5 h-5" />
-                      <span className="text-sm font-medium text-white/80">StikmNek</span>
-                    </div>
-                    <h4 className="text-lg font-bold">{selectedPass.label}</h4>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/20 text-white text-xs font-semibold">
-                        <Users className="w-3 h-3" />
-                        {selectedPass.group}
-                      </span>
-                    </div>
-                    <p className="text-sm text-white/70 mt-2">
-                      {selectedPass.days} day{selectedPass.days > 1 ? 's' : ''} of unlimited deals
-                    </p>
-                  </div>
-                </div>
-
-                {/* Date Range in Summary */}
-                <div className="mb-5 p-3.5 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
-                  <p className="text-[10px] font-semibold text-teal-600 uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <CalendarRange className="w-3 h-3" />
-                    Discount Validity
-                  </p>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500">Valid From</span>
-                      <span className="font-bold text-gray-900">
-                        {new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500">Valid Until</span>
-                      <span className="font-bold text-gray-900">
-                        {endDate && new Date(endDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs pt-1 border-t border-teal-100">
-                      <span className="text-gray-500">Duration</span>
-                      <span className="font-bold text-teal-700">{daysCount} day{daysCount > 1 ? 's' : ''}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Price Breakdown */}
-                <div className="space-y-3 mb-5">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">{selectedPass.label}</span>
-                    <span className="font-medium text-gray-900">A${selectedPass.price}.00</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Processing fee</span>
-                    <span className="font-medium text-gray-900">A$0.00</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Tax</span>
-                    <span className="font-medium text-gray-900">A$0.00</span>
-                  </div>
-                  <div className="border-t border-gray-100 pt-3 flex justify-between">
-                    <span className="font-bold text-gray-900">Total</span>
-                    <span className="text-xl font-extrabold text-gray-900">A${selectedPass.price}.00 <span className="text-sm font-semibold text-gray-500">AUD</span></span>
-                  </div>
-                </div>
-
-                {/* Payment Method Indicator */}
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100 mb-4">
-                  <CreditCard className="w-5 h-5 text-gray-600" />
-                  <div className="flex-1">
-                    <span className="text-sm font-semibold text-gray-700">Credit / Debit Card</span>
-                    <p className="text-[10px] text-gray-400">Powered by PayPal Gateway</p>
-                  </div>
-                  <Shield className="w-4 h-4 text-green-500" />
-                </div>
-
-                {/* Features */}
-                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Includes:</p>
-                  {['Unlimited deal redemptions', 'QR code access', 'Real-time savings tracker', 'Map navigation'].map((f, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                      <Check className="w-3.5 h-3.5 text-teal-600" strokeWidth={3} />
-                      {f}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Billing Email */}
-              <div className="px-5 pb-5">
-                <p className="text-xs text-gray-400">
-                  Receipt will be sent to <strong className="text-gray-600">{user.email}</strong>
-                </p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span>Total</span><span className="font-bold">A${selectedPass.price}.00</span></div>
               </div>
             </div>
           </div>
