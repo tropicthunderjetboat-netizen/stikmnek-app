@@ -44,10 +44,32 @@ interface AppContextType {
   refreshUserPass: () => Promise<void>;
   redemptions: any[];
   dbBusinesses: Business[];
+  selectedBusiness: Business | null;
   setSelectedBusiness: (business: Business | null) => void;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+// 1. HARDENED DEFAULTS: This prevents the .length crash if hook is called early
+const AppContext = createContext<AppContextType>({
+  language: 'en',
+  setLanguage: () => {},
+  currentView: 'home',
+  setCurrentView: () => {},
+  user: null,
+  userPass: null,
+  userProfile: null,
+  authLoading: true,
+  signIn: async () => {},
+  signOut: async () => {},
+  favorites: [],
+  toggleFavorite: () => {},
+  showQR: null,
+  setShowQR: () => {},
+  refreshUserPass: async () => {},
+  redemptions: [],
+  dbBusinesses: [],
+  selectedBusiness: null,
+  setSelectedBusiness: () => {},
+});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('en');
@@ -63,28 +85,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
 
   const loadUserPass = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('user_passes')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    setUserPass(data || null);
+    try {
+      const { data } = await supabase
+        .from('user_passes')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setUserPass(data || null);
+    } catch (e) {
+      console.error("Error loading pass:", e);
+    }
   }, []);
 
   const loadUserProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
+    try {
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
 
-    if (data) {
-      setUserProfile(data);
-      setUser({ id: userId, email: data.email || '', role: data.role || 'tourist' });
-      await loadUserPass(userId);
+      if (data) {
+        setUserProfile(data);
+        setUser({ id: userId, email: data.email || '', role: data.role || 'tourist' });
+        await loadUserPass(userId);
+      }
+    } catch (e) {
+      console.error("Error loading profile:", e);
     }
   }, [loadUserPass]);
 
@@ -134,7 +164,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       language, setLanguage, currentView, setCurrentView, user, userPass, 
       userProfile, authLoading, signIn, signOut, favorites, 
       toggleFavorite: (id) => setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]),
-      showQR, setShowQR, refreshUserPass, redemptions, dbBusinesses, setSelectedBusiness
+      showQR, setShowQR, refreshUserPass, redemptions, dbBusinesses, 
+      selectedBusiness, setSelectedBusiness
     }}>
       {children}
     </AppContext.Provider>
