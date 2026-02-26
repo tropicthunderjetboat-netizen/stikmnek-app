@@ -103,7 +103,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loadUserPass = useCallback(async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('user_passes')
         .select('*')
         .eq('user_id', userId)
@@ -111,8 +111,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-
-      if (error) throw error;
       setUserPass(data || null);
     } catch (err) {
       console.error('Pass load error:', err);
@@ -120,127 +118,3 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const loadUserProfile = useCallback(async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (data) {
-        setUserProfile(data);
-        const role = ADMIN_EMAILS.includes(data.email || '') ? 'admin' : (data.role || 'tourist');
-        setUser({ id: userId, email: data.email || '', role: role as any });
-        await loadUserPass(userId);
-      }
-    } catch (err) {
-      console.error('Profile load error:', err);
-    }
-  }, [loadUserPass]);
-
-  useEffect(() => {
-    const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) await loadUserProfile(session.user.id);
-      setAuthLoading(false);
-    };
-    initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session?.user) {
-        await loadUserProfile(session.user.id);
-      } else {
-        setUser(null);
-        setUserProfile(null);
-        setUserPass(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [loadUserProfile]);
-
-  const signIn = async (email: string) => {
-    try {
-      setAuthLoading(true);
-      const { error } = await supabase.auth.signInWithOtp({ email });
-      if (error) throw error;
-      
-      const { data: profile } = await supabase.from('user_profiles').select('*').eq('email', email).maybeSingle();
-      if (profile) {
-        await loadUserProfile(profile.user_id);
-        setCurrentView('dashboard');
-        toast.success('Signed in successfully');
-      }
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const signUpTourist = async (email: string, fullName: string) => {
-    try {
-      setAuthLoading(true);
-      const { error } = await supabase.auth.signInWithOtp({ email });
-      if (error) throw error;
-      await directProfileInsert(email, fullName, 'tourist');
-      toast.success('Account created!');
-      setAuthMode('login');
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setUserProfile(null);
-    setUserPass(null);
-    setCurrentView('home');
-    toast.success('Signed out');
-  };
-
-  const toggleSidebar = () => setSidebarOpen(prev => !prev);
-  const toggleFavorite = (id: string) => setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
-  const purchasePass = async (type: PassType) => { if (user) setCurrentView('checkout'); else setShowAuth(true); };
-  
-  const refreshUserPass = useCallback(async () => {
-    if (user?.id) await loadUserPass(user.id);
-  }, [user, loadUserPass]);
-
-  const signUp = async (e: string, r: any) => { /* signUp logic */ };
-  const signUpBusiness = async (e: string, b: string) => { /* business logic */ };
-  const updateProfile = async (u: any) => { /* update logic */ };
-  const refreshBusinesses = async () => { /* refresh logic */ };
-  const submitReview = async (b: any, r: any, c: any) => { /* review logic */ };
-  const requestUserLocation = () => { /* location logic */ };
-  const getDistanceTo = (lat: number, lng: number) => null;
-
-  return (
-    <AppContext.Provider
-      value={{
-        sidebarOpen, toggleSidebar, language, setLanguage,
-        currentView, setCurrentView, user, userPass, userProfile, authLoading,
-        signIn, signUp, signUpTourist, signUpBusiness, signOut, updateProfile,
-        favorites, toggleFavorite, cart, setCart, purchasePass,
-        selectedBusiness, setSelectedBusiness, showAuth, setShowAuth,
-        authMode, setAuthMode, showQR, setShowQR, searchQuery, setSearchQuery,
-        selectedCategory, setSelectedCategory, redemptions,
-        dbBusinesses, dbReviews, submitReview, dataLoaded,
-        refreshBusinesses, refreshUserPass, userLocation, locationLoading,
-        locationError, requestUserLocation, getDistanceTo
-      }}
-    >
-      {children}
-    </AppContext.Provider>
-  );
-};
-
-export const useAppContext = () => {
-  const context = useContext(AppContext);
-  if (!context) throw new Error('useAppContext must be used within AppProvider');
-  return context;
-};
