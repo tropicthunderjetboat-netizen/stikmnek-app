@@ -339,7 +339,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
       no_dates: { bg: 'bg-gray-50', border: 'border-gray-200', icon: <Info className="w-5 h-5 text-gray-400" />, label: 'No Dates Set', textColor: 'text-gray-600', badgeBg: 'bg-gray-100 text-gray-700', barColor: 'bg-gray-400' },
     };
 
-    const config = statusConfig[voucher.status] || statusConfig.no_dates;
+    const config = statusConfig[voucher.status as keyof typeof statusConfig] || statusConfig.no_dates;
     const progressPercent = voucher.totalDays && voucher.elapsedDays != null
       ? Math.min(100, Math.max(0, (voucher.elapsedDays / voucher.totalDays) * 100))
       : voucher.status === 'expired' ? 100 : 0;
@@ -560,25 +560,25 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
                 </div>
               </div>
             </div>
+
+            {/* ── Capacity Badge ── */}
+            <div className="mx-4 mt-3 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-bold text-blue-800 uppercase tracking-tight">Pass Capacity</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {(validityResult?.pass?.guest_capacity || 0) > 4 && (
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                )}
+                <span className="text-lg font-black text-blue-700">
+                  {validityResult?.pass?.guest_capacity || 4} People
+                </span>
+              </div>
+            </div>
             
-{/* ── Capacity Badge ── */}
-<div className="flex items-center justify-between mt-3 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl">
-  <div className="flex items-center gap-2">
-    <User className="w-4 h-4 text-blue-600" />
-    <span className="text-xs font-bold text-blue-800 uppercase tracking-tight">Pass Capacity</span>
-  </div>
-  <div className="flex items-center gap-1.5">
-    {/* If capacity is > initial (e.g., 6), show a "Bonus" sparkle */}
-    {(validityResult?.pass?.guest_capacity || 0) > 4 && (
-      <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-    )}
-    <span className="text-lg font-black text-blue-700">
-      {validityResult?.pass?.guest_capacity || 4} People
-    </span>
-  </div>
             {/* ── Receipt-style Details ── */}
             <div className="p-4 space-y-3">
-              {/* Dashed separator */}
               <div className="border-t border-dashed border-gray-200 -mx-4" />
 
               <div className="flex items-center justify-between">
@@ -625,10 +625,8 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
                 </div>
               )}
 
-              {/* Dashed separator */}
               <div className="border-t border-dashed border-gray-200 -mx-4" />
 
-              {/* Savings highlight */}
               {r.savedAmount > 0 && (
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200 text-center">
                   <p className="text-xs font-semibold text-green-600 mb-1">Tourist Savings</p>
@@ -639,33 +637,18 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
                   </div>
                 </div>
               )}
-              {r.savedAmount <= 0 && (
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 border border-green-200 text-center">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-xs font-bold text-green-700">Redemption Recorded Successfully</span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
 
-        {/* Voucher Validity Panel */}
-        {result.voucher && (
-          <div className="px-5">
-            {renderVoucherValidityPanel(result.voucher, 'Your Voucher Validity')}
-          </div>
-        )}
-
-        {/* Actions */}
         <div className="px-5 pb-5 flex items-center gap-3">
           <button onClick={handleReset} className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200/50 flex items-center justify-center gap-2">
             <ScanLine className="w-5 h-5" />Scan Another
           </button>
           <button onClick={() => { stopCamera(); onClose(); }} className="flex-1 py-3.5 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 transition-colors">
             Done
-        </button>
+          </button>
+        </div>
       </div>
     );
   };
@@ -692,7 +675,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
         </div>
 
         <div className="px-5 space-y-4">
-          {/* Status-specific reason card */}
           <div className={`rounded-2xl ${failConfig.bg} border ${failConfig.border} overflow-hidden`}>
             <div className="p-5">
               <div className="flex items-start gap-4">
@@ -705,7 +687,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
                 </div>
               </div>
 
-              {/* Pass type info if available */}
               {result.passType && (
                 <div className="mt-4 flex items-center gap-3 p-3 rounded-xl bg-white/60 border border-white/80">
                   <Ticket className={`w-5 h-5 ${failConfig.color}`} />
@@ -713,30 +694,11 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
                     <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Pass Type</p>
                     <p className="text-sm font-bold text-gray-900 capitalize">{result.passType} Pass</p>
                   </div>
-                  {result.status && (
-                    <span className={`ml-auto px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase ${
-                      result.status === 'expired' || result.status === 'date_range_expired' ? 'bg-red-100 text-red-700'
-                      : result.status === 'not_yet_valid' ? 'bg-amber-100 text-amber-700'
-                      : result.status === 'already_redeemed_today' ? 'bg-orange-100 text-orange-700'
-                      : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {result.status.replace(/_/g, ' ')}
-                    </span>
-                  )}
                 </div>
               )}
-
-              {/* Suggestion */}
-              <div className="mt-4 p-3 rounded-xl bg-blue-50 border border-blue-100">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-blue-700 font-medium leading-relaxed">{failConfig.suggestion}</p>
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-3 pb-5">
             <button onClick={handleReset} className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200/50 flex items-center justify-center gap-2">
               <RotateCcw className="w-5 h-5" />Try Again
@@ -757,7 +719,6 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
 
     return (
       <div className="space-y-4 -mx-5 -mt-5">
-        {/* Status Banner */}
         <div className={`relative px-6 pt-8 pb-6 overflow-hidden ${
           validityResult.canRedeem
             ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600'
@@ -774,16 +735,10 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
             <h3 className="text-2xl font-extrabold text-white mb-1">
               {validityResult.canRedeem ? 'Eligible for Redemption' : 'Not Eligible Right Now'}
             </h3>
-            <p className="text-white/80 text-sm font-medium">
-              {validityResult.canRedeem
-                ? 'Pass and voucher are both valid'
-                : validityResult.pass?.message || 'See details below'}
-            </p>
           </div>
         </div>
 
         <div className="px-5 space-y-4">
-          {/* Tourist Identity Card */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <div className="flex items-center gap-4">
               <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${tierConfig.gradient} flex items-center justify-center text-white text-xl font-extrabold shadow-lg flex-shrink-0`}>
@@ -791,95 +746,18 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-lg font-extrabold text-gray-900 truncate">{validityResult.tourist?.name}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-white ${tierConfig.badge}`}>
-                    {tierConfig.icon}
-                    {tierConfig.label}
-                  </span>
-                  <span className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                    validityResult.pass?.status === 'active' ? 'bg-green-100 text-green-700'
-                    : validityResult.pass?.status === 'expired' || validityResult.pass?.status === 'date_range_expired' ? 'bg-red-100 text-red-700'
-                    : validityResult.pass?.status === 'not_yet_valid' ? 'bg-amber-100 text-amber-700'
-                    : 'bg-gray-100 text-gray-700'
-                  }`}>
-                    <Shield className="w-3 h-3" />
-                    {validityResult.pass?.status?.replace(/_/g, ' ').toUpperCase()}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Pass dates */}
-            <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-400" />
-                <div>
-                  <p className="text-[10px] text-gray-400">Pass Valid</p>
-                  <p className="text-xs font-bold text-gray-700">
-                    {validityResult.pass?.validFrom ? new Date(validityResult.pass.validFrom).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
-                    {' - '}
-                    {validityResult.pass?.validUntil ? new Date(validityResult.pass.validUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-gray-400" />
-                <div>
-                  <p className="text-[10px] text-gray-400">Purchased</p>
-                  <p className="text-xs font-bold text-gray-700">
-                    {validityResult.pass?.purchasedAt ? new Date(validityResult.pass.purchasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
-                  </p>
-                </div>
               </div>
             </div>
           </div>
 
-          {/* Voucher Validity Panel */}
-          {validityResult.voucher && renderVoucherValidityPanel(validityResult.voucher, 'Your Voucher / Discount Validity')}
-
-          {/* Redemption History */}
-          {validityResult.redemptionHistory && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2.5">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                <History className="w-3.5 h-3.5" />Redemption History
-              </p>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Redeemed Today</span>
-                <span className={`text-sm font-bold ${validityResult.redemptionHistory.alreadyRedeemedToday ? 'text-orange-600' : 'text-gray-900'}`}>
-                  {validityResult.redemptionHistory.alreadyRedeemedToday ? 'Yes (limit reached)' : 'No'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Total Visits</span>
-                <span className="text-sm font-bold text-gray-900">{validityResult.redemptionHistory.totalRedemptionsAtBusiness}</span>
-              </div>
-              {validityResult.redemptionHistory.lastRedemptions.length > 0 && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Recent Redemptions:</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {validityResult.redemptionHistory.lastRedemptions.map((date, i) => (
-                      <span key={i} className="px-2 py-0.5 rounded bg-gray-50 text-[10px] font-medium text-gray-600 border border-gray-200">
-                        {new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Actions */}
           <div className="flex items-center gap-3 pb-5">
             {validityResult.canRedeem && (
               <button onClick={handleProceedToRedeem} className="flex-1 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200/50 flex items-center justify-center gap-2">
                 <Zap className="w-5 h-5" />Proceed to Redeem
               </button>
             )}
-            <button onClick={handleReset} className={`${validityResult.canRedeem ? '' : 'flex-1'} py-3.5 px-5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2`}>
+            <button onClick={handleReset} className="py-3.5 px-5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
               <ScanLine className="w-5 h-5" />Scan Another
-            </button>
-            <button onClick={() => { stopCamera(); onClose(); }} className="py-3.5 px-5 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 transition-colors">
-              Done
             </button>
           </div>
         </div>
@@ -899,33 +777,17 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
               <XCircle className="w-10 h-10 text-white" />
             </div>
             <h3 className="text-2xl font-extrabold text-white mb-1">Validity Check Failed</h3>
-            <p className="text-red-100 text-sm font-medium">Could not verify the pass</p>
           </div>
         </div>
 
         <div className="px-5 space-y-4">
           <div className="bg-red-50 rounded-2xl border border-red-200 p-5">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-bold text-red-800 mb-1">Error Details</h4>
-                <p className="text-sm text-red-700 leading-relaxed">{validityResult.error}</p>
-              </div>
-            </div>
-            <div className="mt-4 p-3 rounded-xl bg-blue-50 border border-blue-100">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-blue-700 font-medium">Make sure the tourist is showing a valid StikmNek pass QR code. The code should be from their tourist dashboard.</p>
-              </div>
-            </div>
+            <p className="text-sm text-red-700 leading-relaxed">{validityResult.error}</p>
           </div>
 
           <div className="flex items-center gap-3 pb-5">
             <button onClick={handleReset} className="flex-1 py-3.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
               <RotateCcw className="w-5 h-5" />Try Again
-            </button>
-            <button onClick={() => { stopCamera(); onClose(); }} className="flex-1 py-3.5 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 transition-colors">
-              Close
             </button>
           </div>
         </div>
@@ -937,7 +799,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
 
-        {/* Header - only show when not displaying full-bleed results */}
+        {/* Header */}
         {!(result?.success && result?.redemption) && !(result && !result.success) && !(validityResult?.success) && !(validityResult && !validityResult.success) && (
           <div className="flex items-center justify-between p-5 border-b border-gray-100">
             <div className="flex items-center gap-3">
@@ -964,7 +826,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
           </div>
         )}
 
-        {/* Close button for full-bleed result screens */}
+        {/* Close button for result screens */}
         {(hasResult) && (
           <button
             onClick={() => { stopCamera(); onClose(); }}
@@ -998,14 +860,9 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
                 }`}
               >
                 <Eye className="w-3.5 h-3.5" />
-                Check Validity Only
+                Check Validity
               </button>
             </div>
-            {scanPurpose === 'check' && (
-              <p className="text-[10px] text-blue-600 text-center mt-1.5 font-medium">
-                Checks pass & voucher validity without recording a redemption
-              </p>
-            )}
           </div>
         )}
 
@@ -1016,130 +873,68 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
               onClick={() => { setInputMode('camera'); setCameraError(null); }}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all ${
                 inputMode === 'camera'
-                  ? (scanPurpose === 'check' ? 'bg-blue-600 text-white shadow-sm' : 'bg-teal-600 text-white shadow-sm')
+                  ? 'bg-teal-600 text-white shadow-sm'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               <Camera className="w-4 h-4" />
-              Camera Scan
+              Camera
             </button>
             <button
               onClick={() => { stopCamera(); setInputMode('manual'); }}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-all ${
                 inputMode === 'manual'
-                  ? (scanPurpose === 'check' ? 'bg-blue-600 text-white shadow-sm' : 'bg-teal-600 text-white shadow-sm')
+                  ? 'bg-teal-600 text-white shadow-sm'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               <Keyboard className="w-4 h-4" />
-              Manual Entry
+              Manual
             </button>
           </div>
         )}
 
-        {/* Content */}
+        {/* Main Content Area */}
         <div className="p-5">
-          {/* ═══ CAMERA MODE ═══ */}
           {inputMode === 'camera' && !hasResult && !verifying && (
             <div>
               {cameraError ? (
                 <div className="text-center py-8">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
-                    <AlertTriangle className="w-8 h-8 text-red-500" />
-                  </div>
                   <p className="text-sm text-red-600 mb-4">{cameraError}</p>
-                  <div className="flex items-center gap-3 justify-center">
-                    <button onClick={startCamera} className="px-4 py-2 rounded-xl bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors flex items-center gap-2">
-                      <RotateCcw className="w-4 h-4" />Retry
-                    </button>
-                    <button onClick={() => { setInputMode('manual'); setCameraError(null); }} className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200 transition-colors">
-                      Use Manual Entry
-                    </button>
-                  </div>
+                  <button onClick={startCamera} className="px-4 py-2 rounded-xl bg-teal-600 text-white text-sm font-medium">
+                    Retry Camera
+                  </button>
                 </div>
               ) : (
-                <div>
-                  <div className="relative rounded-2xl overflow-hidden bg-black aspect-[4/3]">
-                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                    <canvas ref={canvasRef} className="hidden" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="relative w-48 h-48">
-                        <div className="absolute top-0 left-0 w-8 h-8 border-t-3 border-l-3 border-teal-400 rounded-tl-lg" style={{ borderWidth: '3px' }} />
-                        <div className="absolute top-0 right-0 w-8 h-8 border-t-3 border-r-3 border-teal-400 rounded-tr-lg" style={{ borderWidth: '3px' }} />
-                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-3 border-l-3 border-teal-400 rounded-bl-lg" style={{ borderWidth: '3px' }} />
-                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-3 border-r-3 border-teal-400 rounded-br-lg" style={{ borderWidth: '3px' }} />
-                        <div className="absolute left-2 right-2 h-0.5 bg-teal-400 animate-bounce opacity-75" style={{ top: '50%' }} />
-                      </div>
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent">
-                      <div className="flex items-center justify-center gap-2">
-                        {cameraReady ? (
-                          <>
-                            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                            <span className="text-white text-xs font-medium">
-                              {hasBarcodeDetector ? 'Scanning for QR code...' : 'Camera ready - use manual entry for best results'}
-                            </span>
-                          </>
-                        ) : (
-                          <><Loader2 className="w-4 h-4 text-white animate-spin" /><span className="text-white text-xs">Starting camera...</span></>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {!hasBarcodeDetector && cameraReady && (
-                    <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200">
-                      <p className="text-xs text-amber-700"><strong>Tip:</strong> Your browser doesn't support automatic QR scanning. Ask the tourist to copy their pass code and use the Manual Entry tab.</p>
-                    </div>
-                  )}
+                <div className="relative rounded-2xl overflow-hidden bg-black aspect-[4/3]">
+                  <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                 </div>
               )}
             </div>
           )}
 
-          {/* ═══ MANUAL ENTRY MODE ═══ */}
           {inputMode === 'manual' && !hasResult && !verifying && (
             <form onSubmit={handleManualSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Paste Tourist's Pass Code</label>
-                <textarea
-                  value={manualCode}
-                  onChange={(e) => setManualCode(e.target.value)}
-                  placeholder='Paste the pass code here (e.g. {"type":"stikm_nek_pass",...})'
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none h-32 font-mono text-xs"
-                  autoFocus
-                />
-              </div>
-              <div className="p-3 rounded-xl bg-blue-50 border border-blue-100">
-                <p className="text-xs text-blue-700"><strong>How to get the code:</strong> Ask the tourist to open their dashboard, find their QR code, and tap "Copy pass code" below it. Then paste it here.</p>
-              </div>
+              <textarea
+                value={manualCode}
+                onChange={(e) => setManualCode(e.target.value)}
+                placeholder="Paste code here..."
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm h-32 font-mono"
+              />
               <button
                 type="submit"
                 disabled={!manualCode.trim()}
-                className={`w-full py-3.5 rounded-xl text-white font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  scanPurpose === 'check'
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-200'
-                    : 'bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 shadow-teal-200'
-                }`}
+                className="w-full py-3.5 rounded-xl bg-teal-600 text-white font-bold disabled:opacity-50"
               >
-                {scanPurpose === 'check' ? <Eye className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
-                {scanPurpose === 'check' ? 'Check Voucher Validity' : 'Verify & Redeem Discount'}
+                Verify Code
               </button>
             </form>
           )}
 
-          {/* ═══ VERIFYING STATE (ENHANCED) ═══ */}
           {verifying && renderVerifyingState()}
-
-          {/* ═══ RESULT: VALIDITY CHECK SUCCESS (ENHANCED) ═══ */}
           {validityResult && validityResult.success && renderValiditySuccess()}
-
-          {/* ═══ RESULT: VALIDITY CHECK ERROR (ENHANCED) ═══ */}
           {validityResult && !validityResult.success && renderValidityFailure()}
-
-          {/* ═══ RESULT: REDEEM SUCCESS (ENHANCED) ═══ */}
           {result && result.success && result.redemption && renderRedeemSuccess()}
-
-          {/* ═══ RESULT: REDEEM ERROR (ENHANCED) ═══ */}
           {result && !result.success && renderRedeemFailure()}
         </div>
       </div>
