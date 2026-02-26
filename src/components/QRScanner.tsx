@@ -60,6 +60,7 @@ interface ValidityResult {
     validUntil: string;
     expiresAt: string;
     purchasedAt: string;
+    guest_capacity: number;
   };
   voucher: {
     businessName: string;
@@ -559,7 +560,22 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
                 </div>
               </div>
             </div>
-
+            
+{/* ── Capacity Badge ── */}
+<div className="flex items-center justify-between mt-3 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl">
+  <div className="flex items-center gap-2">
+    <User className="w-4 h-4 text-blue-600" />
+    <span className="text-xs font-bold text-blue-800 uppercase tracking-tight">Pass Capacity</span>
+  </div>
+  <div className="flex items-center gap-1.5">
+    {/* If capacity is > initial (e.g., 6), show a "Bonus" sparkle */}
+    {(validityResult?.pass?.guest_capacity || 0) > 4 && (
+      <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+    )}
+    <span className="text-lg font-black text-blue-700">
+      {validityResult?.pass?.guest_capacity || 4} People
+    </span>
+  </div>
             {/* ── Receipt-style Details ── */}
             <div className="p-4 space-y-3">
               {/* Dashed separator */}
