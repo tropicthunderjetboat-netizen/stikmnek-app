@@ -665,15 +665,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
           </button>
           <button onClick={() => { stopCamera(); onClose(); }} className="flex-1 py-3.5 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 transition-colors">
             Done
-          </button>
-        </div>
+        </button>
       </div>
-  );
-    }; // This closing brace ends the previous function correctly
+    );
+  };
 
-    // ═══ RENDER: FAILURE SCREEN (REDEMPTION) ═══
-    const renderRedeemFailure = () => {
-      if (!result) return null;
+  // ═══ RENDER: FAILURE SCREEN (REDEMPTION) ═══
+  const renderRedeemFailure = () => {
+    if (!result) return null;
     const failConfig = getFailureConfig(result.status || '');
 
     return (
