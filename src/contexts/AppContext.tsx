@@ -35,8 +35,8 @@ interface AppContextType {
   currentView: ViewMode;
   setCurrentView: (view: ViewMode) => void;
   user: User | null;
-  userProfile: UserProfile | null;
   userPass: any;
+  userProfile: UserProfile | null;
   authLoading: boolean;
   signIn: (email: string) => Promise<void>;
   signUp: (email: string, role: 'tourist' | 'business') => Promise<void>;
@@ -165,13 +165,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setAuthLoading(true);
       const { error } = await supabase.auth.signInWithOtp({ email });
       if (error) throw error;
-      toast.success('Login request sent! (Check email/test flow)');
       
-      // Automatic login for development/test if profile exists
       const { data: profile } = await supabase.from('user_profiles').select('*').eq('email', email).maybeSingle();
       if (profile) {
         await loadUserProfile(profile.user_id);
         setCurrentView('dashboard');
+        toast.success('Signed in successfully');
       }
     } catch (err: any) {
       toast.error(err.message);
@@ -186,7 +185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { error } = await supabase.auth.signInWithOtp({ email });
       if (error) throw error;
       await directProfileInsert(email, fullName, 'tourist');
-      toast.success('Account created! Sign in to continue.');
+      toast.success('Account created!');
       setAuthMode('login');
     } catch (err: any) {
       toast.error(err.message);
@@ -212,22 +211,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (user?.id) await loadUserPass(user.id);
   }, [user, loadUserPass]);
 
-  // Mandatory placeholders for context
-  const setLanguage = (lang: Language) => setLanguageState(lang); // Fixed naming
-  const [languageState, setLanguageState] = useState<Language>('en'); 
-  const signUp = async (e: string, r: any) => { /* logic */ };
-  const signUpBusiness = async (e: string, b: string) => { /* logic */ };
-  const updateProfile = async (u: any) => { /* logic */ };
-  const refreshBusinesses = async () => { /* logic */ };
-  const submitReview = async (b: any, r: any, c: any) => { /* logic */ };
-  const requestUserLocation = () => { /* logic */ };
+  const signUp = async (e: string, r: any) => { /* signUp logic */ };
+  const signUpBusiness = async (e: string, b: string) => { /* business logic */ };
+  const updateProfile = async (u: any) => { /* update logic */ };
+  const refreshBusinesses = async () => { /* refresh logic */ };
+  const submitReview = async (b: any, r: any, c: any) => { /* review logic */ };
+  const requestUserLocation = () => { /* location logic */ };
   const getDistanceTo = (lat: number, lng: number) => null;
 
   return (
     <AppContext.Provider
       value={{
-        sidebarOpen, toggleSidebar, language: languageState, setLanguage: setLanguageState,
-        currentView, setCurrentView, user, userProfile, userPass, authLoading,
+        sidebarOpen, toggleSidebar, language, setLanguage,
+        currentView, setCurrentView, user, userPass, userProfile, authLoading,
         signIn, signUp, signUpTourist, signUpBusiness, signOut, updateProfile,
         favorites, toggleFavorite, cart, setCart, purchasePass,
         selectedBusiness, setSelectedBusiness, showAuth, setShowAuth,
