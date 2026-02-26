@@ -13,34 +13,40 @@ import DashboardFeedback from './DashboardFeedback';
 type DashboardTab = 'overview' | 'savings' | 'analytics' | 'feedback';
 
 const Dashboard: React.FC = () => {
+  const context = useAppContext();
+  
+  // Destructure with hard fallbacks just in case
   const {
-    language, user, userPass, userProfile, favorites, redemptions, 
-    dbBusinesses, setSelectedBusiness, setCurrentView, refreshUserPass, setShowQR
-  } = useAppContext();
+    language = 'en',
+    user = null,
+    userPass = null,
+    userProfile = null,
+    favorites = [],
+    redemptions = [],
+    dbBusinesses = [],
+    setSelectedBusiness = () => {},
+    setCurrentView = () => {},
+    refreshUserPass = async () => {},
+    setShowQR = () => {}
+  } = context;
   
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (user?.id) refreshUserPass();
-  }, [user?.id, refreshUserPass]);
+  }, [user?.id]);
 
-  // PRO DATA HANDLING
-  const allBusinesses = (dbBusinesses?.length > 0) ? dbBusinesses : localBusinesses;
-  const favBizs = useMemo(() => 
-    allBusinesses.filter(b => favorites?.includes(b.id))
-  , [allBusinesses, favorites]);
+  // Use Memo for data calculations to prevent flickering and undefined checks
+  const allBusinesses = useMemo(() => (dbBusinesses?.length > 0 ? dbBusinesses : localBusinesses), [dbBusinesses]);
+  const favBizs = useMemo(() => allBusinesses.filter(b => (favorites || []).includes(b.id)), [allBusinesses, favorites]);
+  const totalSaved = useMemo(() => (redemptions || []).reduce((sum, r) => sum + (r.saved || 0), 0), [redemptions]);
 
-  const totalSaved = useMemo(() => 
-    redemptions?.reduce((sum, r) => sum + (r.saved || 0), 0) || 0
-  , [redemptions]);
-
-  // AUTH GUARD: Prevent the rest of the logic from running if user is null
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <RefreshCw className="w-8 h-8 text-teal-600 animate-spin mb-4" />
-        <p className="text-gray-400 text-sm font-medium">Loading Dashboard...</p>
+        <p className="text-gray-400 text-sm font-medium italic">Loading your adventure...</p>
       </div>
     );
   }
@@ -64,7 +70,7 @@ const Dashboard: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
               {language === 'en' ? 'My Dashboard' : 'Mon Tableau de bord'}
             </h1>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 font-medium tracking-tight">
               {userProfile?.name || user.email?.split('@')[0]}
             </p>
           </div>
@@ -74,18 +80,19 @@ const Dashboard: React.FC = () => {
               await refreshUserPass();
               setIsRefreshing(false);
             }}
-            className={`p-2 rounded-full ${isRefreshing ? 'animate-spin text-teal-600' : 'text-gray-400 hover:bg-gray-100'}`}
+            className={`p-2 rounded-full transition-colors ${isRefreshing ? 'animate-spin text-teal-600' : 'text-gray-400 hover:bg-gray-100'}`}
           >
             <RefreshCw className="w-5 h-5" />
           </button>
         </div>
 
+        {/* Tab Nav */}
         <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
           {(['overview', 'savings', 'analytics', 'feedback'] as DashboardTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2 px-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
+              className={`flex-1 py-2.5 px-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
                 activeTab === tab ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -98,10 +105,11 @@ const Dashboard: React.FC = () => {
       <div className="p-6">
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {/* PASS CARD */}
             {userPass ? (
               <div 
                 onClick={() => setShowQR(userPass.id)}
-                className={`relative overflow-hidden rounded-3xl p-6 text-white shadow-xl cursor-pointer bg-gradient-to-br ${passDetails.bg}`}
+                className={`relative overflow-hidden rounded-3xl p-6 text-white shadow-xl cursor-pointer active:scale-[0.98] transition-transform bg-gradient-to-br ${passDetails.bg}`}
               >
                 <div className="relative z-10 flex justify-between items-start mb-6">
                   <div className="flex items-center gap-2">
@@ -120,11 +128,11 @@ const Dashboard: React.FC = () => {
 
                 <div className="mt-8 flex justify-between items-end border-t border-white/20 pt-4 font-mono">
                   <div>
-                    <p className="text-[9px] uppercase opacity-70">Expires</p>
+                    <p className="text-[9px] uppercase opacity-70">Valid Thru</p>
                     <p className="text-xs font-bold">{new Date(userPass.expires_at).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[9px] uppercase opacity-70 italic">Pass ID</p>
+                    <p className="text-[9px] uppercase opacity-70">Pass ID</p>
                     <p className="text-[10px] font-bold">#{userPass.id?.substring(0, 8).toUpperCase()}</p>
                   </div>
                 </div>
@@ -138,6 +146,7 @@ const Dashboard: React.FC = () => {
               </div>
             )}
 
+            {/* QUICK STATS */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
                 <Flame className="w-5 h-5 text-orange-500 mb-2" />
@@ -151,6 +160,7 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* FAVORITES PREVIEW */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
                 <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm uppercase">
