@@ -1,227 +1,148 @@
-import React, { useState, useEffect } from 'react';
-import { useAppContext } from '@/contexts/AppContext';
-import { businesses as localBusinesses } from '@/data/businesses';
-import {
-  Ticket, Heart, QrCode, ChevronRight,
-  LayoutDashboard, PiggyBank, BarChart3,
-  MapPin, Star, Flame, Compass, Users,
-  MessageCircle, Crown, RefreshCw, ShieldCheck
-} from 'lucide-react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { Language } from '@/data/translations';
+import { Business } from '@/data/businesses';
+import { supabase } from '@/lib/supabase';
 
-import QRCodeDisplay from './QRCodeDisplay';
-import SavingsTracker from './SavingsTracker';
-import DashboardFeedback from './DashboardFeedback';
+export type PassType = 
+  | 'Family Explorer Pass' 
+  | 'Extended Group Adventure Pass' 
+  | 'Ultimate Crew Experience Pass' 
+  | null;
 
-type DashboardTab = 'overview' | 'savings' | 'analytics' | 'feedback';
+export type ViewMode = 'home' | 'deals' | 'map' | 'passes' | 'dashboard' | 'admin' | 'business-detail' | 'checkout' | 'business-dashboard';
 
-const Dashboard: React.FC = () => {
-  // 1. Destructure with extreme safety (null checks + defaults)
-  const context = useAppContext();
-  
-  const {
-    language = 'en',
-    user = null,
-    userPass = null,
-    userProfile = null,
-    favorites = [],
-    redemptions = [],
-    dbBusinesses = [],
-    setSelectedBusiness = () => {},
-    setCurrentView = () => {},
-    refreshUserPass = async () => {},
-    setShowQR = () => {}
-  } = context || {};
-  
-  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
-  const [isRefreshing, setIsRefreshing] = useState(false);
+export interface UserProfile {
+  id: string;
+  user_id: string;
+  name: string | null;
+  email: string | null;
+  role: 'tourist' | 'business' | 'admin';
+}
+
+interface User {
+  id: string;
+  email: string;
+  role: 'tourist' | 'business' | 'admin';
+}
+
+interface AppContextType {
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  currentView: ViewMode;
+  setCurrentView: (view: ViewMode) => void;
+  user: User | null;
+  userPass: any;
+  userProfile: UserProfile | null;
+  authLoading: boolean;
+  signIn: (email: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  favorites: string[];
+  toggleFavorite: (id: string) => void;
+  showQR: string | null;
+  setShowQR: (id: string | null) => void;
+  refreshUserPass: () => Promise<void>;
+  redemptions: any[];
+  dbBusinesses: Business[];
+  setSelectedBusiness: (business: Business | null) => void;
+}
+
+const AppContext = createContext<AppContextType | undefined>(undefined);
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [language, setLanguage] = useState<Language>('en');
+  const [currentView, setCurrentView] = useState<ViewMode>('home');
+  const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userPass, setUserPass] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [showQR, setShowQR] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [redemptions, setRedemptions] = useState<any[]>([]);
+  const [dbBusinesses, setDbBusinesses] = useState<Business[]>([]);
+  const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
+
+  const loadUserPass = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('user_passes')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setUserPass(data || null);
+  }, []);
+
+  const loadUserProfile = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (data) {
+      setUserProfile(data);
+      setUser({ id: userId, email: data.email || '', role: data.role || 'tourist' });
+      await loadUserPass(userId);
+    }
+  }, [loadUserPass]);
 
   useEffect(() => {
-    if (user?.id) {
-      refreshUserPass();
-    }
-  }, [user?.id]);
-
-  // 2. The "Bridge" Guard - If auth is still thinking, show the spinner
-  if (!user) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
-        <RefreshCw className="w-10 h-10 text-teal-600 animate-spin mb-4" />
-        <p className="text-gray-500 font-medium">Loading your Vanuatu experience...</p>
-      </div>
-    );
-  }
-
-  const allBusinesses = (dbBusinesses && dbBusinesses.length > 0) ? dbBusinesses : localBusinesses;
-  const favBizs = allBusinesses.filter(b => favorites.includes(b.id));
-  const totalSaved = redemptions.reduce((sum: number, r: any) => sum + (r.saved || 0), 0);
-
-  // 3. Branded Pass Logic - Strictly using your names
-  const getPassDetails = (passType: string | null) => {
-    const type = (passType || '').toLowerCase();
-    if (type.includes('family') || type.includes('explorer')) {
-      return { 
-        name: 'Family Explorer Pass', 
-        bg: 'from-teal-400 to-emerald-600', 
-        icon: <Compass className="w-6 h-6 text-white" /> 
-      };
-    }
-    if (type.includes('extended') || type.includes('adventure')) {
-      return { 
-        name: 'Extended Group Adventure Pass', 
-        bg: 'from-blue-500 to-indigo-700', 
-        icon: <Users className="w-6 h-6 text-white" /> 
-      };
-    }
-    if (type.includes('ultimate') || type.includes('crew')) {
-      return { 
-        name: 'Ultimate Crew Experience Pass', 
-        bg: 'from-purple-500 via-fuchsia-600 to-pink-600', 
-        icon: <Crown className="w-6 h-6 text-white" /> 
-      };
-    }
-    return { 
-      name: 'Vanuatu Experience Pass', 
-      bg: 'from-gray-700 to-black', 
-      icon: <Ticket className="w-6 h-6 text-white" /> 
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) await loadUserProfile(session.user.id);
+      setAuthLoading(false);
     };
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        await loadUserProfile(session.user.id);
+        if (event === 'SIGNED_IN') setCurrentView('dashboard');
+      } else {
+        setUser(null);
+        setUserPass(null);
+        setUserProfile(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadUserProfile]);
+
+  const signIn = async (email: string) => {
+    const { error } = await supabase.auth.signInWithOtp({ 
+      email, 
+      options: { emailRedirectTo: window.location.origin } 
+    });
+    if (error) toast.error(error.message);
+    else toast.success('Check your email!');
   };
 
-  const passDetails = getPassDetails(userPass?.pass_type);
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setCurrentView('home');
+    window.location.reload();
+  };
+
+  const refreshUserPass = async () => {
+    if (user?.id) await loadUserPass(user.id);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
-      <div className="bg-white px-6 pt-8 pb-6 border-b border-gray-100">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {language === 'en' ? 'My Dashboard' : 'Mon Tableau de bord'}
-            </h1>
-            <p className="text-sm text-gray-500">
-              {userProfile?.name || user.email?.split('@')[0]}
-            </p>
-          </div>
-          <button 
-            onClick={() => {
-              setIsRefreshing(true);
-              refreshUserPass().finally(() => setIsRefreshing(false));
-            }}
-            className={`p-2 rounded-full hover:bg-gray-100 ${isRefreshing ? 'animate-spin text-teal-600' : 'text-gray-400'}`}
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl overflow-x-auto no-scrollbar">
-          {(['overview', 'savings', 'analytics', 'feedback'] as DashboardTab[]).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition-all ${
-                activeTab === tab ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500'
-              }`}
-            >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="p-6">
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            {userPass ? (
-              <div 
-                onClick={() => setShowQR(userPass.id)}
-                className={`relative overflow-hidden rounded-3xl p-6 text-white shadow-xl cursor-pointer bg-gradient-to-br ${passDetails.bg}`}
-              >
-                <div className="relative flex justify-between items-start mb-6">
-                  <div className="flex items-center gap-2">
-                    {passDetails.icon}
-                    <span className="text-[10px] font-black tracking-widest uppercase opacity-90">{passDetails.name}</span>
-                  </div>
-                  <ShieldCheck className="w-5 h-5 opacity-50" />
-                </div>
-
-                <div className="relative bg-white p-3 rounded-2xl mx-auto w-40 h-40 flex items-center justify-center shadow-inner">
-                  <QRCodeDisplay value={userPass.id} size={130} />
-                  <div className="absolute -bottom-2 bg-teal-600 text-[9px] px-3 py-1 rounded-full font-bold border-2 border-white shadow-md">
-                    TAP TO SCAN
-                  </div>
-                </div>
-
-                <div className="mt-8 flex justify-between items-end border-t border-white/20 pt-4 font-mono">
-                  <div>
-                    <p className="text-[9px] uppercase opacity-70 italic">Expires</p>
-                    <p className="text-xs font-bold">{new Date(userPass.expires_at).toLocaleDateString()}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[9px] uppercase opacity-70 italic">Pass ID</p>
-                    <p className="text-[10px] font-bold">#{userPass.id?.substring(0, 8).toUpperCase()}</p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-3xl p-8 text-center border-2 border-dashed border-gray-200 shadow-sm">
-                <Ticket className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-                <h3 className="font-bold text-gray-800">No Active Pass</h3>
-                <p className="text-xs text-gray-500 mt-1 mb-4 text-balance">Unlock massive savings across Vanuatu with an Adventure Pass.</p>
-                <button 
-                  onClick={() => setCurrentView('passes')}
-                  className="bg-teal-600 text-white px-8 py-3 rounded-xl font-bold text-sm shadow-lg shadow-teal-100 active:scale-95 transition-transform"
-                >
-                  View Pass Options
-                </button>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white p-4 rounded-2xl border border-gray-100">
-                <Flame className="w-5 h-5 text-orange-500 mb-1" />
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Visits</p>
-                <p className="text-xl font-black">{redemptions.length}</p>
-              </div>
-              <div className="bg-white p-4 rounded-2xl border border-gray-100">
-                <PiggyBank className="w-5 h-5 text-green-500 mb-1" />
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Saved</p>
-                <p className="text-xl font-black">{totalSaved} VT</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm">
-                  <Heart className="w-4 h-4 text-red-500 fill-red-500" />
-                  Your Favorites
-                </h3>
-              </div>
-              {favBizs.length > 0 ? (
-                <div className="divide-y divide-gray-50">
-                  {favBizs.map(biz => (
-                    <div key={biz.id} onClick={() => { setSelectedBusiness(biz); setCurrentView('business-detail'); }} className="flex items-center gap-4 p-4 cursor-pointer hover:bg-gray-50">
-                      <img src={biz.image} className="w-10 h-10 rounded-lg object-cover bg-gray-100" />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-xs text-gray-900 truncate">{biz.name}</h4>
-                        <p className="text-[10px] text-gray-400 truncate">{biz.location}</p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-300" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-8 text-center text-gray-400 text-[10px] uppercase font-bold tracking-widest">
-                  Nothing saved yet
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'savings' && <SavingsTracker />}
-        {activeTab === 'feedback' && <DashboardFeedback />}
-      </div>
-    </div>
+    <AppContext.Provider value={{
+      language, setLanguage, currentView, setCurrentView, user, userPass, 
+      userProfile, authLoading, signIn, signOut, favorites, 
+      toggleFavorite: (id) => setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]),
+      showQR, setShowQR, refreshUserPass, redemptions, dbBusinesses, setSelectedBusiness
+    }}>
+      {children}
+    </AppContext.Provider>
   );
 };
 
-export default Dashboard;
+export const useAppContext = () => {
+  const context = useContext(AppContext);
+  if (!context) throw new Error('useAppContext must be used within AppProvider');
+  return context;
+};
