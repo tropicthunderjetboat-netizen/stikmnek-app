@@ -86,6 +86,7 @@ interface AppContextType {
   currentView: ViewMode;
   setCurrentView: (view: ViewMode) => void;
   user: User | null;
+  userPass: any;
   userProfile: UserProfile | null;
   authLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -134,7 +135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [language, setLanguage] = useState<Language>('en');
   const [currentView, setCurrentView] = useState<ViewMode>('home');
 
-  const [user, setUser] = useState<User | null>(null);
+  const [userPass, setUserPass] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
