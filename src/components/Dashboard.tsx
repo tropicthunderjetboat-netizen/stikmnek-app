@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as localBusinesses } from '@/data/businesses';
 import {
-  Ticket, Heart, QrCode, ChevronRight,
-  LayoutDashboard, PiggyBank, BarChart3,
-  MapPin, Star, Flame, Compass, Users,
-  MessageCircle, Crown, RefreshCw, ShieldCheck
+  Ticket, Heart, ChevronRight, PiggyBank, 
+  Flame, Compass, Users, Crown, RefreshCw, ShieldCheck
 } from 'lucide-react';
 
 import QRCodeDisplay from './QRCodeDisplay';
@@ -16,15 +14,16 @@ type DashboardTab = 'overview' | 'savings' | 'analytics' | 'feedback';
 
 const Dashboard: React.FC = () => {
   const context = useAppContext();
-  
+
+  // DEFENSIVE DESTRUCTURING: If context is missing, these defaults prevent the crash
   const {
     language = 'en',
     user = null,
     userPass = null,
     userProfile = null,
-    favorites = [],
-    redemptions = [],
-    dbBusinesses = [],
+    favorites = [],     // Forced default empty array
+    redemptions = [],   // Forced default empty array
+    dbBusinesses = [],  // Forced default empty array
     setSelectedBusiness = () => {},
     setCurrentView = () => {},
     refreshUserPass = async () => {},
@@ -35,46 +34,42 @@ const Dashboard: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    if (user?.id) {
-      refreshUserPass();
-    }
-  }, [user?.id, refreshUserPass]);
+    if (user?.id) refreshUserPass();
+  }, [user?.id]);
 
+  // Use useMemo to prevent re-calculating on every flicker
+  const totalSaved = useMemo(() => 
+    redemptions.reduce((sum: number, r: any) => sum + (r.saved || 0), 0)
+  , [redemptions]);
+
+  // AUTH GUARD: Show spinner instead of crashing if user isn't loaded
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
         <RefreshCw className="w-10 h-10 text-teal-600 animate-spin mb-4" />
-        <p className="text-gray-500 font-medium">Loading your dashboard...</p>
+        <p className="text-gray-500 font-medium italic">Authenticating...</p>
       </div>
     );
   }
 
-  const allBusinesses = (dbBusinesses && dbBusinesses.length > 0) ? dbBusinesses : localBusinesses;
-  const favBizs = allBusinesses.filter(b => favorites.includes(b.id));
-  const totalSaved = redemptions.reduce((sum: number, r: any) => sum + (r.saved || 0), 0);
-
+  // BRANDED PASS LOGIC
   const getPassDetails = (passType: string | null) => {
     const type = (passType || '').toLowerCase();
-    if (type.includes('family') || type.includes('explorer')) {
-      return { name: 'Family Explorer Pass', bg: 'from-teal-400 to-emerald-600', icon: <Compass className="w-6 h-6 text-white" /> };
-    }
-    if (type.includes('extended') || type.includes('adventure')) {
-      return { name: 'Extended Group Adventure Pass', bg: 'from-blue-500 to-indigo-700', icon: <Users className="w-6 h-6 text-white" /> };
-    }
-    if (type.includes('ultimate') || type.includes('crew')) {
-      return { name: 'Ultimate Crew Experience Pass', bg: 'from-purple-500 via-fuchsia-600 to-pink-600', icon: <Crown className="w-6 h-6 text-white" /> };
-    }
-    return { name: 'Vanuatu Experience Pass', bg: 'from-gray-700 to-black', icon: <Ticket className="w-6 h-6 text-white" /> };
+    if (type.includes('family')) return { name: 'Family Explorer Pass', bg: 'from-teal-400 to-emerald-600', icon: <Compass className="w-6 h-6 text-white" /> };
+    if (type.includes('extended')) return { name: 'Extended Group Adventure Pass', bg: 'from-blue-500 to-indigo-700', icon: <Users className="w-6 h-6 text-white" /> };
+    if (type.includes('ultimate')) return { name: 'Ultimate Crew Experience Pass', bg: 'from-purple-500 via-fuchsia-600 to-pink-600', icon: <Crown className="w-6 h-6 text-white" /> };
+    return { name: 'Vanuatu Experience Pass', bg: 'from-gray-800 to-black', icon: <Ticket className="w-6 h-6 text-white" /> };
   };
 
   const passDetails = getPassDetails(userPass?.pass_type);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
+      {/* Header */}
       <div className="bg-white px-6 pt-8 pb-6 border-b border-gray-100">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
               {language === 'en' ? 'My Dashboard' : 'Mon Tableau de bord'}
             </h1>
             <p className="text-sm text-gray-500">
@@ -86,22 +81,23 @@ const Dashboard: React.FC = () => {
               setIsRefreshing(true);
               refreshUserPass().finally(() => setIsRefreshing(false));
             }}
-            className={`p-2 rounded-full ${isRefreshing ? 'animate-spin text-teal-600' : 'text-gray-400'}`}
+            className={`p-2 rounded-full transition-colors ${isRefreshing ? 'animate-spin text-teal-600' : 'text-gray-400'}`}
           >
             <RefreshCw className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl overflow-x-auto no-scrollbar">
+        {/* Tab Navigation */}
+        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl">
           {(['overview', 'savings', 'analytics', 'feedback'] as DashboardTab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2 px-4 rounded-lg text-xs font-bold transition-all ${
+              className={`flex-1 py-2 px-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
                 activeTab === tab ? 'bg-white text-teal-600 shadow-sm' : 'text-gray-500'
               }`}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab}
             </button>
           ))}
         </div>
@@ -110,6 +106,7 @@ const Dashboard: React.FC = () => {
       <div className="p-6">
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {/* BRANDED PASS CARD */}
             {userPass ? (
               <div 
                 onClick={() => setShowQR(userPass.id)}
@@ -132,7 +129,7 @@ const Dashboard: React.FC = () => {
 
                 <div className="mt-8 flex justify-between items-end border-t border-white/20 pt-4 font-mono">
                   <div>
-                    <p className="text-[9px] uppercase opacity-70">Expires</p>
+                    <p className="text-[9px] uppercase opacity-70">Valid Thru</p>
                     <p className="text-xs font-bold">{new Date(userPass.expires_at).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
@@ -144,15 +141,13 @@ const Dashboard: React.FC = () => {
             ) : (
               <div className="bg-white rounded-3xl p-8 text-center border-2 border-dashed border-gray-200">
                 <Ticket className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-                <button 
-                  onClick={() => setCurrentView('passes')}
-                  className="bg-teal-600 text-white px-8 py-3 rounded-xl font-bold"
-                >
-                  View Passes
+                <button onClick={() => setCurrentView('passes')} className="bg-teal-600 text-white px-8 py-3 rounded-xl font-bold">
+                  Explore Passes
                 </button>
               </div>
             )}
 
+            {/* QUICK STATS */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
                 <Flame className="w-5 h-5 text-orange-500 mb-1" />
