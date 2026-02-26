@@ -288,29 +288,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loadUserPass = useCallback(async (userId: string) => {
     try {
+      console.log('Fetching pass for user:', userId);
       const { data, error } = await supabase
-        .from('passes')
+        .from('user_passes')
         .select('*')
         .eq('user_id', userId)
-        .eq('active', true)
-        .order('purchased_at', { ascending: false })
-        .limit(1);
-      if (error) throw error;
-      if (data && data.length > 0) {
-        const pass = data[0];
-        const expiry = new Date(pass.expires_at);
-        if (expiry > new Date()) {
-          const validFrom = pass.valid_from ? new Date(pass.valid_from).toISOString().split('T')[0] : null;
-          const validUntil = pass.valid_until ? new Date(pass.valid_until).toISOString().split('T')[0] : null;
-          setUser(prev => prev ? {
-            ...prev,
-            pass: pass.pass_type as PassType,
-            passId: pass.id,
-            passExpiry: expiry.toISOString().split('T')[0],
-            passValidFrom: validFrom,
-            passValidUntil: validUntil,
-          } : null);
-        }
+        .eq('is_active', true) // Updated from 'active' to 'is_active'
+        .order('created_at', { ascending: false }) // Updated from 'purchased_at'
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Supabase error fetching pass:', error);
+        return;
+      }
+
+      if (data) {
+        console.log('Pass found:', data);
+        // Set the dedicated userPass state
+        setUserPass(data);
+        
+        // Also update the user object for legacy support in other components
+        setUser(prev => prev ? {
+          ...prev,
+          pass: data.pass_type as PassType,
+          passId: data.id,
+          passExpiry: data.valid_until,
+          passValidFrom: data.valid_from,
+          passValidUntil: data.valid_until,
+        } : null);
+      } else {
+        console.log('No active pass found in database for this user.');
+        setUserPass(null);
       }
     } catch (err) {
       console.error('Failed to load pass:', err);
@@ -1083,7 +1092,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         sidebarOpen, toggleSidebar,
         language, setLanguage,
         currentView, setCurrentView,
-        user, userProfile, authLoading, signIn, signUp, signUpTourist, signUpBusiness, signOut,
+        user, userPass, userProfile, authLoading, signIn, signUp, signUpTourist, signUpBusiness, signOut,
         updateProfile,
         favorites, toggleFavorite,
         cart, setCart,
