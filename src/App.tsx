@@ -43,5 +43,3 @@ const App = () => (
     </ThemeProvider>
   </ErrorBoundary>
 );
-
-export default App;
