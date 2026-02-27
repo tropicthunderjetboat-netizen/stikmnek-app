@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { AppProvider } from "@/contexts/AppContext";
+import { AppProvider } from "@/contexts/AppContext"; // Import stays here
 import React, { Suspense } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -17,6 +17,7 @@ const App = () => (
   <ErrorBoundary>
     <ThemeProvider defaultTheme="light">
       <QueryClientProvider client={queryClient}>
+        {/* FIX: AppProvider MUST wrap everything to manage Supabase locks correctly */}
         <AppProvider> 
           <TooltipProvider>
             <Toaster />
