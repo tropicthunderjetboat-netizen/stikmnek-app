@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,30 +18,29 @@ const App = () => (
   <ErrorBoundary>
     <ThemeProvider defaultTheme="light">
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route
-                path="/diagnostics"
-                element={
-                  <AppProvider>
+        <AppProvider> {/* Wrap at the TOP level */}
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route
+                  path="/diagnostics"
+                  element={
                     <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading diagnostics...</div>}>
                       <DiagnosticPanel />
                     </Suspense>
-                  </AppProvider>
-                }
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+                  }
+                />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </AppProvider>
       </QueryClientProvider>
     </ThemeProvider>
   </ErrorBoundary>
 );
 
 export default App;
-
