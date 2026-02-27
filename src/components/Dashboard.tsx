@@ -1,4 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+const Dashboard: React.FC = () => {
+  const context = useAppContext();
+  
+  // THE SAFETY ROLLBACK GUARD
+  if (!context) return null;
+
+  const {
+    language, user, userPass, favorites, redemptions, 
+    setSelectedBusiness, setCurrentView, dbBusinesses, refreshUserPass
+  } = context;
+
+  // Re-establish stable data arrays
+  const allBusinesses = (dbBusinesses && dbBusinesses.length > 0) ? dbBusinesses : localBusinesses;
+  const favBizs = (allBusinesses || []).filter(b => (favorites || []).includes(b.id));
+
+  // ... rest of original component
+  
+  import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as localBusinesses } from '@/data/businesses';
 import {
