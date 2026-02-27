@@ -8,7 +8,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { AppProvider } from "@/contexts/AppContext";
 import React, { Suspense } from "react";
 import Index from "./pages/Index";
-import Dashboard from "./components/Dashboard";
+import Dashboard from "./components/Dashboard"; // Pointed to components folder
 import NotFound from "./pages/NotFound";
 
 const DiagnosticPanel = React.lazy(() => import("./components/DiagnosticPanel"));
