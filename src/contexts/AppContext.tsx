@@ -42,29 +42,7 @@ interface AppContextType {
   setSelectedBusiness: (b: Business | null) => void;
 }
 
-const defaultContext: AppContextType = {
-  language: 'en',
-  setLanguage: () => {},
-  currentView: 'home',
-  setCurrentView: () => {},
-  user: null,
-  userPass: null,
-  userProfile: null,
-  authLoading: true,
-  signIn: async () => {},
-  signOut: async () => {},
-  favorites: [],
-  toggleFavorite: () => {},
-  showQR: null,
-  setShowQR: () => {},
-  refreshUserPass: async () => {},
-  redemptions: [],
-  dbBusinesses: [],
-  selectedBusiness: null,
-  setSelectedBusiness: () => {},
-};
-
-const AppContext = createContext<AppContextType>(defaultContext);
+const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('en');
@@ -86,17 +64,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .eq('user_id', userId)
       .eq('status', 'active')
       .maybeSingle();
-    
     if (!error && data) setUserPass(data);
   }, []);
 
   const loadUserProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-    
+    const { data } = await supabase.from('profiles').select('*').eq('user_id', userId).single();
     if (data) {
       setUserProfile(data);
       setUser({ id: userId, email: data.email || '', role: data.role });
@@ -110,7 +82,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (session?.user) loadUserProfile(session.user.id);
       else setAuthLoading(false);
     });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         await loadUserProfile(session.user.id);
@@ -143,17 +114,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{
       language, setLanguage, currentView, setCurrentView, user, userPass, 
-      userProfile, authLoading, signIn, signOut, 
-      favorites: favorites || [], 
-      toggleFavorite: (id) => setFavorites(prev => (prev || []).includes(id) ? prev.filter(f => f !== id) : [...(prev || []), id]),
-      showQR, setShowQR, refreshUserPass, 
-      redemptions: redemptions || [], 
-      dbBusinesses: dbBusinesses || [], 
-      selectedBusiness, setSelectedBusiness
+      userProfile, authLoading, signIn, signOut, favorites, 
+      toggleFavorite: (id) => setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]),
+      showQR, setShowQR, refreshUserPass, redemptions, dbBusinesses, selectedBusiness, setSelectedBusiness
     }}>
       {children}
     </AppContext.Provider>
   );
 };
 
-export const useAppContext = () => useContext(AppContext);
+export const useAppContext = () => {
+  const context = useContext(AppContext);
+  if (context === undefined) throw new Error('useAppContext must be used within an AppProvider');
+  return context;
+};
