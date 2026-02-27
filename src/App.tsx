@@ -11,14 +11,13 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 const DiagnosticPanel = React.lazy(() => import("./components/DiagnosticPanel"));
-
 const queryClient = new QueryClient();
 
 const App = () => (
   <ErrorBoundary>
     <ThemeProvider defaultTheme="light">
       <QueryClientProvider client={queryClient}>
-        <AppProvider> {/* Wrap at the TOP level */}
+        <AppProvider> 
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -28,7 +27,7 @@ const App = () => (
                 <Route
                   path="/diagnostics"
                   element={
-                    <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading diagnostics...</div>}>
+                    <Suspense fallback={<div className="p-10 text-center">Loading...</div>}>
                       <DiagnosticPanel />
                     </Suspense>
                   }
