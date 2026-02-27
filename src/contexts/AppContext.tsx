@@ -137,21 +137,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  const sessionProcessedRef = useRef(false);
-  const lastDbResolvedRoleRef = useRef<'tourist' | 'business' | 'admin' | null>(null);
-  const signInCooldownRef = useRef<number>(0);
   const authProcessingRef = useRef<boolean>(false);
+  const sessionProcessedRef = useRef(false);
 
-  // HELPER FUNCTIONS
   const toggleSidebar = () => setSidebarOpen(prev => !prev);
-  const extractRole = (p: any): 'tourist' | 'business' | 'admin' => (p.user_type || p.role || 'tourist') as any;
-  const extractName = (p: any, email?: string): string => p.name || p.full_name || p.display_name || email?.split('@')[0] || 'User';
 
   const requestUserLocation = useCallback(() => {
     if (!navigator.geolocation) return setLocationError('Geolocation not supported');
     setLocationLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => { setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, timestamp: pos.timestamp }); setLocationLoading(false); },
+      (pos) => { 
+        setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, timestamp: pos.timestamp }); 
+        setLocationLoading(false); 
+      },
       (err) => { setLocationLoading(false); setLocationError(err.message); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -163,58 +161,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [userLocation]);
 
   const loadBusinesses = useCallback(async () => {
-    try {
-      const { data } = await supabase.from('businesses').select('*').order('featured', { ascending: false });
-      if (data) setDbBusinesses(data.map((b: any) => ({ ...b, id: b.id, name: b.name, category: b.category })));
-      setDataLoaded(true);
-    } catch (e) { setDataLoaded(true); }
+    const { data } = await supabase.from('businesses').select('*').order('featured', { ascending: false });
+    if (data) setDbBusinesses(data as any);
+    setDataLoaded(true);
   }, []);
 
-  const loadReviews = useCallback(async () => {
-    const { data } = await supabase.from('reviews').select('*').order('created_at', { ascending: false });
-    if (data) setDbReviews(data as any);
-  }, []);
-
-  const loadUserData = useCallback(async (userId: string) => {
-    const { data: favs } = await supabase.from('favorites').select('business_id').eq('user_id', userId);
-    if (favs) setFavorites(favs.map(f => f.business_id));
-    const { data: reds } = await supabase.from('redemptions').select('*').eq('user_id', userId);
-    if (reds) setRedemptions(reds.map(r => ({ businessId: r.business_id, date: r.redeemed_at, saved: r.saved_amount })));
-  }, []);
-
-  const resolveRole = useCallback(async (userId: string, email: string): Promise<{role: any, profile: any}> => {
-    if (ADMIN_EMAILS.includes(email.toLowerCase())) return { role: 'admin', profile: null };
-    try {
-      const { data } = await supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle();
-      return { role: data ? extractRole(data) : 'tourist', profile: data };
-    } catch { return { role: 'tourist', profile: null }; }
-  }, []);
-
-  // CRITICAL FIX: Added finally block to prevent the sign-in hang
   const handleAuthenticatedUser = useCallback(async (authUser: any, shouldRedirect: boolean) => {
     if (authProcessingRef.current && !shouldRedirect) return;
     authProcessingRef.current = true;
     setAuthLoading(true);
     try {
-      const { role, profile } = await resolveRole(authUser.id, authUser.email || '');
-      setUser({ id: authUser.id, name: extractName(profile || {}, authUser.email), email: authUser.email, type: role } as any);
+      const { data: profile } = await supabase.from('user_profiles').select('*').eq('user_id', authUser.id).maybeSingle();
+      const role = profile?.user_type || profile?.role || 'tourist';
+      setUser({ id: authUser.id, name: profile?.name || authUser.email.split('@')[0], email: authUser.email, type: role } as any);
       setUserProfile(profile);
-      loadUserData(authUser.id);
       if (shouldRedirect) setCurrentView(role === 'admin' ? 'admin' : role === 'business' ? 'business-dashboard' : 'dashboard');
     } finally {
       authProcessingRef.current = false;
-      setAuthLoading(false); // FORCES HANG TO END
+      setAuthLoading(false);
     }
-  }, [resolveRole, loadUserData]);
+  }, []);
 
   useEffect(() => {
-    loadBusinesses(); loadReviews();
+    loadBusinesses();
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') { setUser(null); setUserProfile(null); setAuthLoading(false); }
       else if (session?.user) await handleAuthenticatedUser(session.user, event === 'SIGNED_IN');
       else setAuthLoading(false);
     });
-    return () => subscription.unsubscribe();
+
+    const safetyTimer = setTimeout(() => setAuthLoading(false), 8000);
+    return () => { subscription.unsubscribe(); clearTimeout(safetyTimer); };
   }, [handleAuthenticatedUser]);
 
   const signIn = async (email: string, password: string) => {
@@ -240,7 +217,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const purchasePass = (type: any) => { setCart({ passType: type, price: 0 }); setCurrentView('checkout'); };
   const submitReview = async (bizId: string, rating: number, comment: string) => {
     await supabase.from('reviews').insert({ business_id: bizId, user_id: user?.id, rating, comment });
-    loadReviews();
   };
 
   return (
