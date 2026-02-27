@@ -39,10 +39,9 @@ interface AppContextType {
   redemptions: any[];
   dbBusinesses: Business[];
   selectedBusiness: Business | null;
-  setSelectedBusiness: (business: Business | null) => void;
+  setSelectedBusiness: (b: Business | null) => void;
 }
 
-// 1. Define the default state explicitly
 const defaultContext: AppContextType = {
   language: 'en',
   setLanguage: () => {},
@@ -71,47 +70,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [language, setLanguage] = useState<Language>('en');
   const [currentView, setCurrentView] = useState<ViewMode>('home');
   const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userPass, setUserPass] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [showQR, setShowQR] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [redemptions, setRedemptions] = useState<any[]>([]);
   const [dbBusinesses, setDbBusinesses] = useState<Business[]>([]);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
+  const [showQR, setShowQR] = useState<string | null>(null);
 
   const loadUserPass = useCallback(async (userId: string) => {
-    try {
-      const { data } = await supabase
-        .from('user_passes')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      setUserPass(data || null);
-    } catch (e) { console.error(e); }
+    const { data, error } = await supabase
+      .from('user_passes')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle();
+    
+    if (!error && data) setUserPass(data);
   }, []);
 
   const loadUserProfile = useCallback(async (userId: string) => {
-    try {
-      const { data } = await supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle();
-      if (data) {
-        setUserProfile(data);
-        setUser({ id: userId, email: data.email || '', role: data.role || 'tourist' });
-        await loadUserPass(userId);
-      }
-    } catch (e) { console.error(e); }
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+    
+    if (data) {
+      setUserProfile(data);
+      setUser({ id: userId, email: data.email || '', role: data.role });
+      await loadUserPass(userId);
+    }
+    setAuthLoading(false);
   }, [loadUserPass]);
 
   useEffect(() => {
-    const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) await loadUserProfile(session.user.id);
-      setAuthLoading(false);
-    };
-    initAuth();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) loadUserProfile(session.user.id);
+      else setAuthLoading(false);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
@@ -144,14 +142,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      ...defaultContext, // Fallback base
       language, setLanguage, currentView, setCurrentView, user, userPass, 
       userProfile, authLoading, signIn, signOut, 
-      favorites: favorites ?? [], 
-      redemptions: redemptions ?? [], 
-      dbBusinesses: dbBusinesses ?? [],
-      toggleFavorite: (id) => setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]),
-      showQR, setShowQR, refreshUserPass, selectedBusiness, setSelectedBusiness
+      favorites: favorites || [], 
+      toggleFavorite: (id) => setFavorites(prev => (prev || []).includes(id) ? prev.filter(f => f !== id) : [...(prev || []), id]),
+      showQR, setShowQR, refreshUserPass, 
+      redemptions: redemptions || [], 
+      dbBusinesses: dbBusinesses || [], 
+      selectedBusiness, setSelectedBusiness
     }}>
       {children}
     </AppContext.Provider>
