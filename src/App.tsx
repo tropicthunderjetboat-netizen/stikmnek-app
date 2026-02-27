@@ -2,17 +2,16 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { AppProvider } from "@/contexts/AppContext";
 import React, { Suspense } from "react";
 import Index from "./pages/Index";
-import Dashboard from "./pages/Dashboard";
+import Dashboard from "./components/Dashboard";
 import NotFound from "./pages/NotFound";
 
 const DiagnosticPanel = React.lazy(() => import("./components/DiagnosticPanel"));
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -30,7 +29,7 @@ const App = () => (
                 <Route
                   path="/diagnostics"
                   element={
-                    <Suspense fallback={<div className="min-h-screen bg-gray-950 flex items-center justify-center text-white">Loading diagnostics...</div>}>
+                    <Suspense fallback={<div className="text-white">Loading...</div>}>
                       <DiagnosticPanel />
                     </Suspense>
                   }
