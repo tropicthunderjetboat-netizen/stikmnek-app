@@ -10,18 +10,58 @@ const ADMIN_EMAILS = ['admin@stikmnek.com', 'nzboardtours@yahoo.com'];
 
 export type ViewMode = 'home' | 'deals' | 'map' | 'passes' | 'dashboard' | 'admin' | 'business-detail' | 'checkout' | 'payment-confirmation' | 'business-dashboard' | 'help';
 export type PassType = 'daily' | 'weekly' | 'monthly' | null;
-export type UserRole = 'tourist' | 'business' | 'admin';
 
 export interface UserProfile {
   id: string;
   user_id: string;
   name: string | null;
   full_name: string | null;
-  email: string | null;
-  role: UserRole;
+  user_type: string | null;
+  role: 'tourist' | 'business' | 'admin';
+  display_name: string;
+  email: string;
+  phone: string;
   avatar_url: string | null;
-  pass_type: PassType;
-  pass_expiry: string | null;
+  business_name: string | null;
+  business_category: string | null;
+  business_description: string | null;
+  business_location: string | null;
+  business_phone: string | null;
+  business_email: string | null;
+  business_hours: string | null;
+  home_country: string | null;
+  travel_dates: string | null;
+  onboarding_complete: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  type: 'tourist' | 'business' | 'admin';
+  pass: PassType;
+  passId: string | null;
+  passExpiry: string | null;
+  passValidFrom: string | null;
+  passValidUntil: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface CartItem {
+  passType: 'daily' | 'weekly' | 'monthly';
+  price: number;
+}
+
+export interface DBReview {
+  id: string;
+  business_id: string;
+  user_name: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  has_super_star?: boolean;
 }
 
 interface AppContextType {
@@ -31,36 +71,36 @@ interface AppContextType {
   setLanguage: (lang: Language) => void;
   currentView: ViewMode;
   setCurrentView: (view: ViewMode) => void;
-  user: any;
+  user: User | null;
   userProfile: UserProfile | null;
   authLoading: boolean;
-  signIn: (email: string, pass: string) => Promise<void>;
-  signUp: (email: string, pass: string, fullName: string) => Promise<void>;
-  signUpTourist: (email: string, pass: string, fullName: string) => Promise<void>;
-  signUpBusiness: (email: string, pass: string, bizName: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string, type: 'tourist' | 'business') => Promise<void>;
+  signUpTourist: (name: string, email: string, password: string) => Promise<void>;
+  signUpBusiness: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   favorites: string[];
   toggleFavorite: (id: string) => void;
-  cart: any[];
-  setCart: React.Dispatch<React.SetStateAction<any[]>>;
-  purchasePass: (passType: PassType) => Promise<void>;
+  cart: CartItem | null;
+  setCart: (item: CartItem | null) => void;
+  purchasePass: (passType: 'daily' | 'weekly' | 'monthly') => void;
   selectedBusiness: Business | null;
-  setSelectedBusiness: (b: Business | null) => void;
+  setSelectedBusiness: (biz: Business | null) => void;
   showAuth: boolean;
   setShowAuth: (show: boolean) => void;
-  authMode: 'signin' | 'signup';
-  setAuthMode: (mode: 'signin' | 'signup') => void;
-  showQR: boolean;
-  setShowQR: (show: boolean) => void;
+  authMode: 'signin' | 'signup' | 'signup-tourist' | 'signup-business';
+  setAuthMode: (mode: 'signin' | 'signup' | 'signup-tourist' | 'signup-business') => void;
+  showQR: string | null;
+  setShowQR: (id: string | null) => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   selectedCategory: string;
-  setSelectedCategory: (c: string) => void;
-  redemptions: any[];
+  setSelectedCategory: (cat: string) => void;
+  redemptions: { businessId: string; date: string; saved: number }[];
   dbBusinesses: Business[];
-  dbReviews: any[];
-  submitReview: (bizId: string, rating: number, comment: string) => Promise<void>;
+  dbReviews: DBReview[];
+  submitReview: (businessId: string, rating: number, comment: string) => Promise<void>;
   dataLoaded: boolean;
   refreshBusinesses: () => Promise<void>;
   refreshUserPass: () => Promise<void>;
@@ -68,114 +108,153 @@ interface AppContextType {
   locationLoading: boolean;
   locationError: string | null;
   requestUserLocation: () => void;
-  getDistanceTo: (lat: number, lng: number) => string | null;
+  getDistanceTo: (lat: number, lng: number) => number | null;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+const AppContext = createContext<AppContextType>({} as AppContextType);
+export const useAppContext = () => useContext(AppContext);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [language, setLanguage] = useState<Language>('en');
   const [currentView, setCurrentView] = useState<ViewMode>('home');
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [cart, setCart] = useState<any[]>([]);
+  const [cart, setCart] = useState<CartItem | null>(null);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [showAuth, setShowAuth] = useState(false);
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
-  const [showQR, setShowQR] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'signup-tourist' | 'signup-business'>('signin');
+  const [showQR, setShowQR] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [redemptions, setRedemptions] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [redemptions, setRedemptions] = useState<{ businessId: string; date: string; saved: number }[]>([]);
   const [dbBusinesses, setDbBusinesses] = useState<Business[]>([]);
-  const [dbReviews, setDbReviews] = useState<any[]>([]);
+  const [dbReviews, setDbReviews] = useState<DBReview[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [userLocation, setUserLocation] = useState<GeoPosition | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+  const sessionProcessedRef = useRef(false);
+  const lastDbResolvedRoleRef = useRef<'tourist' | 'business' | 'admin' | null>(null);
+  const signInCooldownRef = useRef<number>(0);
+  const authProcessingRef = useRef<boolean>(false);
 
-  const resolveRole = useCallback(async (userId: string, email: string): Promise<UserRole> => {
-    if (ADMIN_EMAILS.includes(email.toLowerCase())) return 'admin';
-    try {
-      const { data, error } = await supabase.from('user_profiles').select('role').eq('id', userId).maybeSingle();
-      if (error) throw error;
-      return (data?.role as UserRole) || 'tourist';
-    } catch (err) {
-      return 'tourist';
-    }
+  // HELPER FUNCTIONS
+  const toggleSidebar = () => setSidebarOpen(prev => !prev);
+  const extractRole = (p: any): 'tourist' | 'business' | 'admin' => (p.user_type || p.role || 'tourist') as any;
+  const extractName = (p: any, email?: string): string => p.name || p.full_name || p.display_name || email?.split('@')[0] || 'User';
+
+  const requestUserLocation = useCallback(() => {
+    if (!navigator.geolocation) return setLocationError('Geolocation not supported');
+    setLocationLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, timestamp: pos.timestamp }); setLocationLoading(false); },
+      (err) => { setLocationLoading(false); setLocationError(err.message); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   }, []);
 
-  const handleAuthenticatedUser = useCallback(async (sessionUser: any) => {
+  const getDistanceTo = useCallback((lat: number, lng: number): number | null => {
+    if (!userLocation) return null;
+    return haversineDistance(userLocation.lat, userLocation.lng, lat, lng);
+  }, [userLocation]);
+
+  const loadBusinesses = useCallback(async () => {
+    try {
+      const { data } = await supabase.from('businesses').select('*').order('featured', { ascending: false });
+      if (data) setDbBusinesses(data.map((b: any) => ({ ...b, id: b.id, name: b.name, category: b.category })));
+      setDataLoaded(true);
+    } catch (e) { setDataLoaded(true); }
+  }, []);
+
+  const loadReviews = useCallback(async () => {
+    const { data } = await supabase.from('reviews').select('*').order('created_at', { ascending: false });
+    if (data) setDbReviews(data as any);
+  }, []);
+
+  const loadUserData = useCallback(async (userId: string) => {
+    const { data: favs } = await supabase.from('favorites').select('business_id').eq('user_id', userId);
+    if (favs) setFavorites(favs.map(f => f.business_id));
+    const { data: reds } = await supabase.from('redemptions').select('*').eq('user_id', userId);
+    if (reds) setRedemptions(reds.map(r => ({ businessId: r.business_id, date: r.redeemed_at, saved: r.saved_amount })));
+  }, []);
+
+  const resolveRole = useCallback(async (userId: string, email: string): Promise<{role: any, profile: any}> => {
+    if (ADMIN_EMAILS.includes(email.toLowerCase())) return { role: 'admin', profile: null };
+    try {
+      const { data } = await supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle();
+      return { role: data ? extractRole(data) : 'tourist', profile: data };
+    } catch { return { role: 'tourist', profile: null }; }
+  }, []);
+
+  // CRITICAL FIX: Added finally block to prevent the sign-in hang
+  const handleAuthenticatedUser = useCallback(async (authUser: any, shouldRedirect: boolean) => {
+    if (authProcessingRef.current && !shouldRedirect) return;
+    authProcessingRef.current = true;
     setAuthLoading(true);
     try {
-      const role = await resolveRole(sessionUser.id, sessionUser.email);
-      setUser(sessionUser);
-      setUserProfile({ id: sessionUser.id, user_id: sessionUser.id, email: sessionUser.email, role, name: null, full_name: null, avatar_url: null, pass_type: null, pass_expiry: null });
-    } catch (err) {
-      console.error(err);
+      const { role, profile } = await resolveRole(authUser.id, authUser.email || '');
+      setUser({ id: authUser.id, name: extractName(profile || {}, authUser.email), email: authUser.email, type: role } as any);
+      setUserProfile(profile);
+      loadUserData(authUser.id);
+      if (shouldRedirect) setCurrentView(role === 'admin' ? 'admin' : role === 'business' ? 'business-dashboard' : 'dashboard');
     } finally {
-      // THE FIX: This forces the loading screen to close
-      setAuthLoading(false);
+      authProcessingRef.current = false;
+      setAuthLoading(false); // FORCES HANG TO END
     }
-  }, [resolveRole]);
+  }, [resolveRole, loadUserData]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) handleAuthenticatedUser(session.user);
+    loadBusinesses(); loadReviews();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') { setUser(null); setUserProfile(null); setAuthLoading(false); }
+      else if (session?.user) await handleAuthenticatedUser(session.user, event === 'SIGNED_IN');
       else setAuthLoading(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) handleAuthenticatedUser(session.user);
-      else { setUser(null); setUserProfile(null); setAuthLoading(false); }
     });
     return () => subscription.unsubscribe();
   }, [handleAuthenticatedUser]);
 
-  const signIn = async (email: string, pass: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   };
 
-  const signOut = async () => { await supabase.auth.signOut(); setCurrentView('home'); toast.success('Signed out'); };
-  
-  // Placeholder functions to keep Vercel happy
-  const signUp = async () => {};
-  const signUpTourist = async () => {};
-  const signUpBusiness = async () => {};
-  const updateProfile = async () => {};
-  const purchasePass = async () => {};
-  const submitReview = async () => {};
-  const refreshBusinesses = async () => {};
-  const refreshUserPass = async () => {};
-  const requestUserLocation = () => {};
-  const getDistanceTo = () => null;
+  const signUp = async (name: string, email: string, password: string, type: 'tourist' | 'business') => {
+    const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { name, user_type: type } } });
+    if (error) throw error;
+    if (data.session) await directProfileInsert({ userId: data.user!.id, name, email, userType: type });
+  };
 
-  const toggleFavorite = (id: string) => {
-    setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  const signOut = async () => { await supabase.auth.signOut(); setCurrentView('home'); };
+  const updateProfile = async (u: any) => { await supabase.from('user_profiles').update(u).eq('user_id', user?.id); };
+  const toggleFavorite = async (id: string) => {
+    if (!user) return setShowAuth(true);
+    const isFav = favorites.includes(id);
+    setFavorites(prev => isFav ? prev.filter(f => f !== id) : [...prev, id]);
+    isFav ? await supabase.from('favorites').delete().eq('user_id', user.id).eq('business_id', id) : await supabase.from('favorites').insert({ user_id: user.id, business_id: id });
+  };
+
+  const purchasePass = (type: any) => { setCart({ passType: type, price: 0 }); setCurrentView('checkout'); };
+  const submitReview = async (bizId: string, rating: number, comment: string) => {
+    await supabase.from('reviews').insert({ business_id: bizId, user_id: user?.id, rating, comment });
+    loadReviews();
   };
 
   return (
     <AppContext.Provider value={{
       sidebarOpen, toggleSidebar, language, setLanguage, currentView, setCurrentView,
-      user, userProfile, authLoading, signIn, signUp, signUpTourist, signUpBusiness, signOut,
-      updateProfile, favorites, toggleFavorite, cart, setCart, purchasePass,
-      selectedBusiness, setSelectedBusiness, showAuth, setShowAuth, authMode, setAuthMode,
-      showQR, setShowQR, searchQuery, setSearchQuery, selectedCategory, setSelectedCategory,
-      redemptions, dbBusinesses, dbReviews, submitReview, dataLoaded,
-      refreshBusinesses, refreshUserPass, userLocation, locationLoading, locationError,
-      requestUserLocation, getDistanceTo
+      user, userProfile, authLoading, signIn, signUp, signUpTourist: (n,e,p)=>signUp(n,e,p,'tourist'),
+      signUpBusiness: (n,e,p)=>signUp(n,e,p,'business'), signOut, updateProfile, favorites,
+      toggleFavorite, cart, setCart, purchasePass, selectedBusiness, setSelectedBusiness,
+      showAuth, setShowAuth, authMode, setAuthMode, showQR, setShowQR, searchQuery, setSearchQuery,
+      selectedCategory, setSelectedCategory, redemptions, dbBusinesses, dbReviews, submitReview,
+      dataLoaded, refreshBusinesses: loadBusinesses, refreshUserPass: ()=>Promise.resolve(),
+      userLocation, locationLoading, locationError, requestUserLocation, getDistanceTo
     }}>
       {children}
     </AppContext.Provider>
   );
-};
-
-export const useAppContext = () => {
-  const context = useContext(AppContext);
-  if (!context) throw new Error('useAppContext must be used within AppProvider');
-  return context;
 };
