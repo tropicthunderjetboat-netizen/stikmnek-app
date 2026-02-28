@@ -191,20 +191,27 @@ const MapController: React.FC<{
   const prevZoomRef = useRef(zoom);
 
   useEffect(() => {
-    // Check if map exists to avoid another type of null error
     if (!map) return;
 
-    // Create a fallback so we NEVER read .lat from null
-    const targetLat = userLocation?.lat ?? center[0] ?? -17.7348;
-    const targetLng = userLocation?.lng ?? center[1] ?? 168.3277;
-    const target: [number, number] = [targetLat, targetLng];
+    // 1. Create the safest possible coordinates
+    // We use Port Vila as the ultimate fallback
+    const lat = userLocation?.lat ?? center?.[0] ?? -17.7348;
+    const lng = userLocation?.lng ?? center?.[1] ?? 168.3277;
 
-    if (flyToUser && userLocation) {
-      map.flyTo(target, zoom, { duration: 1.2 });
-      onFlyComplete();
-    } else if (zoom !== prevZoomRef.current) {
-      map.flyTo(target, zoom, { duration: 0.8 });
+    // 2. Ensure we are passing a valid array of numbers
+    const safeTarget: [number, number] = [Number(lat), Number(lng)];
+
+    try {
+      if (flyToUser && userLocation) {
+        map.flyTo(safeTarget, zoom, { duration: 1.2 });
+        onFlyComplete();
+      } else if (zoom !== prevZoomRef.current) {
+        map.flyTo(safeTarget, zoom, { duration: 0.8 });
+      }
+    } catch (err) {
+      console.warn("Map flyTo failed safely:", err);
     }
+    
     prevZoomRef.current = zoom;
   }, [center, zoom, userLocation, flyToUser, map, onFlyComplete]);
 
