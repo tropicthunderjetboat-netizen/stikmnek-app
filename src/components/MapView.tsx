@@ -191,16 +191,19 @@ const MapController: React.FC<{
   const prevZoomRef = useRef(zoom);
 
   useEffect(() => {
-    // 1. Determine a safe target (Use coordinates for Port Vila or your center if user is null)
-    const safeLat = userLocation?.lat ?? center[0] ?? -17.7348;
-    const safeLng = userLocation?.lng ?? center[1] ?? 168.3277;
-    const safeTarget: [number, number] = [safeLat, safeLng];
+    // Check if map exists to avoid another type of null error
+    if (!map) return;
+
+    // Create a fallback so we NEVER read .lat from null
+    const targetLat = userLocation?.lat ?? center[0] ?? -17.7348;
+    const targetLng = userLocation?.lng ?? center[1] ?? 168.3277;
+    const target: [number, number] = [targetLat, targetLng];
 
     if (flyToUser && userLocation) {
-      map.flyTo(safeTarget, zoom, { duration: 1.2 });
+      map.flyTo(target, zoom, { duration: 1.2 });
       onFlyComplete();
     } else if (zoom !== prevZoomRef.current) {
-      map.flyTo(safeTarget, zoom, { duration: 0.8 });
+      map.flyTo(target, zoom, { duration: 0.8 });
     }
     prevZoomRef.current = zoom;
   }, [center, zoom, userLocation, flyToUser, map, onFlyComplete]);
