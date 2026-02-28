@@ -1,30 +1,25 @@
 import { createClient } from '@supabase/supabase-js';
 
 // ═══════════════════════════════════════════════════════════════
-// SUPABASE CLIENT — Project StikmNek
-// Project ref: hbaflbmfptobyfqbudrt
-//
-// These are PUBLIC credentials (anon key). Safe to commit.
-// The anon key can only do what RLS policies allow.
+// Hardcoded credentials to bypass Vercel variable issues
 // ═══════════════════════════════════════════════════════════════
-
-// src/lib/supabase.ts
-// We are going back to basics to break the loop
 const supabaseUrl = 'https://hbaflbmfptobyfqbudrt.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYWZsYm1mcHRvYnlmcWJ1ZHJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MTMwMTIsImV4cCI6MjA4NzI4OTAxMn0.Ukdx0PKI6cpoEdKGcV4LgcgumkhDIfiIXbmVMgbqKL0'; // Get this from Supabase Dashboard
-}
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYWZsYm1mcHRvYnlmcWJ1ZHJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MTMwMTIsImV4cCI6MjA4NzI4OTAxMn0.Ukdx0PKI6cpoEdKGcV4LgcgumkhDIfiIXbmVMgbqKL0';
 
-// ═══════════════════════════════════════════════════════════════
-// DERIVED ENDPOINTS — These are the exact URLs the SDK calls.
-// ═══════════════════════════════════════════════════════════════
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
 export const ENDPOINTS = {
   auth:      `${supabaseUrl}/auth/v1`,
   rest:      `${supabaseUrl}/rest/v1`,
   functions: `${supabaseUrl}/functions/v1`,
   storage:   `${supabaseUrl}/storage/v1`,
-  realtime:  `${supabaseUrl}/realtime/v1`,
-} as const;
+};
 
+// DO NOT DELETE ANYTHING BELOW THIS LINE
+// Keep your directProfileInsert and other functions exactly as they were...
+// ═══════════════════════════════════════════════════════════════
+// DERIVED ENDPOINTS — These are the exact URLs the SDK calls.
+// ═══════════════════════════════════════════════════════════════
 
 /**
  * Custom lock implementation that avoids the Navigator LockManager API.

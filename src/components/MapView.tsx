@@ -266,7 +266,7 @@ const MapView: React.FC = () => {
   // Map center and zoom based on user location and radius
   const defaultCenter: [number, number] = [-17.735, 168.312];
   const mapCenter: [number, number] = userLocation
-    ? [userLocation.lat, userLocation.lng]
+    ? safeTarget
     : defaultCenter;
 
   const getZoomForRadius = (radius: RadiusFilter): number => {
@@ -509,7 +509,7 @@ const MapView: React.FC = () => {
             {/* Radius circle */}
             {userLocation && radiusFilter !== 'all' && (
               <Circle
-                center={[userLocation.lat, userLocation.lng]}
+                center={[safeTarget]}
                 radius={radiusFilter}
                 pathOptions={{
                   color: 'rgba(59, 130, 246, 0.4)',
@@ -524,7 +524,7 @@ const MapView: React.FC = () => {
             {/* User location blue dot */}
             {userLocation && (
               <Marker
-                position={[userLocation.lat, userLocation.lng]}
+                position={[safeTarget]}
                 icon={userLocationIcon}
                 zIndexOffset={1000}
               >
