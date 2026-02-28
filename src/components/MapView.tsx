@@ -180,7 +180,6 @@ const createClusterCustomIcon = (cluster: any) => {
   });
 };
 
-// ─── Map Controller: handles fly-to and zoom changes ───
 const MapController: React.FC<{
   center: [number, number];
   zoom: number;
@@ -192,19 +191,22 @@ const MapController: React.FC<{
   const prevZoomRef = useRef(zoom);
 
   useEffect(() => {
+    // 1. Determine a safe target (Use coordinates for Port Vila or your center if user is null)
+    const safeLat = userLocation?.lat ?? center[0] ?? -17.7348;
+    const safeLng = userLocation?.lng ?? center[1] ?? 168.3277;
+    const safeTarget: [number, number] = [safeLat, safeLng];
+
     if (flyToUser && userLocation) {
-      map.flyTo([userLocation.lat, userLocation.lng], zoom, { duration: 1.2 });
+      map.flyTo(safeTarget, zoom, { duration: 1.2 });
       onFlyComplete();
     } else if (zoom !== prevZoomRef.current) {
-      const target = userLocation ? [userLocation.lat, userLocation.lng] as [number, number] : center;
-      map.flyTo(target, zoom, { duration: 0.8 });
+      map.flyTo(safeTarget, zoom, { duration: 0.8 });
     }
     prevZoomRef.current = zoom;
   }, [center, zoom, userLocation, flyToUser, map, onFlyComplete]);
 
   return null;
 };
-
 // ─── Tile layer options ───
 const tileLayers = {
   streets: {

@@ -8,11 +8,10 @@ import { createClient } from '@supabase/supabase-js';
 // The anon key can only do what RLS policies allow.
 // ═══════════════════════════════════════════════════════════════
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://hbaflbmfptobyfqbudrt.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseKey) {
-  console.error("CRITICAL: VITE_SUPABASE_ANON_KEY is missing! Check Vercel Settings.");
+// src/lib/supabase.ts
+// We are going back to basics to break the loop
+const supabaseUrl = 'https://hbaflbmfptobyfqbudrt.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYWZsYm1mcHRvYnlmcWJ1ZHJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MTMwMTIsImV4cCI6MjA4NzI4OTAxMn0.Ukdx0PKI6cpoEdKGcV4LgcgumkhDIfiIXbmVMgbqKL0'; // Get this from Supabase Dashboard
 }
 
 // ═══════════════════════════════════════════════════════════════
