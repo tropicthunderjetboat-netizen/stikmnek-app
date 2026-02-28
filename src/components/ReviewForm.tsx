@@ -13,17 +13,26 @@ interface ReviewFormProps {
   compact?: boolean;
 }
 
-async function getValidAccessToken(): Promise<string | null> {
+/**
+ * Ensures the Supabase SDK has a valid, fresh session token.
+ * We do NOT pass this token as a custom Authorization header.
+ * The SDK's functions.invoke() automatically uses its internal session token.
+ * We only call this to FORCE a refresh before the invoke.
+ */
+async function ensureFreshSession(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
-  if (session?.access_token) {
-    const expiresAt = session.expires_at;
-    const now = Math.floor(Date.now() / 1000);
-    if (expiresAt && (expiresAt - now) > 60) return session.access_token;
+  if (!session?.access_token) return null;
+  const expiresAt = session.expires_at;
+  const now = Math.floor(Date.now() / 1000);
+  const secondsLeft = expiresAt ? expiresAt - now : 0;
+  if (secondsLeft < 120) {
+    const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
+    if (error || !refreshed?.access_token) return null;
+    return refreshed.access_token;
   }
-  const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
-  if (error) return null;
-  return refreshedSession?.access_token || null;
+  return session.access_token;
 }
+
 
 // Card formatting helpers
 function formatCardNumber(value: string): string {
@@ -132,14 +141,16 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     setSsPaymentError(null);
 
     try {
-      const accessToken = await getValidAccessToken();
-      if (!accessToken) {
+      // Ensure the SDK has a fresh session (do NOT pass custom Authorization header)
+      const token = await ensureFreshSession();
+      if (!token) {
         toast.error('Session expired. Please sign in again.');
         setSuperStarProcessing(false);
         setSsPaymentStep('form');
         return;
       }
 
+      // FIXED: No custom Authorization header — let the SDK handle it
       const { data, error } = await supabase.functions.invoke('process-card-payment', {
         body: {
           action: 'purchase_superstar',
@@ -151,10 +162,9 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           cardCvv: ssCardCvv,
           cardName: ssCardName.trim(),
         },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        // NO custom headers — SDK sends its own Authorization automatically
       });
+
 
       if (error) throw error;
 

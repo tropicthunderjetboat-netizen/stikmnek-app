@@ -135,28 +135,32 @@ const CelebrationOverlay: React.FC<{ show: boolean; passName: string; bonusDays:
   );
 };
 
-// ─── Get valid access token helper ───
-async function getValidAccessToken(): Promise<string | null> {
+// ─── Ensure fresh session helper (replaces getValidAccessToken) ───
+// We call this to force a session refresh if needed, but we do NOT
+// pass the token as a custom Authorization header. The SDK handles that.
+async function ensureFreshSession(): Promise<string | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      const expiresAt = session.expires_at;
-      const now = Math.floor(Date.now() / 1000);
-      if (expiresAt && (expiresAt - now) > 60) {
-        return session.access_token;
+    if (!session?.access_token) return null;
+    const expiresAt = session.expires_at;
+    const now = Math.floor(Date.now() / 1000);
+    const secondsLeft = expiresAt ? expiresAt - now : 0;
+    if (secondsLeft < 120) {
+      console.log('[PassCards] Session expires in', secondsLeft, 's — refreshing...');
+      const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
+      if (error || !refreshed?.access_token) {
+        console.warn('[PassCards] Session refresh failed:', error?.message);
+        return null;
       }
+      return refreshed.access_token;
     }
-    const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
-    if (error) {
-      console.warn('[PassCards] Token refresh failed:', error.message);
-      return null;
-    }
-    return refreshedSession?.access_token || null;
+    return session.access_token;
   } catch (err) {
-    console.error('[PassCards] getValidAccessToken threw:', err);
+    console.error('[PassCards] ensureFreshSession threw:', err);
     return null;
   }
 }
+
 
 // ─── Helper: Extract HTTP status code from supabase FunctionsHttpError ───
 // supabase.functions.invoke returns FunctionsHttpError for non-2xx responses.
@@ -239,16 +243,17 @@ async function invokeExtendPassWithRetry(
     }
 
     try {
+      // FIXED: No custom Authorization header — let the SDK handle it automatically
+
       const { data, error } = await supabase.functions.invoke('extend-pass', {
         body: {
           user_id: userId,
           share_proof: shareProof,
           platform: platform,
         },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        // NO custom headers — SDK sends its own Authorization automatically
       });
+
 
       if (!error) {
         return { data, error: null, errorBody: null, statusCode: 200 };
@@ -414,7 +419,8 @@ const PassCards: React.FC = () => {
 
       // ═══ STEP 2: Call extend-pass edge function if user has an active pass ═══
       if (user?.pass && user?.passId) {
-        const accessToken = await getValidAccessToken();
+        const accessToken = await ensureFreshSession();
+
         
         if (!accessToken) {
           // Auth token expired and couldn't refresh

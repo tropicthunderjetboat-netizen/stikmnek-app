@@ -14,21 +14,53 @@ const PASSES = {
   monthly: { price: 99, days: 6, label: 'Ultimate Crew Experience Pass', icon: Crown, color: 'from-orange-500 to-amber-600', shadow: 'shadow-orange-200', group: '7 people' },
 };
 
-async function getValidAccessToken(): Promise<string | null> {
+/**
+ * Ensures the Supabase SDK has a valid, fresh access token.
+ * 
+ * This does TWO things:
+ * 1. Refreshes the session if it's close to expiry (< 120s)
+ * 2. Returns the token so we can verify it exists
+ * 
+ * IMPORTANT: We do NOT pass this token as a custom Authorization header.
+ * The SDK's functions.invoke() automatically uses its internal session token.
+ * We only call this to FORCE a refresh before the invoke.
+ */
+async function ensureFreshSession(): Promise<string | null> {
+  console.log('[PaymentCheckout] ensureFreshSession: checking current session...');
+  
   const { data: { session } } = await supabase.auth.getSession();
-  if (session?.access_token) {
-    const expiresAt = session.expires_at;
-    const now = Math.floor(Date.now() / 1000);
-    if (expiresAt && (expiresAt - now) > 60) return session.access_token;
-  }
-  console.log('[PaymentCheckout] Refreshing session...');
-  const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
-  if (error) {
-    console.error('[PaymentCheckout] Session refresh failed:', error);
+  
+  if (!session?.access_token) {
+    console.error('[PaymentCheckout] ensureFreshSession: NO session found');
     return null;
   }
-  return refreshedSession?.access_token || null;
+
+  const expiresAt = session.expires_at;
+  const now = Math.floor(Date.now() / 1000);
+  const secondsLeft = expiresAt ? expiresAt - now : 0;
+  console.log('[PaymentCheckout] ensureFreshSession: token expires in', secondsLeft, 'seconds');
+
+  // If token expires in less than 120 seconds, refresh it
+  if (secondsLeft < 120) {
+    console.log('[PaymentCheckout] ensureFreshSession: refreshing session (< 120s left)...');
+    const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
+    if (error) {
+      console.error('[PaymentCheckout] ensureFreshSession: refresh FAILED:', error.message);
+      return null;
+    }
+    if (!refreshed?.access_token) {
+      console.error('[PaymentCheckout] ensureFreshSession: refresh returned no token');
+      return null;
+    }
+    const newExpiry = refreshed.expires_at ? refreshed.expires_at - Math.floor(Date.now() / 1000) : 0;
+    console.log('[PaymentCheckout] ensureFreshSession: refreshed OK, new token expires in', newExpiry, 's');
+    return refreshed.access_token;
+  }
+
+  console.log('[PaymentCheckout] ensureFreshSession: current token is fresh enough');
+  return session.access_token;
 }
+
 
 // ═══ CARD FORMATTING HELPERS ═══
 function formatCardNumber(value: string): string {
@@ -215,6 +247,16 @@ const PaymentCheckout: React.FC = () => {
   };
 
   // ═══ PROCESS CARD PAYMENT ═══
+  //
+  // KEY FIX (2026-02-28): 
+  // 1. We call ensureFreshSession() to guarantee the SDK has a valid JWT
+  // 2. We do NOT pass a custom Authorization header — the SDK handles it
+  // 3. We extract error details from both `data` and `error` objects
+  //
+  // The old code passed `headers: { Authorization: ... }` which could
+  // conflict with the SDK's internal auth header management and cause
+  // the Supabase relay to reject the request with 401.
+  // ═══════════════════════════════════════════════════════════════
   const handlePayWithCard = async () => {
     if (!validateCard()) return;
 
@@ -223,8 +265,11 @@ const PaymentCheckout: React.FC = () => {
     setPaymentError(null);
 
     try {
-      const accessToken = await getValidAccessToken();
-      if (!accessToken) {
+      // Step 1: Ensure the SDK has a fresh, valid session token
+      console.log('[PaymentCheckout] Step 1: Ensuring fresh session...');
+      const token = await ensureFreshSession();
+      if (!token) {
+        console.error('[PaymentCheckout] No valid session — prompting sign in');
         toast.error('Your session has expired. Please sign in again.');
         setStep('payment');
         setProcessing(false);
@@ -232,12 +277,20 @@ const PaymentCheckout: React.FC = () => {
         setAuthMode('signin');
         return;
       }
+      console.log('[PaymentCheckout] Session OK — token length:', token.length);
 
-      // Get stored referral code if any
+      // Step 2: Get stored referral code if any
       let referralCode: string | null = null;
       try {
         referralCode = localStorage.getItem('stikmnek-referral-code');
       } catch {}
+
+      // Step 3: Invoke the edge function
+      // IMPORTANT: Do NOT pass custom Authorization header.
+      // The Supabase SDK automatically includes the session JWT.
+      // Passing a custom header can cause conflicts with the relay's JWT validation.
+      console.log('[PaymentCheckout] Step 3: Invoking process-card-payment...');
+      console.log('[PaymentCheckout] passType:', cart.passType, 'startDate:', startDate);
 
       const { data, error } = await supabase.functions.invoke('process-card-payment', {
         body: {
@@ -250,18 +303,45 @@ const PaymentCheckout: React.FC = () => {
           cardName: cardName.trim(),
           referralCode,
         },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        // NO custom headers — let the SDK handle Authorization automatically
       });
 
+      console.log('[PaymentCheckout] invoke returned — data:', JSON.stringify(data)?.substring(0, 200), 'error:', error?.message);
+
+      // Step 4: Handle the response
+      // The SDK returns { data, error }. When the function returns non-2xx:
+      // - error: FunctionsHttpError with generic message
+      // - data: may contain the actual error response body from our function
+      
       if (error) {
-        console.error('[PaymentCheckout] Edge function error:', error);
-        throw new Error(error.message || 'Payment processing failed');
+        console.error('[PaymentCheckout] Edge function error object:', error);
+        
+        // Try to extract the actual error message from the data object
+        // (the SDK sometimes puts the response body in data even on error)
+        const serverError = data?.error || data?.message;
+        const serverHint = data?.hint || data?.step;
+        
+        if (serverError) {
+          console.error('[PaymentCheckout] Server error:', serverError, 'hint:', serverHint);
+          throw new Error(serverError);
+        }
+        
+        // If no server error in data, use the SDK error message
+        // but make it more user-friendly
+        const errMsg = error.message || 'Payment processing failed';
+        if (errMsg.includes('non-2xx')) {
+          throw new Error('Unable to reach payment server. Please check your connection and try again.');
+        }
+        throw new Error(errMsg);
       }
 
-      if (data?.success) {
+      if (!data) {
+        throw new Error('No response from payment server');
+      }
+
+      if (data.success) {
         // Payment successful!
+        console.log('[PaymentCheckout] Payment SUCCESS — receipt:', data.receiptNumber);
         setPaymentResult(data);
         setStep('success');
 
@@ -299,16 +379,16 @@ const PaymentCheckout: React.FC = () => {
           setCart(null);
           setCurrentView('payment-confirmation' as any);
         }, 2500);
-      } else if (data?.requires3DS) {
-        // 3D Secure required - show message
+      } else if (data.requires3DS) {
         setPaymentError('Your bank requires additional verification. Please try a different card or contact your bank.');
         setStep('payment');
         setProcessing(false);
       } else {
-        throw new Error(data?.error || 'Payment processing failed');
+        // Function returned a non-success response
+        throw new Error(data.error || 'Payment processing failed');
       }
     } catch (err: any) {
-      console.error('Card payment error:', err);
+      console.error('[PaymentCheckout] CATCH:', err.message);
       const errorMsg = err.message || 'Failed to process payment. Please try again.';
       setPaymentError(errorMsg);
       toast.error(errorMsg);
@@ -316,6 +396,7 @@ const PaymentCheckout: React.FC = () => {
       setProcessing(false);
     }
   };
+
 
   const Icon = selectedPass.icon;
   const currentStepIndex = step === 'dates' ? 0 : step === 'payment' ? 1 : step === 'success' ? 2 : 2;

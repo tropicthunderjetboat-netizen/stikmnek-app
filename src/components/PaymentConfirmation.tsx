@@ -58,28 +58,30 @@ const SHARE_BONUSES: Record<string, { extraDays: number; extraPeople: number; ex
   },
 };
 
-// ─── Helper: get valid access token ───
-async function getValidAccessToken(): Promise<string | null> {
+// ─── Ensure fresh session helper (replaces getValidAccessToken) ───
+async function ensureFreshSession(): Promise<string | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      const expiresAt = session.expires_at;
-      const now = Math.floor(Date.now() / 1000);
-      if (expiresAt && (expiresAt - now) > 60) {
-        return session.access_token;
+    if (!session?.access_token) return null;
+    const expiresAt = session.expires_at;
+    const now = Math.floor(Date.now() / 1000);
+    const secondsLeft = expiresAt ? expiresAt - now : 0;
+    if (secondsLeft < 120) {
+      console.log('[PaymentConfirmation] Session expires in', secondsLeft, 's — refreshing...');
+      const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
+      if (error || !refreshed?.access_token) {
+        console.warn('[PaymentConfirmation] Session refresh failed:', error?.message);
+        return null;
       }
+      return refreshed.access_token;
     }
-    const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
-    if (error) {
-      console.warn('[PaymentConfirmation] Token refresh failed:', error.message);
-      return null;
-    }
-    return refreshedSession?.access_token || null;
+    return session.access_token;
   } catch (err) {
-    console.error('[PaymentConfirmation] getValidAccessToken threw:', err);
+    console.error('[PaymentConfirmation] ensureFreshSession threw:', err);
     return null;
   }
 }
+
 
 // ─── Helper: Extract HTTP status code from FunctionsHttpError ───
 function extractStatusCode(error: any): number | null {
@@ -154,16 +156,16 @@ async function invokeExtendPassWithRetry(
     }
 
     try {
+      // FIXED: No custom Authorization header — let the SDK handle it automatically
       const { data, error } = await supabase.functions.invoke('extend-pass', {
         body: {
           user_id: userId,
           share_proof: shareProof,
           platform: platform,
         },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        // NO custom headers — SDK sends its own Authorization automatically
       });
+
 
       if (!error) {
         return { data, error: null, errorBody: null, statusCode: 200 };
@@ -368,9 +370,10 @@ const ShareCTA: React.FC<{ passType: string; userId: string }> = ({ passType, us
       }
 
       // Step 2: Call extend-pass with retry to claim the bonus
-      const accessToken = await getValidAccessToken();
+      const accessToken = await ensureFreshSession();
       if (!accessToken) {
         toast.warning('Shared successfully! Sign in again to claim your bonus days.', { duration: 5000 });
+
         markSharedLocally();
         setShareState('success');
         return;
@@ -400,7 +403,8 @@ const ShareCTA: React.FC<{ passType: string; userId: string }> = ({ passType, us
   const handleRetry = async () => {
     setRetrying(true);
     try {
-      const accessToken = await getValidAccessToken();
+      const accessToken = await ensureFreshSession();
+
       if (!accessToken) {
         toast.warning('Please sign in again to claim your bonus.', { duration: 5000 });
         setRetrying(false);

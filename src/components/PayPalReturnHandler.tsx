@@ -5,31 +5,28 @@ import { toast } from 'sonner';
 import { Loader2, Shield, CheckCircle, XCircle } from 'lucide-react';
 
 /**
- * Helper: Get a valid access token, refreshing the session if needed.
+ * Ensures the Supabase SDK has a valid, fresh session token.
+ * We do NOT pass this token as a custom Authorization header.
+ * The SDK's functions.invoke() automatically uses its internal session token.
  */
-async function getValidAccessToken(): Promise<string | null> {
+async function ensureFreshSession(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
-  
-  if (session?.access_token) {
-    const expiresAt = session.expires_at;
-    const now = Math.floor(Date.now() / 1000);
-    
-    if (expiresAt && (expiresAt - now) > 60) {
-      return session.access_token;
+  if (!session?.access_token) return null;
+  const expiresAt = session.expires_at;
+  const now = Math.floor(Date.now() / 1000);
+  const secondsLeft = expiresAt ? expiresAt - now : 0;
+  if (secondsLeft < 120) {
+    console.log('[PayPalReturn] Session expires in', secondsLeft, 's — refreshing...');
+    const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
+    if (error || !refreshed?.access_token) {
+      console.error('[PayPalReturn] Session refresh failed:', error?.message);
+      return null;
     }
+    return refreshed.access_token;
   }
-  
-  // Try to refresh
-  console.log('[PayPalReturn] Refreshing session...');
-  const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
-  
-  if (error) {
-    console.error('[PayPalReturn] Session refresh failed:', error);
-    return null;
-  }
-  
-  return refreshedSession?.access_token || null;
+  return session.access_token;
 }
+
 
 const PayPalReturnHandler: React.FC = () => {
   const { user, setCurrentView, setCart } = useAppContext();
@@ -90,7 +87,7 @@ const PayPalReturnHandler: React.FC = () => {
     const waitForAuth = (): Promise<string | null> => {
       return new Promise((resolve) => {
         const check = async () => {
-          const token = await getValidAccessToken();
+          const token = await ensureFreshSession();
           if (token) {
             resolve(token);
             return;
@@ -119,16 +116,15 @@ const PayPalReturnHandler: React.FC = () => {
     try {
       console.log('[PayPalReturn] Capturing PayPal order:', paypalOrderId, 'Token length:', accessToken.length);
 
-      // Call edge function with explicit Authorization header
+      // FIXED: No custom Authorization header — let the SDK handle it automatically
       const { data, error } = await supabase.functions.invoke('paypal-capture', {
         body: {
           paypalOrderId,
           receiptNumber: pendingInfo?.receiptNumber,
         },
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        // NO custom headers — SDK sends its own Authorization automatically
       });
+
 
       if (error) throw error;
 
