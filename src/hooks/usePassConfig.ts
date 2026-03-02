@@ -152,7 +152,7 @@ kids: 0,
     maxRedemptionsPerDay: 10,
     sortOrder: 2,
     adults: 0,
-kids: 0 
+kids: 0, 
     totalPeople: 4,
     baseDays: 6,
     fullDays: 7,
