@@ -73,9 +73,8 @@ serve(async (req) => {
     const paymentData: PaymentData = await req.json();
     if (!paymentData.amount || !paymentData.email) {
       return new Response(JSON.stringify({ error: 'Missing fields' }), { status: 400, headers: corsHeaders });
-    }
-
-    const passDetails = getPassDetails(paymentData.amount);
+    
+} const passDetails = getPassDetails(paymentData.amount);
     const dollarAmount = paymentData.amount > 1000 ? paymentData.amount / 100 : paymentData.amount;
     
     // Send email without waiting for it to finish
@@ -90,8 +89,8 @@ return new Response(
         group: details.group,
         currency: "AUD"
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } 
+});
 
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {

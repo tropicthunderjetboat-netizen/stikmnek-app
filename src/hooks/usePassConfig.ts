@@ -108,8 +108,9 @@ const DEFAULT_PASSES: PassConfig[] = [
     descriptionBi: 'Gud blong famili we i eksplor blong wan dei',
     maxRedemptionsPerDay: 5,
     sortOrder: 1,
-    people: 4,
-      totalPeople: null,
+    Adults: 0,
+kids: 0,
+      totalPeople: 4,
     baseDays: 1,
     fullDays: 1,
     shareBonus: {
@@ -150,8 +151,9 @@ const DEFAULT_PASSES: PassConfig[] = [
     descriptionBi: 'Beswan valu blong grup advenija blong 6 dei',
     maxRedemptionsPerDay: 10,
     sortOrder: 2,
-    people: 4,
-    totalPeople: null,
+    adults: 0,
+kids: 0 
+    totalPeople: 4,
     baseDays: 6,
     fullDays: 7,
     shareBonus: {
