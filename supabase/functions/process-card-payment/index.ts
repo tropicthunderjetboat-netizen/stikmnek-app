@@ -27,21 +27,24 @@ serve(async (req) => {
       completedAt: new Date().toISOString()
     };
 
-    return new Response(
-      JSON.stringify(data),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-        status: 200 
-      }
-    );
+   // Use 'pType' (which we defined from the price) instead of 'selectedPassType'
+    const pType = nAmt >= 99 ? 'monthly' : nAmt >= 45 ? 'weekly' : 'daily';
 
+    return new Response(
+      JSON.stringify({
+        success: true,
+        passType: pType, // <--- Use the variable we just made
+        amount: nAmt,
+        group: pType === 'monthly' ? '7 people' : '4 people',
+        receiptNumber: `REC-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
+        completedAt: new Date().toISOString()
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
   } catch (error: any) {
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-        status: 400 
-      }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
     );
   }
 });
