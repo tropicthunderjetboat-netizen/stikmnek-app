@@ -81,19 +81,14 @@ serve(async (req) => {
     // Send email without waiting for it to finish
     sendReceipt(paymentData.email, paymentData.amount, passDetails).catch(console.error);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        amount: dollarAmount,
-        currency: 'AUD',
-        passLabel: passDetails.passLabel,
-        group: passDetails.group,
-        duration: passDetails.duration,
-        isShared: passDetails.isShared
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 200, headers: corsHeaders });
-  }
-});
+  return new Response(
+  JSON.stringify({
+    success: true,
+    amount: nAmt,
+    passType: nAmt >= 99 ? 'monthly' : nAmt >= 45 ? 'weekly' : 'daily', // THE MISSING LINK
+    passLabel: details.label,
+    group: details.group,
+    currency: "AUD"
+  }),
+  { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+);

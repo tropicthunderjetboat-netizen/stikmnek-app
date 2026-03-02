@@ -12,57 +12,34 @@ import { getPassDisplayName } from '@/hooks/usePassConfig';
 interface PaymentResult {
   receiptNumber: string;
   passType: string;
-  passLabel?: string;
+  passLabel?: string; // Add this
+  group?: string;     // Add this
   amount: number;
-  currency?: string;
+  currency?: string;  // Add this
   paymentMethod: string;
   expiresAt: string;
   validFrom?: string;
   validUntil?: string;
   days?: number;
-  group?: string;
   sessionId: string;
   completedAt: string;
   cardLast4?: string;
-  paypalOrderId?: string;
 }
-
-
-
 const PASS_LABELS: Record<string, string> = {
   daily: 'Family Explorer Pass',
   weekly: 'Extended Group Adventure Pass',
   monthly: 'Ultimate Crew Experience Pass',
 };
-
 const PASS_GROUPS: Record<string, string> = {
-  daily: '2 adults & 2 kids',
-  weekly: '2 adults & 2 kids',
+  daily: '4 people',
+  weekly: '4 people',
   monthly: '7 people',
 };
-
-// Share bonus configuration matching the pass configs
-const SHARE_BONUSES: Record<string, { extraDays: number; extraPeople: number; extraKids: number; description: string }> = {
-  daily: {
-    extraDays: 0,
-    extraPeople: 2,
-    extraKids: 0,
-    description: 'Share the app to add 2 more people to your pass!',
-  },
-  weekly: {
-    extraDays: 1,
-    extraPeople: 0,
-    extraKids: 2,
-    description: 'Share the app to get 1 extra day free and add 2 more kids!',
-  },
-  monthly: {
-    extraDays: 1,
-    extraPeople: 1,
-    extraKids: 0,
-    description: 'Share the app to get 1 extra day free and add 1 more person!',
-  },
+const SHARE_BONUSES = {
+  daily: { extraDays: 0, extraPeople: 2, description: 'Share to add 2 extra people for free!' },
+  weekly: { extraDays: 1, extraPeople: 2, description: 'Share to add 2 extra people + 1 extra day for free!' },
+  monthly: { extraDays: 1, extraPeople: 1, description: 'Share to add 1 extra person + 1 extra day for free!' },
 };
-
 // ─── Ensure fresh session helper (replaces getValidAccessToken) ───
 async function ensureFreshSession(): Promise<string | null> {
   try {
@@ -663,7 +640,7 @@ const PaymentConfirmation: React.FC = () => {
   // Use passLabel from the edge function response (stored in localStorage), 
   // with fallback to the hardcoded PASS_LABELS map
   const passLabel = payment.passLabel || PASS_LABELS[payment.passType] || `${payment.passType} Pass`;
-  const passGroup = payment.group || PASS_GROUPS[payment.passType] || '';
+  const passGroup = payment.group || PASS_GROUPS[payment.passType] || '4 people';
 
 
   const passIcons: Record<string, React.ReactNode> = {
@@ -1010,3 +987,4 @@ Enjoy your deals in Vanuatu!
 };
 
 export default PaymentConfirmation;
+
