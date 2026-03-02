@@ -1,86 +1,226 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-// 1. Fixed CORS Handshake
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-serve(async (req) => {
-  // Handle the pre-flight request from the browser
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+interface PaymentData {
+  amount: number;
+  email: string;
+  shared?: boolean;
+}
+
+interface PassDetails {
+  passLabel: string;
+  duration: string;
+  group: string;
+  isShared: boolean;
+}
+
+function getPassDetails(nAmt: number): PassDetails {
+  const dollarAmount = nAmt > 100 ? nAmt / 100 : nAmt;
+  
+  if (dollarAmount >= 99) {
+    return {
+      passLabel: 'Ultimate Crew Experience Pass',
+      duration: '7 days',
+      group: '7-8 people',
+      isShared: true
+    };
+  } else if (dollarAmount >= 49) {
+    return {
+      passLabel: 'Extended Group Adventure Pass', 
+      duration: '7 days',
+      group: '4-6 people',
+      isShared: false
+    };
+  } else if (dollarAmount >= 15) {
+    return {
+      passLabel: 'Family Explorer Pass',
+      duration: '1 day', 
+      group: '2 adults & 2 kids',
+      isShared: false
+    };
+  } else {
+    return {
+      passLabel: 'Basic Pass',
+      duration: '1 day',
+      group: '1-2 people',
+      isShared: false
+    };
+  }
+}
+async function sendReceipt(email: string, amount: number, passDetails: PassDetails) {
+  const sendGridApiKey = Deno.env.get('SENDGRID_API_KEY');
+  
+  if (!sendGridApiKey) {
+    console.warn('SendGrid API key not configured - skipping email');
+    return;
+  }
 
   try {
-    const body = await req.json();
-    console.log("RECEIVED FROM WEBSITE:", JSON.stringify(body));
-
-    // 2. Smart Price Detection (Checks every possible name for the price)
-    const rawAmt = body.amount || body.unit_amount || body.price || body.total || 0;
-    let nAmt = Number(rawAmt);
+    const dollarAmount = amount > 100 ? amount / 100 : amount;
     
-    // If Stripe sends 9900 (cents), convert it to 99 (dollars)
-    if (nAmt > 1000) nAmt = nAmt / 100;
+    const emailData = {
+      personalizations: [
+        {
+          to: [{ email: email }],
+          subject: 'Payment Confirmation - Stikmnek Adventure Pass'
+        }
+      ],
+      from: { email: 'noreply@stikmnek.com' },
+      content: [
+        {
+          type: 'text/html',
+          value: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #2c5530;">Payment Confirmation</h2>
+            <p>Thank you for your Stikmnek adventure purchase!</p>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #2c5530;">
+              <h3 style="margin-top: 0; color: #2c5530;">Purchase Details:</h3>
+              <p><strong>Pass Type:</strong> ${passDetails.passLabel}</p>
+              <p><strong>Duration:</strong> ${passDetails.duration}</p>
+              <p><strong>Group Size:</strong> ${passDetails.group}</p>
+              <p><strong>Amount Paid:</strong> A$${dollarAmount.toFixed(2)}</p>
+              ${passDetails.isShared ? '<p style="color: #28a745;"><strong>✓ Shared Group Experience</strong></p>' : ''}
+            </div>
+            <p style="margin-top: 20px;">Your adventure awaits! We will see you soon.</p>
+            <p style="color: #666; font-size: 12px;">This is an automated confirmation email.</p>
+          </div>`
+        }
+      ]
+    };
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${sendGridApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(emailData),
+    });
 
-    // 3. Tier Logic for Pass Labels and Groups
-    let details = { label: "Family Explorer Pass", group: "2 adults & 2 kids", days: 1 };
-    
-    if (nAmt >= 90) {
-      details = { label: "Ultimate Crew Experience Pass", group: "7-8 people", days: 7 };
-    } else if (nAmt >= 40) {
-      details = { label: "Extended Group Adventure Pass", group: "4-6 people", days: 7 };
+    if (!response.ok) {
+      console.error('SendGrid API error:', await response.text());
     }
-
-    // 4. Expiry Date Calculation
-    const expiry = new Date();
-    expiry.setDate(expiry.getDate() + details.days);
-
-    // 5. SendGrid Email Notification
-    const SG_KEY = Deno.env.get('SENDGRID_API_KEY');
-    const customerEmail = body.email || body.customer_email;
-    
-    if (SG_KEY && customerEmail) {
-      try {
-        await fetch('https://api.sendgrid.com/v3/mail/send', {
-          method: 'POST',
-          headers: { 
-            'Authorization': `Bearer ${SG_KEY}`, 
-            'Content-Type': 'application/json' 
-          },
-          body: JSON.stringify({
-            personalizations: [{ to: [{ email: customerEmail }], subject: 'Your Pass is Ready' }],
-            from: { email: 'stikmnek@gmail.com' },
-            content: [{ type: 'text/html', value: `Confirmed: ${details.label} for A$${nAmt}` }]
-          })
-        });
-      } catch (e) {
-        console.error("Email deferred:", e.message);
-      }
-    }
-
-    // 6. Success Response (Universal Keys to fix A$0)
-    return new Response(
-      JSON.stringify({
-        success: true,
-        amount: nAmt,           // Standard
-        total: nAmt,            // Common for receipts
-        price: nAmt,            // Common for templates
-        unit_amount: nAmt,      // Stripe style
-        value: nAmt,            // General
-        currency: "AUD",
-        passLabel: details.label, 
-        group: details.group,     
-        paymentMethod: "card",
-        validUntil: expiry.toLocaleDateString('en-AU')
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
   } catch (error) {
-    console.error("Critical Error:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), { 
-      status: 200, // Keep status 200 to prevent the "Connection Failed" screen
+    console.error('Error sending email:', error);
+  }
+}
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { 
+      status: 200, 
       headers: corsHeaders 
     });
   }
-})
+
+  try {
+    if (req.method !== 'POST') {
+      return new Response(
+        JSON.stringify({ error: 'Method not allowed' }),
+        { 
+          status: 405, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const paymentData: PaymentData = await req.json();
+    
+    // Validate required fields
+    if (!paymentData.amount || !paymentData.email) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: amount and email' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Get pass details based on amount
+    const passDetails = getPassDetails(paymentData.amount);
+    const dollarAmount = paymentData.amount > 100 ? paymentData.amount / 100 : paymentData.amount;
+    
+    // Send receipt email (non-blocking)
+    sendReceipt(paymentData.email, paymentData.amount, passDetails).catch(error => {
+      console.error('Email sending failed:', error);
+    });
+
+    // Return success response with required frontend keys
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Payment processed successfully',
+        amount: dollarAmount,
+        currency: 'AUD',
+        passLabel: passDetails.passLabel,
+        group: passDetails.group,
+        duration: passDetails.duration,
+        email: paymentData.email,
+        isShared: passDetails.isShared
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  } catch (error) {
+    console.error('Error processing payment:', error);
+
+    // Check if the error is due to the inability to reach the payment server
+    if (error.message.includes('Unable to reach payment server')) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Unable to reach payment server. Please check your connection and try again.'
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Error processing payment' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+  }
+});
+
+console.log('Stikmnek payment function running');
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Payment processed successfully',
+        amount: dollarAmount,
+        currency: 'AUD',
+        passLabel: passDetails.passLabel,
+        group: passDetails.group,
+        duration: passDetails.duration,
+        email: paymentData.email,
+        isShared: passDetails.isShared
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );  } catch (error) {
+    console.error('Error processing payment:', error);
+    return new Response(
+      JSON.stringify({ error: 'Error processing payment' }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+});
+
+console.log('Stikmnek payment function running');
