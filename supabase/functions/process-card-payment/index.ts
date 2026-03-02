@@ -12,8 +12,8 @@ serve(async (req) => {
     const { amount, planType, email, shared } = await req.json()
     let pass = { name: "Tourist Pass", days: 1, people: 4 }
 
-    // Your $15, $45, and $99 Plan Logic
-    if (amount === 15) {
+    // Logic for $15, $45, and $99 using the cleaned numericAmount
+    if (numericAmount === 15) {
       pass = { name: "Family Explorer Pass", days: 1, people: shared ? 6 : 4 }
     } else if (amount === 45) {
       pass = { name: "Extended Group Adventure", days: shared ? 7 : 6, people: shared ? 6 : 4 }
