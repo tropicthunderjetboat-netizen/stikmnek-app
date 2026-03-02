@@ -58,17 +58,20 @@ serve(async (req) => {
       }
     }
 
-    // 6. Success Response (Sends all keys to fix A$0 and undefined)
+    // 6. Success Response (Universal Keys to fix A$0)
     return new Response(
       JSON.stringify({
         success: true,
-        amount: nAmt,           // For the A$99.00 display
-        total: nAmt,            // Backup for different receipt templates
+        amount: nAmt,           // Standard
+        total: nAmt,            // Common for receipts
+        price: nAmt,            // Common for templates
+        unit_amount: nAmt,      // Stripe style
+        value: nAmt,            // General
         currency: "AUD",
-        passLabel: details.label, // Fixed "undefined Pass"
-        group: details.group,     // Fixed capacity/group display
+        passLabel: details.label, 
+        group: details.group,     
         paymentMethod: "card",
-        validUntil: expiry.toLocaleDateString('en-AU') // Fixed "Invalid Date"
+        validUntil: expiry.toLocaleDateString('en-AU')
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
