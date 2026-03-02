@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 
 const PASSES = {
-  daily: { price: 15, days: 1, label: 'Family Explorer Pass', icon: Zap, color: 'from-sky-500 to-blue-600', shadow: 'shadow-sky-200', group: '2 adults & 2 kids' },
-  weekly: { price: 45, days: 6, label: 'Extended Group Adventure Pass', icon: Star, color: 'from-teal-500 to-emerald-600', shadow: 'shadow-teal-200', group: '2 adults & 2 kids' },
+  daily: { price: 15, days: 1, label: 'Family Explorer Pass', icon: Zap, color: 'from-sky-500 to-blue-600', shadow: 'shadow-sky-200', group: '4 people' },
+  weekly: { price: 45, days: 6, label: 'Extended Group Adventure Pass', icon: Star, color: 'from-teal-500 to-emerald-600', shadow: 'shadow-teal-200', group: '4 people' },
   monthly: { price: 99, days: 6, label: 'Ultimate Crew Experience Pass', icon: Crown, color: 'from-orange-500 to-amber-600', shadow: 'shadow-orange-200', group: '7 people' },
 };
 

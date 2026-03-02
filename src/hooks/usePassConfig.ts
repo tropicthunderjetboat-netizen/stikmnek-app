@@ -95,7 +95,7 @@ const DEFAULT_PASSES: PassConfig[] = [
     shadowColor: 'sky-200',
     icon: 'zap',
     features: [
-      { id: 'f1', text: 'Valid for 2 adults & 2 kids', textFr: 'Valable pour 2 adultes et 2 enfants', textBi: '2 bigman mo 2 pikinini' },
+      { id: 'f1', text: 'Valid for 4 people', textFr: 'Valable pour 4 personnes', textBi: '4 man' },
       { id: 'f2', text: 'Access all deals for 1 day', textFr: 'Accès à toutes les offres pendant 1 jour', textBi: 'Akses olgeta dils blong 1 dei' },
       { id: 'f3', text: 'QR code coupons', textFr: 'Coupons QR code', textBi: 'QR kod kupons' },
       { id: 'f4', text: 'Map navigation', textFr: 'Navigation carte', textBi: 'Map navigesen' },
@@ -137,7 +137,7 @@ const DEFAULT_PASSES: PassConfig[] = [
     shadowColor: 'teal-200',
     icon: 'star',
     features: [
-      { id: 'f1', text: 'Valid for 2 adults & 2 kids', textFr: 'Valable pour 2 adultes et 2 enfants', textBi: '2 bigman mo 2 pikinini' },
+      { id: 'f1', text: 'Valid for 4 people', textFr: 'Valable pour 4 personnes', textBi: '4 man' },
       { id: 'f2', text: '6 days of unlimited deals', textFr: '6 jours d\'offres illimitées', textBi: '6 dei blong dils we i no gat limit' },
       { id: 'f3', text: 'QR code coupons', textFr: 'Coupons QR code', textBi: 'QR kod kupons' },
       { id: 'f4', text: 'Map navigation', textFr: 'Navigation carte', textBi: 'Map navigesen' },
@@ -160,9 +160,9 @@ const DEFAULT_PASSES: PassConfig[] = [
       extraDays: 1,
       extraPeople: 0,
       extraKids: 2,
-      description: 'Share the app to get 1 extra day free (7 total) and add 2 more kids',
-      descriptionFr: 'Partagez l\'app pour obtenir 1 jour gratuit (7 au total) et ajouter 2 enfants',
-      descriptionBi: 'Serem app blong kasem 1 fri dei (7 totol) mo ademap 2 moa pikinini',
+      description: 'Share the app to get 1 extra day free (7 total) and add 2 people',
+      descriptionFr: 'Partagez l\'app pour obtenir 1 jour gratuit (7 au total) et ajouter 2 personnes',
+      descriptionBi: 'Serem app blong kasem 1 fri dei (7 totol) mo ademap 2 moa man',
     },
   },
   {
