@@ -81,21 +81,19 @@ serve(async (req) => {
     sendReceipt(paymentData.email, paymentData.amount, passDetails).catch(console.error);
 
 return new Response(
-      JSON.stringify({
-        success: true,
-        amount: nAmt,
-        passType: nAmt >= 99 ? 'monthly' : nAmt >= 45 ? 'weekly' : 'daily',
-        passLabel: details.label,
-        group: details.group,
-        currency: "AUD"
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } 
-});
-
+      JSON.stringify(data),
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+        status: 200 
+      }
+    );
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400,
-    });
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
+        status: 400 
+      }
+    );
   }
 });
