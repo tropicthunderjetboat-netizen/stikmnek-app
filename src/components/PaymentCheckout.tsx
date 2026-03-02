@@ -361,7 +361,7 @@ const PaymentCheckout: React.FC = () => {
 
        const paymentResultData = {
   receiptNumber: data.receiptNumber || `REC-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-  passType: selectedPassType,
+  passType: cart.passType, // or whatever variable holds your 'daily'/'weekly'/'monthly' string
   passLabel: data.passLabel || selectedPass.label, 
   group: data.group || selectedPass.group, 
   amount: data.amount || selectedPass.price, // This fixes the A$0
