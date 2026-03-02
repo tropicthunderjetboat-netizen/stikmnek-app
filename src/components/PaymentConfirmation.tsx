@@ -640,7 +640,6 @@ const PaymentConfirmation: React.FC = () => {
   // Use passLabel from the edge function response (stored in localStorage), 
   // with fallback to the hardcoded PASS_LABELS map
   const passLabel = payment?.passLabel || (payment?.passType ? PASS_LABELS[payment.passType] : 'Family Explorer Pass');
-const passGroup = payment?.group || (payment?.passType ? PASS_GROUPS[payment.passType] : '4 people');
   const passGroup = payment.group || PASS_GROUPS[payment.passType] || '4 people';
 
 
@@ -767,7 +766,7 @@ Enjoy your deals in Vanuatu!
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-                  {payment?.passType ? passIcons[payment.passType] : <Zap className="w-6 h-6" />}
+              {payment?.passType ? passIcons[payment.passType] : <Zap className="w-6 h-6" />}
                 </div>
                 <div>
                   <p className="text-white/80 text-sm font-medium">StikmNek</p>
