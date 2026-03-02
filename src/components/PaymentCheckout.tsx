@@ -345,21 +345,25 @@ const PaymentCheckout: React.FC = () => {
         setPaymentResult(data);
         setStep('success');
 
-        // Store payment result for confirmation page
         const paymentResultData = {
           receiptNumber: data.receiptNumber,
           passType: data.passType,
+          passLabel: data.passLabel || selectedPass.label,
           amount: data.amount,
-          paymentMethod: 'card',
+          currency: data.currency || 'AUD',
+          paymentMethod: data.paymentMethod || 'card',
           expiresAt: data.expiresAt,
           validFrom: data.validFrom,
           validUntil: data.validUntil,
           days: data.days,
+          group: data.group || selectedPass.group,
           sessionId: data.sessionId,
           completedAt: new Date().toISOString(),
           cardLast4: data.cardLast4,
+          paypalOrderId: data.paypalOrderId,
         };
         localStorage.setItem('lastPayment', JSON.stringify(paymentResultData));
+
 
         // Clear referral code after successful purchase
         try { localStorage.removeItem('stikmnek-referral-code'); } catch {}

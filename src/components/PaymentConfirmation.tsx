@@ -12,16 +12,21 @@ import { getPassDisplayName } from '@/hooks/usePassConfig';
 interface PaymentResult {
   receiptNumber: string;
   passType: string;
+  passLabel?: string;
   amount: number;
+  currency?: string;
   paymentMethod: string;
   expiresAt: string;
   validFrom?: string;
   validUntil?: string;
   days?: number;
+  group?: string;
   sessionId: string;
   completedAt: string;
   cardLast4?: string;
+  paypalOrderId?: string;
 }
+
 
 
 const PASS_LABELS: Record<string, string> = {
@@ -655,8 +660,11 @@ const PaymentConfirmation: React.FC = () => {
     );
   }
 
-  const passLabel = PASS_LABELS[payment.passType] || `${payment.passType} Pass`;
-  const passGroup = PASS_GROUPS[payment.passType] || '';
+  // Use passLabel from the edge function response (stored in localStorage), 
+  // with fallback to the hardcoded PASS_LABELS map
+  const passLabel = payment.passLabel || PASS_LABELS[payment.passType] || `${payment.passType} Pass`;
+  const passGroup = payment.group || PASS_GROUPS[payment.passType] || '';
+
 
   const passIcons: Record<string, React.ReactNode> = {
     daily: <Zap className="w-6 h-6" />,
