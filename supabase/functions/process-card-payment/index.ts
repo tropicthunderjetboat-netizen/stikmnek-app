@@ -3,39 +3,27 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { amount, details } = await req.json();
+    const { amount } = await req.json();
     const nAmt = Number(amount);
 
-    // This ensures the server sends back the NEW group sizes for the receipt
-    const data = {
-      success: true,
-      amount: nAmt,
-      passType: nAmt >= 99 ? 'monthly' : nAmt >= 45 ? 'weekly' : 'daily',
-      passLabel: details?.label || 'Pass',
-      group: nAmt >= 99 ? '7 people' : '4 people',
-      receiptNumber: `REC-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      completedAt: new Date().toISOString()
-    };
-
-   // Use 'pType' (which we defined from the price) instead of 'selectedPassType'
     const pType = nAmt >= 99 ? 'monthly' : nAmt >= 45 ? 'weekly' : 'daily';
+    const days = nAmt >= 99 ? 6 : nAmt >= 45 ? 6 : 1;
 
     return new Response(
       JSON.stringify({
         success: true,
-        passType: pType, // <--- Use the variable we just made
+        passType: pType,
         amount: nAmt,
-        group: pType === 'monthly' ? '7 people' : '4 people',
+        days: days, // This fixes the "? day" on your receipt
+        group: pType === 'monthly' ? '7 people' : '4 people', // This fixes the "4 people" on $99 pass
         receiptNumber: `REC-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
         completedAt: new Date().toISOString()
       }),
