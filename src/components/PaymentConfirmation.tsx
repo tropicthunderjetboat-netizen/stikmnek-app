@@ -641,8 +641,7 @@ const PaymentConfirmation: React.FC = () => {
   // with fallback to the hardcoded PASS_LABELS map
   const passLabel = payment?.passLabel || (payment?.passType ? PASS_LABELS[payment.passType] : 'Family Explorer Pass');
   // This prioritizes the 'group' sent by your Edge Function (the 7 people you just added)
-const passGroup = payment?.group || (payment?.passType ? PASS_GROUPS[payment.passType] : '7 people');
-
+const passGroup = payment?.group || (payment?.amount >= 99 ? '7 people' : '4 people');
 
   const passIcons: Record<string, React.ReactNode> = {
     daily: <Zap className="w-6 h-6" />,
@@ -821,8 +820,7 @@ Enjoy your deals in Vanuatu!
                 </div>
                 <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
                   <div className="px-3 py-1 rounded-full bg-teal-600 text-white text-[10px] font-bold shadow-sm">
-                    {payment?.days || (payment?.amount >= 99 ? 6 : '?')} day{(payment?.days || (payment?.amount >= 99 ? 6 : 0)) > 1 ? 's' : ''}
-                  </div>
+{payment?.days || (payment?.amount >= 99 ? 6 : '?')} day{(payment?.days || (payment?.amount >= 99 ? 6 : 0)) > 1 ? 's' : ''}                  </div>
                   <div className="w-8 h-0.5 bg-teal-300 rounded-full" />
                 </div>
                 <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200 shadow-sm">
@@ -866,8 +864,7 @@ Enjoy your deals in Vanuatu!
                   <span className="text-xs text-gray-400 font-medium">Pass Duration</span>
                 </div>
                 <p className="text-sm font-semibold text-gray-900">
-                  {payment?.days || (payment?.amount >= 99 ? 6 : '?')} day{(payment?.days || (payment?.amount >= 99 ? 6 : 0)) > 1 ? 's' : ''}
-                </p>
+{payment?.days || (payment?.amount >= 99 ? 6 : '?')} day{(payment?.days || (payment?.amount >= 99 ? 6 : 0)) > 1 ? 's' : ''}                </p>
               </div>
 
               <div className="p-4 rounded-xl bg-gray-50">
