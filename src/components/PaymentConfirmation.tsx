@@ -596,11 +596,11 @@ const PaymentConfirmation: React.FC = () => {
           user_name: user.name,
           user_email: user.email,
           receipt_number: payment.receiptNumber,
-          // Use our corrected variables here:
-          pass_type: payment.passType,
-          pass_label: passLabel,  // Send the "Ultimate Crew" text
-          pass_group: passGroup,  // Send the "7 people" text
-          pass_days: passDays,    // Send the "6" days number
+          // ─── ADD THESE NEW LINES TO FIX THE HANG ───
+          pass_label: passLabel,
+          pass_group: passGroup,
+          pass_days: passDays,
+          // ──────────────────────────────────────────
           amount: payment.amount,
           currency: 'AUD',
           payment_method: payment.paymentMethod === 'card'
@@ -611,11 +611,15 @@ const PaymentConfirmation: React.FC = () => {
         },
       });
 
+      if (error) throw error; // This stops the hanging and shows the error
+
       if (data?.success) {
         setEmailSent(true);
+        toast.success('Confirmation email sent!');
       }
     } catch (err) {
       console.error("Email failed:", err);
+      toast.error('Could not send email. Please check your internet or try again later.');
     } finally {
       setSendingEmail(false);
     }
