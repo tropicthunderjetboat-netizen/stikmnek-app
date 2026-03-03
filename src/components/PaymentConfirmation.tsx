@@ -597,6 +597,9 @@ const PaymentConfirmation: React.FC = () => {
           user_email: user.email,
           receipt_number: payment.receiptNumber,
           pass_type: payment.passType,
+          pass_label: passLabel, // Added this
+          pass_group: passGroup, // Added this
+          pass_days: passDays,   // Added this
           amount: payment.amount,
           currency: 'AUD',
           payment_method: payment.paymentMethod === 'card'
@@ -605,8 +608,6 @@ const PaymentConfirmation: React.FC = () => {
           valid_from: payment.validFrom,
           valid_until: payment.validUntil,
         },
-      });
-
       if (data?.success) {
         setEmailSent(true);
       }
