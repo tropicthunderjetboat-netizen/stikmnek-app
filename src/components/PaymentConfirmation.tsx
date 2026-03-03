@@ -637,18 +637,29 @@ const PaymentConfirmation: React.FC = () => {
     );
   }
 
-  // Use passLabel from the edge function response (stored in localStorage), 
-  // with fallback to the hardcoded PASS_LABELS map
-  const passLabel = payment?.passLabel || (payment?.passType ? PASS_LABELS[payment.passType] : 'Family Explorer Pass');
-  // This prioritizes the 'group' sent by your Edge Function (the 7 people you just added)
-const passGroup = payment?.group || (payment?.amount >= 99 ? '7 people' : '4 people');
+// 1. Define if this is the $99 pass
+  const isUltimate = payment?.amount >= 99;
+
+  // 2. Force the correct Label (Ultimate Crew)
+  const passLabel = isUltimate 
+    ? 'Ultimate Crew Experience Pass' 
+    : (payment?.passLabel || (payment?.passType ? PASS_LABELS[payment.passType] : 'Pass'));
+
+  // 3. Force the correct Group (7 people)
+  const passGroup = isUltimate 
+    ? '7 people' 
+    : (payment?.group || (payment?.passType ? PASS_GROUPS[payment.passType] : '4 people'));
+
+  // 4. Force the correct Days (6 days)
+  const passDays = isUltimate 
+    ? 6 
+    : (payment?.days || (payment?.amount >= 45 ? 6 : 1));
 
   const passIcons: Record<string, React.ReactNode> = {
     daily: <Zap className="w-6 h-6" />,
     weekly: <Star className="w-6 h-6" />,
     monthly: <Crown className="w-6 h-6" />,
   };
-
   const passColors: Record<string, string> = {
     daily: 'from-sky-500 to-blue-600',
     weekly: 'from-teal-500 to-emerald-600',
@@ -689,8 +700,7 @@ ITEM DETAILS
 ─────────────────────────────────────
 Pass: ${passLabel}
 Group: ${passGroup}
-Duration: ${payment.days || '?'} day(s)
-
+Duration: ${passDays} day(s)
 ─────────────────────────────────────
 DISCOUNT VALIDITY PERIOD
 ─────────────────────────────────────
@@ -820,7 +830,8 @@ Enjoy your deals in Vanuatu!
                 </div>
                 <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
                   <div className="px-3 py-1 rounded-full bg-teal-600 text-white text-[10px] font-bold shadow-sm">
-{payment?.days || (payment?.amount >= 99 ? 6 : '?')} day{(payment?.days || (payment?.amount >= 99 ? 6 : 0)) > 1 ? 's' : ''}                  </div>
+{passDays} day{passDays > 1 ? 's' : ''}         
+        </div>
                   <div className="w-8 h-0.5 bg-teal-300 rounded-full" />
                 </div>
                 <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200 shadow-sm">
@@ -864,7 +875,7 @@ Enjoy your deals in Vanuatu!
                   <span className="text-xs text-gray-400 font-medium">Pass Duration</span>
                 </div>
                 <p className="text-sm font-semibold text-gray-900">
-{payment?.days || (payment?.amount >= 99 ? 6 : '?')} day{(payment?.days || (payment?.amount >= 99 ? 6 : 0)) > 1 ? 's' : ''}                </p>
+{passDays} day{passDays > 1 ? 's' : ''}                </p>
               </div>
 
               <div className="p-4 rounded-xl bg-gray-50">
