@@ -596,10 +596,11 @@ const PaymentConfirmation: React.FC = () => {
           user_name: user.name,
           user_email: user.email,
           receipt_number: payment.receiptNumber,
+          // Use our corrected variables here:
           pass_type: payment.passType,
-          pass_label: passLabel, // Added this
-          pass_group: passGroup, // Added this
-          pass_days: passDays,   // Added this
+          pass_label: passLabel,  // Send the "Ultimate Crew" text
+          pass_group: passGroup,  // Send the "7 people" text
+          pass_days: passDays,    // Send the "6" days number
           amount: payment.amount,
           currency: 'AUD',
           payment_method: payment.paymentMethod === 'card'
@@ -608,11 +609,13 @@ const PaymentConfirmation: React.FC = () => {
           valid_from: payment.validFrom,
           valid_until: payment.validUntil,
         },
+      });
+
       if (data?.success) {
         setEmailSent(true);
       }
     } catch (err) {
-      // silently fail
+      console.error("Email failed:", err);
     } finally {
       setSendingEmail(false);
     }
