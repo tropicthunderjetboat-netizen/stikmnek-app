@@ -596,7 +596,7 @@ const PaymentConfirmation: React.FC = () => {
           user_name: user.name,
           user_email: user.email,
           receipt_number: payment.receiptNumber,
-          // ─── ADD THESE NEW LINES TO FIX THE HANG ───
+          // ─── THESE LINES FIX THE EMAIL CONTENT ───
           pass_label: passLabel,
           pass_group: passGroup,
           pass_days: passDays,
@@ -611,7 +611,8 @@ const PaymentConfirmation: React.FC = () => {
         },
       });
 
-      if (error) throw error; // This stops the hanging and shows the error
+      // This line stops the "hanging" by actually reporting the error
+      if (error) throw error; 
 
       if (data?.success) {
         setEmailSent(true);
@@ -619,7 +620,7 @@ const PaymentConfirmation: React.FC = () => {
       }
     } catch (err) {
       console.error("Email failed:", err);
-      toast.error('Could not send email. Please check your internet or try again later.');
+      toast.error('Could not send email. Please check your internet or Supabase logs.');
     } finally {
       setSendingEmail(false);
     }
