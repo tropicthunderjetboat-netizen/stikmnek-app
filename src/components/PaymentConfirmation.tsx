@@ -596,11 +596,11 @@ const sendConfirmationEmail = async () => {
           user_name: user.name,
           user_email: user.email,
           receipt_number: payment.receiptNumber,
-          // ─── ADD THESE TO FIX THE DATA ───
+          // ─── THESE 3 LINES SYNC THE EMAIL DATA ───
           pass_label: passLabel,
           pass_group: passGroup,
           pass_days: passDays,
-          // ─────────────────────────────────
+          // ──────────────────────────────────────────
           amount: payment.amount,
           currency: 'AUD',
           payment_method: payment.paymentMethod === 'card'
@@ -611,18 +611,19 @@ const sendConfirmationEmail = async () => {
         },
       });
 
-      // THIS LINE STOPS THE HANGING
+      // This line stops the "hanging" by reporting the error to the 'catch' block
       if (error) throw error; 
 
       if (data?.success) {
         setEmailSent(true);
         toast.success('Confirmation email sent!');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Email failed:", err);
-      // THIS TELLS YOU WHAT WENT WRONG
-      toast.error('Email failed to send. Check your Supabase logs.');
+      // This ensures the spinner stops and you see the problem
+      toast.error(err.message || 'Email failed to send. Check Supabase logs.');
     } finally {
+      // This is the most important part to stop the hanging spinner
       setSendingEmail(false);
     }
   };
