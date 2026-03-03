@@ -640,7 +640,8 @@ const PaymentConfirmation: React.FC = () => {
   // Use passLabel from the edge function response (stored in localStorage), 
   // with fallback to the hardcoded PASS_LABELS map
   const passLabel = payment?.passLabel || (payment?.passType ? PASS_LABELS[payment.passType] : 'Family Explorer Pass');
-  const passGroup = payment.group || PASS_GROUPS[payment.passType] || '4 people';
+  // This prioritizes the 'group' sent by your Edge Function (the 7 people you just added)
+const passGroup = payment?.group || (payment?.passType ? PASS_GROUPS[payment.passType] : '7 people');
 
 
   const passIcons: Record<string, React.ReactNode> = {
@@ -820,7 +821,7 @@ Enjoy your deals in Vanuatu!
                 </div>
                 <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
                   <div className="px-3 py-1 rounded-full bg-teal-600 text-white text-[10px] font-bold shadow-sm">
-                    {payment.days || '?'} day{(payment.days || 0) > 1 ? 's' : ''}
+                    {payment?.days || (payment?.amount >= 99 ? 6 : '?')} day{(payment?.days || (payment?.amount >= 99 ? 6 : 0)) > 1 ? 's' : ''}
                   </div>
                   <div className="w-8 h-0.5 bg-teal-300 rounded-full" />
                 </div>
@@ -865,7 +866,7 @@ Enjoy your deals in Vanuatu!
                   <span className="text-xs text-gray-400 font-medium">Pass Duration</span>
                 </div>
                 <p className="text-sm font-semibold text-gray-900">
-                  {payment.days || '?'} day{(payment.days || 0) > 1 ? 's' : ''}
+                  {payment?.days || (payment?.amount >= 99 ? 6 : '?')} day{(payment?.days || (payment?.amount >= 99 ? 6 : 0)) > 1 ? 's' : ''}
                 </p>
               </div>
 
