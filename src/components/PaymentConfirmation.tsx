@@ -587,7 +587,7 @@ const PaymentConfirmation: React.FC = () => {
 
 const sendConfirmationEmail = async () => {
     if (!payment || !user?.email) return;
-    setSendingEmail(true);
+    setSendingEmail(true); // This starts the spinner
     
     try {
       const { data, error } = await supabase.functions.invoke('send-email', {
@@ -610,26 +610,25 @@ const sendConfirmationEmail = async () => {
         },
       });
 
-      // If the server tells us there is an error, stop here and show it
-      if (error) throw error;
+      if (error) throw error; // Stops the hang if server crashes
 
       if (data?.success) {
         setEmailSent(true);
         toast.success('Confirmation email sent!');
       } else {
-        // If the server responded but didn't send the email
         throw new Error(data?.error || 'Failed to send');
       }
 
     } catch (err: any) {
       console.error("Email failed:", err);
-      toast.error('Email failed to send. Please check your connection.');
+      // This tells you what actually happened
+      toast.error(err.message || 'Email failed to send.'); 
     } finally {
-      // THIS IS THE KEY: This tells the button to stop "spinning" no matter what
-      setSendingEmail(false);
+      // 🚨 THIS IS THE FIX: This stops the spinner no matter what!
+      setSendingEmail(false); 
     }
-  };
-  if (!payment) {
+  };  
+if (!payment) {
     return (
       <div className="min-h-screen bg-gray-50 pt-20 pb-16">
         <div className="max-w-lg mx-auto px-4 text-center pt-20">
