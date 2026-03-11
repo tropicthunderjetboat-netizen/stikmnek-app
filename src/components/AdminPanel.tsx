@@ -192,11 +192,26 @@ const AdminPanel: React.FC = () => {
 
 
   // ─── Load pending businesses ───
+  // Strategy 1: RPC (bypasses RLS, most reliable for admins)
+  // Strategy 2: Edge Function
+  // Strategy 3: Direct query (may be blocked by RLS if policies missing)
   const loadPending = useCallback(async (showToast = false) => {
     if (!user || loadingRef.current) return;
     loadingRef.current = true;
     setLoadingPending(true);
     try {
+      // Strategy 1: RPC — bypasses RLS, guaranteed to work for admins
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_pending_businesses_for_admin');
+      if (!rpcError && Array.isArray(rpcData)) {
+        setPendingBusinesses((rpcData || []) as PendingBusiness[]);
+        loadAllPhotos((rpcData || []) as PendingBusiness[]);
+        if (showToast) toast.success(`Loaded ${(rpcData || []).length} pending submission(s)`);
+        setLastRefreshed(new Date());
+        retryCountRef.current = 0;
+        return;
+      }
+
+      // Strategy 2: Edge Function
       const { data, error } = await invokeWithRetry('manage-business', {
         action: 'get_pending', userId: user.id, isAdmin: true,
       });
@@ -209,9 +224,9 @@ const AdminPanel: React.FC = () => {
         retryCountRef.current = 0;
         return;
       }
-      if (error || data?.error || !data?.businesses) {
-        await loadPendingDirect(showToast);
-      }
+
+      // Strategy 3: Direct query fallback
+      await loadPendingDirect(showToast);
     } catch (err: any) {
       await loadPendingDirect(showToast);
     } finally {
