@@ -284,9 +284,16 @@ const AdminPanel: React.FC = () => {
     if (!user) return;
     setLoadingEdits(true);
     try {
+      // Strategy 1: RPC (bypasses RLS)
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_pending_edits_for_admin');
+      if (!rpcError && Array.isArray(rpcData)) {
+        setPendingEdits((rpcData || []) as PendingEdit[]);
+        if (showToast && (rpcData?.length ?? 0) > 0) toast.success(`Loaded ${rpcData.length} pending edit(s)`);
+        return;
+      }
+      // Strategy 2: Edge Function
       const { data, error } = await supabase.functions.invoke('manage-business', { body: { action: 'get_pending_edits', userId: user.id, isAdmin: true } });
-      if (error) throw error;
-      if (data?.edits && Array.isArray(data.edits)) {
+      if (!error && data?.edits && Array.isArray(data.edits)) {
         const pendingOnly = data.edits.filter((e: PendingEdit) => e.status === 'pending');
         setPendingEdits(pendingOnly);
         return;
@@ -601,6 +608,7 @@ const AdminPanel: React.FC = () => {
   const handleReviewBusiness = async (businessId: string, decision: 'approved' | 'rejected') => {
     setProcessingId(businessId);
     const biz = pendingBusinesses.find(b => b.id === businessId);
+    let rpcErrorMsg: string | null = null;
     try {
       // Strategy 1: RPC (bypasses Edge Function, most reliable)
       const { data: rpcData, error: rpcError } = await supabase.rpc('review_pending_business', {
@@ -608,6 +616,8 @@ const AdminPanel: React.FC = () => {
         p_decision: decision,
         p_admin_notes: adminNotes[businessId] || '',
       });
+
+      if (rpcError) rpcErrorMsg = rpcError.message;
 
       if (!rpcError && rpcData?.success) {
         setPendingBusinesses(prev => prev.filter(b => b.id !== businessId));
@@ -689,7 +699,8 @@ const AdminPanel: React.FC = () => {
         }
       }
     } catch (err: any) {
-      toast.error('Failed to process review: ' + (err.message || 'Unknown error'));
+      const msg = rpcErrorMsg || err?.message || 'Unknown error';
+      toast.error('Failed to process review: ' + msg);
     } finally {
       setProcessingId(null);
     }
