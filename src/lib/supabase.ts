@@ -250,14 +250,20 @@ export async function directProfileInsert(params: {
     if (existing) {
       console.log('[directProfileInsert] Profile already exists — checking if new columns need updating');
 
+      // NEVER downgrade admin — admins may be set via SQL/Dashboard, not signup metadata
+      const existingRole = (existing.role || existing.user_type || '').toLowerCase();
+      if (existingRole === 'admin') {
+        console.log('[directProfileInsert] Preserving existing admin role');
+        return { success: true, profile: existing };
+      }
+
       // If the trigger created the row but didn't populate name/full_name/user_type, update them.
-      // IMPORTANT: Always overwrite role/user_type when they don't match the signup choice —
-      // the trigger may have defaulted to 'tourist' if metadata wasn't available yet.
+      // Overwrite role/user_type when they don't match signup choice (but never downgrade admin).
       const needsUpdate =
         !existing.name ||
         !existing.full_name ||
         !existing.user_type ||
-        existing.role !== params.userType;
+        (existing.role !== params.userType && existingRole !== 'admin');
 
       if (needsUpdate) {
         console.log('[directProfileInsert] Updating profile — userType:', params.userType);
