@@ -15,6 +15,8 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1N
 // ═══════════════════════════════════════════════════════════════
 // DERIVED ENDPOINTS — These are the exact URLs the SDK calls.
 // ═══════════════════════════════════════════════════════════════
+export const SUPABASE_URL = supabaseUrl;
+
 export const ENDPOINTS = {
   auth:      `${supabaseUrl}/auth/v1`,
   rest:      `${supabaseUrl}/rest/v1`,

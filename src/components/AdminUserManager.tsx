@@ -171,6 +171,13 @@ const AdminUserManager: React.FC = () => {
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
+      // Strategy 1: RPC (bypasses RLS, admin-only)
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_for_admin');
+      if (!rpcError && Array.isArray(rpcData)) {
+        setUsers((rpcData || []) as UserProfile[]);
+        return;
+      }
+      // Strategy 2: Direct query (may fail if RLS blocks)
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')

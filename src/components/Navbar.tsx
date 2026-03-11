@@ -37,12 +37,8 @@ const Navbar: React.FC = () => {
         { key: 'business-dashboard', view: 'business-dashboard', icon: <Store className="w-4 h-4" />, label: language === 'en' ? 'My Business' : language === 'fr' ? 'Mon Entreprise' : 'Bisnis Blong Mi' },
       );
     } else if (user.type === 'admin') {
-      // Admin gets both dashboards
-      navItems.push(
-        { key: 'dashboard', view: 'dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: t('nav.dashboard', language) },
-        { key: 'business-dashboard', view: 'business-dashboard', icon: <Store className="w-4 h-4" />, label: language === 'en' ? 'Business Hub' : 'Hub Entreprise' },
-        { key: 'admin', view: 'admin', icon: <Shield className="w-4 h-4" />, label: t('nav.admin', language) },
-      );
+      // Admin: only Admin panel (no My Dashboard or Business Hub)
+      navItems.push({ key: 'admin', view: 'admin', icon: <Shield className="w-4 h-4" />, label: t('nav.admin', language) });
     }
   }
 
@@ -153,7 +149,7 @@ const Navbar: React.FC = () => {
             {user ? (
               <div className="hidden sm:flex items-center gap-2">
                 <button
-                  onClick={() => setCurrentView(user.type === 'business' ? 'business-dashboard' : 'dashboard')}
+                  onClick={() => setCurrentView(user.type === 'admin' ? 'admin' : user.type === 'business' ? 'business-dashboard' : 'dashboard')}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
                 >
                   {user.avatarUrl ? (

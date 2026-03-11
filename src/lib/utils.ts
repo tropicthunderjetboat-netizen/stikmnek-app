@@ -15,3 +15,21 @@ export function formatVT(amount: number | string): string {
   if (isNaN(num)) return 'VT 0';
   return `VT ${Math.round(num).toLocaleString('en-US')}`;
 }
+
+/**
+ * Resolve display URL for a business photo.
+ * Uses url if valid; otherwise builds public URL from file_path (Supabase storage).
+ */
+export function getPhotoDisplayUrl(
+  photo: { url?: string; file_path?: string },
+  supabaseUrl: string
+): string {
+  const u = photo?.url?.trim();
+  if (u && (u.startsWith('http://') || u.startsWith('https://'))) return u;
+  const fp = photo?.file_path?.trim();
+  if (fp) {
+    const base = supabaseUrl.replace(/\/$/, '');
+    return `${base}/storage/v1/object/public/business-photos/${fp.replace(/^\//, '')}`;
+  }
+  return '';
+}

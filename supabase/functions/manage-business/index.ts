@@ -537,9 +537,34 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ─── ADMIN_DELETE_USER (stub - complex operation) ───
+    // ─── ADMIN_DELETE_USER ───
     if (action === 'admin_delete_user') {
-      return errorResponse('admin_delete_user not implemented in this function', 501);
+      const targetUserId = body.targetUserId || body.userId;
+      if (!targetUserId) return errorResponse('Missing targetUserId');
+
+      // Verify caller is admin
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('user_id', authUser.id)
+        .single();
+      if (profile?.role !== 'admin') {
+        return errorResponse('Admin access required', 403);
+      }
+
+      // Prevent deleting self
+      if (targetUserId === authUser.id) {
+        return errorResponse('Cannot delete your own account', 400);
+      }
+
+      // Delete from auth.users via Admin API
+      const { error: deleteErr } = await supabase.auth.admin.deleteUser(targetUserId);
+      if (deleteErr) {
+        console.error('[manage-business] admin_delete_user:', deleteErr);
+        return errorResponse(deleteErr.message || 'Failed to delete user', 500);
+      }
+
+      return jsonResponse({ success: true });
     }
 
     return errorResponse('Unknown action: ' + action, 400);

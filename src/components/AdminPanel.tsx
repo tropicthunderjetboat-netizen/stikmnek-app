@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as hardcodedBusinesses, Business } from '@/data/businesses';
 
-import { supabase } from '@/lib/supabase';
+import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   BarChart3, Users, TrendingUp, DollarSign, Store, Eye, Download,
@@ -12,7 +12,7 @@ import {
   Wifi, WifiOff, Mail, Trash2, AlertTriangle, X, MapPin, Phone, Tag, Save,
   Globe, Percent, CreditCard
 } from 'lucide-react';
-import { formatVT } from '@/lib/utils';
+import { formatVT, getPhotoDisplayUrl } from '@/lib/utils';
 import PricingDiscountFields from './PricingDiscountFields';
 
 import EmailReceiptManager from './EmailReceiptManager';
@@ -1125,7 +1125,7 @@ const AdminPanel: React.FC = () => {
                                 )}
                               </p>
                               {/* Bulk actions for photos */}
-                              {pendingPhotos.length > 1 && (
+                              {pendingPhotos.length >= 1 && (
                                 <div className="flex items-center gap-2">
                                   <button
                                     onClick={() => handleBulkPhotoReview(photos, 'approved')}
@@ -1153,7 +1153,7 @@ const AdminPanel: React.FC = () => {
                                   {/* Photo */}
                                   <div className="relative">
                                     <img
-                                      src={photo.url}
+                                      src={getPhotoDisplayUrl(photo, SUPABASE_URL) || photo.url || '/placeholder.svg'}
                                       alt={`Photo ${idx + 1}`}
                                       className="w-full h-40 object-cover"
                                       onError={(e) => {
