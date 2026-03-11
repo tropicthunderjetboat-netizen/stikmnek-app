@@ -781,7 +781,59 @@ const BusinessOwnerDashboard: React.FC = () => {
         isMain: index === 0,
       }));
 
-      // Strategy 1: Edge function (with retry for transient failures)
+      // Strategy 1: RPC insert (SECURITY DEFINER, bypasses RLS — most reliable)
+      const { data: rpcId, error: rpcError } = await supabase.rpc('insert_pending_business', {
+        p_owner_id: user?.id,
+        p_name: submitForm.name,
+        p_category: submitForm.category,
+        p_description: submitForm.description,
+        p_discount: submitForm.discount || '',
+        p_original_price: origPrice,
+        p_deal_price: dlPrice,
+        p_location: submitForm.location || 'Port Vila, Vanuatu',
+        p_phone: submitForm.phone,
+        p_email: submitForm.email || user?.email,
+        p_hours: submitForm.hours,
+        p_image: mainImageUrl,
+        p_map_url: submitForm.mapUrl || null,
+        p_website: submitForm.website || null,
+        p_discount_valid_from: submitForm.discountValidFrom || null,
+        p_discount_valid_until: discountValidUntil || null,
+        p_whatsapp_number: submitForm.whatsappNumber || null,
+      });
+
+      if (!rpcError && rpcId) {
+        const directData = { id: rpcId };
+        if (directData.id && submitPhotos.length > 0 && user) {
+          const photoRecords = submitPhotos.map((photo, index) => ({
+            business_id: directData.id,
+            url: photo.url,
+            file_path: photo.filePath,
+            uploaded_by: user.id,
+            is_main: index === 0,
+            status: 'pending',
+          }));
+          await supabase.from('business_photos').insert(photoRecords);
+        }
+        toast.success('Business submitted for approval!');
+        setSubmitForm({
+          name: '', category: 'dining', description: '', discount: '',
+          originalPrice: '', discountPercent: '', dealPrice: '',
+          location: '', phone: '', email: '', hours: '', image: '',
+          whatsappNumber: '',
+          mapUrl: '', website: '',
+          discountValidFrom: todayStr(),
+          listingDuration: '1_month',
+        });
+        setSubmitPhotos([]);
+        await loadAllOwnerData();
+        setActiveTab('submissions');
+        setLoading(false);
+        return;
+      }
+
+      // Strategy 2: Edge function fallback (if RPC not deployed or fails)
+      console.warn('[Dashboard] RPC failed, trying manage-business Edge Function...', { rpcError: rpcError?.message });
       const { data, error } = await invokeWithRetry(
         'manage-business',
         {
@@ -823,59 +875,14 @@ const BusinessOwnerDashboard: React.FC = () => {
         setSubmitPhotos([]);
         await loadAllOwnerData();
         setActiveTab('submissions');
+        setLoading(false);
         return;
       }
 
-      // Strategy 2: RPC insert (bypasses RLS) if edge function failed
-      console.warn('[Dashboard] Edge function failed, trying insert_pending_business RPC...', { error: error?.message, dataError: data?.error });
-      const { data: rpcId, error: directError } = await supabase.rpc('insert_pending_business', {
-        p_owner_id: user?.id,
-        p_name: submitForm.name,
-        p_category: submitForm.category,
-        p_description: submitForm.description,
-        p_discount: submitForm.discount || '',
-        p_original_price: origPrice,
-        p_deal_price: dlPrice,
-        p_location: submitForm.location || 'Port Vila, Vanuatu',
-        p_phone: submitForm.phone,
-        p_email: submitForm.email || user?.email,
-        p_hours: submitForm.hours,
-        p_image: mainImageUrl,
-        p_map_url: submitForm.mapUrl || null,
-        p_website: submitForm.website || null,
-        p_discount_valid_from: submitForm.discountValidFrom || null,
-        p_discount_valid_until: discountValidUntil || null,
-        p_whatsapp_number: submitForm.whatsappNumber || null,
-      });
-
-      if (directError) throw new Error(directError.message || 'Failed to submit business');
-      const directData = rpcId ? { id: rpcId } : null;
-
-      if (directData?.id && submitPhotos.length > 0 && user) {
-        const photoRecords = submitPhotos.map((photo, index) => ({
-          business_id: directData.id,
-          url: photo.url,
-          file_path: photo.filePath,
-          uploaded_by: user.id,
-          is_main: index === 0,
-          status: 'pending',
-        }));
-        await supabase.from('business_photos').insert(photoRecords);
-      }
-
-      toast.success('Business submitted for approval!');
-      setSubmitForm({
-        name: '', category: 'dining', description: '', discount: '',
-        originalPrice: '', discountPercent: '', dealPrice: '',
-        location: '', phone: '', email: '', hours: '', image: '',
-        whatsappNumber: '',
-        mapUrl: '', website: '',
-        discountValidFrom: todayStr(),
-        listingDuration: '1_month',
-      });
-      setSubmitPhotos([]);
-      await loadAllOwnerData();
-      setActiveTab('submissions');
+      // Both strategies failed
+      throw new Error(
+        rpcError?.message || data?.error || error?.message || 'Failed to submit business. Please ensure the database migration has been applied.'
+      );
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit business');
     } finally {

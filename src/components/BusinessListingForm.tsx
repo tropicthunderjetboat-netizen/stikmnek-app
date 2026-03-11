@@ -254,7 +254,69 @@ const BusinessListingForm: React.FC = () => {
         userId: user.id,
       });
 
-      // Strategy 1: Try edge function with retry (up to 3 attempts)
+      // Strategy 1: RPC insert (SECURITY DEFINER, bypasses RLS — most reliable)
+      const { data: rpcId, error: rpcError } = await supabase.rpc('insert_pending_business', {
+        p_owner_id: user.id,
+        p_name: form.name,
+        p_category: form.category,
+        p_description: form.description,
+        p_discount: form.discount,
+        p_original_price: Number(form.originalPrice) || 0,
+        p_deal_price: Number(form.dealPrice) || 0,
+        p_location: form.address || 'Port Vila, Vanuatu',
+        p_phone: form.phone,
+        p_email: form.email || user.email,
+        p_hours: form.hours,
+        p_image: mainImageUrl,
+        p_map_url: form.mapUrl || null,
+        p_website: form.website || null,
+        p_discount_valid_from: form.discountValidFrom || null,
+        p_discount_valid_until: discountValidUntil || null,
+        p_whatsapp_number: form.whatsappNumber || null,
+      });
+
+      if (!rpcError && rpcId) {
+        console.log('[BusinessForm] RPC insert SUCCESS:', rpcId);
+        const directData = { id: rpcId };
+        if (directData.id && photos.length > 0) {
+          try {
+            const photoRecords = photos.map((p, i) => ({
+              business_id: String(directData.id),
+              url: p.url,
+              file_path: p.filePath,
+              uploaded_by: user.id,
+              is_main: i === 0,
+              status: 'pending',
+            }));
+            const { error: photoErr } = await supabase
+              .from('business_photos')
+              .insert(photoRecords);
+            if (photoErr) console.warn('[BusinessForm] Photo insert warning (non-blocking):', photoErr.message);
+          } catch (photoEx) {
+            console.warn('[BusinessForm] Photo insert exception (non-blocking):', photoEx);
+          }
+        }
+        setSubmitted(true);
+        toast.success(
+          language === 'en'
+            ? 'Business listing submitted for review!'
+            : 'Inscription soumise pour examen!'
+        );
+        setForm({
+          name: '', category: 'dining', description: '', discount: '',
+          originalPrice: '', discountPercent: '', dealPrice: '',
+          address: '', phone: '', email: '', hours: '',
+          whatsappNumber: '',
+          mapUrl: '', website: '',
+          discountValidFrom: todayStr(),
+          listingDuration: '1_month',
+        });
+        setPhotos([]);
+        return;
+      }
+
+      // Strategy 2: Edge function fallback (if RPC not deployed or fails)
+      console.warn('[BusinessForm] RPC failed, trying manage-business Edge Function...', { rpcError: rpcError?.message });
       const { data, error } = await invokeWithRetry(
         'manage-business',
         submissionPayload,
@@ -279,92 +341,16 @@ const BusinessListingForm: React.FC = () => {
           discountValidFrom: todayStr(),
           listingDuration: '1_month',
         });
-
         setPhotos([]);
         return;
       }
 
-
-      // Strategy 2: RPC insert (bypasses RLS) if edge function failed
-      console.warn('[BusinessForm] Edge function failed, trying insert_pending_business RPC...', {
-        error: error?.message,
-        dataError: data?.error,
-      });
-
-      const { data: rpcId, error: directError } = await supabase.rpc('insert_pending_business', {
-        p_owner_id: user.id,
-        p_name: form.name,
-        p_category: form.category,
-        p_description: form.description,
-        p_discount: form.discount,
-        p_original_price: Number(form.originalPrice) || 0,
-        p_deal_price: Number(form.dealPrice) || 0,
-        p_location: form.address || 'Port Vila, Vanuatu',
-        p_phone: form.phone,
-        p_email: form.email || user.email,
-        p_hours: form.hours,
-        p_image: mainImageUrl,
-        p_map_url: form.mapUrl || null,
-        p_website: form.website || null,
-        p_discount_valid_from: form.discountValidFrom || null,
-        p_discount_valid_until: discountValidUntil || null,
-        p_whatsapp_number: form.whatsappNumber || null,
-      });
-
-      if (directError) {
-        console.error('[BusinessForm] RPC insert FAILED:', directError);
-        throw new Error(
-          directError.message || 'Failed to submit listing. Please try again.'
-        );
-      }
-
-      const directData = rpcId ? { id: rpcId } : null;
-      console.log('[BusinessForm] RPC insert SUCCESS:', directData?.id);
-
-      // Insert photos directly if we have them
-      if (directData?.id && photos.length > 0) {
-        try {
-          const photoRecords = photos.map((p, i) => ({
-            business_id: String(directData.id),
-            url: p.url,
-            file_path: p.filePath,
-            uploaded_by: user.id,
-            is_main: i === 0,
-            status: 'pending',
-          }));
-          console.log('[BusinessForm] Inserting', photoRecords.length, 'photos directly...');
-          const { error: photoErr } = await supabase
-            .from('business_photos')
-            .insert(photoRecords);
-          if (photoErr) {
-            console.warn('[BusinessForm] Photo insert warning (non-blocking):', photoErr.message);
-          } else {
-            console.log('[BusinessForm] Photos inserted successfully');
-          }
-        } catch (photoEx) {
-          console.warn('[BusinessForm] Photo insert exception (non-blocking):', photoEx);
-        }
-      }
-
-      setSubmitted(true);
-      toast.success(
-        language === 'en'
-          ? 'Business listing submitted for review!'
-          : 'Inscription soumise pour examen!'
+      throw new Error(
+        rpcError?.message || data?.error || error?.message ||
+        (language === 'en'
+          ? 'Failed to submit listing. Please ensure the database migration has been applied.'
+          : 'Échec de la soumission. Veuillez appliquer la migration de base de données.')
       );
-
-      setForm({
-        name: '', category: 'dining', description: '', discount: '',
-        originalPrice: '', discountPercent: '', dealPrice: '',
-        address: '', phone: '', email: '', hours: '',
-        whatsappNumber: '',
-        mapUrl: '', website: '',
-        discountValidFrom: todayStr(),
-        listingDuration: '1_month',
-      });
-
-
-      setPhotos([]);
     } catch (err: any) {
       console.error('[BusinessForm] Submit business FINAL error:', err);
       toast.error(

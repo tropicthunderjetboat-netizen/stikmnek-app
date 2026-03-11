@@ -818,14 +818,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [loadBusinesses, loadReviews, handleAuthenticatedUser]);
 
 
-  // When auth modal opens but user is already logged in (e.g. session restored from localStorage),
-  // close the modal and redirect instead of showing the sign-in form.
+  // When auth modal opens but user is already logged in (session restored from localStorage),
+  // close the modal and show a toast. Do NOT redirect — user may have clicked "Sign In" by accident
+  // or may want to stay on the current page. Redirect only happens on explicit sign-in (SIGNED_IN).
   useEffect(() => {
     if (showAuth && user) {
       setShowAuth(false);
-      redirectForRole(user.type);
+      toast.info('You\'re already signed in.');
     }
-  }, [showAuth, user, redirectForRole]);
+  }, [showAuth, user]);
 
   // Realtime subscriptions for reviews
   useEffect(() => {
