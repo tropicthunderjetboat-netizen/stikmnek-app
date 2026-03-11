@@ -317,7 +317,7 @@ async function invokeExtendPassWithRetry(
 
 // ─── Main PassCards Component ───
 const PassCards: React.FC = () => {
-  const { language, purchasePass, user, refreshUserPass, setCurrentView, setVanuatuBonus } = useAppContext();
+  const { language, purchasePass, user, refreshUserPass, setCurrentView } = useAppContext();
 
   const { activePasses } = usePassConfig();
   const [sharedPasses, setSharedPasses] = useState<Set<string>>(
@@ -414,8 +414,7 @@ const PassCards: React.FC = () => {
 
       if (!shareSucceeded) {
         setSharingPassId(null);
-        return;// This unlocks the bonus for the checkout page
-      setVanuatuBonus(true);
+        return;
       }
 
       // ═══ STEP 2: Call extend-pass edge function if user has an active pass ═══
@@ -765,10 +764,24 @@ const PassCards: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-baseline gap-1 mb-5">
+                    <div className="flex items-baseline gap-1 mb-3">
                       <span className="text-4xl font-extrabold text-gray-900">${pass.price}</span>
                       <span className="text-gray-400 text-sm">{passPeriod}</span>
                     </div>
+
+                    {/* Share Bonus Badge - prominent callout */}
+                    {hasBonus && !shared && (
+                      <div className="mb-5 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200">
+                        <Gift className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                        <span className="text-sm font-bold text-amber-800">
+                          {bonus.extraPeople > 0 && bonus.extraDays > 0
+                            ? (language === 'en' ? `Share to get +${bonus.extraPeople} people FREE & +${bonus.extraDays} day!` : language === 'fr' ? `Partagez pour +${bonus.extraPeople} personnes gratuites et +${bonus.extraDays} jour !` : `Serem blong kasem +${bonus.extraPeople} man fri mo +${bonus.extraDays} dei!`)
+                            : bonus.extraPeople > 0
+                              ? (language === 'en' ? `Share to get +${bonus.extraPeople} people FREE!` : language === 'fr' ? `Partagez pour +${bonus.extraPeople} personnes gratuites !` : `Serem blong kasem +${bonus.extraPeople} man fri!`)
+                              : (language === 'en' ? `Share to get +${bonus.extraDays} free day!` : language === 'fr' ? `Partagez pour +${bonus.extraDays} jour gratuit !` : `Serem blong kasem +${bonus.extraDays} fri dei!`)}
+                        </span>
+                      </div>
+                    )}
 
                     <ul className="space-y-3 mb-5">
                       {pass.features.map((feature) => {

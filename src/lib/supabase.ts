@@ -87,6 +87,8 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
     detectSessionInUrl: true,
     flowType: 'implicit',
     lock: navigatorLockFallback,
+    // Reduce lock acquire timeout for faster fail — avoids hanging on session restore
+    lockAcquireTimeout: 2000,
   },
 });
 

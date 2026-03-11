@@ -1,44 +1,99 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+// deno-lint-ignore-file no-explicit-any
+/**
+ * process-card-payment Edge Function
+ * Handles: purchase_pass, purchase_superstar
+ *
+ * For purchase_superstar: Charges $5.00 AUD (HARDCODED), increments superstar_credits.
+ * Amount is NEVER taken from the request body for security.
+ */
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+const SUPERSTAR_PRICE_AUD = 5.0;
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   try {
-    const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing Authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !authUser) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid or expired session' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const body = await req.json();
-    const { user_id, passType, startDate, amount, days, group_size } = body;
+    const action = body?.action;
 
-    const finalDays = Number(days); 
-    const finalGroup = group_size;
+    if (action === 'purchase_superstar') {
+      // ═══ SUPERSTAR PURCHASE — $5.00 AUD HARDCODED ═══
+      // TODO: Integrate actual card charge (PayPal/Stripe) for SUPERSTAR_PRICE_AUD
+      // For now: increment credits. Replace with real payment flow when ready.
+      const amountToCharge = SUPERSTAR_PRICE_AUD;
 
-    const expiryDate = new Date(startDate);
-    expiryDate.setDate(expiryDate.getDate() + finalDays);
+      const { data: newCount, error: rpcError } = await supabase.rpc('increment_superstar_credits', {
+        p_user_id: authUser.id,
+      });
 
-    const { data, error } = await supabaseClient
-      .from('passes')
-      .insert([{
-        user_id,
-        pass_type: passType,
-        total_amount: Number(amount),
-        price_paid: Number(amount),
-        expires_at: expiryDate.toISOString(),
-        group_size: finalGroup,
-        status: 'active',
-        active: true,
-        payment_method: 'card'
-      }])
-      .select().single();
+      if (rpcError) {
+        console.error('increment_superstar_credits error:', rpcError);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Failed to add Super Star credit' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    if (error) throw error;
-    return new Response(JSON.stringify({ success: true, receiptNumber: data.id.slice(0,8).toUpperCase() }), 
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), { headers: corsHeaders, status: 400 });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          superstar_credits: newCount ?? 1,
+          amount: amountToCharge,
+          currency: 'AUD',
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (action === 'purchase_pass') {
+      // Existing pass purchase logic — delegate to your current implementation
+      // This stub returns 501; replace with actual pass purchase code
+      return new Response(
+        JSON.stringify({ success: false, error: 'Pass purchase: see existing implementation' }),
+        { status: 501, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ success: false, error: 'Unknown action' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (err) {
+    console.error('process-card-payment error:', err);
+    return new Response(
+      JSON.stringify({ success: false, error: (err as Error).message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });

@@ -7,39 +7,61 @@ import {
   CalendarRange, Users, Share2, Gift, Baby, Sparkles, PartyPopper
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getPassDisplayName } from '@/hooks/usePassConfig';
+import { PASS_PRODUCTS } from '@/data/pricing';
 
 interface PaymentResult {
   receiptNumber: string;
   passType: string;
-  passLabel?: string; // Add this
-  group?: string;     // Add this
+  passLabel?: string;
   amount: number;
-  currency?: string;  // Add this
+  currency?: string;
   paymentMethod: string;
   expiresAt: string;
   validFrom?: string;
   validUntil?: string;
   days?: number;
+  group?: string;
   sessionId: string;
   completedAt: string;
   cardLast4?: string;
+  paypalOrderId?: string;
+  shareBonusApplied?: boolean;
+  peopleCount?: number;
 }
+
 const PASS_LABELS: Record<string, string> = {
-  daily: 'Family Explorer Pass',
-  weekly: 'Extended Group Adventure Pass',
-  monthly: 'Ultimate Crew Experience Pass',
+  daily: PASS_PRODUCTS.daily.title,
+  weekly: PASS_PRODUCTS.weekly.title,
+  monthly: PASS_PRODUCTS.monthly.title,
 };
+
 const PASS_GROUPS: Record<string, string> = {
-  daily: '4 people',
-  weekly: '4 people',
-  monthly: '7 people',
+  daily: `Up to ${PASS_PRODUCTS.daily.basePeople} people`,
+  weekly: `Up to ${PASS_PRODUCTS.weekly.basePeople} people`,
+  monthly: `Up to ${PASS_PRODUCTS.monthly.basePeople} people`,
 };
-const SHARE_BONUSES = {
-  daily: { extraDays: 0, extraPeople: 2, description: 'Share to add 2 extra people for free!' },
-  weekly: { extraDays: 1, extraPeople: 2, description: 'Share to add 2 extra people + 1 extra day for free!' },
-  monthly: { extraDays: 1, extraPeople: 1, description: 'Share to add 1 extra person + 1 extra day for free!' },
+
+const SHARE_BONUSES: Record<string, { extraDays: number; extraPeople: number; extraKids: number; description: string }> = {
+  daily: {
+    extraDays: 0,
+    extraPeople: PASS_PRODUCTS.daily.shareBonus.extraPeople,
+    extraKids: 0,
+    description: PASS_PRODUCTS.daily.shareBonus.description,
+  },
+  weekly: {
+    extraDays: PASS_PRODUCTS.weekly.shareBonus.extraDays,
+    extraPeople: PASS_PRODUCTS.weekly.shareBonus.extraPeople,
+    extraKids: 0,
+    description: PASS_PRODUCTS.weekly.shareBonus.description,
+  },
+  monthly: {
+    extraDays: PASS_PRODUCTS.monthly.shareBonus.extraDays,
+    extraPeople: PASS_PRODUCTS.monthly.shareBonus.extraPeople,
+    extraKids: 0,
+    description: PASS_PRODUCTS.monthly.shareBonus.description,
+  },
 };
+
 // ─── Ensure fresh session helper (replaces getValidAccessToken) ───
 async function ensureFreshSession(): Promise<string | null> {
   try {
@@ -558,7 +580,7 @@ const ShareCTA: React.FC<{ passType: string; userId: string }> = ({ passType, us
 
 // ─── Main PaymentConfirmation Component ───
 const PaymentConfirmation: React.FC = () => {
-  const { user, setCurrentView, vanuatuBonus } = useAppContext();
+  const { user, setCurrentView } = useAppContext();
   const [payment, setPayment] = useState<PaymentResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -585,34 +607,39 @@ const PaymentConfirmation: React.FC = () => {
     }
   }, [payment, user]);
 
-const sendConfirmationEmail = async () => {
+  const sendConfirmationEmail = async () => {
     if (!payment || !user?.email) return;
-    setSendingEmail(true); 
-    
+    setSendingEmail(true);
     try {
       const { data, error } = await supabase.functions.invoke('send-email', {
         body: {
           action: 'send_pass_confirmation',
           user_id: user.id,
-          receipt_number: payment.receiptNumber,
-          pass_label: passLabel,
-          pass_group: passGroup,
-          pass_days: passDays, // This will now be 7
-          amount: payment.amount,
+          user_name: user.name,
           user_email: user.email,
+          receipt_number: payment.receiptNumber,
+          pass_type: payment.passType,
+          amount: payment.amount,
+          currency: 'AUD',
+          payment_method: payment.paymentMethod === 'card'
+            ? `Credit Card ending ${payment.cardLast4 || '****'}`
+            : 'PayPal',
+          valid_from: payment.validFrom,
+          valid_until: payment.validUntil,
         },
       });
 
-      if (error) throw error;
-      if (data?.success) setEmailSent(true);
-
+      if (data?.success) {
+        setEmailSent(true);
+      }
     } catch (err) {
-      console.error("Email failed:", err);
+      // silently fail
     } finally {
-      // 🚨 CRITICAL: This line stops the "Processing" spinner no matter what.
-      setSendingEmail(false); 
+      setSendingEmail(false);
     }
-  };if (!payment) {
+  };
+
+  if (!payment) {
     return (
       <div className="min-h-screen bg-gray-50 pt-20 pb-16">
         <div className="max-w-lg mx-auto px-4 text-center pt-20">
@@ -632,33 +659,18 @@ const sendConfirmationEmail = async () => {
     );
   }
 
-// 1. Define if this is the $99 pass
-  const isUltimate = payment?.amount >= 99;
+  const passLabel = payment.passLabel || PASS_LABELS[payment.passType] || `${payment.passType} Pass`;
+  const passGroup = payment.group || PASS_GROUPS[payment.passType] || '';
+  const shareBonusApplied = payment.shareBonusApplied ?? false;
+  const peopleCount = payment.peopleCount ?? (payment.passType && PASS_PRODUCTS[payment.passType as keyof typeof PASS_PRODUCTS] ? PASS_PRODUCTS[payment.passType as keyof typeof PASS_PRODUCTS].basePeople : 4);
 
-  // 2. Force the correct Label (Ultimate Crew)
-  const passLabel = isUltimate 
-    ? 'Ultimate Crew Experience Pass' 
-    : (payment?.passLabel || (payment?.passType ? PASS_LABELS[payment.passType] : 'Pass'));
 
-  // 3. Force the correct Group (7 people)
-  const passGroup = isUltimate 
-    ? '7 people' 
-    : (payment?.group || (payment?.passType ? PASS_GROUPS[payment.passType] : '4 people'));
-
-  // 4. Force the correct Days (Check for 7-day share bonus)
-  const passDays = isUltimate 
-    ? 6 
-    : (vanuatuBonus && payment?.passType === 'weekly' ? 7 : (payment?.days || (payment?.amount >= 45 ? 6 : 1)));
-
-  // 5. Force the correct Group (Check for extra people share bonus)
-  const passGroup = isUltimate 
-    ? '7 people' 
-    : (vanuatuBonus && payment?.passType === 'weekly' ? '6 people' : (payment?.group || (payment?.passType ? PASS_GROUPS[payment.passType] : '4 people')));
   const passIcons: Record<string, React.ReactNode> = {
     daily: <Zap className="w-6 h-6" />,
     weekly: <Star className="w-6 h-6" />,
     monthly: <Crown className="w-6 h-6" />,
   };
+
   const passColors: Record<string, string> = {
     daily: 'from-sky-500 to-blue-600',
     weekly: 'from-teal-500 to-emerald-600',
@@ -699,7 +711,10 @@ ITEM DETAILS
 ─────────────────────────────────────
 Pass: ${passLabel}
 Group: ${passGroup}
-Duration: ${passDays} day(s)
+Duration: ${payment.days || '?'} day(s)
+Valid for: ${peopleCount} people
+Share Bonus Applied: ${shareBonusApplied ? 'Yes' : 'No'}
+
 ─────────────────────────────────────
 DISCOUNT VALIDITY PERIOD
 ─────────────────────────────────────
@@ -775,7 +790,7 @@ Enjoy your deals in Vanuatu!
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-              {payment?.passType ? passIcons[payment.passType] : <Zap className="w-6 h-6" />}
+                  {passIcons[payment.passType]}
                 </div>
                 <div>
                   <p className="text-white/80 text-sm font-medium">StikmNek</p>
@@ -829,8 +844,8 @@ Enjoy your deals in Vanuatu!
                 </div>
                 <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
                   <div className="px-3 py-1 rounded-full bg-teal-600 text-white text-[10px] font-bold shadow-sm">
-{passDays} day{passDays > 1 ? 's' : ''}         
-        </div>
+                    {payment.days || '?'} day{(payment.days || 0) > 1 ? 's' : ''}
+                  </div>
                   <div className="w-8 h-0.5 bg-teal-300 rounded-full" />
                 </div>
                 <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200 shadow-sm">
@@ -874,7 +889,31 @@ Enjoy your deals in Vanuatu!
                   <span className="text-xs text-gray-400 font-medium">Pass Duration</span>
                 </div>
                 <p className="text-sm font-semibold text-gray-900">
-{passDays} day{passDays > 1 ? 's' : ''}                </p>
+                  {payment.days || '?'} day{(payment.days || 0) > 1 ? 's' : ''}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-gray-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="w-4 h-4 text-gray-400" />
+                  <span className="text-xs text-gray-400 font-medium">Valid for</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {peopleCount} people
+                  {shareBonusApplied && (
+                    <span className="block text-xs font-medium text-emerald-600 mt-0.5">Share bonus applied</span>
+                  )}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-gray-50">
+                <div className="flex items-center gap-2 mb-2">
+                  <Gift className="w-4 h-4 text-gray-400" />
+                  <span className="text-xs text-gray-400 font-medium">Share Bonus</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {shareBonusApplied ? 'Yes' : 'No'}
+                </p>
               </div>
 
               <div className="p-4 rounded-xl bg-gray-50">
@@ -995,4 +1034,3 @@ Enjoy your deals in Vanuatu!
 };
 
 export default PaymentConfirmation;
-

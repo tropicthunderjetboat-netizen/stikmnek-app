@@ -33,7 +33,7 @@ const HelpCenter: React.FC = () => {
   const touristFAQ: FAQItem[] = [
     { question: 'What is StikmNek?', answer: 'StikmNek is a tourist discount platform for Vanuatu. Purchase a pass (Daily, Weekly, or Monthly) and unlock exclusive deals at restaurants, tours, activities, spas, and accommodation across all locations in Vanuatu.', icon: <HelpCircle className="w-4 h-4" /> },
 
-    { question: 'How do I purchase a pass?', answer: 'Navigate to the "Passes" section, choose your preferred pass type (Daily $15, Weekly $45, or Monthly $99), select your start date, and complete payment via PayPal. Your pass activates on the selected date.', icon: <CreditCard className="w-4 h-4" /> },
+    { question: 'How do I purchase a pass?', answer: 'Navigate to the "Passes" section, choose your preferred pass (Family Explorer $15, Extended Group Adventure $45, or Ultimate Crew Experience $99), select your start date, and complete payment via PayPal. Your pass activates on the selected date.', icon: <CreditCard className="w-4 h-4" /> },
 
     { question: 'How do I redeem a deal?', answer: 'Visit any partner business, show your digital pass QR code on your phone, and the business will scan it to verify your pass. The discount is applied immediately to your purchase.', icon: <QrCode className="w-4 h-4" /> },
     { question: 'Can I use my pass at multiple businesses?', answer: 'Yes! Your pass works at ALL partner businesses during its validity period. There is no limit on how many deals you can redeem per day.', icon: <Store className="w-4 h-4" /> },

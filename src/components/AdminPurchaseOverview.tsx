@@ -44,7 +44,7 @@ const PASS_COLORS: Record<string, string> = {
 const PASS_LABELS: Record<string, string> = {
   daily: 'Family Explorer',
   weekly: 'Group Adventure',
-  monthly: 'Ultimate Crew',
+  monthly: 'Crew Experience',
 };
 
 const PASS_PRICES: Record<string, number> = {

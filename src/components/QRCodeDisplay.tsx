@@ -1,14 +1,17 @@
 import React, { useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import { getBasePeople, getShareBonusTotalPeople } from '@/data/pricing';
 import { QrCode, Calendar, Shield, Ticket, Copy, Check } from 'lucide-react';
 
 const QRCodeDisplay: React.FC = () => {
   const { user } = useAppContext();
   const [copied, setCopied] = React.useState(false);
 
-  // Generate the QR code data payload
+  // Generate the QR code data payload (includes maxPeople for scanner to validate capacity)
   const qrPayload = useMemo(() => {
     if (!user || !user.pass || !user.passId) return null;
+    // Use DB value if available, else derive from pass type (share bonus applied = total, else base)
+    const maxPeople = user.passPeopleCount ?? (user.shareBonusApplied ? getShareBonusTotalPeople(user.pass) : getBasePeople(user.pass));
     return JSON.stringify({
       type: 'stikm_nek_pass',
       userId: user.id,
@@ -17,6 +20,7 @@ const QRCodeDisplay: React.FC = () => {
       validFrom: user.passValidFrom,
       validUntil: user.passValidUntil,
       name: user.name,
+      maxPeople,
     });
   }, [user]);
 
@@ -95,9 +99,14 @@ const QRCodeDisplay: React.FC = () => {
           <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
             <div className="flex items-center gap-2">
               <Ticket className="w-4 h-4 text-teal-600" />
-              <span className="text-sm text-gray-600">Pass Type</span>
+              <span className="text-sm text-gray-600">Valid for</span>
             </div>
-            <span className="text-sm font-bold text-gray-900 capitalize">{user.pass} Pass</span>
+            <span className="text-sm font-bold text-gray-900">
+              {user.passPeopleCount ?? getBasePeople(user.pass)} people
+              {user.shareBonusApplied && (
+                <span className="ml-1.5 text-xs font-medium text-emerald-600">(Share bonus applied)</span>
+              )}
+            </span>
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50">

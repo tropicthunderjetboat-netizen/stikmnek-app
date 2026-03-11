@@ -46,6 +46,7 @@ export interface UserProfile {
   home_country: string | null;
   travel_dates: string | null;
   onboarding_complete: boolean;
+  superstar_credits?: number;
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +62,12 @@ export interface User {
   passValidFrom: string | null;
   passValidUntil: string | null;
   avatarUrl?: string | null;
+  /** People capacity (base or after share bonus). Used by QR code & receipts. */
+  passPeopleCount?: number | null;
+  /** Whether share bonus has been applied to this pass. */
+  shareBonusApplied?: boolean | null;
+  /** Super Star review credits (purchased, decremented on use). */
+  superstarCredits?: number;
 }
 
 export interface CartItem {
@@ -114,7 +121,8 @@ interface AppContextType {
   redemptions: { businessId: string; date: string; saved: number }[];
   dbBusinesses: Business[];
   dbReviews: DBReview[];
-  submitReview: (businessId: string, rating: number, comment: string) => Promise<void>;
+  submitReview: (businessId: string, rating: number, comment: string, isSuperStar?: boolean) => Promise<void>;
+  refreshUserProfile: () => Promise<void>;
   dataLoaded: boolean;
   refreshBusinesses: () => Promise<void>;
   refreshUserPass: () => Promise<void>;
@@ -139,8 +147,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authLoading, setAuthLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem | null>(null);
-
-const [vanuatuBonus, setVanuatuBonus] = useState(true);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'signup-tourist' | 'signup-business'>('signin');
@@ -314,14 +320,22 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
         if (expiry > new Date()) {
           const validFrom = pass.valid_from ? new Date(pass.valid_from).toISOString().split('T')[0] : null;
           const validUntil = pass.valid_until ? new Date(pass.valid_until).toISOString().split('T')[0] : null;
-          setUser(prev => prev ? {
-            ...prev,
-            pass: pass.pass_type as PassType,
-            passId: pass.id,
-            passExpiry: expiry.toISOString().split('T')[0],
-            passValidFrom: validFrom,
-            passValidUntil: validUntil,
-          } : null);
+          const peopleCount = pass.max_people ?? pass.people_count ?? null;
+          const shareBonusApplied = pass.share_bonus_applied ?? false;
+          // Only update if we have the same user — never clear user (prev can be null if race with setUser)
+          setUser(prev => {
+            if (!prev || prev.id !== userId) return prev;
+            return {
+              ...prev,
+              pass: pass.pass_type as PassType,
+              passId: pass.id,
+              passExpiry: expiry.toISOString().split('T')[0],
+              passValidFrom: validFrom,
+              passValidUntil: validUntil,
+              passPeopleCount: peopleCount,
+              shareBonusApplied,
+            };
+          });
         }
       }
     } catch (err) {
@@ -385,10 +399,13 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
 
 
   // ═══════════════════════════════════════════════════════════
-  // ROLE RESOLUTION — Single source of truth
+  // ROLE RESOLUTION — Fail-fast, single source of truth
   // Priority: 1) Admin email  2) DB profile  3) Previously resolved
-  //           4) Auth metadata  5) Default tourist
+  //           4) Auth metadata  5) Default tourist (never hang)
+  // DB fetch has 3s timeout. Admin DB update runs in background.
   // ═══════════════════════════════════════════════════════════
+  const ROLE_RESOLVE_TIMEOUT_MS = 3000;
+
   const resolveRole = useCallback(async (
     userId: string,
     email: string,
@@ -396,21 +413,27 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
   ): Promise<{ role: 'tourist' | 'business' | 'admin'; profile: UserProfile | null; fromDb: boolean }> => {
     console.log('[resolveRole] START for userId:', userId, 'email:', email);
 
-    // Step 1: Admin email check
+    // Step 1: Admin email check (synchronous, never blocks)
     const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
     if (isAdmin) {
       console.log('[resolveRole] ADMIN EMAIL MATCH — role = admin');
     }
 
-    // Step 2: Fetch profile from user_profiles table
+    // Step 2: Fetch profile with timeout — fail-fast
     let profile: UserProfile | null = null;
     let dbQuerySucceeded = false;
     try {
-      const { data, error } = await supabase
+      const fetchPromise = supabase
         .from('user_profiles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('resolveRole: DB query timeout')), ROLE_RESOLVE_TIMEOUT_MS)
+      );
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (error) {
         console.error('[resolveRole] DB query error:', error.message);
@@ -423,24 +446,26 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
         console.log('[resolveRole] No profile in DB for this user');
       }
     } catch (err) {
-      console.error('[resolveRole] Exception fetching profile:', err);
+      console.warn('[resolveRole] Exception or timeout:', (err as Error)?.message);
     }
 
-    // Step 3: Determine final role
+    // Step 3: Determine final role — never block, always resolve
     let finalRole: 'tourist' | 'business' | 'admin';
     let resolvedFromDb = false;
 
     if (isAdmin) {
       finalRole = 'admin';
       resolvedFromDb = true;
+      // Defer admin DB update to background — don't block auth flow
       if (profile && extractRole(profile) !== 'admin') {
-        console.log('[resolveRole] Updating DB profile to admin');
-        await supabase
+        console.log('[resolveRole] Scheduling admin DB update (background)');
+        supabase
           .from('user_profiles')
           .update({ role: 'admin', user_type: 'admin', updated_at: new Date().toISOString() })
-          .eq('user_id', userId);
-        profile.role = 'admin';
-        profile.user_type = 'admin';
+          .eq('user_id', userId)
+          .then(() => console.log('[resolveRole] Admin profile updated'))
+          .catch((e) => console.warn('[resolveRole] Admin update failed:', e?.message));
+        profile = { ...profile, role: 'admin', user_type: 'admin' };
       }
     } else if (profile) {
       finalRole = extractRole(profile);
@@ -454,7 +479,7 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
       console.log('[resolveRole] No DB profile — using metadata user_type:', finalRole);
     } else {
       finalRole = 'tourist';
-      console.log('[resolveRole] Defaulting to tourist');
+      console.log('[resolveRole] Fail-fast: defaulting to tourist');
     }
 
     if (resolvedFromDb) {
@@ -501,6 +526,7 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
       passValidFrom: null,
       passValidUntil: null,
       avatarUrl,
+      superstarCredits: profile?.superstar_credits ?? 0,
     };
   }, []);
 
@@ -542,34 +568,55 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
     try {
       console.log('[handleAuthenticatedUser] Processing user:', authUser.email, 'shouldRedirect:', shouldRedirect);
 
-      let { role, profile } = await resolveRole(
-        authUser.id,
-        authUser.email || '',
-        authUser.user_metadata
-      );
+      // Fail-fast: resolveRole has internal timeout; wrap in extra safety
+      let role: 'tourist' | 'business' | 'admin';
+      let profile: UserProfile | null;
+      try {
+        const result = await Promise.race([
+          resolveRole(authUser.id, authUser.email || '', authUser.user_metadata),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('handleAuthenticatedUser: resolveRole timeout')), 5000)
+          ),
+        ]);
+        role = result.role;
+        profile = result.profile;
+      } catch (resolveErr) {
+        console.warn('[handleAuthenticatedUser] resolveRole failed — using default tourist:', (resolveErr as Error)?.message);
+        role = ADMIN_EMAILS.includes((authUser.email || '').toLowerCase()) ? 'admin' : 'tourist';
+        profile = null;
+      }
 
-      // ─── FALLBACK: If no profile found, create one via direct DB INSERT ───
+      // ─── FALLBACK: If no profile found, create one (with timeout, don't block) ───
       if (!profile) {
         console.log('[handleAuthenticatedUser] No profile found — creating via direct DB insert');
         const meta = authUser.user_metadata || {};
         const fallbackName = meta.name || meta.full_name || authUser.email?.split('@')[0] || 'User';
         const fallbackType = meta.user_type || 'tourist';
 
-        const directResult = await directProfileInsert({
-          userId: authUser.id,
-          name: fallbackName,
-          email: authUser.email || '',
-          userType: fallbackType as 'tourist' | 'business' | 'admin',
-        });
+        try {
+          const directResult = await Promise.race([
+            directProfileInsert({
+              userId: authUser.id,
+              name: fallbackName,
+              email: authUser.email || '',
+              userType: fallbackType as 'tourist' | 'business' | 'admin',
+            }),
+            new Promise<{ success: boolean; profile?: any; error?: string }>((resolve) =>
+              setTimeout(() => resolve({ success: false, error: 'directProfileInsert timeout' }), 4000)
+            ),
+          ]);
 
-        if (directResult.success && directResult.profile) {
-          profile = directResult.profile as UserProfile;
-          role = extractRole(profile);
-          setUserProfile(profile);
-          lastDbResolvedRoleRef.current = role;
-          console.log('[handleAuthenticatedUser] Profile created — role:', role);
-        } else {
-          console.warn('[handleAuthenticatedUser] Direct DB insert failed:', directResult.error);
+          if (directResult.success && directResult.profile) {
+            profile = directResult.profile as UserProfile;
+            role = extractRole(profile);
+            setUserProfile(profile);
+            lastDbResolvedRoleRef.current = role;
+            console.log('[handleAuthenticatedUser] Profile created — role:', role);
+          } else {
+            console.warn('[handleAuthenticatedUser] Direct DB insert failed or timed out:', directResult.error);
+          }
+        } catch (insertErr) {
+          console.warn('[handleAuthenticatedUser] directProfileInsert exception:', (insertErr as Error)?.message);
         }
       }
 
@@ -624,11 +671,36 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
 
 
   // ═══════════════════════════════════════════════════════════
-  // AUTH STATE CHANGE LISTENER
+  // AUTH STATE CHANGE LISTENER + PROACTIVE SESSION RESTORE
+  //
+  // Session persistence fix: getSession() is called immediately on mount.
+  // If INITIAL_SESSION doesn't fire (e.g. cached/stale state), we restore
+  // from storage proactively. Fallback timer reduced to 1.5s.
   // ═══════════════════════════════════════════════════════════
   useEffect(() => {
     loadBusinesses();
     loadReviews();
+
+    // Proactive session restore — don't rely solely on INITIAL_SESSION
+    const initSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user && !sessionProcessedRef.current) {
+          console.log('[Init] Proactive getSession — restoring:', session.user.email);
+          sessionProcessedRef.current = true;
+          await handleAuthenticatedUser(session.user, false);
+          return;
+        }
+        if (!session?.user) {
+          sessionProcessedRef.current = true;
+          setAuthLoading(false);
+        }
+      } catch (err) {
+        console.warn('[Init] getSession error:', err);
+        setAuthLoading(false);
+      }
+    };
+    initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -675,14 +747,20 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
             }
 
             case 'INITIAL_SESSION': {
+              if (sessionProcessedRef.current) {
+                console.log('[onAuthStateChange] INITIAL_SESSION — already processed by proactive getSession');
+                setAuthLoading(false);
+                break;
+              }
               if (session?.user) {
                 console.log('[onAuthStateChange] INITIAL_SESSION — restoring:', session.user.email);
+                sessionProcessedRef.current = true;
                 await handleAuthenticatedUser(session.user, false);
               } else {
                 console.log('[onAuthStateChange] INITIAL_SESSION — no session');
+                sessionProcessedRef.current = true;
                 setAuthLoading(false);
               }
-              sessionProcessedRef.current = true;
               break;
             }
 
@@ -698,37 +776,39 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
       }
     );
 
-    // FALLBACK: If INITIAL_SESSION doesn't fire within 3 seconds
+    // FALLBACK: If proactive getSession and INITIAL_SESSION both miss, retry at 1.5s
     const fallbackTimer = setTimeout(async () => {
       if (!sessionProcessedRef.current) {
-        console.log('[Init] INITIAL_SESSION did not fire — checking session manually');
+        console.log('[Init] Session not yet processed — retrying getSession');
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
             console.log('[Init] Found existing session for:', session.user.email);
+            sessionProcessedRef.current = true;
             await handleAuthenticatedUser(session.user, false);
           } else {
             console.log('[Init] No existing session');
+            sessionProcessedRef.current = true;
             setAuthLoading(false);
           }
         } catch (err) {
           console.error('[Init] getSession error:', err);
+          sessionProcessedRef.current = true;
           setAuthLoading(false);
         }
-        sessionProcessedRef.current = true;
       }
-    }, 3000);
+    }, 1500);
 
-    // SAFETY NET: Force authLoading off after 10 seconds
+    // SAFETY NET: Force authLoading off after 6 seconds (fail-fast)
     const safetyTimer = setTimeout(() => {
       setAuthLoading(prev => {
         if (prev) {
-          console.warn('[Safety] authLoading still true after 10s — forcing false');
+          console.warn('[Safety] authLoading still true after 6s — forcing false');
           return false;
         }
         return prev;
       });
-    }, 10000);
+    }, 6000);
 
     return () => {
       subscription.unsubscribe();
@@ -751,6 +831,7 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
           rating: r.rating,
           comment: r.comment,
           created_at: r.created_at,
+          has_super_star: r.has_super_star || false,
         }, ...prev]);
       })
       .subscribe();
@@ -1033,37 +1114,73 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
     setCurrentView('checkout');
   }, [user, setCurrentView]);
 
+  const refreshUserProfile = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const { data: profile, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (profile) {
+        setUserProfile(profile as UserProfile);
+        setUser(prev => prev && prev.id === user.id
+          ? { ...prev, superstarCredits: profile.superstar_credits ?? 0 }
+          : prev);
+      }
+    } catch (err) {
+      console.error('refreshUserProfile failed:', err);
+    }
+  }, [user?.id]);
+
   // ═══════════════════════════════════════════════════════════
-  // SUBMIT REVIEW — Direct DB insert (no edge function)
+  // SUBMIT REVIEW — Direct insert or RPC for Superstar
   // ═══════════════════════════════════════════════════════════
-  const submitReview = useCallback(async (businessId: string, rating: number, comment: string) => {
+  const submitReview = useCallback(async (businessId: string, rating: number, comment: string, isSuperStar = false) => {
     if (!user) {
       setShowAuth(true);
       return;
     }
     try {
-      const { data, error } = await supabase
-        .from('reviews')
-        .insert({
-          business_id: businessId,
-          user_id: user.id,
-          user_name: user.name,
-          rating,
-          comment,
-          created_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
+      let data: any;
 
-      if (error) throw error;
+      if (isSuperStar || rating === 6) {
+        // Superstar: use RPC (atomic decrement credit + insert)
+        const { data: rpcData, error } = await supabase.rpc('submit_superstar_review', {
+          p_business_id: businessId,
+          p_user_name: user.name,
+          p_comment: comment,
+        });
+        if (error) throw error;
+        data = rpcData;
+      } else {
+        // Standard 1-5: direct insert
+        const { data: insertData, error } = await supabase
+          .from('reviews')
+          .insert({
+            business_id: businessId,
+            user_id: user.id,
+            user_name: user.name,
+            rating,
+            comment,
+            has_super_star: false,
+            created_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        data = insertData;
+      }
 
       const newReview: DBReview = {
         id: data?.id || `temp-${Date.now()}`,
         business_id: businessId,
         user_name: user.name,
-        rating,
+        rating: isSuperStar || rating === 6 ? 6 : rating,
         comment,
         created_at: data?.created_at || new Date().toISOString(),
+        has_super_star: isSuperStar || rating === 6,
       };
 
       setDbReviews(prev => {
@@ -1071,13 +1188,18 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
         return [newReview, ...prev];
       });
 
+      // Refresh superstar credits after using one
+      if (isSuperStar || rating === 6) {
+        refreshUserProfile();
+      }
+
       toast.success('Review submitted! Thank you.');
     } catch (err: any) {
       console.error('Submit review error:', err);
       toast.error(err.message || 'Failed to submit review');
       throw err;
     }
-  }, [user]);
+  }, [user, refreshUserProfile]);
 
   const refreshBusinesses = useCallback(async () => {
     await loadBusinesses();
@@ -1110,10 +1232,9 @@ const [vanuatuBonus, setVanuatuBonus] = useState(true);
         dbBusinesses, dbReviews, submitReview, dataLoaded,
         refreshBusinesses,
         refreshUserPass,
+        refreshUserProfile,
         userLocation, locationLoading, locationError,
-        requestUserLocation, getDistanceTo, 
-vanuatuBonus,
-setVanuatuBonus,
+        requestUserLocation, getDistanceTo,
       }}
     >
       {children}

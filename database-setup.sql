@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   home_country        text,
   travel_dates        text,
   onboarding_complete boolean NOT NULL DEFAULT false,
+  superstar_credits   integer NOT NULL DEFAULT 0,
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now(),
   UNIQUE(user_id)
@@ -175,7 +176,7 @@ CREATE TABLE IF NOT EXISTS public.reviews (
   business_id   uuid NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
   user_id       uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   user_name     text DEFAULT 'Anonymous',
-  rating        integer NOT NULL CHECK (rating >= 1 AND rating <= 5),
+  rating        integer NOT NULL CHECK (rating >= 1 AND rating <= 6),
   comment       text,
   has_super_star boolean NOT NULL DEFAULT false,
   created_at    timestamptz NOT NULL DEFAULT now()

@@ -54,13 +54,14 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   onCancel,
   compact = false,
 }) => {
-  const { user, setShowAuth, setAuthMode, language, submitReview } = useAppContext();
+  const { user, setShowAuth, setAuthMode, language, submitReview, refreshUserProfile } = useAppContext();
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ rating?: string; comment?: string }>({});
   const [submitted, setSubmitted] = useState(false);
+  const [lastSubmittedSuperStar, setLastSubmittedSuperStar] = useState(false);
 
   // Super Star state
   const [wantsSuperStar, setWantsSuperStar] = useState(false);
@@ -104,9 +105,25 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
+  const superstarCredits = user?.superstarCredits ?? 0;
+  const hasSuperStarCredit = superstarCredits > 0 || superStarPurchased;
+
   const handleSuperStarClick = () => {
     if (!user) { setShowAuth(true); setAuthMode('signin'); return; }
-    if (superStarPurchased) { setWantsSuperStar(false); setSuperStarPurchased(false); return; }
+    // If already selected, deselect
+    if (wantsSuperStar || superStarPurchased || rating === 6) {
+      setWantsSuperStar(false);
+      setSuperStarPurchased(false);
+      setRating(0);
+      return;
+    }
+    // Has credits: allow 6-star without purchase
+    if (superstarCredits > 0) {
+      setWantsSuperStar(true);
+      setRating(6);
+      return;
+    }
+    // No credits: open purchase modal
     setShowSuperStarModal(true);
     setSsPaymentStep('form');
     setSsPaymentError(null);
@@ -174,6 +191,8 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
         setWantsSuperStar(true);
         setRating(6);
         toast.success('Super Star purchased!');
+        // Refresh user profile to update superstar_credits
+        refreshUserProfile?.();
 
         setTimeout(() => {
           setShowSuperStarModal(false);
@@ -205,12 +224,16 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     setSubmitting(true);
     setErrors({});
     try {
-      const effectiveRating = Math.min(rating, 5);
-      await submitReview(businessId, effectiveRating, comment.trim());
+      // Standard 1-5: rating is 1-5. Superstar: rating is 6 (after purchase). Pass as-is.
+      const wasSuperStar = rating === 6;
+      await submitReview(businessId, rating, comment.trim(), wasSuperStar);
       setSubmitted(true);
+      setLastSubmittedSuperStar(wasSuperStar);
       setRating(0);
       setComment('');
-      setTimeout(() => { setSubmitted(false); onSuccess?.(); }, 2000);
+      setWantsSuperStar(false);
+      setSuperStarPurchased(false);
+      setTimeout(() => { setSubmitted(false); setLastSubmittedSuperStar(false); onSuccess?.(); }, 2000);
     } catch (err) {
       // Error toast handled in submitReview
     } finally {
@@ -227,7 +250,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           {language === 'en' ? 'Thank You!' : language === 'fr' ? 'Merci !' : 'Tangkiu tumas!'}
         </h4>
         <p className="text-sm text-emerald-600">
-          {superStarPurchased
+          {lastSubmittedSuperStar
             ? (language === 'en' ? 'Your Super Star review has been submitted!' : language === 'fr' ? 'Votre avis Super Étoile a été soumis !' : 'Supa Sta riviu blong yu i go finis!')
             : (language === 'en' ? 'Your review has been submitted successfully.' : language === 'fr' ? 'Votre avis a été soumis avec succès.' : 'Riviu blong yu i go finis.')}
         </p>
@@ -302,25 +325,25 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
             >
               <div className="relative">
                 <Star className={`w-10 h-10 transition-all duration-300 ${
-                  wantsSuperStar || superStarPurchased
-                    ? 'text-purple-500 fill-purple-500 drop-shadow-lg'
+                  wantsSuperStar || superStarPurchased || rating === 6
+                    ? 'text-amber-500 fill-amber-500 drop-shadow-lg'
                     : hoveredRating === 6
-                    ? 'text-purple-400 fill-purple-200 drop-shadow-md'
+                    ? 'text-amber-400 fill-amber-200 drop-shadow-md'
                     : 'text-purple-200 hover:text-purple-300'
                 }`} />
                 <Sparkles className={`absolute -top-1 -right-1 w-4 h-4 transition-all duration-300 ${
-                  wantsSuperStar || superStarPurchased
+                  wantsSuperStar || superStarPurchased || rating === 6
                     ? 'text-yellow-400 animate-pulse'
                     : hoveredRating === 6
                     ? 'text-yellow-300 opacity-80'
                     : 'text-gray-300 opacity-40'
                 }`} />
-                {!superStarPurchased && (
+                {!hasSuperStarCredit && (
                   <span className={`absolute -bottom-1 -right-1 px-1 py-0.5 rounded-full text-[8px] font-bold transition-all ${
                     hoveredRating === 6 ? 'bg-purple-600 text-white scale-110' : 'bg-purple-100 text-purple-600'
                   }`}>$5</span>
                 )}
-                {superStarPurchased && (
+                {hasSuperStarCredit && (
                   <CheckCircle2 className="absolute -bottom-1 -right-1 w-4 h-4 text-green-500 bg-white rounded-full" />
                 )}
               </div>
@@ -334,7 +357,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
               <span className={`ml-2 text-sm font-medium animate-in fade-in ${
                 activeRating === 6 || wantsSuperStar ? 'text-purple-600' : 'text-gray-600'
               }`}>
-                {wantsSuperStar || superStarPurchased
+                {wantsSuperStar || superStarPurchased || rating === 6
                   ? (ratingLabels[6]?.[language] || ratingLabels[6]?.en)
                   : (ratingLabels[activeRating]?.[language] || ratingLabels[activeRating]?.en)}
               </span>
@@ -361,7 +384,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
             </div>
           )}
 
-          {superStarPurchased && (
+          {hasSuperStarCredit && (
             <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-50 border border-purple-200">
               <Sparkles className="w-4 h-4 text-purple-500" />
               <span className="text-sm font-semibold text-purple-700">
