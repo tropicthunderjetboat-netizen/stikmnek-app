@@ -753,7 +753,8 @@ const BusinessOwnerDashboard: React.FC = () => {
         isMain: index === 0,
       }));
 
-      const { data } = await supabase.functions.invoke('manage-business', {
+      // Strategy 1: Edge function
+      const { data, error } = await supabase.functions.invoke('manage-business', {
         body: {
           action: 'submit_business',
           userId: user?.id,
@@ -765,7 +766,7 @@ const BusinessOwnerDashboard: React.FC = () => {
           dealPrice: dlPrice,
           location: submitForm.location || 'Port Vila, Vanuatu',
           phone: submitForm.phone,
-          whatsappNumber: submitForm.whatsappNumber,
+          whatsappNumber: submitForm.whatsappNumber || null,
           email: submitForm.email || user?.email,
           hours: submitForm.hours,
           image: mainImageUrl,
@@ -777,13 +778,66 @@ const BusinessOwnerDashboard: React.FC = () => {
         },
       });
 
+      if (data?.success && data?.business?.id) {
+        toast.success('Business submitted for approval!');
+        setSubmitForm({
+          name: '', category: 'dining', description: '', discount: '',
+          originalPrice: '', discountPercent: '', dealPrice: '',
+          location: '', phone: '', email: '', hours: '', image: '',
+          whatsappNumber: '',
+          mapUrl: '', website: '',
+          discountValidFrom: todayStr(),
+          listingDuration: '1_month',
+        });
+        setSubmitPhotos([]);
+        await loadAllOwnerData();
+        setActiveTab('submissions');
+        return;
+      }
 
-      if (data?.business?.id && submitPhotos.length > 0 && user) {
+      // Strategy 2: Direct DB insert fallback if edge function failed
+      console.warn('[Dashboard] Edge function failed, trying direct DB insert...', { error: error?.message, dataError: data?.error });
+      const directRecord = {
+        owner_id: user?.id,
+        name: submitForm.name,
+        category: submitForm.category,
+        description: submitForm.description,
+        discount: submitForm.discount || '',
+        original_price: origPrice,
+        deal_price: dlPrice,
+        location: submitForm.location || 'Port Vila, Vanuatu',
+        phone: submitForm.phone,
+        email: submitForm.email || user?.email,
+        hours: submitForm.hours,
+        whatsapp_number: submitForm.whatsappNumber || null,
+        image: mainImageUrl,
+        status: 'pending',
+        discount_valid_from: submitForm.discountValidFrom || null,
+        discount_valid_until: discountValidUntil || null,
+        map_url: submitForm.mapUrl || null,
+        website: submitForm.website || null,
+      };
+
+      const { data: directData, error: directError } = await supabase
+        .from('pending_businesses')
+        .insert(directRecord)
+        .select()
+        .single();
+
+      if (directError) throw new Error(directError.message || 'Failed to submit business');
+
+      if (directData?.id && submitPhotos.length > 0 && user) {
         const photoRecords = submitPhotos.map((photo, index) => ({
-          business_id: data.business.id, url: photo.url, file_path: photo.filePath, uploaded_by: user.id, is_main: index === 0,
+          business_id: directData.id,
+          url: photo.url,
+          file_path: photo.filePath,
+          uploaded_by: user.id,
+          is_main: index === 0,
+          status: 'pending',
         }));
         await supabase.from('business_photos').insert(photoRecords);
       }
+
       toast.success('Business submitted for approval!');
       setSubmitForm({
         name: '', category: 'dining', description: '', discount: '',
@@ -794,13 +848,8 @@ const BusinessOwnerDashboard: React.FC = () => {
         discountValidFrom: todayStr(),
         listingDuration: '1_month',
       });
-
       setSubmitPhotos([]);
-
-      // Refresh all owner data to show the new submission immediately
       await loadAllOwnerData();
-
-      // Switch to submissions tab to show the new submission
       setActiveTab('submissions');
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit business');

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 import { X, Mail, Lock, User, Briefcase, Plane, Loader2, Shield, ArrowLeft, Store, MapPin, Globe } from 'lucide-react';
 
 const AuthModal: React.FC = () => {
@@ -13,19 +15,58 @@ const AuthModal: React.FC = () => {
   const [name, setName] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
 
   if (!showAuth) return null;
 
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!email || !email.includes('@')) errs.email = 'Valid email required';
-    if (!password || password.length < 6) errs.password = 'Min 6 characters';
-    if ((authMode === 'signup' || authMode === 'signup-tourist' || authMode === 'signup-business') && !name) errs.name = 'Name required';
+    if (!forgotPasswordMode) {
+      if (!password || password.length < 6) errs.password = 'Min 6 characters';
+      if ((authMode === 'signup' || authMode === 'signup-tourist' || authMode === 'signup-business') && !name) errs.name = 'Name required';
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !email.includes('@')) {
+      setErrors({ email: 'Valid email required' });
+      return;
+    }
+    setSubmitting(true);
+    setErrors({});
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/`,
+      });
+      if (error) throw error;
+      setForgotPasswordSent(true);
+      toast.success(
+        language === 'en'
+          ? 'Check your email for a password reset link.'
+          : language === 'fr'
+          ? 'Consultez votre email pour le lien de réinitialisation.'
+          : 'Lukim email blong yu blong reset link.'
+      );
+    } catch (err: any) {
+      console.error('[AuthModal] Forgot password error:', err);
+      toast.error(err?.message || 'Failed to send reset link');
+      setErrors({ email: err?.message || 'Failed to send' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (forgotPasswordMode) {
+      await handleForgotPassword(e);
+      return;
+    }
     e.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
@@ -57,6 +98,8 @@ const AuthModal: React.FC = () => {
     setPassword('');
     setName('');
     setErrors({});
+    setForgotPasswordMode(false);
+    setForgotPasswordSent(false);
   };
 
   const isSignup = authMode === 'signup' || authMode === 'signup-tourist' || authMode === 'signup-business';
@@ -177,11 +220,92 @@ const AuthModal: React.FC = () => {
     : isBizSignup
     ? (language === 'en' ? 'Business Sign Up' : language === 'fr' ? 'Inscription Entreprise' : 'Bisnis Saen Ap')
     : (language === 'en' ? 'Tourist Sign Up' : language === 'fr' ? 'Inscription Touriste' : 'Turis Saen Ap');
-  const headerSubtitle = authMode === 'signin'
+  const headerSubtitle = forgotPasswordMode
+    ? (language === 'en' ? 'We\'ll send you a reset link' : language === 'fr' ? 'Nous vous enverrons un lien' : 'Bae mifala sendem link long yu')
+    : authMode === 'signin'
     ? (language === 'en' ? 'Welcome back to StikmNek' : language === 'fr' ? 'Bienvenue sur StikmNek' : 'Welkam bak long StikmNek')
     : isBizSignup
     ? (language === 'en' ? 'Create your business account to start listing' : language === 'fr' ? 'Créez votre compte entreprise' : 'Mekem bisnis akaont blong yu')
     : (language === 'en' ? 'Create your account to start saving' : language === 'fr' ? 'Créez votre compte pour économiser' : 'Mekem akaont blong yu blong sevem');
+
+  // ─── FORGOT PASSWORD SCREEN ───
+  if (authMode === 'signin' && (forgotPasswordMode || forgotPasswordSent)) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowAuth(false)} />
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[95vh] overflow-y-auto">
+          <div className="relative bg-gradient-to-r from-teal-600 to-emerald-600 px-6 py-7 text-white">
+            <button
+              onClick={() => { setForgotPasswordMode(false); setForgotPasswordSent(false); setErrors({}); }}
+              className="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <button onClick={() => setShowAuth(false)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+              <Lock className="w-6 h-6" />
+            </div>
+            <h2 className="text-2xl font-bold">
+              {forgotPasswordSent
+                ? (language === 'en' ? 'Check Your Email' : language === 'fr' ? 'Vérifiez votre email' : 'Lukim Email Blong Yu')
+                : (language === 'en' ? 'Forgot Password?' : language === 'fr' ? 'Mot de passe oublié ?' : 'Fogetem Paswod?')}
+            </h2>
+            <p className="text-white/70 text-sm mt-1">
+              {forgotPasswordSent
+                ? (language === 'en' ? 'We sent a reset link to your email' : language === 'fr' ? 'Un lien a été envoyé à votre email' : 'Mifala i sendem link long email blong yu')
+                : (language === 'en' ? 'Enter your email to receive a reset link' : language === 'fr' ? 'Entrez votre email pour recevoir un lien' : 'Putum email blong yu blong karem reset link')}
+            </p>
+          </div>
+          <div className="px-6 py-6">
+            {forgotPasswordSent ? (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  {language === 'en'
+                    ? 'If an account exists for that email, you will receive a password reset link. Check your spam folder if you don\'t see it.'
+                    : language === 'fr'
+                    ? 'Si un compte existe pour cet email, vous recevrez un lien. Vérifiez vos spams si vous ne le voyez pas.'
+                    : 'Sapos gat akaont long email ia, bae yu karem link. Lukim spam folder.'}
+                </p>
+                <button
+                  onClick={() => { setForgotPasswordMode(false); setForgotPasswordSent(false); }}
+                  className="w-full py-3 rounded-xl bg-teal-600 text-white font-bold text-sm hover:bg-teal-700 transition-colors"
+                >
+                  {language === 'en' ? 'Back to Sign In' : language === 'fr' ? 'Retour à la connexion' : 'Go Bak long Saen In'}
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.email', language)}</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: '' })); }}
+                      className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-200'} text-sm focus:outline-none focus:ring-2 focus:ring-teal-500`}
+                      placeholder="you@example.com"
+                    />
+                  </div>
+                  {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+                </div>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {language === 'en' ? 'Send Reset Link' : language === 'fr' ? 'Envoyer le lien' : 'Sendem Reset Link'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -261,20 +385,31 @@ const AuthModal: React.FC = () => {
             {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.password', language)}</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${errors.password ? 'border-red-300 bg-red-50' : 'border-gray-200'} text-sm focus:outline-none focus:ring-2 focus:ring-teal-500`}
-                placeholder="Min 6 characters"
-              />
+          {!forgotPasswordMode && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.password', language)}</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-xl border ${errors.password ? 'border-red-300 bg-red-50' : 'border-gray-200'} text-sm focus:outline-none focus:ring-2 focus:ring-teal-500`}
+                  placeholder="Min 6 characters"
+                />
+              </div>
+              {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+              {authMode === 'signin' && (
+                <button
+                  type="button"
+                  onClick={() => setForgotPasswordMode(true)}
+                  className="mt-1.5 text-xs text-teal-600 hover:text-teal-700 font-medium"
+                >
+                  {language === 'en' ? 'Forgot Password?' : language === 'fr' ? 'Mot de passe oublié ?' : 'Fogetem Paswod?'}
+                </button>
+              )}
             </div>
-            {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
-          </div>
+          )}
 
           <button
             type="submit"
