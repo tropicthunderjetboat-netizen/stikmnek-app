@@ -139,6 +139,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authLoading, setAuthLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem | null>(null);
+
+const [vanuatuBonus, setVanuatuBonus] = useState(true);
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup' | 'signup-tourist' | 'signup-business'>('signin');
@@ -1109,7 +1111,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         refreshBusinesses,
         refreshUserPass,
         userLocation, locationLoading, locationError,
-        requestUserLocation, getDistanceTo,
+        requestUserLocation, getDistanceTo, 
+vanuatuBonus,
+setVanuatuBonus,
       }}
     >
       {children}

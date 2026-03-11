@@ -317,7 +317,7 @@ async function invokeExtendPassWithRetry(
 
 // ─── Main PassCards Component ───
 const PassCards: React.FC = () => {
-  const { language, purchasePass, user, refreshUserPass, setCurrentView } = useAppContext();
+  const { language, purchasePass, user, refreshUserPass, setCurrentView, setVanuatuBonus } = useAppContext();
 
   const { activePasses } = usePassConfig();
   const [sharedPasses, setSharedPasses] = useState<Set<string>>(
@@ -414,7 +414,8 @@ const PassCards: React.FC = () => {
 
       if (!shareSucceeded) {
         setSharingPassId(null);
-        return;
+        return;// This unlocks the bonus for the checkout page
+      setVanuatuBonus(true);
       }
 
       // ═══ STEP 2: Call extend-pass edge function if user has an active pass ═══

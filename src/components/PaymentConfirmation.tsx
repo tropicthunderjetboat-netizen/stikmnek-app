@@ -558,7 +558,7 @@ const ShareCTA: React.FC<{ passType: string; userId: string }> = ({ passType, us
 
 // ─── Main PaymentConfirmation Component ───
 const PaymentConfirmation: React.FC = () => {
-  const { user, setCurrentView } = useAppContext();
+  const { user, setCurrentView, vanuatuBonus } = useAppContext();
   const [payment, setPayment] = useState<PaymentResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -587,48 +587,32 @@ const PaymentConfirmation: React.FC = () => {
 
 const sendConfirmationEmail = async () => {
     if (!payment || !user?.email) return;
-    setSendingEmail(true); // This starts the spinner
+    setSendingEmail(true); 
     
     try {
       const { data, error } = await supabase.functions.invoke('send-email', {
         body: {
           action: 'send_pass_confirmation',
           user_id: user.id,
-          user_name: user.name,
-          user_email: user.email,
           receipt_number: payment.receiptNumber,
           pass_label: passLabel,
           pass_group: passGroup,
-          pass_days: passDays,
+          pass_days: passDays, // This will now be 7
           amount: payment.amount,
-          currency: 'AUD',
-          payment_method: payment.paymentMethod === 'card'
-            ? `Credit Card ending ${payment.cardLast4 || '****'}`
-            : 'PayPal',
-          valid_from: payment.validFrom,
-          valid_until: payment.validUntil,
+          user_email: user.email,
         },
       });
 
-      if (error) throw error; // Stops the hang if server crashes
+      if (error) throw error;
+      if (data?.success) setEmailSent(true);
 
-      if (data?.success) {
-        setEmailSent(true);
-        toast.success('Confirmation email sent!');
-      } else {
-        throw new Error(data?.error || 'Failed to send');
-      }
-
-    } catch (err: any) {
+    } catch (err) {
       console.error("Email failed:", err);
-      // This tells you what actually happened
-      toast.error(err.message || 'Email failed to send.'); 
     } finally {
-      // 🚨 THIS IS THE FIX: This stops the spinner no matter what!
+      // 🚨 CRITICAL: This line stops the "Processing" spinner no matter what.
       setSendingEmail(false); 
     }
-  };  
-if (!payment) {
+  };if (!payment) {
     return (
       <div className="min-h-screen bg-gray-50 pt-20 pb-16">
         <div className="max-w-lg mx-auto px-4 text-center pt-20">
@@ -661,11 +645,15 @@ if (!payment) {
     ? '7 people' 
     : (payment?.group || (payment?.passType ? PASS_GROUPS[payment.passType] : '4 people'));
 
-  // 4. Force the correct Days (6 days)
+  // 4. Force the correct Days (Check for 7-day share bonus)
   const passDays = isUltimate 
     ? 6 
-    : (payment?.days || (payment?.amount >= 45 ? 6 : 1));
+    : (vanuatuBonus && payment?.passType === 'weekly' ? 7 : (payment?.days || (payment?.amount >= 45 ? 6 : 1)));
 
+  // 5. Force the correct Group (Check for extra people share bonus)
+  const passGroup = isUltimate 
+    ? '7 people' 
+    : (vanuatuBonus && payment?.passType === 'weekly' ? '6 people' : (payment?.group || (payment?.passType ? PASS_GROUPS[payment.passType] : '4 people')));
   const passIcons: Record<string, React.ReactNode> = {
     daily: <Zap className="w-6 h-6" />,
     weekly: <Star className="w-6 h-6" />,

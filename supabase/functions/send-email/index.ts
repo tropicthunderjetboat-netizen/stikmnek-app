@@ -22,7 +22,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: body.user_email }] }],
-        from: { email: 'stikmnekgmail.com', name: 'StikmNek Adventure' },
+        from: { email: 'stikmnek@gmail.com', name: 'StikmNek Adventure' },
         subject: `Your StikmNek Receipt: ${body.receipt_number}`,
         content: [{
           type: 'text/html',
