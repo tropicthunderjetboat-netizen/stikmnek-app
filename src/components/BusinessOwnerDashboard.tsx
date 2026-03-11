@@ -25,7 +25,35 @@ import BusinessHomeScreen from './BusinessHomeScreen';
 import DashboardFeedback from './DashboardFeedback';
 import DealExpiryWarningBanner from './DealExpiryWarningBanner';
 
-
+// ─── Retry helper for edge function calls (matches BusinessListingForm) ───
+async function invokeWithRetry(
+  fnName: string,
+  body: Record<string, unknown>,
+  maxRetries = 2,
+  label = ''
+): Promise<{ data: any; error: any }> {
+  let lastError: any = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        await new Promise(r => setTimeout(r, 500 * attempt));
+      }
+      const result = await supabase.functions.invoke(fnName, { body });
+      if (result.error) {
+        lastError = result.error;
+        continue;
+      }
+      if (result.data?.error) {
+        lastError = new Error(result.data.error);
+        continue;
+      }
+      return result;
+    } catch (err: any) {
+      lastError = err;
+    }
+  }
+  return { data: null, error: lastError };
+}
 
 
 interface ReviewResponse {
@@ -753,9 +781,10 @@ const BusinessOwnerDashboard: React.FC = () => {
         isMain: index === 0,
       }));
 
-      // Strategy 1: Edge function
-      const { data, error } = await supabase.functions.invoke('manage-business', {
-        body: {
+      // Strategy 1: Edge function (with retry for transient failures)
+      const { data, error } = await invokeWithRetry(
+        'manage-business',
+        {
           action: 'submit_business',
           userId: user?.id,
           name: submitForm.name,
@@ -776,7 +805,9 @@ const BusinessOwnerDashboard: React.FC = () => {
           discountValidFrom: submitForm.discountValidFrom,
           discountValidUntil: discountValidUntil,
         },
-      });
+        2,
+        'submit_business'
+      );
 
       if (data?.success && data?.business?.id) {
         toast.success('Business submitted for approval!');

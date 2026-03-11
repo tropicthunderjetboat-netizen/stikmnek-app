@@ -250,18 +250,25 @@ export async function directProfileInsert(params: {
     if (existing) {
       console.log('[directProfileInsert] Profile already exists — checking if new columns need updating');
 
-      // If the trigger created the row but didn't populate name/full_name/user_type, update them
-      const needsUpdate = !existing.name || !existing.full_name || !existing.user_type;
+      // If the trigger created the row but didn't populate name/full_name/user_type, update them.
+      // IMPORTANT: Always overwrite role/user_type when they don't match the signup choice —
+      // the trigger may have defaulted to 'tourist' if metadata wasn't available yet.
+      const needsUpdate =
+        !existing.name ||
+        !existing.full_name ||
+        !existing.user_type ||
+        existing.role !== params.userType;
+
       if (needsUpdate) {
-        console.log('[directProfileInsert] Updating missing columns: name, full_name, user_type');
+        console.log('[directProfileInsert] Updating profile — userType:', params.userType);
         const { data: updated, error: updateError } = await supabase
           .from('user_profiles')
           .update({
             name: existing.name || params.name,
             full_name: existing.full_name || params.name,
-            user_type: existing.user_type || params.userType,
+            user_type: params.userType,
             display_name: existing.display_name || params.name,
-            role: existing.role || params.userType,
+            role: params.userType,
             updated_at: new Date().toISOString(),
           })
           .eq('user_id', params.userId)
