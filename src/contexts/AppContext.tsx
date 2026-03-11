@@ -818,6 +818,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [loadBusinesses, loadReviews, handleAuthenticatedUser]);
 
 
+  // When auth modal opens but user is already logged in (e.g. session restored from localStorage),
+  // close the modal and redirect instead of showing the sign-in form.
+  useEffect(() => {
+    if (showAuth && user) {
+      setShowAuth(false);
+      redirectForRole(user.type);
+    }
+  }, [showAuth, user, redirectForRole]);
+
   // Realtime subscriptions for reviews
   useEffect(() => {
     const channel = supabase

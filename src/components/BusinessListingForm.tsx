@@ -285,53 +285,41 @@ const BusinessListingForm: React.FC = () => {
       }
 
 
-      // Strategy 2: Direct DB insert fallback if edge function failed
-      console.warn('[BusinessForm] Edge function failed, trying direct DB insert...', {
+      // Strategy 2: RPC insert (bypasses RLS) if edge function failed
+      console.warn('[BusinessForm] Edge function failed, trying insert_pending_business RPC...', {
         error: error?.message,
         dataError: data?.error,
       });
 
-      const directRecord = {
-        owner_id: user.id,
-        name: form.name,
-        category: form.category,
-        description: form.description,
-        discount: form.discount,
-        original_price: Number(form.originalPrice) || 0,
-        deal_price: Number(form.dealPrice) || 0,
-        location: form.address || 'Port Vila, Vanuatu',
-        phone: form.phone,
-        email: form.email || user.email,
-        hours: form.hours,
-        whatsapp_number: form.whatsappNumber || null,
-        image: mainImageUrl,
-        status: 'pending',
-        discount_valid_from: form.discountValidFrom || null,
-        discount_valid_until: discountValidUntil || null,
-        map_url: form.mapUrl || null,
-        website: form.website || null,
-      };
-
-
-      console.log('[BusinessForm] Direct DB insert payload:', {
-        ...directRecord,
-        image: directRecord.image ? '(has image)' : '(no image)',
+      const { data: rpcId, error: directError } = await supabase.rpc('insert_pending_business', {
+        p_owner_id: user.id,
+        p_name: form.name,
+        p_category: form.category,
+        p_description: form.description,
+        p_discount: form.discount,
+        p_original_price: Number(form.originalPrice) || 0,
+        p_deal_price: Number(form.dealPrice) || 0,
+        p_location: form.address || 'Port Vila, Vanuatu',
+        p_phone: form.phone,
+        p_email: form.email || user.email,
+        p_hours: form.hours,
+        p_image: mainImageUrl,
+        p_map_url: form.mapUrl || null,
+        p_website: form.website || null,
+        p_discount_valid_from: form.discountValidFrom || null,
+        p_discount_valid_until: discountValidUntil || null,
+        p_whatsapp_number: form.whatsappNumber || null,
       });
 
-      const { data: directData, error: directError } = await supabase
-        .from('pending_businesses')
-        .insert(directRecord)
-        .select()
-        .single();
-
       if (directError) {
-        console.error('[BusinessForm] Direct DB insert FAILED:', directError);
+        console.error('[BusinessForm] RPC insert FAILED:', directError);
         throw new Error(
           directError.message || 'Failed to submit listing. Please try again.'
         );
       }
 
-      console.log('[BusinessForm] Direct DB insert SUCCESS:', directData?.id);
+      const directData = rpcId ? { id: rpcId } : null;
+      console.log('[BusinessForm] RPC insert SUCCESS:', directData?.id);
 
       // Insert photos directly if we have them
       if (directData?.id && photos.length > 0) {

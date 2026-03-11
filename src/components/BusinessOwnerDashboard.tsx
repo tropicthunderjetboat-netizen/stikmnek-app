@@ -826,36 +826,30 @@ const BusinessOwnerDashboard: React.FC = () => {
         return;
       }
 
-      // Strategy 2: Direct DB insert fallback if edge function failed
-      console.warn('[Dashboard] Edge function failed, trying direct DB insert...', { error: error?.message, dataError: data?.error });
-      const directRecord = {
-        owner_id: user?.id,
-        name: submitForm.name,
-        category: submitForm.category,
-        description: submitForm.description,
-        discount: submitForm.discount || '',
-        original_price: origPrice,
-        deal_price: dlPrice,
-        location: submitForm.location || 'Port Vila, Vanuatu',
-        phone: submitForm.phone,
-        email: submitForm.email || user?.email,
-        hours: submitForm.hours,
-        whatsapp_number: submitForm.whatsappNumber || null,
-        image: mainImageUrl,
-        status: 'pending',
-        discount_valid_from: submitForm.discountValidFrom || null,
-        discount_valid_until: discountValidUntil || null,
-        map_url: submitForm.mapUrl || null,
-        website: submitForm.website || null,
-      };
-
-      const { data: directData, error: directError } = await supabase
-        .from('pending_businesses')
-        .insert(directRecord)
-        .select()
-        .single();
+      // Strategy 2: RPC insert (bypasses RLS) if edge function failed
+      console.warn('[Dashboard] Edge function failed, trying insert_pending_business RPC...', { error: error?.message, dataError: data?.error });
+      const { data: rpcId, error: directError } = await supabase.rpc('insert_pending_business', {
+        p_owner_id: user?.id,
+        p_name: submitForm.name,
+        p_category: submitForm.category,
+        p_description: submitForm.description,
+        p_discount: submitForm.discount || '',
+        p_original_price: origPrice,
+        p_deal_price: dlPrice,
+        p_location: submitForm.location || 'Port Vila, Vanuatu',
+        p_phone: submitForm.phone,
+        p_email: submitForm.email || user?.email,
+        p_hours: submitForm.hours,
+        p_image: mainImageUrl,
+        p_map_url: submitForm.mapUrl || null,
+        p_website: submitForm.website || null,
+        p_discount_valid_from: submitForm.discountValidFrom || null,
+        p_discount_valid_until: discountValidUntil || null,
+        p_whatsapp_number: submitForm.whatsappNumber || null,
+      });
 
       if (directError) throw new Error(directError.message || 'Failed to submit business');
+      const directData = rpcId ? { id: rpcId } : null;
 
       if (directData?.id && submitPhotos.length > 0 && user) {
         const photoRecords = submitPhotos.map((photo, index) => ({
