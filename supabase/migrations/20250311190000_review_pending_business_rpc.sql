@@ -51,33 +51,31 @@ BEGIN
   WHERE id = p_pending_id;
 
   IF p_decision = 'approved' THEN
-    -- Insert into businesses (explicit defaults for all required columns)
+    -- Insert into businesses (matches actual schema: image_url, deal, discounted_price, opening_hours)
     INSERT INTO public.businesses (
-      owner_id, name, category, description, description_fr, description_bi,
-      discount, original_price, deal_price, location, phone, hours,
-      image, map_url, website, discount_valid_from, discount_valid_until,
-      whatsapp_number, rating, review_count, featured, active, super_star_count
+      name, category, description, description_fr, description_bi,
+      image_url, rating, review_count, deal, original_price, discounted_price,
+      location, opening_hours, phone
     ) VALUES (
-      v_pending.owner_id,
       COALESCE(NULLIF(TRIM(v_pending.name), ''), 'Unnamed Business'),
       COALESCE(NULLIF(TRIM(v_pending.category), ''), 'dining'),
-      v_pending.description, v_pending.description, v_pending.description,
+      v_pending.description,
+      v_pending.description,
+      v_pending.description,
+      COALESCE(v_pending.image, ''),
+      0, 0,
       COALESCE(NULLIF(TRIM(v_pending.discount), ''), ''),
       COALESCE(v_pending.original_price::numeric, 0),
       COALESCE(v_pending.deal_price::numeric, 0),
       COALESCE(NULLIF(TRIM(v_pending.location), ''), 'Port Vila, Vanuatu'),
-      v_pending.phone, v_pending.hours,
-      COALESCE(v_pending.image, ''),
-      v_pending.map_url, v_pending.website,
-      v_pending.discount_valid_from, v_pending.discount_valid_until,
-      v_pending.whatsapp_number,
-      0, 0, false, true, 0
+      v_pending.hours,
+      v_pending.phone
     )
     RETURNING id INTO v_new_biz_id;
 
-    -- Update business_photos: change business_id from pending id to new business id
+    -- Update business_photos: point to new business id AND set status = 'approved' so they're visible
     UPDATE public.business_photos
-    SET business_id = v_new_biz_id
+    SET business_id = v_new_biz_id, status = 'approved'
     WHERE business_id = p_pending_id;
 
     RETURN jsonb_build_object('success', true, 'new_business_id', v_new_biz_id);
