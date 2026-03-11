@@ -602,6 +602,47 @@ const AdminPanel: React.FC = () => {
     setProcessingId(businessId);
     const biz = pendingBusinesses.find(b => b.id === businessId);
     try {
+      // Strategy 1: RPC (bypasses Edge Function, most reliable)
+      const { data: rpcData, error: rpcError } = await supabase.rpc('review_pending_business', {
+        p_pending_id: businessId,
+        p_decision: decision,
+        p_admin_notes: adminNotes[businessId] || '',
+      });
+
+      if (!rpcError && rpcData?.success) {
+        setPendingBusinesses(prev => prev.filter(b => b.id !== businessId));
+        toast.success(`Business "${biz?.name}" ${decision === 'approved' ? 'approved' : 'rejected'} successfully!`);
+        if (decision === 'approved') {
+          setTimeout(async () => {
+            await refreshBusinesses();
+            toast.success('Business list refreshed - new business is now live!');
+          }, 1000);
+        }
+        if (biz?.email) {
+          try {
+            await supabase.functions.invoke('send-email', {
+              body: {
+                action: 'send_business_decision',
+                owner_id: biz.owner_id || '',
+                owner_email: biz.email,
+                owner_name: biz.name,
+                business_name: biz.name,
+                category: biz.category,
+                location: biz.location,
+                discount: biz.discount,
+                decision,
+                admin_notes: adminNotes[businessId] || 'No additional notes.',
+              },
+            });
+            toast.success(`Notification email sent to ${biz.email}`);
+          } catch (emailErr) {
+            console.error('Failed to send decision email:', emailErr);
+          }
+        }
+        return;
+      }
+
+      // Strategy 2: Edge Function fallback
       const { data, error } = await supabase.functions.invoke('manage-business', {
         body: {
           action: 'review_business',
@@ -615,14 +656,10 @@ const AdminPanel: React.FC = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // Remove the reviewed business from the approvals list immediately
       setPendingBusinesses(prev => prev.filter(b => b.id !== businessId));
       toast.success(`Business "${biz?.name}" ${decision === 'approved' ? 'approved' : 'rejected'} successfully!`);
 
-
-      // Refresh the main business list so the new business shows in categories
       if (decision === 'approved') {
-        // Small delay to allow DB to propagate
         setTimeout(async () => {
           await refreshBusinesses();
           toast.success('Business list refreshed - new business is now live!');
