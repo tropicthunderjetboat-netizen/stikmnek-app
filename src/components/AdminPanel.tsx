@@ -484,14 +484,20 @@ const AdminPanel: React.FC = () => {
     if (!editBusinessId || !editForm.name) { toast.error('Business name is required.'); return; }
     setSavingEdit(true);
     try {
+      // Build updates (migration 20250311230000 adds deal_price etc. if missing)
       const updates: Record<string, any> = {
         name: editForm.name, category: editForm.category, description: editForm.description,
-        discount: editForm.discount, original_price: Number(editForm.originalPrice) || 0,
-        deal_price: Number(editForm.dealPrice) || 0, location: editForm.location,
-        phone: editForm.phone, hours: editForm.hours,
+        discount: editForm.discount, deal: editForm.discount,
+        original_price: Number(editForm.originalPrice) || 0,
+        deal_price: Number(editForm.dealPrice) || 0, discounted_price: Number(editForm.dealPrice) || 0,
+        location: editForm.location, phone: editForm.phone,
+        hours: editForm.hours, opening_hours: editForm.hours,
         map_url: editForm.mapUrl, website: editForm.website,
       };
-      if (editForm.image) updates.image = editForm.image;
+      if (editForm.image) {
+        updates.image_url = editForm.image;
+        updates.image = editForm.image;
+      }
 
       const { error } = await supabase.from('businesses').update(updates).eq('id', editBusinessId);
       if (error) throw error;

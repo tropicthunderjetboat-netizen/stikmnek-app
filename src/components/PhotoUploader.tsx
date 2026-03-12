@@ -226,9 +226,15 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
     file: File,
     preReadDataUrl?: string
   ): Promise<UploadedPhoto | null> => {
-    if (!userId || userId.trim() === '') {
-      toast.error('Please sign in before uploading photos.');
-      return null;
+    // Resolve user id: use prop or fetch from session (handles loading state)
+    let effectiveUserId = userId?.trim() || '';
+    if (!effectiveUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please sign in before uploading photos.');
+        return null;
+      }
+      effectiveUserId = user.id;
     }
 
     if (!file) {
@@ -372,7 +378,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               fileBase64: finalBase64,
               fileName: file.name,
               contentType: file.type || 'image/jpeg',
-              userId: userId,
+              userId: effectiveUserId,
             },
           });
           const elapsed = Date.now() - startMs;
@@ -401,17 +407,33 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
 
       clearInterval(progressInterval);
 
-      if (uploadError) {
-        console.error(`[${file.name}] Upload error:`, uploadError);
-        
-        // Check if it's a non-2xx response with data
-        if (uploadError.context?.body) {
-          try {
-            const errorBody = await uploadError.context.body.json?.() || {};
-            console.error(`[${file.name}] Error body:`, errorBody);
-          } catch (_) {}
+      // Fallback: direct storage upload when Edge Function fails
+      if (uploadError && !uploadData) {
+        console.warn(`[${file.name}] Edge Function failed, trying direct storage upload...`);
+        try {
+          const base64Data = finalBase64.replace(/^data:image\/\w+;base64,/, '');
+          const binary = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+          const ext = (file.name || 'image.jpg').split('.').pop() || 'jpg';
+          const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : 'jpg';
+          const filePath = `${effectiveUserId}/${crypto.randomUUID()}.${safeExt}`;
+          const blob = new Blob([binary], { type: file.type || 'image/jpeg' });
+
+          const { error: storageErr } = await supabase.storage
+            .from('business-photos')
+            .upload(filePath, blob, { contentType: file.type || 'image/jpeg', upsert: false });
+
+          if (!storageErr) {
+            const { data: urlData } = supabase.storage.from('business-photos').getPublicUrl(filePath);
+            uploadData = { url: urlData.publicUrl, filePath, success: true };
+            console.log(`[${file.name}] Direct storage upload succeeded`);
+          }
+        } catch (directErr: any) {
+          console.error(`[${file.name}] Direct storage upload failed:`, directErr);
         }
-        
+      }
+
+      if (uploadError && !uploadData) {
+        console.error(`[${file.name}] Upload error:`, uploadError);
         setUploading(prev => prev.map(u =>
           u.id === fileId ? { ...u, status: 'error', progress: 0, errorMessage: 'Upload failed. Please try again.' } : u
         ));
