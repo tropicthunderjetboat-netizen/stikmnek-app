@@ -346,12 +346,11 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       const compressedSize = estimateBase64Size(finalBase64);
       console.log(`[${file.name}] Final: original ~${Math.round(file.size / 1024)}KB, final ~${Math.round(compressedSize / 1024)}KB`);
 
-      // ── STEP 3: Upload via edge function ──
+      // ── STEP 3: Upload (direct storage first — avoids Edge Function hang/cold start) ──
       setUploading(prev => prev.map(u =>
         u.id === fileId ? { ...u, status: 'uploading', progress: 40 } : u
       ));
 
-      // Simulate progress during upload
       const progressInterval = setInterval(() => {
         setUploading(prev => prev.map(u =>
           u.id === fileId && u.status === 'uploading'
@@ -363,17 +362,39 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       let uploadData: any;
       let uploadError: any;
 
-      // Retry logic for upload-photo edge function (up to 3 attempts)
-      const maxUploadRetries = 2;
-      for (let attempt = 0; attempt <= maxUploadRetries; attempt++) {
+      // Strategy A: Direct storage upload (fast, no Edge Function; RLS allows authenticated)
+      const base64Data = finalBase64.replace(/^data:image\/\w+;base64,/, '');
+      const binary = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+      const ext = (file.name || 'image.jpg').split('.').pop() || 'jpg';
+      const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : 'jpg';
+      const filePath = `${effectiveUserId}/${crypto.randomUUID()}.${safeExt}`;
+      const blob = new Blob([binary], { type: file.type || 'image/jpeg' });
+
+      try {
+        const startMs = Date.now();
+        const { error: storageErr } = await supabase.storage
+          .from('business-photos')
+          .upload(filePath, blob, { contentType: file.type || 'image/jpeg', upsert: false });
+        const elapsed = Date.now() - startMs;
+        if (!storageErr) {
+          const { data: urlData } = supabase.storage.from('business-photos').getPublicUrl(filePath);
+          uploadData = { url: urlData.publicUrl, filePath, success: true };
+          console.log(`[${file.name}] Direct storage upload succeeded (${elapsed}ms)`);
+        } else {
+          uploadError = { message: storageErr.message };
+          console.warn(`[${file.name}] Direct storage failed:`, storageErr.message);
+        }
+      } catch (directErr: any) {
+        uploadError = directErr;
+        console.warn(`[${file.name}] Direct storage threw:`, directErr?.message || directErr);
+      }
+
+      // Strategy B: Edge Function fallback (if direct storage fails, e.g. RLS not applied)
+      if (!uploadData && uploadError) {
+        console.warn(`[${file.name}] Trying upload-photo Edge Function...`);
+        const UPLOAD_TIMEOUT_MS = 45000; // 45s max to avoid indefinite hang
         try {
-          if (attempt > 0) {
-            const delay = 500 * attempt;
-            console.log(`[${file.name}] Upload retry ${attempt}/${maxUploadRetries} after ${delay}ms...`);
-            await new Promise(r => setTimeout(r, delay));
-          }
-          const startMs = Date.now();
-          const result = await supabase.functions.invoke('upload-photo', {
+          const invokePromise = supabase.functions.invoke('upload-photo', {
             body: {
               fileBase64: finalBase64,
               fileName: file.name,
@@ -381,56 +402,25 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               userId: effectiveUserId,
             },
           });
-          const elapsed = Date.now() - startMs;
-          console.log(`[${file.name}] Upload attempt ${attempt}: ${elapsed}ms, hasData=${!!result.data}, hasError=${!!result.error}`);
-          
-          if (result.error) {
-            uploadError = result.error;
-            console.warn(`[${file.name}] Upload attempt ${attempt} error:`, result.error.message || result.error);
-            continue; // Retry
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Upload timed out after 45 seconds')), UPLOAD_TIMEOUT_MS)
+          );
+          const result = await Promise.race([invokePromise, timeoutPromise]);
+          if (!result.error && !result.data?.error) {
+            uploadData = result.data;
+            uploadError = null;
+            console.log(`[${file.name}] Edge Function succeeded`);
+          } else {
+            uploadError = result.error || { message: result.data?.error };
           }
-          if (result.data?.error) {
-            uploadError = { message: result.data.error };
-            console.warn(`[${file.name}] Upload attempt ${attempt} server error:`, result.data.error);
-            continue; // Retry
-          }
-          // Success!
-          uploadData = result.data;
-          uploadError = null;
-          break;
         } catch (invokeErr: any) {
+          const isTimeout = invokeErr?.message?.includes('timed out');
+          console.warn(`[${file.name}] Edge Function ${isTimeout ? 'timed out' : 'failed'}:`, invokeErr?.message || invokeErr);
           uploadError = invokeErr;
-          console.warn(`[${file.name}] Upload attempt ${attempt} threw:`, invokeErr.message);
         }
       }
-
 
       clearInterval(progressInterval);
-
-      // Fallback: direct storage upload when Edge Function fails
-      if (uploadError && !uploadData) {
-        console.warn(`[${file.name}] Edge Function failed, trying direct storage upload...`);
-        try {
-          const base64Data = finalBase64.replace(/^data:image\/\w+;base64,/, '');
-          const binary = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
-          const ext = (file.name || 'image.jpg').split('.').pop() || 'jpg';
-          const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : 'jpg';
-          const filePath = `${effectiveUserId}/${crypto.randomUUID()}.${safeExt}`;
-          const blob = new Blob([binary], { type: file.type || 'image/jpeg' });
-
-          const { error: storageErr } = await supabase.storage
-            .from('business-photos')
-            .upload(filePath, blob, { contentType: file.type || 'image/jpeg', upsert: false });
-
-          if (!storageErr) {
-            const { data: urlData } = supabase.storage.from('business-photos').getPublicUrl(filePath);
-            uploadData = { url: urlData.publicUrl, filePath, success: true };
-            console.log(`[${file.name}] Direct storage upload succeeded`);
-          }
-        } catch (directErr: any) {
-          console.error(`[${file.name}] Direct storage upload failed:`, directErr);
-        }
-      }
 
       if (uploadError && !uploadData) {
         console.error(`[${file.name}] Upload error:`, uploadError);
