@@ -111,7 +111,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
       >
         <div className="flex flex-col sm:flex-row">
           <div className="relative w-full sm:w-56 h-40 sm:h-auto overflow-hidden flex-shrink-0">
-            <img src={business.image} alt={business.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            <img src={business.image || '/placeholder.svg'} alt={business.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
             <div className="absolute top-3 left-3 px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold shadow-lg">
               {business.discount}
             </div>
@@ -190,9 +190,10 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
       {/* Image */}
       <div className="relative h-48 overflow-hidden">
         <img
-          src={business.image}
+          src={business.image || '/placeholder.svg'}
           alt={business.name}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
         

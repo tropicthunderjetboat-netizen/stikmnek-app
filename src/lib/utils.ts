@@ -33,3 +33,25 @@ export function getPhotoDisplayUrl(
   }
   return '';
 }
+
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif)(\?.*)?$/i;
+
+/**
+ * Resolve business image URL for display.
+ * Handles: full URLs, Supabase storage paths (business-photos or images bucket).
+ * Skips building storage URLs for non-image paths (e.g. column names, API paths).
+ */
+export function getBusinessImageUrl(
+  imageOrPath: string | undefined | null,
+  supabaseUrl: string
+): string {
+  const val = (imageOrPath || '').trim();
+  if (!val) return '';
+  if (val.startsWith('http://') || val.startsWith('https://')) return val;
+  if (!IMAGE_EXT.test(val) && !val.includes('/')) return '';
+  const base = supabaseUrl.replace(/\/$/, '');
+  const path = val.replace(/^\//, '');
+  const bucket = path.startsWith('images/') ? 'images' : 'business-photos';
+  const storagePath = path.startsWith('images/') ? path.slice(7) : path;
+  return `${base}/storage/v1/object/public/${bucket}/${storagePath}`;
+}

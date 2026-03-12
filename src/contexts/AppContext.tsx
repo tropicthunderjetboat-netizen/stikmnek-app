@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { toast } from 'sonner';
 import { Language } from '@/data/translations';
 import { Business } from '@/data/businesses';
-import { supabase, directProfileInsert } from '@/lib/supabase';
+import { supabase, directProfileInsert, SUPABASE_URL } from '@/lib/supabase';
+import { getBusinessImageUrl } from '@/lib/utils';
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
@@ -240,16 +241,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           description: b.description,
           descriptionFr: b.description_fr || b.description,
           descriptionBi: b.description_bi || b.description,
-          image: b.image || '',
+          image: getBusinessImageUrl(b.image_url || b.image, SUPABASE_URL),
           rating: Number(b.rating) || 0,
           reviewCount: b.review_count || 0,
-          discount: b.discount || '',
+          discount: b.deal || b.discount || '',
           originalPrice: Number(b.original_price) || 0,
-          dealPrice: Number(b.deal_price) || 0,
+          dealPrice: Number(b.discounted_price ?? b.deal_price) || 0,
           location: b.location || '',
           lat: Number(b.lat) || 0,
           lng: Number(b.lng) || 0,
-          hours: b.hours || '',
+          hours: b.opening_hours || b.hours || '',
           phone: b.phone || '',
           whatsappNumber: b.whatsapp_number || null,
           tags: b.tags || [],
@@ -861,16 +862,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           description: b.description,
           descriptionFr: b.description_fr || b.description,
           descriptionBi: b.description_bi || b.description,
-          image: b.image || '',
+          image: getBusinessImageUrl(b.image_url || b.image, SUPABASE_URL),
           rating: Number(b.rating) || 0,
           reviewCount: b.review_count || 0,
-          discount: b.discount || '',
+          discount: b.deal || b.discount || '',
           originalPrice: Number(b.original_price) || 0,
-          dealPrice: Number(b.deal_price) || 0,
+          dealPrice: Number(b.discounted_price ?? b.deal_price) || 0,
           location: b.location || '',
           lat: Number(b.lat) || 0,
           lng: Number(b.lng) || 0,
-          hours: b.hours || '',
+          hours: b.opening_hours || b.hours || '',
           phone: b.phone || '',
           whatsappNumber: b.whatsapp_number || null,
           tags: b.tags || [],
