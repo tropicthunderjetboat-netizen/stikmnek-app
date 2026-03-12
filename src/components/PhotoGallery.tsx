@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, X, Expand, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { getPhotoDisplayUrl } from '@/lib/utils';
+import { SUPABASE_URL } from '@/lib/supabase';
 
 interface BusinessPhoto {
   id: string;
@@ -35,9 +37,11 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ businessId, coverImage, bus
     }
 
     // Add DB photos, skip any that match the cover image URL
+    // Use getPhotoDisplayUrl for proper URL resolution (handles file_path when url is broken)
     photos.forEach(p => {
-      if (p.url && p.url !== coverImage) {
-        gallery.push({ id: p.id, url: p.url, isMain: p.is_main });
+      const resolvedUrl = getPhotoDisplayUrl(p, SUPABASE_URL) || p.url;
+      if (resolvedUrl && resolvedUrl !== coverImage) {
+        gallery.push({ id: p.id, url: resolvedUrl, isMain: p.is_main });
       }
     });
 
@@ -53,6 +57,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ businessId, coverImage, bus
           .from('business_photos')
           .select('*')
           .eq('business_id', businessId)
+          .eq('status', 'approved')
           .order('is_main', { ascending: false })
           .order('created_at', { ascending: true });
 
@@ -166,6 +171,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ businessId, coverImage, bus
                   alt={`${businessName} photo ${idx + 1}`}
                   className="w-full h-full object-cover"
                   loading={idx === 0 ? 'eager' : 'lazy'}
+                  onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
                 />
               </div>
             ))}
@@ -239,6 +245,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ businessId, coverImage, bus
                     alt={`Thumbnail ${idx + 1}`}
                     className="w-full h-full object-cover"
                     loading="lazy"
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
                   />
                   {idx === activeIndex && (
                     <div className="absolute inset-0 border-2 border-teal-500 rounded-lg" />
@@ -270,9 +277,10 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ businessId, coverImage, bus
           {/* Main Image */}
           <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-12">
             <img
-              src={allPhotos[lightboxIndex]?.url}
+              src={allPhotos[lightboxIndex]?.url || '/placeholder.svg'}
               alt={`${businessName} photo ${lightboxIndex + 1}`}
               className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
             />
           </div>
 
@@ -314,6 +322,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ businessId, coverImage, bus
                     alt={`Thumbnail ${idx + 1}`}
                     className="w-full h-full object-cover"
                     loading="lazy"
+                    onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
                   />
                 </button>
               ))}

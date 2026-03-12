@@ -12,7 +12,7 @@ import { errorLogger } from '@/lib/errorLogger';
 // ═══════════════════════════════════════════════════════════════
 // ADMIN EMAILS: These always get 'admin' role regardless of DB
 // ═══════════════════════════════════════════════════════════════
-const ADMIN_EMAILS = ['admin@stikmnek.com', 'testadmin@example.com'];
+const ADMIN_EMAILS = ['admin@stikmnek.com', 'testadmin@example.com', 'stikmnek@gmail.com'];
 
 export type ViewMode = 'home' | 'deals' | 'map' | 'passes' | 'dashboard' | 'admin' | 'business-detail' | 'checkout' | 'payment-confirmation' | 'business-dashboard' | 'help';
 
