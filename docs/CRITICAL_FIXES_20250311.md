@@ -91,6 +91,7 @@ Run these in order:
 3. `20250311260000_backfill_businesses_owner_id.sql` — backfills owner_id for existing approved businesses
 4. `20250311270000_rejected_resubmit_flow.sql` — allows owners to edit and resubmit rejected listings
 5. `20250311280000_admin_read_business_photos.sql` — admins can read ALL business_photos (including pending) for multi-photo display and moderation
+6. `20250311290000_businesses_add_map_url_and_extras.sql` — add map_url, website, discount_valid_from, discount_valid_until to businesses if missing (fixes approval error)
 
 ---
 
@@ -105,6 +106,17 @@ Run these in order:
 - **AdminPanel `loadAllPhotos`:** Use direct DB query first (relies on admin RLS), then Edge Function as fallback
 - **Edge Function:** `get_all_photos`, `approve_photo`, `reject_photo` now verify caller is admin
 - **UI:** Already displays all photos with individual Approve/Reject buttons; bulk Approve All / Reject All when pending photos exist
+
+---
+
+## 8. map_url Column Missing on Approval
+
+### Problem
+- Error: `Failed to process review: column "map_url" of relation "businesses" does not exist`
+- Admin approval blocked; `review_pending_business` RPC inserts map_url, website, discount_valid_from, discount_valid_until
+
+### Fix
+- **Migration `20250311290000_businesses_add_map_url_and_extras.sql`:** Add map_url, website, discount_valid_from, discount_valid_until to `public.businesses` if missing
 
 ---
 
