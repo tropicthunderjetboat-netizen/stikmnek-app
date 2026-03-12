@@ -90,6 +90,21 @@ Run these in order:
 2. `20250311250000_review_pending_business_fix_owner_and_schema.sql` — fixes RPC
 3. `20250311260000_backfill_businesses_owner_id.sql` — backfills owner_id for existing approved businesses
 4. `20250311270000_rejected_resubmit_flow.sql` — allows owners to edit and resubmit rejected listings
+5. `20250311280000_admin_read_business_photos.sql` — admins can read ALL business_photos (including pending) for multi-photo display and moderation
+
+---
+
+## 7. Multi-Photo Display & Admin Moderation
+
+### Problem
+- Only one photo displayed in Admin approval area (was fallback `biz.image` when `businessPhotos[biz.id]` was empty)
+- Admin couldn't view or moderate individual photos
+
+### Fix
+- **Migration `20250311280000_admin_read_business_photos.sql`:** RLS policy so admins can read all rows in `business_photos` (including `status = 'pending'`)
+- **AdminPanel `loadAllPhotos`:** Use direct DB query first (relies on admin RLS), then Edge Function as fallback
+- **Edge Function:** `get_all_photos`, `approve_photo`, `reject_photo` now verify caller is admin
+- **UI:** Already displays all photos with individual Approve/Reject buttons; bulk Approve All / Reject All when pending photos exist
 
 ---
 

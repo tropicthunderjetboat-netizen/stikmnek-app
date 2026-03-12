@@ -251,26 +251,63 @@ const AdminPanel: React.FC = () => {
   }, []);
 
   const loadAllPhotos = async (businesses: PendingBusiness[]) => {
+    const groupPhotos = (photos: BusinessPhoto[]) => {
+      const grouped: Record<string, BusinessPhoto[]> = {};
+      for (const photo of photos) {
+        if (!grouped[photo.business_id]) grouped[photo.business_id] = [];
+        grouped[photo.business_id].push(photo);
+      }
+      return grouped;
+    };
+
+    // Strategy 1: Direct DB query (admin RLS allows reading all photos)
     try {
-      const { data, error } = await supabase.functions.invoke('manage-business', { body: { action: 'get_all_photos', userId: user?.id } });
-      if (data?.photos) {
-        const grouped: Record<string, BusinessPhoto[]> = {};
-        for (const photo of data.photos) { if (!grouped[photo.business_id]) grouped[photo.business_id] = []; grouped[photo.business_id].push(photo); }
-        setBusinessPhotos(grouped);
-      } else if (error) { await loadAllPhotosDirect(); }
-    } catch (err) { await loadAllPhotosDirect(); }
+      const { data, error } = await supabase
+        .from('business_photos')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (!error && data && data.length > 0) {
+        setBusinessPhotos(groupPhotos(data as BusinessPhoto[]));
+        return;
+      }
+    } catch (err) {
+      console.warn('[Admin] Direct photo load failed:', err);
+    }
+
+    // Strategy 2: Edge Function fallback
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        body: { action: 'get_all_photos', userId: user?.id },
+      });
+      if (!error && data?.photos && data.photos.length > 0) {
+        setBusinessPhotos(groupPhotos(data.photos));
+      } else if (businesses.length > 0) {
+        setBusinessPhotos({});
+      }
+    } catch (err) {
+      console.warn('[Admin] get_all_photos failed:', err);
+      setBusinessPhotos({});
+    }
   };
 
   const loadAllPhotosDirect = async () => {
     try {
-      const { data, error } = await supabase.from('business_photos').select('*').order('created_at', { ascending: true });
+      const { data, error } = await supabase
+        .from('business_photos')
+        .select('*')
+        .order('created_at', { ascending: true });
       if (error) return;
       if (data && data.length > 0) {
         const grouped: Record<string, BusinessPhoto[]> = {};
-        for (const photo of data) { if (!grouped[photo.business_id]) grouped[photo.business_id] = []; grouped[photo.business_id].push(photo as BusinessPhoto); }
+        for (const photo of data) {
+          if (!grouped[photo.business_id]) grouped[photo.business_id] = [];
+          grouped[photo.business_id].push(photo as BusinessPhoto);
+        }
         setBusinessPhotos(grouped);
       }
-    } catch (err) { console.error('[Admin] Direct photo fallback failed:', err); }
+    } catch (err) {
+      console.error('[Admin] Direct photo fallback failed:', err);
+    }
   };
 
   const editsLoadedRef = useRef(false);

@@ -560,8 +560,15 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
-    // ─── GET_ALL_PHOTOS ───
+    // ─── GET_ALL_PHOTOS ─── (admin only)
     if (action === 'get_all_photos') {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('user_id', authUser.id)
+        .single();
+      if (profile?.role !== 'admin') return errorResponse('Admin access required', 403);
+
       const { data, error } = await supabase
         .from('business_photos')
         .select('*')
@@ -571,10 +578,17 @@ Deno.serve(async (req) => {
       return jsonResponse({ photos: data || [] });
     }
 
-    // ─── APPROVE_PHOTO / REJECT_PHOTO ───
+    // ─── APPROVE_PHOTO / REJECT_PHOTO ─── (admin only)
     if (action === 'approve_photo' || action === 'reject_photo') {
       const photoId = body.photoId;
       if (!photoId) return errorResponse('Missing photoId');
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('user_id', authUser.id)
+        .single();
+      if (profile?.role !== 'admin') return errorResponse('Admin access required', 403);
 
       const status = action === 'approve_photo' ? 'approved' : 'rejected';
       const { error } = await supabase
