@@ -145,11 +145,20 @@ const BusinessOwnerDashboard: React.FC = () => {
   const initialLoadDone = useRef(false);
 
   // Listen for custom tab-switch events
+  // Resubmit mode: when owner edits a rejected submission
+  const [resubmitSubmission, setResubmitSubmission] = useState<any | null>(null);
+
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (['submit', 'submissions', 'overview', 'edit', 'analytics', 'reviews', 'photos', 'emails'].includes(detail)) {
-        setActiveTab(detail);
+      const payload = (e as CustomEvent).detail;
+      const tab = typeof payload === 'string' ? payload : payload?.tab ?? payload;
+      if (['submit', 'submissions', 'overview', 'edit', 'analytics', 'reviews', 'photos', 'emails'].includes(tab)) {
+        setActiveTab(tab);
+        if (tab === 'submit' && payload?.submission) {
+          setResubmitSubmission(payload.submission);
+        } else {
+          setResubmitSubmission(null);
+        }
       }
     };
     window.addEventListener('switch-dashboard-tab', handler);
@@ -191,7 +200,38 @@ const BusinessOwnerDashboard: React.FC = () => {
     listingDuration: '1_month',
   });
 
-
+  // Pre-fill form when resubmitting a rejected submission (once per submission)
+  const lastResubmitIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (resubmitSubmission && activeTab === 'submit' && lastResubmitIdRef.current !== resubmitSubmission.id) {
+      lastResubmitIdRef.current = resubmitSubmission.id;
+      const s = resubmitSubmission;
+      const orig = Number(s.original_price) || 0;
+      const deal = Number(s.deal_price) || 0;
+      const pct = orig > 0 && deal > 0 ? Math.round((1 - deal / orig) * 100) : 0;
+      setSubmitForm({
+        name: s.name || '',
+        category: s.category || 'dining',
+        description: s.description || '',
+        discount: s.discount || '',
+        originalPrice: orig > 0 ? String(orig) : '',
+        discountPercent: pct > 0 ? String(pct) : '',
+        dealPrice: deal > 0 ? String(deal) : '',
+        location: s.location || '',
+        phone: s.phone || '',
+        email: s.email || '',
+        hours: s.hours || '',
+        image: s.image || '',
+        whatsappNumber: s.whatsapp_number || '',
+        mapUrl: s.map_url || '',
+        website: s.website || '',
+        discountValidFrom: s.discount_valid_from ? s.discount_valid_from.split('T')[0] : todayStr(),
+        listingDuration: '1_month',
+      });
+      setSubmitPhotos([]);
+    }
+    if (!resubmitSubmission) lastResubmitIdRef.current = null;
+  }, [resubmitSubmission, activeTab]);
 
 
 
@@ -780,8 +820,10 @@ const BusinessOwnerDashboard: React.FC = () => {
         toast.error('Deal price should be less than the original price');
         return;
       }
+    } else {
+      origPrice = Number(submitForm.originalPrice) || 0;
+      dlPrice = Number(submitForm.dealPrice) || 0;
     }
-
 
     setLoading(true);
     try {
@@ -799,6 +841,49 @@ const BusinessOwnerDashboard: React.FC = () => {
         filePath: photo.filePath,
         isMain: index === 0,
       }));
+
+      // ─── RESUBMIT: Edit & resubmit a rejected submission ───
+      if (resubmitSubmission?.id) {
+        const { data: resubmitData, error: resubmitErr } = await invokeWithRetry(
+          'manage-business',
+          {
+            action: 'resubmit_pending_business',
+            userId: user?.id,
+            pendingId: resubmitSubmission.id,
+            name: submitForm.name,
+            category: submitForm.category,
+            description: submitForm.description,
+            discount: submitForm.discount || '',
+            originalPrice: origPrice,
+            dealPrice: dlPrice,
+            location: submitForm.location || 'Port Vila, Vanuatu',
+            phone: submitForm.phone,
+            whatsappNumber: submitForm.whatsappNumber || null,
+            email: submitForm.email || user?.email,
+            hours: submitForm.hours,
+            image: mainImageUrl,
+            photos: photoData.length > 0 ? photoData : undefined,
+            mapUrl: submitForm.mapUrl,
+            website: submitForm.website,
+            discountValidFrom: submitForm.discountValidFrom,
+            discountValidUntil: discountValidUntil,
+          },
+          2,
+          'resubmit'
+        );
+        if (resubmitErr) throw resubmitErr;
+        if (resubmitData?.error) throw new Error(resubmitData.error);
+        if (resubmitData?.success) {
+          toast.success('Listing resubmitted for approval!');
+          setResubmitSubmission(null);
+          setSubmitForm({ name: '', category: 'dining', description: '', discount: '', originalPrice: '', discountPercent: '', dealPrice: '', location: '', phone: '', email: '', hours: '', image: '', whatsappNumber: '', mapUrl: '', website: '', discountValidFrom: todayStr(), listingDuration: '1_month' });
+          setSubmitPhotos([]);
+          await loadAllOwnerData();
+          setActiveTab('submissions');
+          setLoading(false);
+          return;
+        }
+      }
 
       // Strategy 1: RPC insert (SECURITY DEFINER, bypasses RLS — most reliable)
       const { data: rpcId, error: rpcError } = await supabase.rpc('insert_pending_business', {
@@ -1207,11 +1292,18 @@ const BusinessOwnerDashboard: React.FC = () => {
   // ═══ SUBMIT TAB ═══
   function renderSubmitTab() {
     if (!user) return null;
+    const isResubmit = !!resubmitSubmission;
     return (
       <div className="max-w-3xl space-y-6">
+        {isResubmit && resubmitSubmission?.admin_notes && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <h4 className="text-sm font-bold text-amber-800 mb-1">Admin feedback (please address before resubmitting)</h4>
+            <p className="text-sm text-amber-700">{resubmitSubmission.admin_notes}</p>
+          </div>
+        )}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2"><Plus className="w-5 h-5 text-teal-600" />Submit New Business Listing</h3>
-          <p className="text-sm text-gray-500 mb-6">Your listing will be reviewed by our admin team before going live.</p>
+          <h3 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2"><Plus className="w-5 h-5 text-teal-600" />{isResubmit ? 'Edit & Resubmit Listing' : 'Submit New Business Listing'}</h3>
+          <p className="text-sm text-gray-500 mb-6">{isResubmit ? 'Make your changes below and resubmit for approval.' : 'Your listing will be reviewed by our admin team before going live.'}</p>
           <form onSubmit={handleSubmitBusiness} className="space-y-5">
             {/* Business Name & Category */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

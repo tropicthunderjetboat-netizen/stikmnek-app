@@ -762,13 +762,15 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
                       {submission.status === 'rejected' && (
                         <button
                           onClick={() => {
-                            const event = new CustomEvent('switch-dashboard-tab', { detail: 'submit' });
+                            const event = new CustomEvent('switch-dashboard-tab', {
+                              detail: { tab: 'submit', submission },
+                            });
                             window.dispatchEvent(event);
                           }}
                           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-50 text-orange-700 text-xs font-semibold hover:bg-orange-100 transition-colors"
                         >
                           <RefreshCw className="w-3.5 h-3.5" />
-                          {language === 'en' ? 'Resubmit' : language === 'fr' ? 'Resoumettre' : 'Sabmitem bakegen'}
+                          {language === 'en' ? 'Edit & Resubmit' : language === 'fr' ? 'Modifier et resoumettre' : 'Editim mo Sabmitem bakegen'}
                         </button>
                       )}
                       {submission.status === 'pending' && (

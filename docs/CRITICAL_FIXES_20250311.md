@@ -60,6 +60,28 @@ This document describes the fixes applied to resolve core business lifecycle iss
 
 ---
 
+## 5. Image Architecture (pending_businesses)
+
+**No schema change needed.** Multiple photos are stored in `business_photos`, not in `pending_businesses` columns:
+- `pending_businesses.image` = main cover image URL (single column)
+- `business_photos` = all photos (5+), linked by `business_id` = `pending_businesses.id` for new submissions
+
+When a listing is submitted, photos are inserted into `business_photos` with `business_id` = the new pending record's id.
+
+---
+
+## 6. Rejected Submission → Edit & Resubmit
+
+**Flow:** Admin rejects → owner sees "Edit & Resubmit" → edits form pre-filled with rejected data + admin notes → resubmits → status back to `pending` → admin approves → moves to `businesses`.
+
+- **Migration `20250311270000_rejected_resubmit_flow.sql`:** RLS allows owners to update their own rejected submissions
+- **Edge Function:** `resubmit_pending_business` action updates record and sets status = 'pending'
+- **UI:** MySubmissions "Edit & Resubmit" passes submission to submit tab; form pre-fills; admin notes shown
+
+**Note:** `pending_edits` remains for edits to **approved** businesses only (owner requests changes to live listing).
+
+---
+
 ## Migrations to Apply
 
 Run these in order:
@@ -67,6 +89,7 @@ Run these in order:
 1. `20250311230000_businesses_schema_align.sql` — adds deal_price, discount, image, hours if missing
 2. `20250311250000_review_pending_business_fix_owner_and_schema.sql` — fixes RPC
 3. `20250311260000_backfill_businesses_owner_id.sql` — backfills owner_id for existing approved businesses
+4. `20250311270000_rejected_resubmit_flow.sql` — allows owners to edit and resubmit rejected listings
 
 ---
 
