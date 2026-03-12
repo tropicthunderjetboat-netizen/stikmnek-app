@@ -1,113 +1,79 @@
-# Critical Fixes — Photo Upload & Admin Schema
-
-**Date:** March 11, 2025
-
----
+# Critical Business Hub Fixes
 
 ## Summary
 
-Two critical regressions were fixed:
-
-1. **Photo Upload Failure** — Added direct storage upload fallback when Edge Function fails; resolved userId loading; added storage policies.
-2. **Admin Panel Schema Mismatch** — Added migration to align `businesses` columns; Admin update now supports both schema variants.
+This document describes the fixes applied to resolve core business lifecycle issues: Admin approval flow, Business Owner Dashboard display, photo management, and schema alignment.
 
 ---
 
-## 1. Photo Upload Fix
+## 1. Admin Approval Flow (CRITICAL)
 
-### Root Causes Addressed
+### Problem
+- Approved businesses stayed in `pending_businesses`; `businesses` table remained empty or had wrong data
+- Inserted businesses had **no `owner_id`**, so `get_owner_businesses` / `get_all_owner_data` returned nothing
+- RPC used wrong column names (`image_url`, `deal`, `discounted_price`, `opening_hours`) instead of canonical schema (`image`, `discount`, `deal_price`, `hours`)
 
-- **userId empty during load** — PhotoUploader now resolves user id from session when prop is empty.
-- **Edge Function failure** — Added direct `supabase.storage.upload()` fallback when `upload-photo` Edge Function fails.
-- **Storage policies** — Migration adds INSERT policy for authenticated users on `business-photos` bucket.
-
-### Code Changes (Already Applied)
-
-- **PhotoUploader.tsx**: Resolves `effectiveUserId` from session; direct storage upload fallback when Edge Function fails.
-- **Migration 20250311240000**: Storage policies for `business-photos` bucket.
-
-### Verify Storage Bucket
-
-1. Supabase Dashboard → **Storage**
-2. Ensure bucket **`business-photos`** exists (hyphen, not underscore).
-3. If missing: create bucket, name = `business-photos`, set to **Public**.
+### Fix
+- **Migration `20250311250000_review_pending_business_fix_owner_and_schema.sql`**
+  - Updates `review_pending_business` RPC to:
+    - Include `owner_id` from `v_pending.owner_id` in the INSERT
+    - Use canonical schema: `image`, `discount`, `deal_price`, `hours`, `tags`
+- **Migration `20250311260000_backfill_businesses_owner_id.sql`**
+  - Backfills `owner_id` for businesses approved before the fix (matches by name, category, approval time)
+- **Edge Function `manage-business`**
+  - Photo update now sets `status = 'approved'` when approving (was already correct for owner_id)
 
 ---
 
-## 2. Admin Panel Schema Fix
+## 2. Business Owner Dashboard
 
-### Root Cause
+### Problem
+- "You haven't submitted any business listings yet" and "No businesses yet" shown even when owner had approved listings
+- Select Business dropdown empty
+- Edit Listing tab showed pending-only notice
 
-The `businesses` table may use `discounted_price`, `deal`, `image_url`, `opening_hours` (from review RPC) while Admin update used `deal_price`, `discount`, `image`, `hours`.
-
-### Migrations to Run
-
-Run these in **Supabase SQL Editor** (in order):
-
-#### A. Schema alignment (adds missing columns)
-
-```sql
--- 20250311230000_businesses_schema_align.sql
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'deal_price') THEN
-    ALTER TABLE public.businesses ADD COLUMN deal_price numeric(12,2) DEFAULT 0;
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'discounted_price') THEN
-      UPDATE public.businesses SET deal_price = COALESCE(discounted_price, 0);
-    END IF;
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'discount') THEN
-    ALTER TABLE public.businesses ADD COLUMN discount text DEFAULT '';
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'deal') THEN
-      UPDATE public.businesses SET discount = COALESCE(deal, '');
-    END IF;
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'image') THEN
-    ALTER TABLE public.businesses ADD COLUMN image text DEFAULT '';
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'image_url') THEN
-      UPDATE public.businesses SET image = COALESCE(image_url, '');
-    END IF;
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'hours') THEN
-    ALTER TABLE public.businesses ADD COLUMN hours text DEFAULT '';
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'businesses' AND column_name = 'opening_hours') THEN
-      UPDATE public.businesses SET hours = COALESCE(opening_hours, '');
-    END IF;
-  END IF;
-END $$;
-```
-
-#### B. Storage policies
-
-```sql
--- 20250311240000_storage_business_photos_policies.sql
-DROP POLICY IF EXISTS "Authenticated upload to business-photos" ON storage.objects;
-CREATE POLICY "Authenticated upload to business-photos"
-  ON storage.objects FOR INSERT TO authenticated
-  WITH CHECK (bucket_id = 'business-photos');
-
-DROP POLICY IF EXISTS "Public read business-photos" ON storage.objects;
-CREATE POLICY "Public read business-photos"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'business-photos');
-```
+### Fix
+- **Root cause:** Approved businesses had `owner_id = NULL`, so `get_all_owner_data` returned empty approved list
+- **Fix 1:** RPC now inserts `owner_id` (see above)
+- **Fix 2:** Direct Supabase fallback in `loadAllOwnerData` — when Edge Function fails, fetches directly from `businesses` and `pending_businesses` by `owner_id`
+- Fallback uses both schema variants (`image`/`image_url`, `discount`/`deal`, etc.) for compatibility
 
 ---
 
-## Testing Checklist
+## 3. Photo Gallery & Admin Moderation
 
-- [ ] **Photo upload**: Sign in as business → New Listing → upload 2–3 photos → verify they appear and submit succeeds.
-- [ ] **Admin edit**: Admin Panel → Businesses → Edit a business → change deal price → Save → verify no schema error.
-- [ ] **Browser console**: No errors during photo upload; if Edge Function fails, fallback should log "Direct storage upload succeeded".
+### Status
+- **PhotoDisplay:** `PhotoGallery` uses `getPhotoDisplayUrl()`, filters by `status = 'approved'`, RLS allows public read
+- **Admin Approval:** When admin approves a business, RPC now updates `business_photos` with `business_id = new_biz_id` and `status = 'approved'`
+- **Admin Photo Moderation:** Already implemented — approve/reject via `manage-business` (`approve_photo` / `reject_photo`)
+
+---
+
+## 4. Schema & Regressions
+
+### Admin Panel `deal_price` Error
+- **Fix:** Admin update now uses only canonical columns (`image`, `discount`, `deal_price`, `hours`) — removed `deal`, `discounted_price`, `image_url`, `opening_hours` to avoid "column not found"
+
+### Photo Upload
+- PhotoUploader already has fallback to direct `supabase.storage.upload()` when Edge Function fails
+- Storage policies in `20250311240000` allow authenticated upload
+
+---
+
+## Migrations to Apply
+
+Run these in order:
+
+1. `20250311230000_businesses_schema_align.sql` — adds deal_price, discount, image, hours if missing
+2. `20250311250000_review_pending_business_fix_owner_and_schema.sql` — fixes RPC
+3. `20250311260000_backfill_businesses_owner_id.sql` — backfills owner_id for existing approved businesses
+
+---
+
+## Verification
+
+1. **Admin approval:** Approve a pending business → verify it appears in `businesses` with `owner_id` set
+2. **Business Hub:** Log in as owner → verify approved businesses appear in dropdown and sidebar
+3. **Edit Listing:** Select approved business → verify edit form loads and saves
+4. **Photos:** Verify gallery shows all approved photos on business detail page
+5. **Admin:** Edit a business → verify no "deal_price column not found" error

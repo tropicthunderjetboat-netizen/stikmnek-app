@@ -314,11 +314,19 @@ Deno.serve(async (req) => {
           return errorResponse('Approved but failed to create business record: ' + insertErr.message, 500);
         }
 
-        // Update business_photos: change business_id from pending id to new business id for approved photos
-        await supabase
+        // Update business_photos: point to new business id AND set status = 'approved' so they're visible
+        const { error: photoErr } = await supabase
           .from('business_photos')
-          .update({ business_id: newBiz.id })
+          .update({ business_id: newBiz.id, status: 'approved' })
           .eq('business_id', businessId);
+
+        if (photoErr) {
+          console.error('[manage-business] Photo update failed after business approval:', photoErr);
+          return errorResponse(
+            'Business approved but photos could not be updated. Please manually approve photos for this business. Error: ' + photoErr.message,
+            500
+          );
+        }
       }
 
       return jsonResponse({ success: true });

@@ -377,19 +377,36 @@ const BusinessOwnerDashboard: React.FC = () => {
 
     } catch (err2) {
       console.error('[Dashboard] Fallback load also failed:', err2);
-      // Last resort: try direct DB query
+      // Last resort: try direct DB queries for both businesses and pending_businesses
       try {
-        const { data: directPending } = await supabase
-          .from('pending_businesses')
-          .select('*')
-          .eq('owner_id', user.id)
-          .order('created_at', { ascending: false });
-        if (directPending && directPending.length > 0) {
-          setPendingBusinesses(directPending);
-          setAllSubmissions(directPending);
-          const unified: UnifiedBusiness[] = directPending
-            .filter((s: any) => s.status === 'pending' || s.status === 'rejected')
-            .map((s: any) => ({
+        const [approvedRes, pendingRes] = await Promise.all([
+          supabase.from('businesses').select('*').eq('owner_id', user.id).eq('active', true),
+          supabase.from('pending_businesses').select('*').eq('owner_id', user.id).order('created_at', { ascending: false }),
+        ]);
+        const approved = approvedRes.data || [];
+        const directPending = pendingRes.data || [];
+        setApprovedBusinesses(approved);
+        setPendingBusinesses(directPending);
+        setAllSubmissions(directPending);
+
+        const unified: UnifiedBusiness[] = [];
+        for (const b of approved) {
+          unified.push({
+            id: b.id, name: b.name, category: b.category,
+            description: b.description, descriptionFr: b.description_fr || b.description,
+            descriptionBi: b.description_bi || b.description,
+            image: b.image || b.image_url || '', rating: Number(b.rating) || 0,
+            reviewCount: b.review_count || 0, discount: b.discount || b.deal || '',
+            originalPrice: Number(b.original_price) || 0, dealPrice: Number(b.deal_price) || Number(b.discounted_price) || 0,
+            location: b.location || '', lat: Number(b.lat) || 0, lng: Number(b.lng) || 0,
+            hours: b.hours || b.opening_hours || '', phone: b.phone || '', tags: b.tags || [],
+            featured: b.featured || false, ownerId: b.owner_id || null,
+            _source: 'approved', _status: 'approved', _createdAt: b.created_at,
+          });
+        }
+        for (const s of directPending) {
+          if (s.status === 'pending' || s.status === 'rejected') {
+            unified.push({
               id: `pending-${s.id}`, name: s.name, category: s.category,
               description: s.description, descriptionFr: '', descriptionBi: '',
               image: s.image || '', rating: 0, reviewCount: 0, discount: s.discount || '',
@@ -399,14 +416,16 @@ const BusinessOwnerDashboard: React.FC = () => {
               featured: false, ownerId: s.owner_id || null,
               _source: 'pending' as const, _status: (s.status || 'pending') as any, _pendingId: s.id,
               _adminNotes: s.admin_notes, _reviewedAt: s.reviewed_at, _createdAt: s.created_at,
-            }));
-          setUnifiedBusinesses(unified);
-
-          if (!initialLoadDone.current) {
-            initialLoadDone.current = true;
+            });
           }
-
         }
+        setUnifiedBusinesses(unified);
+
+        if (unified.length > 0 && !selectedBusinessId) {
+          const firstApproved = unified.find(b => b._source === 'approved');
+          setSelectedBusinessId(firstApproved?.id || unified[0].id);
+        }
+        if (!initialLoadDone.current) initialLoadDone.current = true;
       } catch (e3) {
         console.error('[Dashboard] Direct query failed:', e3);
       }
