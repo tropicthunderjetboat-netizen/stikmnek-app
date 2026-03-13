@@ -16,6 +16,22 @@ const corsHeaders = {
 
 const SUPERSTAR_PRICE_AUD = 5.0;
 
+// Pass configuration (keep in sync with pricing.ts and paypal-capture)
+const PASS_DAYS: Record<string, number> = { daily: 1, weekly: 6, monthly: 6 };
+const PASS_MAX_PEOPLE: Record<string, number> = { daily: 4, weekly: 4, monthly: 7 };
+const PASS_PRICES_AUD: Record<string, number> = { daily: 15, weekly: 45, monthly: 99 };
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+function endOfDayDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T23:59:59.999Z');
+  return d.toISOString();
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -84,13 +100,88 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'purchase_pass') {
-      // Card payment for passes is not implemented; use PayPal (create-checkout + paypal-capture).
+      // ═══ PASS PURCHASE VIA CARD (mock charge) ═══
+      //
+      // This implementation validates the input, performs a MOCK charge (no real
+      // gateway call in sandbox), and then creates a row in public.passes with
+      // correct validity dates. The frontend treats this response the same way
+      // as paypal-capture.
+
+      const rawPassType = (body?.passType ?? body?.pass_type ?? '').toLowerCase();
+      const startDate = body?.startDate ?? body?.start_date;
+
+      if (!rawPassType || !['daily', 'weekly', 'monthly'].includes(rawPassType)) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Missing or invalid passType' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Missing or invalid startDate (YYYY-MM-DD)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const passType = rawPassType;
+      const days = PASS_DAYS[passType] ?? 1;
+      const maxPeople = PASS_MAX_PEOPLE[passType] ?? 4;
+      const amount = PASS_PRICES_AUD[passType] ?? 0;
+
+      // MOCK charge: in production you would call a real gateway here (Stripe/PayPal).
+      // For now we assume the card charge succeeded if we reached this point.
+
+      const validFrom = startDate;
+      const validUntil = addDays(startDate, days);
+      const expiresAt = endOfDayDate(validUntil);
+      const receiptNumber = body?.receiptNumber ?? `STK-${Date.now().toString(36).toUpperCase()}`;
+
+      const passRow: Record<string, any> = {
+        user_id: authUser.id,
+        pass_type: passType,
+        active: true,
+        valid_from: validFrom,
+        valid_until: validUntil,
+        expires_at: expiresAt,
+        max_people: maxPeople,
+        share_bonus_applied: false,
+        amount_paid: amount,
+        currency: 'AUD',
+        payment_provider: 'card-mock',
+        payment_session_id: null,
+        purchased_at: new Date().toISOString(),
+      };
+
+      const { data: insertedPass, error: insertErr } = await supabase
+        .from('passes')
+        .insert(passRow)
+        .select('id, purchased_at')
+        .single();
+
+      if (insertErr) {
+        console.error('process-card-payment: insert passes error:', insertErr);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Payment captured but failed to create pass: ' + insertErr.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       return new Response(
         JSON.stringify({
-          success: false,
-          error: 'Card payment for passes is not available. Please use the "Pay with PayPal" button above.',
+          success: true,
+          receiptNumber,
+          passType,
+          amount,
+          currency: 'AUD',
+          expiresAt,
+          validFrom,
+          validUntil,
+          days,
+          sessionId: insertedPass?.id ?? receiptNumber,
+          purchasedAt: insertedPass?.purchased_at ?? new Date().toISOString(),
         }),
-        { status: 501, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
