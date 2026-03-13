@@ -69,6 +69,18 @@ Deno.serve(async (req) => {
       return errorResponse('Invalid or expired session', 401);
     }
 
+    // ─── AUTHZ: Ensure scanner is a business owner or admin ───
+    const { data: scannerProfile, error: profileErr } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('user_id', scannerUser.id)
+      .maybeSingle();
+
+    const scannerRole = scannerProfile?.role as string | undefined;
+    if (profileErr || !scannerRole || !['business', 'admin'].includes(scannerRole)) {
+      return errorResponse('Not authorized to verify passes', 403);
+    }
+
     const body = await req.json().catch(() => ({}));
     const action = body?.action;
     const rawQr = body?.qrData;
@@ -152,6 +164,20 @@ Deno.serve(async (req) => {
     let lastRedemptions: string[] = [];
 
     if (businessId) {
+      // If scanner is a business user, ensure the businessId belongs to them.
+      if (scannerRole === 'business') {
+        const { data: ownedBusiness, error: bizErr } = await supabase
+          .from('businesses')
+          .select('id')
+          .eq('id', businessId)
+          .eq('owner_id', scannerUser.id)
+          .maybeSingle();
+
+        if (bizErr || !ownedBusiness) {
+          return errorResponse('You are not authorized to scan for this business', 403);
+        }
+      }
+
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date();
