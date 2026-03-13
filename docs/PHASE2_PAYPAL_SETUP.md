@@ -30,6 +30,14 @@ In **Supabase Dashboard → Project Settings → Edge Functions → Secrets**, a
 
 Get sandbox credentials from [PayPal Developer Dashboard](https://developer.paypal.com/dashboard/) → Apps & Credentials → Sandbox → Create App (or use existing sandbox app).
 
+## JWT verification: set to **OFF** for payment/auth functions
+
+If you get **401** or "Session expired" when clicking Pay with PayPal (even when signed in), the gateway may be **not forwarding** the `Authorization` header when "Verify JWT" is ON.
+
+- In **Supabase Dashboard → Edge Functions** → open **create-checkout** (and **paypal-capture**, **extend-pass**, **process-card-payment**).
+- Set **Verify JWT** to **OFF** for each of these.
+- The function code still validates the token with `getUser(token)`, so security is unchanged; the browser sends the Bearer token and the function receives it only when JWT verification at the gateway is OFF.
+
 ## Share Bonus: `extend-pass` Edge Function
 
 When a tourist shares the app (from the Passes page), the frontend calls **`extend-pass`** to apply the share bonus to their active pass (extra people and/or extra days). You must deploy this function for the share bonus to work:

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -9,6 +9,12 @@ import {
 } from 'lucide-react';
 
 import { PASS_PRODUCTS } from '@/data/pricing';
+
+declare global {
+  interface Window {
+    paypal?: any;
+  }
+}
 
 const PASSES = {
   daily: {
@@ -85,6 +91,32 @@ async function ensureFreshSession(): Promise<string | null> {
 
   console.log('[PaymentCheckout] ensureFreshSession: current token is fresh enough');
   return session.access_token;
+}
+
+function loadPayPalSdk(clientId: string): Promise<void> {
+  if (typeof window === 'undefined') return Promise.reject(new Error('No window'));
+  if (window.paypal) return Promise.resolve();
+
+  const existing = document.querySelector<HTMLScriptElement>('script[data-paypal-sdk="true"]');
+  if (existing) {
+    return new Promise((resolve, reject) => {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('Failed to load PayPal SDK')));
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.dataset.paypalSdk = 'true';
+    script.async = true;
+    script.src =
+      `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}` +
+      `&components=buttons,hosted-fields` +
+      `&currency=AUD&intent=capture&commit=true`;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load PayPal SDK'));
+    document.head.appendChild(script);
+  });
 }
 
 /** Get HTTP status from Supabase Edge Function invoke error. */
@@ -209,6 +241,14 @@ const PaymentCheckout: React.FC = () => {
   const expiryRef = useRef<HTMLInputElement>(null);
   const cvvRef = useRef<HTMLInputElement>(null);
 
+  // PayPal Hosted Fields (Advanced Card Payments)
+  const paypalClientId = (import.meta as any)?.env?.VITE_PAYPAL_CLIENT_ID as string | undefined;
+  const [paypalSdkReady, setPayPalSdkReady] = useState(false);
+  const [hostedEligible, setHostedEligible] = useState<boolean | null>(null);
+  const [hostedReady, setHostedReady] = useState(false);
+  const hostedFieldsRef = useRef<any>(null);
+  const hostedRenderOnceRef = useRef(false);
+
   const selectedPass = cart ? PASSES[cart.passType] : null;
 
   const endDate = useMemo(() => {
@@ -290,6 +330,172 @@ const PaymentCheckout: React.FC = () => {
 
     setCardErrors(errors);
     return Object.keys(errors).length === 0;
+  };
+
+  // Load PayPal SDK + render Hosted Fields when user reaches payment step.
+  useEffect(() => {
+    if (step !== 'payment') return;
+    if (!paypalClientId) {
+      setHostedEligible(false);
+      setHostedReady(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await loadPayPalSdk(paypalClientId);
+        if (cancelled) return;
+        setPayPalSdkReady(true);
+
+        const paypal = window.paypal;
+        const eligible = !!paypal?.HostedFields?.isEligible?.();
+        setHostedEligible(eligible);
+
+        if (!eligible) {
+          setHostedReady(false);
+          return;
+        }
+
+        if (hostedRenderOnceRef.current) return;
+        hostedRenderOnceRef.current = true;
+
+        const numberEl = document.getElementById('paypal-card-number');
+        const cvvEl = document.getElementById('paypal-card-cvv');
+        const expEl = document.getElementById('paypal-card-expiration');
+        if (numberEl) numberEl.innerHTML = '';
+        if (cvvEl) cvvEl.innerHTML = '';
+        if (expEl) expEl.innerHTML = '';
+
+        const instance = await paypal.HostedFields.render({
+          createOrder: async () => {
+            const token = await ensureFreshSession();
+            if (!token) throw new Error('Session expired. Please sign in again and try paying.');
+
+            const origin = window.location.origin;
+            const basePath = window.location.pathname || '/';
+            const { data, error } = await supabase.functions.invoke('create-checkout', {
+              body: {
+                passType: cart.passType,
+                startDate,
+                returnUrl: `${origin}${basePath}?paypal_return=true`,
+                cancelUrl: `${origin}${basePath}?paypal_cancel=true`,
+              },
+            });
+
+            if (error || !data?.success || !data?.orderId) {
+              const serverMsg = typeof data?.error === 'string' ? data.error : null;
+              throw new Error(serverMsg || error?.message || 'Could not create PayPal order');
+            }
+
+            return data.orderId;
+          },
+          styles: {
+            input: {
+              'font-size': '14px',
+              'font-family':
+                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace',
+              color: '#111827',
+            },
+            '.valid': { color: '#059669' },
+            '.invalid': { color: '#dc2626' },
+          },
+          fields: {
+            number: { selector: '#paypal-card-number', placeholder: 'Card number' },
+            cvv: { selector: '#paypal-card-cvv', placeholder: 'CVV' },
+            expirationDate: { selector: '#paypal-card-expiration', placeholder: 'MM/YY' },
+          },
+        });
+
+        hostedFieldsRef.current = instance;
+        setHostedReady(true);
+      } catch (e: any) {
+        console.error('[PaymentCheckout] PayPal HostedFields init failed:', e);
+        setHostedEligible(false);
+        setHostedReady(false);
+        // Keep current paymentError if something else set it; otherwise set a helpful one.
+        setPaymentError(prev => prev || (e?.message ?? 'Could not load card payments. Use Pay with PayPal instead.'));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step, paypalClientId, cart.passType, startDate]);
+
+  const handlePayWithCardHostedFields = async () => {
+    setProcessing(true);
+    setStep('processing');
+    setPaymentError(null);
+
+    try {
+      const token = await ensureFreshSession();
+      if (!token) {
+        toast.error('Your session has expired. Please sign in again.');
+        setStep('payment');
+        setProcessing(false);
+        return;
+      }
+
+      if (!hostedFieldsRef.current) {
+        throw new Error('Card fields are not ready yet. Please wait a moment and try again.');
+      }
+
+      const receiptNumber = `STK-${Date.now().toString(36).toUpperCase()}`;
+      const submitResult = await hostedFieldsRef.current.submit({ contingencies: ['3D_SECURE'] });
+      const orderId = submitResult?.orderId || submitResult?.id || (typeof submitResult === 'string' ? submitResult : null);
+      if (!orderId) throw new Error('Could not confirm card payment. Please try again.');
+
+      const { data, error } = await supabase.functions.invoke('paypal-capture', {
+        body: { paypalOrderId: orderId, receiptNumber, passType: cart.passType, startDate },
+      });
+
+      if (error || !data?.success) {
+        const serverMsg = typeof data?.error === 'string' ? data.error : null;
+        throw new Error(serverMsg || error?.message || 'Payment failed. Please try again.');
+      }
+
+      setPaymentResult(data);
+      setStep('success');
+
+      const paymentResultData = {
+        receiptNumber: data.receiptNumber,
+        passType: data.passType,
+        passLabel: data.passLabel || selectedPass.label,
+        amount: data.amount,
+        currency: data.currency || 'AUD',
+        paymentMethod: 'card',
+        expiresAt: data.expiresAt,
+        validFrom: data.validFrom,
+        validUntil: data.validUntil,
+        days: data.days,
+        group: data.group || selectedPass.group,
+        sessionId: data.sessionId,
+        completedAt: new Date().toISOString(),
+        paypalOrderId: orderId,
+      };
+      localStorage.setItem('lastPayment', JSON.stringify(paymentResultData));
+      localStorage.removeItem('paypalPending');
+      localStorage.removeItem('pendingPayment');
+
+      toast.success('Payment successful! Your pass is now active.');
+
+      setTimeout(() => {
+        refreshUserPass();
+      }, 1000);
+
+      setTimeout(() => {
+        setCart(null);
+        setCurrentView('payment-confirmation' as any);
+      }, 2500);
+    } catch (err: any) {
+      console.error('[PaymentCheckout] HostedFields card payment error:', err);
+      setPaymentError(err?.message || 'Payment failed. Please try again.');
+      toast.error(err?.message || 'Payment failed');
+      setStep('payment');
+      setProcessing(false);
+    }
   };
 
   // ═══ PAY WITH PAYPAL (redirect to PayPal, then paypal-capture on return) ═══
@@ -730,7 +936,56 @@ const PaymentCheckout: React.FC = () => {
                   </div>
 
                   <div className="border-t border-gray-100 pt-5 space-y-4">
-                    {/* Cardholder Name */}
+                    {/* PayPal Hosted Fields (secure iframes) */}
+                    {!paypalClientId && (
+                      <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+                        PayPal card payments are not configured. Set <code className="font-mono">VITE_PAYPAL_CLIENT_ID</code> in Vercel.
+                      </div>
+                    )}
+
+                    {paypalClientId && hostedEligible === false && (
+                      <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+                        Card payments on-site are not available for this browser/account. Please use the PayPal checkout option below.
+                      </div>
+                    )}
+
+                    {paypalClientId && hostedEligible !== false && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Card Number</label>
+                          <div className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 hover:border-gray-300 transition-all">
+                            <div id="paypal-card-number" className="min-h-[20px]" />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Expiry Date</label>
+                            <div className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 hover:border-gray-300 transition-all">
+                              <div id="paypal-card-expiration" className="min-h-[20px]" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">CVV</label>
+                            <div className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 hover:border-gray-300 transition-all">
+                              <div id="paypal-card-cvv" className="min-h-[20px]" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {(!paypalSdkReady || !hostedReady) && (
+                          <div className="text-xs text-gray-500 flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Loading secure card fields…
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Legacy raw card inputs are disabled (PCI). Keep for reference only. */}
+                    {false && (
+                      <>
+                        {/* Cardholder Name */}
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                         Cardholder Name
@@ -859,6 +1114,8 @@ const PaymentCheckout: React.FC = () => {
                         )}
                       </div>
                     </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Security badges */}
@@ -899,8 +1156,8 @@ const PaymentCheckout: React.FC = () => {
 
                 {/* Pay with Card Button */}
                 <button
-                  onClick={handlePayWithCard}
-                  disabled={processing}
+                  onClick={handlePayWithCardHostedFields}
+                  disabled={processing || hostedEligible === false || !hostedReady}
                   className="w-full py-4 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-lg transition-all shadow-lg shadow-teal-200 hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                 >
                   {processing ? (

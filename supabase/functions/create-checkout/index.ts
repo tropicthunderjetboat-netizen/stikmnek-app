@@ -59,6 +59,9 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // When "Verify JWT" is ON in Supabase, the gateway may not forward the Authorization header,
+    // so the function gets no token and returns 401. Set Verify JWT to OFF for this function;
+    // we still validate the token below with getUser().
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return errorResponse('Missing Authorization header', 401);
@@ -67,7 +70,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     const supabase = createClient(supabaseUrl, serviceKey);
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return errorResponse('Invalid or expired session', 401);
