@@ -78,6 +78,10 @@ When a listing is submitted, photos are inserted into `business_photos` with `bu
 - **Edge Function:** `resubmit_pending_business` action updates record and sets status = 'pending'
 - **UI:** MySubmissions "Edit & Resubmit" passes submission to submit tab; form pre-fills; admin notes shown
 
+**Resubmit non-2xx error surfacing:**
+- `invokeWithRetry` now preserves the response body on non-2xx so the toast shows the actual error from the Edge Function (e.g. `Resubmit failed: column "map_url" does not exist`) instead of the generic "Edge Function returned a non-2xx status code".
+- If you see schema-related errors, run migration `20250311300000_pending_businesses_add_map_url_and_extras.sql`.
+
 **Note:** `pending_edits` remains for edits to **approved** businesses only (owner requests changes to live listing).
 
 ---
@@ -92,6 +96,7 @@ Run these in order:
 4. `20250311270000_rejected_resubmit_flow.sql` — allows owners to edit and resubmit rejected listings
 5. `20250311280000_admin_read_business_photos.sql` — admins can read ALL business_photos (including pending) for multi-photo display and moderation
 6. `20250311290000_businesses_add_map_url_and_extras.sql` — add map_url, website, discount_valid_from, discount_valid_until to businesses if missing (fixes approval error)
+7. `20250311300000_pending_businesses_add_map_url_and_extras.sql` — same columns on pending_businesses (fixes resubmit "column does not exist" errors)
 
 ---
 

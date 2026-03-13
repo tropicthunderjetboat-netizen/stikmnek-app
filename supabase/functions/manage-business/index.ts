@@ -136,67 +136,78 @@ Deno.serve(async (req) => {
     // ─── RESUBMIT_PENDING_BUSINESS ───
     // Owner edits a rejected submission and resubmits for approval
     if (action === 'resubmit_pending_business') {
-      const userId = body.userId || authUser.id;
-      const pendingId = body.pendingId;
-      if (!userId || !pendingId) return errorResponse('Missing userId or pendingId');
+      try {
+        const userId = body.userId || authUser.id;
+        const pendingId = body.pendingId;
+        if (!userId || !pendingId) return errorResponse('Missing userId or pendingId', 400);
 
-      const { data: existing, error: fetchErr } = await supabase
-        .from('pending_businesses')
-        .select('*')
-        .eq('id', pendingId)
-        .eq('owner_id', userId)
-        .single();
+        const { data: existing, error: fetchErr } = await supabase
+          .from('pending_businesses')
+          .select('*')
+          .eq('id', pendingId)
+          .eq('owner_id', userId)
+          .single();
 
-      if (fetchErr || !existing) return errorResponse('Submission not found or access denied', 404);
-      if (existing.status !== 'rejected') return errorResponse('Only rejected submissions can be resubmitted', 400);
+        if (fetchErr || !existing) return errorResponse('Submission not found or access denied', 404);
+        if (existing.status !== 'rejected') return errorResponse('Only rejected submissions can be resubmitted', 400);
 
-      const updates = {
-        name: body.name ?? existing.name,
-        category: body.category ?? existing.category,
-        description: body.description ?? existing.description,
-        discount: body.discount ?? existing.discount ?? '',
-        original_price: Number(body.originalPrice ?? body.original_price ?? existing.original_price) || 0,
-        deal_price: Number(body.dealPrice ?? body.deal_price ?? existing.deal_price) || 0,
-        location: body.location ?? existing.location ?? '',
-        phone: body.phone ?? existing.phone ?? '',
-        email: body.email ?? existing.email ?? '',
-        hours: body.hours ?? existing.hours ?? '',
-        image: body.image ?? existing.image ?? '',
-        map_url: body.mapUrl ?? body.map_url ?? existing.map_url,
-        website: body.website ?? existing.website,
-        discount_valid_from: body.discountValidFrom ?? body.discount_valid_from ?? existing.discount_valid_from,
-        discount_valid_until: body.discountValidUntil ?? body.discount_valid_until ?? existing.discount_valid_until,
-        whatsapp_number: body.whatsappNumber ?? body.whatsapp_number ?? existing.whatsapp_number,
-        status: 'pending' as const,
-        admin_notes: null,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { data: updated, error: updateErr } = await supabase
-        .from('pending_businesses')
-        .update(updates)
-        .eq('id', pendingId)
-        .select()
-        .single();
-
-      if (updateErr) return errorResponse(updateErr.message, 500);
-
-      // Optionally replace photos
-      const photos = body.photos || [];
-      if (photos.length > 0) {
-        await supabase.from('business_photos').delete().eq('business_id', pendingId);
-        const photoRecords = photos.map((p: any, i: number) => ({
-          business_id: pendingId,
-          url: p.url || '',
-          file_path: p.filePath || null,
-          uploaded_by: userId,
-          is_main: p.isMain ?? i === 0,
+        const updates: Record<string, any> = {
+          name: body.name ?? existing.name,
+          category: body.category ?? existing.category,
+          description: body.description ?? existing.description,
+          discount: body.discount ?? existing.discount ?? '',
+          original_price: Number(body.originalPrice ?? body.original_price ?? existing.original_price) || 0,
+          deal_price: Number(body.dealPrice ?? body.deal_price ?? existing.deal_price) || 0,
+          location: body.location ?? existing.location ?? '',
+          phone: body.phone ?? existing.phone ?? '',
+          email: body.email ?? existing.email ?? '',
+          hours: body.hours ?? existing.hours ?? '',
+          image: body.image ?? existing.image ?? '',
           status: 'pending',
-        }));
-        await supabase.from('business_photos').insert(photoRecords);
-      }
+          admin_notes: null,
+          updated_at: new Date().toISOString(),
+        };
+        if (body.mapUrl !== undefined || body.map_url !== undefined || existing.map_url !== undefined) updates.map_url = body.mapUrl ?? body.map_url ?? existing.map_url;
+        if (body.website !== undefined || existing.website !== undefined) updates.website = body.website ?? existing.website;
+        if (body.discountValidFrom !== undefined || body.discount_valid_from !== undefined || existing.discount_valid_from !== undefined) updates.discount_valid_from = body.discountValidFrom ?? body.discount_valid_from ?? existing.discount_valid_from;
+        if (body.discountValidUntil !== undefined || body.discount_valid_until !== undefined || existing.discount_valid_until !== undefined) updates.discount_valid_until = body.discountValidUntil ?? body.discount_valid_until ?? existing.discount_valid_until;
+        if (body.whatsappNumber !== undefined || body.whatsapp_number !== undefined || existing.whatsapp_number !== undefined) updates.whatsapp_number = body.whatsappNumber ?? body.whatsapp_number ?? existing.whatsapp_number;
 
-      return jsonResponse({ success: true, business: updated });
+        const { data: updated, error: updateErr } = await supabase
+          .from('pending_businesses')
+          .update(updates)
+          .eq('id', pendingId)
+          .select()
+          .single();
+
+        if (updateErr) {
+          console.error('[manage-business] resubmit update error:', updateErr);
+          return errorResponse('Resubmit failed: ' + updateErr.message, 500);
+        }
+
+        const photos = (body.photos || []).filter((p: any) => p?.url);
+        if (photos.length > 0) {
+          await supabase.from('business_photos').delete().eq('business_id', pendingId);
+          const photoRecords = photos.map((p: any, i: number) => ({
+            business_id: pendingId,
+            url: p.url,
+            file_path: p.filePath || null,
+            uploaded_by: userId,
+            is_main: p.isMain ?? i === 0,
+            status: 'pending',
+          }));
+          const { error: insertErr } = await supabase.from('business_photos').insert(photoRecords);
+          if (insertErr) {
+            console.error('[manage-business] resubmit photo insert error:', insertErr);
+            return errorResponse('Resubmit succeeded but photo save failed: ' + insertErr.message, 500);
+          }
+        }
+
+        return jsonResponse({ success: true, business: updated });
+      } catch (err: any) {
+        console.error('[manage-business] resubmit error:', err);
+        return errorResponse('Resubmit failed: ' + (err?.message || String(err)), 500);
+      }
     }
 
     // ─── GET_ALL_OWNER_DATA ───

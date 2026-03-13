@@ -29,7 +29,7 @@ async function ensureFreshSession(): Promise<string | null> {
 
 
 const PayPalReturnHandler: React.FC = () => {
-  const { user, setCurrentView, setCart } = useAppContext();
+  const { user, setCurrentView, setCart, refreshUserPass } = useAppContext();
   const [status, setStatus] = useState<'idle' | 'capturing' | 'success' | 'error' | 'cancelled'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const processedRef = useRef(false);
@@ -121,6 +121,8 @@ const PayPalReturnHandler: React.FC = () => {
         body: {
           paypalOrderId,
           receiptNumber: pendingInfo?.receiptNumber,
+          passType: pendingInfo?.passType,
+          startDate: pendingInfo?.startDate,
         },
         // NO custom headers — SDK sends its own Authorization automatically
       });
@@ -130,6 +132,9 @@ const PayPalReturnHandler: React.FC = () => {
 
       if (data?.success) {
         setStatus('success');
+        if (typeof refreshUserPass === 'function') {
+          refreshUserPass().catch(() => {});
+        }
 
         // Store payment result for confirmation page
         const paymentResult = {

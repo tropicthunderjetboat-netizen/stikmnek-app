@@ -33,6 +33,7 @@ async function invokeWithRetry(
   label = ''
 ): Promise<{ data: any; error: any }> {
   let lastError: any = null;
+  let lastData: any = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       if (attempt > 0) {
@@ -41,10 +42,12 @@ async function invokeWithRetry(
       const result = await supabase.functions.invoke(fnName, { body });
       if (result.error) {
         lastError = result.error;
+        lastData = result.data ?? lastData; // Preserve response body on non-2xx (may contain error message)
         continue;
       }
       if (result.data?.error) {
         lastError = new Error(result.data.error);
+        lastData = result.data;
         continue;
       }
       return result;
@@ -52,7 +55,7 @@ async function invokeWithRetry(
       lastError = err;
     }
   }
-  return { data: null, error: lastError };
+  return { data: lastData, error: lastError };
 }
 
 
@@ -871,8 +874,8 @@ const BusinessOwnerDashboard: React.FC = () => {
           2,
           'resubmit'
         );
-        if (resubmitErr) throw resubmitErr;
-        if (resubmitData?.error) throw new Error(resubmitData.error);
+        const errMsg = resubmitData?.error || resubmitErr?.message || 'Resubmit failed';
+        if (resubmitErr || resubmitData?.error) throw new Error(typeof errMsg === 'string' ? errMsg : 'Resubmit failed');
         if (resubmitData?.success) {
           toast.success('Listing resubmitted for approval!');
           setResubmitSubmission(null);

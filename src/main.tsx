@@ -3,6 +3,21 @@ import App from './App.tsx';
 import './index.css';
 
 // ═══════════════════════════════════════════════════════════════════
+// PASSWORD RESET: If user landed on any path with recovery hash, send
+// them to /reset-password so the "Set new password" form is shown.
+// (Supabase email link sometimes redirects to Site URL "/" instead of
+// the redirectTo we send; without this, they get logged in on home with
+// no way to change password.)
+// ═══════════════════════════════════════════════════════════════════
+const isRecoveryOnWrongPage =
+  typeof window !== 'undefined' &&
+  window.location.hash.includes('type=recovery') &&
+  ((window.location.pathname.replace(/\/$/, '') || '/') !== '/reset-password');
+if (isRecoveryOnWrongPage) {
+  window.location.replace(window.location.origin + '/reset-password' + window.location.hash);
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // NUCLEAR FIX: Kill all service workers and clear all caches.
 // This runs on EVERY page load to ensure no stale SW can trap users.
 // ═══════════════════════════════════════════════════════════════════
@@ -60,9 +75,11 @@ if ('serviceWorker' in navigator) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Render the app
+// Render the app (skip if we just triggered a redirect to /reset-password)
 // ═══════════════════════════════════════════════════════════════════
-createRoot(document.getElementById('root')!).render(<App />);
+if (!isRecoveryOnWrongPage) {
+  createRoot(document.getElementById('root')!).render(<App />);
+}
 
 // Defer error logger initialization
 const initErrorLogger = () => {

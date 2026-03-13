@@ -44,8 +44,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    const body = await req.json();
-    const action = body?.action;
+    const body = await req.json().catch(() => ({}));
+    const action = body?.action ?? body?.Action;
+
+    if (!action) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing action. Use Pay with PayPal for pass purchase.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (action === 'purchase_superstar') {
       // ═══ SUPERSTAR PURCHASE — $5.00 AUD HARDCODED ═══
@@ -77,16 +84,18 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'purchase_pass') {
-      // Existing pass purchase logic — delegate to your current implementation
-      // This stub returns 501; replace with actual pass purchase code
+      // Card payment for passes is not implemented; use PayPal (create-checkout + paypal-capture).
       return new Response(
-        JSON.stringify({ success: false, error: 'Pass purchase: see existing implementation' }),
+        JSON.stringify({
+          success: false,
+          error: 'Card payment for passes is not available. Please use the "Pay with PayPal" button above.',
+        }),
         { status: 501, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     return new Response(
-      JSON.stringify({ success: false, error: 'Unknown action' }),
+      JSON.stringify({ success: false, error: `Unknown action: ${action}. Use Pay with PayPal for pass purchase.` }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {

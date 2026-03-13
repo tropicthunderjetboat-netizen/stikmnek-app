@@ -10,6 +10,7 @@ import { AppProvider } from "@/contexts/AppContext";
 import React, { Suspense } from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import ResetPassword from "./pages/ResetPassword";
 
 const DiagnosticPanel = React.lazy(() => import("./components/DiagnosticPanel"));
 
@@ -25,6 +26,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route
                 path="/diagnostics"
                 element={

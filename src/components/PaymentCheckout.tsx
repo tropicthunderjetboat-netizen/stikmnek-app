@@ -87,6 +87,26 @@ async function ensureFreshSession(): Promise<string | null> {
   return session.access_token;
 }
 
+/** Get HTTP status from Supabase Edge Function invoke error. */
+function getInvokeStatus(error: any): number | null {
+  try {
+    if (error?.context && typeof (error.context as Response).status === 'number') return (error.context as Response).status;
+    if (typeof error?.status === 'number') return error.status;
+  } catch {}
+  return null;
+}
+
+/** Get response body from Edge Function error (FunctionsHttpError has context = Response). */
+async function getInvokeErrorBody(error: any): Promise<{ error?: string } | null> {
+  try {
+    const res = error?.context as Response | undefined;
+    if (res && typeof res.json === 'function') {
+      const body = await res.json();
+      return body && typeof body === 'object' ? body : null;
+    }
+  } catch {}
+  return null;
+}
 
 // ═══ CARD FORMATTING HELPERS ═══
 function formatCardNumber(value: string): string {
@@ -272,6 +292,68 @@ const PaymentCheckout: React.FC = () => {
     return Object.keys(errors).length === 0;
   };
 
+  // ═══ PAY WITH PAYPAL (redirect to PayPal, then paypal-capture on return) ═══
+  const handlePayWithPayPal = async () => {
+    setProcessing(true);
+    setPaymentError(null);
+    try {
+      const token = await ensureFreshSession();
+      if (!token) {
+        toast.error('Your session has expired. Please sign in again.');
+        setShowAuth(true);
+        setAuthMode('signin');
+        setProcessing(false);
+        return;
+      }
+      const origin = window.location.origin;
+      const basePath = window.location.pathname || '/';
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          passType: cart.passType,
+          startDate,
+          returnUrl: `${origin}${basePath}?paypal_return=true`,
+          cancelUrl: `${origin}${basePath}?paypal_cancel=true`,
+        },
+      });
+      const serverMsg = typeof data?.error === 'string' ? data?.error : null;
+      if (error) {
+        const status = getInvokeStatus(error);
+        const body = await getInvokeErrorBody(error);
+        const fromBody = typeof body?.error === 'string' ? body.error : null;
+        let msg = fromBody || serverMsg || error.message || 'Could not create PayPal order';
+        if (msg.includes('non-2xx') || !fromBody) {
+          if (status === 404) msg = 'Payment server: "create-checkout" not found. In Supabase, deploy the create-checkout Edge Function.';
+          else if (status === 502) msg = fromBody || 'Payment server error. Check Supabase Edge Functions → create-checkout → Logs.';
+          else if (status === 500) msg = fromBody || 'Payment server error. Check Supabase Edge Function logs for create-checkout.';
+          else if (status === 401) msg = fromBody || 'Session expired. Please sign in again and try paying.';
+          else if (!fromBody) msg = 'Payment server unavailable. Check your connection. If you set up PayPal recently, confirm PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are set in Supabase → Project Settings → Edge Functions → Secrets.';
+        }
+        throw new Error(msg);
+      }
+      if (!data?.success || !data?.approvalUrl || !data?.orderId) {
+        throw new Error(serverMsg || data?.error || 'Could not create PayPal order');
+      }
+      const receiptNumber = `STK-${Date.now().toString(36).toUpperCase()}`;
+      localStorage.setItem(
+        'paypalPending',
+        JSON.stringify({
+          passType: cart.passType,
+          startDate,
+          orderId: data.orderId,
+          amount: data.amount,
+          days: selectedPass?.days ?? 1,
+          receiptNumber,
+        })
+      );
+      window.location.href = data.approvalUrl;
+    } catch (err: any) {
+      console.error('[PaymentCheckout] PayPal create-checkout error:', err);
+      setPaymentError(err?.message || 'Failed to start PayPal. Try again or use card.');
+      toast.error(err?.message || 'PayPal unavailable');
+      setProcessing(false);
+    }
+  };
+
   // ═══ PROCESS CARD PAYMENT ═══
   //
   // KEY FIX (2026-02-28): 
@@ -335,28 +417,24 @@ const PaymentCheckout: React.FC = () => {
       console.log('[PaymentCheckout] invoke returned — data:', JSON.stringify(data)?.substring(0, 200), 'error:', error?.message);
 
       // Step 4: Handle the response
-      // The SDK returns { data, error }. When the function returns non-2xx:
-      // - error: FunctionsHttpError with generic message
-      // - data: may contain the actual error response body from our function
-      
+      // The SDK returns { data, error }. On non-2xx, error is set and data is often null;
+      // read the real message from the response body via error.context (Response).
       if (error) {
         console.error('[PaymentCheckout] Edge function error object:', error);
-        
-        // Try to extract the actual error message from the data object
-        // (the SDK sometimes puts the response body in data even on error)
-        const serverError = data?.error || data?.message;
-        const serverHint = data?.hint || data?.step;
-        
+        const status = getInvokeStatus(error);
+        const body = await getInvokeErrorBody(error);
+        const fromBody = typeof body?.error === 'string' ? body.error : null;
+        const serverError = fromBody ?? data?.error ?? data?.message;
+
         if (serverError) {
-          console.error('[PaymentCheckout] Server error:', serverError, 'hint:', serverHint);
           throw new Error(serverError);
         }
-        
-        // If no server error in data, use the SDK error message
-        // but make it more user-friendly
         const errMsg = error.message || 'Payment processing failed';
         if (errMsg.includes('non-2xx')) {
-          throw new Error('Unable to reach payment server. Please check your connection and try again.');
+          if (status === 404) throw new Error('Payment server: "process-card-payment" not found. Deploy the Edge Function in Supabase.');
+          if (status === 501) throw new Error('Card payment for passes is not available. Please use the "Pay with PayPal" button above.');
+          if (status === 400) throw new Error(fromBody || 'Invalid request. Please try again or use Pay with PayPal.');
+          throw new Error('Payment server unavailable. Check your connection or try again.');
         }
         throw new Error(errMsg);
       }
@@ -490,7 +568,10 @@ const PaymentCheckout: React.FC = () => {
                       <p className="font-semibold mb-1">How it works</p>
                       <p className="text-teal-700">
                         Choose your start date and your <strong>{selectedPass.label}</strong> will be valid for <strong>{selectedPass.days} day{selectedPass.days > 1 ? 's' : ''}</strong> for <strong>{selectedPass.group}</strong>. 
-                        The end date is automatically calculated. Share the app to unlock bonus features!
+                        The end date is automatically calculated.
+                      </p>
+                      <p className="text-teal-700 mt-2 font-medium">
+                        Share the app (from the Passes page or after purchase) to unlock bonus extra people and/or extra days.
                       </p>
                     </div>
                   </div>
@@ -797,7 +878,26 @@ const PaymentCheckout: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Pay Button */}
+                {/* Pay with PayPal */}
+                <button
+                  type="button"
+                  onClick={handlePayWithPayPal}
+                  disabled={processing}
+                  className="w-full py-3.5 rounded-xl border-2 border-[#003087] bg-[#003087] hover:bg-[#002a6e] text-white font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
+                    <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797H9.603c-.564 0-1.04.408-1.13.964L7.076 21.337z"/>
+                  </svg>
+                  Pay A${selectedPass.price}.00 with PayPal
+                </button>
+
+                <div className="relative flex items-center gap-3 my-4">
+                  <div className="flex-1 h-px bg-gray-200" />
+                  <span className="text-xs font-medium text-gray-400">or pay with card</span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
+
+                {/* Pay with Card Button */}
                 <button
                   onClick={handlePayWithCard}
                   disabled={processing}
@@ -811,13 +911,13 @@ const PaymentCheckout: React.FC = () => {
                   ) : (
                     <>
                       <Lock className="w-5 h-5" />
-                      Pay A${selectedPass.price}.00 Securely
+                      Pay A${selectedPass.price}.00 with Card
                     </>
                   )}
                 </button>
 
                 <p className="text-xs text-center text-gray-400">
-                  Your card will be charged A${selectedPass.price}.00 AUD. Payment processed securely by PayPal.
+                  Card is processed securely. You can also pay with your PayPal account above.
                 </p>
               </div>
             )}
