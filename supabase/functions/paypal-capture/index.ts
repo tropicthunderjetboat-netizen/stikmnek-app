@@ -28,6 +28,94 @@ function errorResponse(message: string, status = 400) {
   return jsonResponse({ success: false, error: message }, status);
 }
 
+async function sendReceiptEmail(params: {
+  toEmail: string;
+  toName?: string | null;
+  receiptNumber: string;
+  passType: string;
+  amount: number;
+  currency: string;
+  validFrom: string;
+  validUntil: string;
+}): Promise<{ sent: boolean; skipped?: boolean; error?: string }> {
+  const apiKey = Deno.env.get('SENDGRID_API_KEY');
+  if (!apiKey) {
+    console.warn('[paypal-capture] SENDGRID_API_KEY not set - skipping receipt email');
+    return { sent: false, skipped: true, error: 'SENDGRID_API_KEY not set' };
+  }
+
+  const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'noreply@stikmnek.com';
+  const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
+
+  const passLabel =
+    params.passType === 'daily'
+      ? 'Family Explorer Pass (1 day)'
+      : params.passType === 'weekly'
+        ? 'Extended Group Adventure Pass (6 days)'
+        : params.passType === 'monthly'
+          ? 'Ultimate Crew Experience Pass (6 days)'
+          : params.passType;
+
+  const subject = `StikmNek receipt — ${passLabel}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111;">
+      <h2 style="margin: 0 0 12px;">Thanks for your purchase!</h2>
+      <p style="margin: 0 0 12px;">Your pass is now active.</p>
+      <table style="border-collapse: collapse; width: 100%; max-width: 520px;">
+        <tr>
+          <td style="padding: 6px 0; color: #555;">Receipt</td>
+          <td style="padding: 6px 0; font-weight: 700;">${params.receiptNumber}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #555;">Pass</td>
+          <td style="padding: 6px 0; font-weight: 700;">${passLabel}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #555;">Valid from</td>
+          <td style="padding: 6px 0;">${params.validFrom}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #555;">Valid until</td>
+          <td style="padding: 6px 0;">${params.validUntil}</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 0; color: #555;">Amount</td>
+          <td style="padding: 6px 0; font-weight: 700;">${params.currency} ${params.amount.toFixed(2)}</td>
+        </tr>
+      </table>
+      <p style="margin: 16px 0 0; color: #555; font-size: 12px;">
+        If you have any issues, reply to this email and we’ll help.
+      </p>
+    </div>
+  `;
+
+  const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      personalizations: [
+        {
+          to: [{ email: params.toEmail, name: params.toName ?? undefined }],
+          subject,
+        },
+      ],
+      from: { email: fromEmail, name: fromName },
+      content: [{ type: 'text/html', value: html }],
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error('[paypal-capture] SendGrid receipt error:', res.status, errText);
+    return { sent: false, error: `SendGrid error: ${res.status}` };
+  }
+
+  return { sent: true };
+}
+
 async function getPayPalAccessToken(sandbox: boolean): Promise<string> {
   const clientId = Deno.env.get('PAYPAL_CLIENT_ID');
   const clientSecret = Deno.env.get('PAYPAL_CLIENT_SECRET');
@@ -155,6 +243,29 @@ Deno.serve(async (req) => {
       return errorResponse('Payment captured but failed to create pass: ' + insertErr.message, 500);
     }
 
+    // Send receipt email (best-effort; do not fail purchase if email fails)
+    let receiptEmail: { sent: boolean; skipped?: boolean; error?: string } | null = null;
+    try {
+      const buyerEmail = user.email;
+      if (buyerEmail) {
+        receiptEmail = await sendReceiptEmail({
+          toEmail: buyerEmail,
+          toName: (user.user_metadata as any)?.full_name ?? (user.user_metadata as any)?.name ?? null,
+          receiptNumber,
+          passType,
+          amount,
+          currency: 'AUD',
+          validFrom,
+          validUntil,
+        });
+      } else {
+        receiptEmail = { sent: false, skipped: true, error: 'No user email' };
+      }
+    } catch (emailErr: any) {
+      console.error('[paypal-capture] receipt email error:', emailErr);
+      receiptEmail = { sent: false, error: emailErr?.message ?? 'Receipt email failed' };
+    }
+
     return jsonResponse({
       success: true,
       receiptNumber,
@@ -166,6 +277,7 @@ Deno.serve(async (req) => {
       validUntil,
       days,
       sessionId: insertedPass?.id ?? receiptNumber,
+      receiptEmail,
     });
   } catch (err: any) {
     console.error('[paypal-capture]', err);

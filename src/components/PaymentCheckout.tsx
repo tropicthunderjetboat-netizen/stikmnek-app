@@ -936,19 +936,9 @@ const PaymentCheckout: React.FC = () => {
                   </div>
 
                   <div className="border-t border-gray-100 pt-5 space-y-4">
-                    {/* PayPal Hosted Fields (secure iframes) */}
-                    {!paypalClientId && (
-                      <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
-                        PayPal card payments are not configured. Set <code className="font-mono">VITE_PAYPAL_CLIENT_ID</code> in Vercel.
-                      </div>
-                    )}
-
-                    {paypalClientId && hostedEligible === false && (
-                      <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-sm">
-                        Card payments on-site are not available for this browser/account. Please use the PayPal checkout option below.
-                      </div>
-                    )}
-
+                    {/* If PayPal Hosted Fields are available, prefer them.
+                        Otherwise, fall back to the existing card inputs so the UI
+                        always shows a usable form. */}
                     {paypalClientId && hostedEligible !== false && (
                       <>
                         <div>
@@ -982,8 +972,8 @@ const PaymentCheckout: React.FC = () => {
                       </>
                     )}
 
-                    {/* Legacy raw card inputs are disabled (PCI). Keep for reference only. */}
-                    {false && (
+                    {/* Fallback / legacy card inputs (used when Hosted Fields not usable) */}
+                    {(!paypalClientId || hostedEligible === false) && (
                       <>
                         {/* Cardholder Name */}
                     <div>
