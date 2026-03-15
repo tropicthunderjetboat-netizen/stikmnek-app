@@ -221,7 +221,12 @@ async function invokeExtendPassWithRetry(
 }
 
 // ─── Share CTA Component ───
-const ShareCTA: React.FC<{ passType: string; userId: string }> = ({ passType, userId }) => {
+type ShareBonusApplied = { days: number; people: number; kids: number };
+const ShareCTA: React.FC<{
+  passType: string;
+  userId: string;
+  onBonusApplied?: (bonus: ShareBonusApplied) => void;
+}> = ({ passType, userId, onBonusApplied }) => {
   const [shareState, setShareState] = useState<'idle' | 'sharing' | 'success' | 'already-claimed' | 'error'>(() => {
     try {
       const stored = localStorage.getItem('stikmnek-shared-passes');
@@ -271,6 +276,7 @@ const ShareCTA: React.FC<{ passType: string; userId: string }> = ({ passType, us
       toast.success(`Bonus unlocked: ${formatBonusParts(bd, bp, bk)}! Your pass has been extended.`, { duration: 6000 });
       markSharedLocally();
       setShareState('success');
+      onBonusApplied?.({ days: bd, people: bp, kids: bk });
       return;
     }
 
@@ -578,6 +584,14 @@ const ShareCTA: React.FC<{ passType: string; userId: string }> = ({ passType, us
 };
 
 
+// Add days to a YYYY-MM-DD string; returns YYYY-MM-DD
+function addDaysToDate(dateStr: string | undefined, days: number): string {
+  if (!dateStr || days <= 0) return dateStr ?? '';
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 // ─── Main PaymentConfirmation Component ───
 const PaymentConfirmation: React.FC = () => {
   const { user, setCurrentView } = useAppContext();
@@ -597,6 +611,28 @@ const PaymentConfirmation: React.FC = () => {
         setPayment(null);
       }
     }
+  }, []);
+
+  const handleShareBonusApplied = React.useCallback((bonus: ShareBonusApplied) => {
+    setPayment((prev) => {
+      if (!prev) return prev;
+      const basePeople = prev.passType && PASS_PRODUCTS[prev.passType as keyof typeof PASS_PRODUCTS]
+        ? PASS_PRODUCTS[prev.passType as keyof typeof PASS_PRODUCTS].basePeople
+        : 4;
+      const newPeople = (prev.peopleCount ?? basePeople) + (bonus.people ?? 0);
+      const newValidUntil = addDaysToDate(prev.validUntil, bonus.days ?? 0) || prev.validUntil;
+      const updated: PaymentResult = {
+        ...prev,
+        peopleCount: newPeople,
+        validUntil: newValidUntil,
+        shareBonusApplied: true,
+        group: `Up to ${newPeople} people`,
+      };
+      try {
+        localStorage.setItem('lastPayment', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
   }, []);
 
   // Auto-send confirmation email when payment loads
@@ -997,7 +1033,11 @@ Enjoy your deals in Vanuatu!
 
         {/* ═══ SHARE CTA SECTION ═══ */}
         {user?.id && payment.passType && (
-          <ShareCTA passType={payment.passType} userId={user.id} />
+          <ShareCTA
+            passType={payment.passType}
+            userId={user.id}
+            onBonusApplied={handleShareBonusApplied}
+          />
         )}
 
         {/* Action Buttons */}

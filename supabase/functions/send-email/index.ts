@@ -33,11 +33,14 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.warn('[send-email] Rejected: Missing Authorization header (is Verify JWT OFF for this function?)');
       return errorResponse('Missing Authorization header', 401);
     }
 
     const body = await req.json().catch(() => ({}));
     const action = body?.action;
+
+    console.log('[send-email] Invoked with action:', action ?? '(missing)');
 
     if (!action) {
       return errorResponse('Missing action');
@@ -94,9 +97,18 @@ Deno.serve(async (req) => {
       });
 
       if (!res.ok) {
-        const errText = await res.text();
-        console.error('[send-email] SendGrid error:', res.status, errText);
-        return errorResponse(`SendGrid error: ${res.status}`, 500);
+        let errText = '';
+        try {
+          errText = await res.text();
+        } catch (e) {
+          errText = '(could not read response body)';
+        }
+        const logMsg = `[send-email] SendGrid send_business_decision FAILED status=${res.status} body=${errText}`;
+        console.error(logMsg);
+        return jsonResponse(
+          { success: false, error: `SendGrid error: ${res.status}`, details: errText },
+          500
+        );
       }
 
       return jsonResponse({ success: true, sent: true });
@@ -106,13 +118,17 @@ Deno.serve(async (req) => {
     // Called from PaymentConfirmation page when user lands on receipt. Requires SENDGRID_API_KEY.
     // From address should be a verified sender in SendGrid (e.g. no-reply@stikmnek.com).
     if (action === 'send_pass_confirmation') {
+      console.log('[send-email] send_pass_confirmation: started');
+
       const apiKey = Deno.env.get('SENDGRID_API_KEY');
+      const fromEnv = Deno.env.get('SENDGRID_FROM_EMAIL');
+      console.log('[send-email] SENDGRID_API_KEY present:', !!apiKey);
+      console.log('[send-email] SENDGRID_FROM_EMAIL from env:', fromEnv ?? '(not set, will use default)');
+
       if (!apiKey) {
-        console.warn('[send-email] SENDGRID_API_KEY not set - skipping pass confirmation email');
-        return jsonResponse({
-          success: false,
-          error: 'Email not configured. Set SENDGRID_API_KEY in Supabase Edge Function secrets.',
-        });
+        const msg = 'Email not configured. Set SENDGRID_API_KEY in Supabase Edge Function secrets.';
+        console.error('[send-email] send_pass_confirmation FAILED: ' + msg);
+        return jsonResponse({ success: false, error: msg }, 500);
       }
 
       const {
@@ -127,7 +143,10 @@ Deno.serve(async (req) => {
         valid_until,
       } = body;
 
+      console.log('[send-email] user_email present:', !!user_email, typeof user_email, user_email ? `${user_email.slice(0, 2)}***@${user_email.split('@')[1] ?? '?'}` : '(missing)');
+
       if (!user_email || typeof user_email !== 'string') {
+        console.warn('[send-email] Missing or invalid user_email in body. Keys received:', Object.keys(body ?? {}));
         return errorResponse('Missing user_email');
       }
 
@@ -142,6 +161,8 @@ Deno.serve(async (req) => {
 
       const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
       const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
+      console.log('[send-email] From address:', fromEmail, '| To:', user_email);
+
       const subject = `StikmNek receipt — ${passLabel}`;
       const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111;">
@@ -159,23 +180,44 @@ Deno.serve(async (req) => {
     </div>
       `.trim();
 
-      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email: user_email, name: user_name ?? undefined }] }],
-          from: { email: fromEmail, name: fromName },
-          subject,
-          content: [{ type: 'text/html', value: html }],
-        }),
-      });
+      const sgBody = {
+        personalizations: [{ to: [{ email: user_email, name: user_name ?? undefined }] }],
+        from: { email: fromEmail, name: fromName },
+        subject,
+        content: [{ type: 'text/html', value: html }],
+      };
+      console.log('[send-email] Calling SendGrid API...');
+      let res: Response;
+      try {
+        res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(sgBody),
+        });
+      } catch (fetchErr: unknown) {
+        const fetchMsg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+        const logMsg = `[send-email] SendGrid fetch threw: ${fetchMsg}`;
+        console.error(logMsg);
+        return jsonResponse(
+          { success: false, error: 'SendGrid request failed', details: fetchMsg },
+          500
+        );
+      }
+
+      console.log('[send-email] SendGrid response status:', res.status);
 
       if (!res.ok) {
-        const errText = await res.text();
-        console.error('[send-email] SendGrid send_pass_confirmation error:', res.status, errText);
+        let errText = '';
+        try {
+          errText = await res.text();
+        } catch (e) {
+          errText = '(could not read response body)';
+        }
+        const logMsg = `[send-email] SendGrid send_pass_confirmation FAILED status=${res.status} body=${errText}`;
+        console.error(logMsg);
         return jsonResponse(
           { success: false, error: `SendGrid error: ${res.status}`, details: errText },
           500
@@ -204,8 +246,16 @@ Deno.serve(async (req) => {
     }
 
     return errorResponse('Unknown action: ' + action);
-  } catch (err) {
-    console.error('[send-email] error:', err);
-    return errorResponse((err as Error).message, 500);
+  } catch (err: unknown) {
+    const errMessage = err instanceof Error ? err.message : String(err ?? 'Unknown error');
+    const logMsg = `[send-email] Caught error: ${errMessage}`;
+    console.error(logMsg);
+    if (err instanceof Error && err.stack) {
+      console.error('[send-email] Stack:', err.stack);
+    }
+    return jsonResponse(
+      { success: false, error: errMessage || 'Internal server error' },
+      500
+    );
   }
 });

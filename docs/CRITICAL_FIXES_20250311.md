@@ -154,3 +154,49 @@ Run these in order:
 1. Redeploy the `send-email` Edge Function after the code change.
 2. Purchase a pass (card or PayPal), land on the receipt page → confirmation email should be sent automatically.
 3. If it fails, check Supabase Edge Function logs for `send-email` and SendGrid Activity for delivery status.
+
+### Diagnosing confirmation email failure (SendGrid shows no attempt)
+- **Where secrets live:** Supabase → **Project Settings** → **Edge Functions** → **Secrets** (project-level; all Edge Functions see them). Add `SENDGRID_API_KEY` and optionally `SENDGRID_FROM_EMAIL`. This is **not** the same as Auth → SMTP (that’s for password reset only).
+- **Logs:** Edge Functions → **send-email** → **Logs**. After a pass purchase and opening the receipt page, look for:
+  - `[send-email] Invoked with action: send_pass_confirmation` — function was called with the right action.
+  - `[send-email] SENDGRID_API_KEY present: true/false` — if false, add the secret and redeploy.
+  - `[send-email] user_email present: ...` — if false or missing, the frontend payload is wrong or user has no email.
+  - `[send-email] Rejected: Missing Authorization header` — turn **Verify JWT** OFF for `send-email` and redeploy.
+  - `[send-email] Calling SendGrid API...` then `SendGrid response status: 202` — email accepted by SendGrid.
+  - `[send-email] SendGrid send_pass_confirmation error: 4xx/5xx` — SendGrid rejected (e.g. bad API key, unverified From); check Activity for details.
+
+---
+
+## Migration order (19 migrations, run in order)
+
+Apply in Supabase SQL Editor or `supabase db push` in this order:
+
+| # | Filename | Purpose |
+|---|----------|---------|
+| 1 | 20250311000000_add_pass_share_bonus_columns.sql | passes: max_people, share_bonus_applied |
+| 2 | 20250311120000_superstar_review_support.sql | SuperStar reviews, rating 1–6, RPCs |
+| 3 | 20250311140000_add_whatsapp_to_pending_businesses.sql | pending_businesses: whatsapp_number |
+| 4 | 20250311150000_fix_pending_businesses_insert_rls.sql | pending_businesses INSERT RLS |
+| 5 | 20250311160000_insert_pending_business_rpc.sql | insert_pending_business RPC |
+| 6 | 20250311170000_consolidate_pending_businesses.sql | GRANTs, RLS, RPC |
+| 7 | 20250311180000_admin_get_pending_businesses_rpc.sql | get_pending_businesses_for_admin |
+| 8 | 20250311190000_review_pending_business_rpc.sql | review_pending_business (initial) |
+| 9 | 20250311200000_get_pending_edits_for_admin_rpc.sql | get_pending_edits_for_admin |
+| 10 | 20250311210000_admin_users_and_photo_urls.sql | get_all_users_for_admin |
+| 11 | 20250311220000_business_photos_public_read.sql | business_photos public read |
+| 12 | **20250311230000_businesses_schema_align.sql** | **businesses: deal_price, discount, image, hours** |
+| 13 | 20250311240000_storage_business_photos_policies.sql | Storage policies business-photos |
+| 14 | 20250311250000_review_pending_business_fix_owner_and_schema.sql | owner_id, canonical schema |
+| 15 | 20250311260000_backfill_businesses_owner_id.sql | Backfill businesses.owner_id |
+| 16 | 20250311270000_rejected_resubmit_flow.sql | Rejected resubmit RLS |
+| 17 | 20250311280000_admin_read_business_photos.sql | Admin read all business_photos |
+| 18 | 20250311290000_businesses_add_map_url_and_extras.sql | businesses: map_url, website, discount_valid_* |
+| 19 | 20250311300000_pending_businesses_add_map_url_and_extras.sql | pending_businesses: map_url, website, etc. |
+
+Later (passes table): 20250311500000_passes_add_amount_paid.sql, 20250311510000_passes_add_currency_and_payment_columns.sql
+
+---
+
+## Share Bonus display on receipt (fixed)
+
+After the user unlocks the share bonus via WhatsApp (extend-pass), the receipt page now updates in place: **people count** (e.g. 4 → 6), **Valid until** (if bonus days applied), **Share bonus applied**, and **group** label. `ShareCTA` calls `onBonusApplied` with the bonus; `PaymentConfirmation` updates `payment` state and `lastPayment` in localStorage so the UI and downloaded/printed receipt reflect the new values.

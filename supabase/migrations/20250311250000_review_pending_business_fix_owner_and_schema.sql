@@ -17,7 +17,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $func$
 DECLARE
   v_pending record;
   v_new_biz_id uuid;
@@ -93,6 +93,6 @@ BEGIN
     RETURN jsonb_build_object('success', true);
   END IF;
 END;
-$$;
+$func$;
 
 GRANT EXECUTE ON FUNCTION public.review_pending_business TO authenticated;
