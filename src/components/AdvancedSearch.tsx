@@ -51,11 +51,11 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     for (const biz of allBusinesses) {
       if (biz.tags) {
         for (const tag of biz.tags) {
-          tagSet.add(tag.toLowerCase());
+          tagSet.add((tag ?? '').toLowerCase());
         }
       }
       // Also add category as a tag
-      tagSet.add(biz.category.toLowerCase());
+      tagSet.add((biz.category ?? '').toLowerCase());
     }
     return Array.from(tagSet).sort();
   }, [allBusinesses]);
@@ -83,7 +83,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
     // Match business names (partial + fuzzy)
     for (const biz of allBusinesses) {
-      const name = biz.name.toLowerCase();
+      const name = (biz.name ?? '').toLowerCase();
       // Exact substring match
       if (name.includes(q)) {
         results.push({ type: 'business', text: biz.name });
@@ -105,7 +105,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     for (const tag of allTags) {
       if (tag.includes(q) || q.includes(tag)) {
         const count = allBusinesses.filter(b =>
-          b.tags?.some(t => t.toLowerCase() === tag) || b.category.toLowerCase() === tag
+          b.tags?.some(t => (t ?? '').toLowerCase() === tag) || (b.category ?? '').toLowerCase() === tag
         ).length;
         if (count > 0) {
           results.push({ type: 'tag', text: tag, count });

@@ -63,9 +63,10 @@ function computeLeaderboardScore(
 }
 
 // ─── Fuzzy/partial matching helper ───
-function fuzzyMatch(query: string, text: string): boolean {
-  const q = query.toLowerCase();
-  const t = text.toLowerCase();
+function fuzzyMatch(query: string, text: string | null | undefined): boolean {
+  if (text == null) return false;
+  const q = (query ?? '').toLowerCase();
+  const t = String(text).toLowerCase();
 
   // Direct substring match
   if (t.includes(q)) return true;
@@ -81,7 +82,12 @@ function fuzzyMatch(query: string, text: string): boolean {
 }
 
 const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, title }) => {
-  const { language, searchQuery, setSearchQuery, selectedCategory, setSelectedCategory, setCurrentView, dbBusinesses, dbReviews, redemptions, dataLoaded, userLocation, getDistanceTo } = useAppContext();
+  const { language, searchQuery, setSearchQuery, selectedCategory, setSelectedCategory, setCurrentView, dbBusinesses, dbReviews, redemptions, dataLoaded, userLocation, getDistanceTo, refreshBusinesses } = useAppContext();
+
+  // Refresh public listings when deals view is shown (e.g. after admin approval or "view on live site")
+  React.useEffect(() => {
+    refreshBusinesses?.();
+  }, [refreshBusinesses]);
 
   const [sortBy, setSortBy] = useState<SortOption>('featured');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
@@ -120,9 +126,9 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
         const nameMatch = fuzzyMatch(q, biz.name);
         const descMatch = fuzzyMatch(q, biz.description);
         const locationMatch = fuzzyMatch(q, biz.location);
-        const categoryMatch = biz.category.toLowerCase().includes(q);
-        const tagMatch = biz.tags.some(tag => {
-          const tagLower = tag.toLowerCase();
+        const categoryMatch = (biz.category ?? '').toLowerCase().includes(q);
+        const tagMatch = (biz.tags ?? []).some(tag => {
+          const tagLower = String(tag).toLowerCase();
           return tagLower.includes(q) || q.includes(tagLower) || fuzzyMatch(q, tagLower);
         });
 
@@ -133,8 +139,8 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
 
         // Also check phonetic-like matching (first 3 chars)
         const phoneticMatch = q.length >= 3 && (
-          biz.name.toLowerCase().startsWith(q.substring(0, 3)) ||
-          biz.tags.some(tag => tag.toLowerCase().startsWith(q.substring(0, 3)))
+          (biz.name ?? '').toLowerCase().startsWith(q.substring(0, 3)) ||
+          (biz.tags ?? []).some(tag => String(tag).toLowerCase().startsWith(q.substring(0, 3)))
         );
 
         if (!nameMatch && !descMatch && !locationMatch && !categoryMatch && !tagMatch && !phoneticMatch && !whatsappMatch) return false;
@@ -232,7 +238,8 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const biz of allBusinesses) {
-      counts[biz.category] = (counts[biz.category] || 0) + 1;
+      const cat = biz.category ?? 'other';
+      counts[cat] = (counts[cat] || 0) + 1;
     }
     return counts;
   }, [allBusinesses]);

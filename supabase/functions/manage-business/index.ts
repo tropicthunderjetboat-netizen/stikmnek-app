@@ -216,7 +216,7 @@ Deno.serve(async (req) => {
       if (!userId) return errorResponse('Missing userId');
 
       const [approvedRes, pendingRes] = await Promise.all([
-        supabase.from('businesses').select('*').eq('owner_id', userId).eq('active', true),
+        supabase.from('businesses').select('*').eq('owner_id', userId),
         supabase.from('pending_businesses').select('*').eq('owner_id', userId).order('created_at', { ascending: false }),
       ]);
 

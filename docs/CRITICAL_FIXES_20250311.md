@@ -37,6 +37,7 @@ This document describes the fixes applied to resolve core business lifecycle iss
 - **Fix 1:** RPC now inserts `owner_id` (see above)
 - **Fix 2:** Direct Supabase fallback in `loadAllOwnerData` — when Edge Function fails, fetches directly from `businesses` and `pending_businesses` by `owner_id`
 - Fallback uses both schema variants (`image`/`image_url`, `discount`/`deal`, etc.) for compatibility
+- **Fix 3 (post-approval visibility):** Removed `.eq('active', true)` from `get_all_owner_data` (Edge Function) and from the dashboard direct fallback. If `businesses.active` is missing or false for new rows, the owner would still see no listings; now all owner businesses are returned regardless of `active`.
 
 ---
 
@@ -47,9 +48,27 @@ This document describes the fixes applied to resolve core business lifecycle iss
 - **Admin Approval:** When admin approves a business, RPC now updates `business_photos` with `business_id = new_biz_id` and `status = 'approved'`
 - **Admin Photo Moderation:** Already implemented — approve/reject via `manage-business` (`approve_photo` / `reject_photo`)
 
+### Admin multi-photo display (fix for "only one photo visible")
+- **Grouping key:** Photos are grouped by `business_id` using a consistent string key (`String(photo.business_id)`) so lookup by `biz.id` matches.
+- **Per-card refetch:** When the pending list is shown, any business with no photos in state triggers a direct fetch for that `business_id` from `business_photos`, so all uploaded photos appear even if the initial bulk load missed them.
+
 ---
 
-## 4. Schema & Regressions
+## 4. Public Listing Display & Crash Fixes
+
+### "Cannot read properties of null (reading 'toLowerCase')"
+- **Cause:** Some DB businesses had `null` for `name`, `category`, or `tags`; code called `.toLowerCase()` on them.
+- **Fix:** Defensive null handling:
+  - **AppContext `loadBusinesses`:** Map `name`, `category`, `description` with `?? ''` / `?? 'dining'`.
+  - **BusinessGrid:** `fuzzyMatch` accepts null/undefined; all uses of `biz.category`, `biz.name`, `biz.tags` use `(biz.category ?? '').toLowerCase()` etc.
+  - **AdvancedSearch:** Same pattern for `biz.name`, `biz.category`, and tag/category comparisons.
+
+### Listing not visible until refresh
+- **Fix:** `BusinessGrid` calls `refreshBusinesses()` when it mounts (deals view). Opening "Deals" or "view on live site" triggers a refetch so newly approved listings appear without a full page refresh.
+
+---
+
+## 5. Schema & Regressions
 
 ### Admin Panel `deal_price` Error
 - **Fix:** Admin update now uses only canonical columns (`image`, `discount`, `deal_price`, `hours`) — removed `deal`, `discounted_price`, `image_url`, `opening_hours` to avoid "column not found"
@@ -60,7 +79,7 @@ This document describes the fixes applied to resolve core business lifecycle iss
 
 ---
 
-## 5. Image Architecture (pending_businesses)
+## 6. Image Architecture (pending_businesses)
 
 **No schema change needed.** Multiple photos are stored in `business_photos`, not in `pending_businesses` columns:
 - `pending_businesses.image` = main cover image URL (single column)
@@ -70,7 +89,7 @@ When a listing is submitted, photos are inserted into `business_photos` with `bu
 
 ---
 
-## 6. Rejected Submission → Edit & Resubmit
+## 7. Rejected Submission → Edit & Resubmit
 
 **Flow:** Admin rejects → owner sees "Edit & Resubmit" → edits form pre-filled with rejected data + admin notes → resubmits → status back to `pending` → admin approves → moves to `businesses`.
 
@@ -100,7 +119,7 @@ Run these in order:
 
 ---
 
-## 7. Multi-Photo Display & Admin Moderation
+## 8. Multi-Photo Display & Admin Moderation
 
 ### Problem
 - Only one photo displayed in Admin approval area (was fallback `biz.image` when `businessPhotos[biz.id]` was empty)
@@ -114,7 +133,7 @@ Run these in order:
 
 ---
 
-## 8. map_url Column Missing on Approval
+## 9. map_url Column Missing on Approval
 
 ### Problem
 - Error: `Failed to process review: column "map_url" of relation "businesses" does not exist`

@@ -254,8 +254,9 @@ const AdminPanel: React.FC = () => {
     const groupPhotos = (photos: BusinessPhoto[]) => {
       const grouped: Record<string, BusinessPhoto[]> = {};
       for (const photo of photos) {
-        if (!grouped[photo.business_id]) grouped[photo.business_id] = [];
-        grouped[photo.business_id].push(photo);
+        const key = String(photo.business_id ?? '');
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(photo);
       }
       return grouped;
     };
@@ -300,8 +301,9 @@ const AdminPanel: React.FC = () => {
       if (data && data.length > 0) {
         const grouped: Record<string, BusinessPhoto[]> = {};
         for (const photo of data) {
-          if (!grouped[photo.business_id]) grouped[photo.business_id] = [];
-          grouped[photo.business_id].push(photo as BusinessPhoto);
+          const key = String((photo as BusinessPhoto).business_id ?? '');
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(photo as BusinessPhoto);
         }
         setBusinessPhotos(grouped);
       }
@@ -309,6 +311,41 @@ const AdminPanel: React.FC = () => {
       console.error('[Admin] Direct photo fallback failed:', err);
     }
   };
+
+  // Per-card photo fetch: when a pending business has no photos in state, refetch for that id
+  const photoFetchRequestedRef = useRef<Set<string>>(new Set());
+  const loadPhotosForPendingId = useCallback(async (pendingId: string) => {
+    if (!pendingId || photoFetchRequestedRef.current.has(pendingId)) return;
+    photoFetchRequestedRef.current.add(pendingId);
+    try {
+      const { data, error } = await supabase
+        .from('business_photos')
+        .select('*')
+        .eq('business_id', pendingId)
+        .order('created_at', { ascending: true });
+      if (error) return;
+      if (data && data.length > 0) {
+        setBusinessPhotos(prev => ({
+          ...prev,
+          [String(pendingId)]: data as BusinessPhoto[],
+        }));
+      }
+    } catch (err) {
+      console.warn('[Admin] Per-card photo fetch failed:', err);
+    } finally {
+      photoFetchRequestedRef.current.delete(pendingId);
+    }
+  }, []);
+
+  // When pending list is loaded, ensure we have photos for each biz (refetch if missing)
+  const pendingIdsKey = pendingBusinesses.map(b => b.id).join(',');
+  useEffect(() => {
+    if (pendingBusinesses.length === 0) return;
+    pendingBusinesses.forEach(biz => {
+      const key = String(biz.id);
+      if (!businessPhotos[key]?.length) loadPhotosForPendingId(key);
+    });
+  }, [pendingIdsKey, loadPhotosForPendingId]);
 
   const editsLoadedRef = useRef(false);
   useEffect(() => {

@@ -236,9 +236,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (data) {
         const mapped: Business[] = data.map((b: any) => ({
           id: b.id,
-          name: b.name,
-          category: b.category,
-          description: b.description,
+          name: b.name ?? '',
+          category: b.category ?? 'dining',
+          description: b.description ?? '',
           descriptionFr: b.description_fr || b.description,
           descriptionBi: b.description_bi || b.description,
           image: getBusinessImageUrl(b.image_url || b.image, SUPABASE_URL),

@@ -423,7 +423,7 @@ const BusinessOwnerDashboard: React.FC = () => {
       // Last resort: try direct DB queries for both businesses and pending_businesses
       try {
         const [approvedRes, pendingRes] = await Promise.all([
-          supabase.from('businesses').select('*').eq('owner_id', user.id).eq('active', true),
+          supabase.from('businesses').select('*').eq('owner_id', user.id),
           supabase.from('pending_businesses').select('*').eq('owner_id', user.id).order('created_at', { ascending: false }),
         ]);
         const approved = approvedRes.data || [];
