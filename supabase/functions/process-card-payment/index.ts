@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
 
     if (!action) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing action. Use Pay with PayPal for pass purchase.' }),
+        JSON.stringify({ success: false, error: 'Missing action. Use action: purchase_pass for pass purchase.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: false, error: `Unknown action: ${action}. Use Pay with PayPal for pass purchase.` }),
+      JSON.stringify({ success: false, error: `Unknown action: ${action}. Use action: purchase_pass for pass purchase.` }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
