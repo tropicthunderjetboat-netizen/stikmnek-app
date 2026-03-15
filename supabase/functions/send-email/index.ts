@@ -2,7 +2,11 @@
 /**
  * send-email Edge Function
  * Handles email notifications via SendGrid.
- * Requires: SendGrid API key (set SENDGRID_API_KEY in Supabase secrets)
+ * Required secrets (Supabase → Project Settings → Edge Functions → Secrets):
+ *   SENDGRID_API_KEY — your SendGrid API key
+ * Optional (defaults shown):
+ *   SENDGRID_FROM_EMAIL — default no-reply@stikmnek.com (must be verified in SendGrid)
+ *   SENDGRID_FROM_NAME — default "StikmNek"
  */
 
 const corsHeaders = {
@@ -81,7 +85,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           personalizations: [{ to: [{ email: owner_email }] }],
           from: {
-            email: Deno.env.get('SENDGRID_FROM_EMAIL') || 'noreply@stikmnek.com',
+            email: Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com',
             name: Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek',
           },
           subject,
@@ -95,6 +99,90 @@ Deno.serve(async (req) => {
         return errorResponse(`SendGrid error: ${res.status}`, 500);
       }
 
+      return jsonResponse({ success: true, sent: true });
+    }
+
+    // ─── SEND_PASS_CONFIRMATION (receipt email after pass purchase) ───
+    // Called from PaymentConfirmation page when user lands on receipt. Requires SENDGRID_API_KEY.
+    // From address should be a verified sender in SendGrid (e.g. no-reply@stikmnek.com).
+    if (action === 'send_pass_confirmation') {
+      const apiKey = Deno.env.get('SENDGRID_API_KEY');
+      if (!apiKey) {
+        console.warn('[send-email] SENDGRID_API_KEY not set - skipping pass confirmation email');
+        return jsonResponse({
+          success: false,
+          error: 'Email not configured. Set SENDGRID_API_KEY in Supabase Edge Function secrets.',
+        });
+      }
+
+      const {
+        user_email,
+        user_name,
+        receipt_number,
+        pass_type,
+        amount,
+        currency,
+        payment_method,
+        valid_from,
+        valid_until,
+      } = body;
+
+      if (!user_email || typeof user_email !== 'string') {
+        return errorResponse('Missing user_email');
+      }
+
+      const passLabel =
+        pass_type === 'daily'
+          ? 'Family Explorer Pass (1 day)'
+          : pass_type === 'weekly'
+            ? 'Extended Group Adventure Pass (6 days)'
+            : pass_type === 'monthly'
+              ? 'Ultimate Crew Experience Pass (6 days)'
+              : pass_type || 'Pass';
+
+      const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
+      const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
+      const subject = `StikmNek receipt — ${passLabel}`;
+      const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111;">
+      <h2 style="margin: 0 0 12px;">Thanks for your purchase!</h2>
+      <p style="margin: 0 0 12px;">Your pass is now active.</p>
+      <table style="border-collapse: collapse; width: 100%; max-width: 520px;">
+        <tr><td style="padding: 6px 0; color: #555;">Receipt</td><td style="padding: 6px 0; font-weight: 700;">${receipt_number || '—'}</td></tr>
+        <tr><td style="padding: 6px 0; color: #555;">Pass</td><td style="padding: 6px 0; font-weight: 700;">${passLabel}</td></tr>
+        <tr><td style="padding: 6px 0; color: #555;">Valid from</td><td style="padding: 6px 0;">${valid_from || '—'}</td></tr>
+        <tr><td style="padding: 6px 0; color: #555;">Valid until</td><td style="padding: 6px 0;">${valid_until || '—'}</td></tr>
+        <tr><td style="padding: 6px 0; color: #555;">Amount</td><td style="padding: 6px 0; font-weight: 700;">${currency || 'AUD'} ${typeof amount === 'number' ? amount.toFixed(2) : amount ?? '—'}</td></tr>
+        <tr><td style="padding: 6px 0; color: #555;">Payment</td><td style="padding: 6px 0;">${payment_method || '—'}</td></tr>
+      </table>
+      <p style="margin: 16px 0 0; color: #555; font-size: 12px;">If you have any issues, reply to this email and we'll help.</p>
+    </div>
+      `.trim();
+
+      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: user_email, name: user_name ?? undefined }] }],
+          from: { email: fromEmail, name: fromName },
+          subject,
+          content: [{ type: 'text/html', value: html }],
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('[send-email] SendGrid send_pass_confirmation error:', res.status, errText);
+        return jsonResponse(
+          { success: false, error: `SendGrid error: ${res.status}`, details: errText },
+          500
+        );
+      }
+
+      console.log('[send-email] Pass confirmation sent to', user_email);
       return jsonResponse({ success: true, sent: true });
     }
 

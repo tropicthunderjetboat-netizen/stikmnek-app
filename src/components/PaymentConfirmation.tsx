@@ -631,9 +631,12 @@ const PaymentConfirmation: React.FC = () => {
 
       if (data?.success) {
         setEmailSent(true);
+      } else if (data?.error || error) {
+        const msg = typeof data?.error === 'string' ? data.error : (error as Error)?.message || 'Email could not be sent';
+        toast.error(msg);
       }
     } catch (err) {
-      // silently fail
+      toast.error((err as Error)?.message || 'Confirmation email could not be sent');
     } finally {
       setSendingEmail(false);
     }

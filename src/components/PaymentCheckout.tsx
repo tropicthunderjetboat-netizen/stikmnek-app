@@ -371,7 +371,7 @@ const PaymentCheckout: React.FC = () => {
         if (errMsg.includes('non-2xx')) {
           if (status === 404) throw new Error('Payment server: "process-card-payment" not found. Deploy the Edge Function in Supabase.');
           if (status === 501) throw new Error('Card payment is temporarily unavailable. Please try again later.');
-          if (status === 400) throw new Error(fromBody || 'Invalid request. Please try again or use Pay with PayPal.');
+          if (status === 400) throw new Error(fromBody || 'Invalid request. Please check your details and try again.');
           throw new Error('Payment server unavailable. Check your connection or try again.');
         }
         throw new Error(errMsg);

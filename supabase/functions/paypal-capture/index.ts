@@ -44,7 +44,7 @@ async function sendReceiptEmail(params: {
     return { sent: false, skipped: true, error: 'SENDGRID_API_KEY not set' };
   }
 
-  const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'noreply@stikmnek.com';
+  const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
   const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
 
   const passLabel =

@@ -132,3 +132,25 @@ Run these in order:
 3. **Edit Listing:** Select approved business → verify edit form loads and saves
 4. **Photos:** Verify gallery shows all approved photos on business detail page
 5. **Admin:** Edit a business → verify no "deal_price column not found" error
+
+---
+
+## Pass confirmation email (receipt)
+
+### Problem
+- Receipt page showed "an email has been sent" but no confirmation email was received (inbox or spam).
+- **Root cause:** The PaymentConfirmation page calls `send-email` with action `send_pass_confirmation`, but that action was not implemented in the Edge Function (returned "Unknown action").
+
+### Fix
+- **`send-email` Edge Function:** Implemented `send_pass_confirmation` action. It reads `user_email`, `receipt_number`, `pass_type`, `amount`, `valid_from`, `valid_until`, etc. from the request, builds an HTML receipt, and sends via SendGrid.
+- **From address:** Default `SENDGRID_FROM_EMAIL` is `no-reply@stikmnek.com` (must be a verified sender in SendGrid; use the same as Supabase Auth SMTP for consistency).
+- **Secrets:** In Supabase → Project Settings → Edge Functions → Secrets, set:
+  - `SENDGRID_API_KEY` (required)
+  - `SENDGRID_FROM_EMAIL` (optional, default `no-reply@stikmnek.com`)
+  - `SENDGRID_FROM_NAME` (optional, default `StikmNek`)
+- **PaymentConfirmation.tsx:** On send failure, the UI now shows a toast with the error (e.g. "Email not configured" or SendGrid error) so you can fix config.
+
+### Verification
+1. Redeploy the `send-email` Edge Function after the code change.
+2. Purchase a pass (card or PayPal), land on the receipt page → confirmation email should be sent automatically.
+3. If it fails, check Supabase Edge Function logs for `send-email` and SendGrid Activity for delivery status.
