@@ -912,15 +912,31 @@ const BusinessOwnerDashboard: React.FC = () => {
       if (!rpcError && rpcId) {
         const directData = { id: rpcId };
         if (directData.id && submitPhotos.length > 0 && user) {
-          const photoRecords = submitPhotos.map((photo, index) => ({
-            business_id: directData.id,
+          const photoData = submitPhotos.map((photo, index) => ({
             url: photo.url,
-            file_path: photo.filePath,
-            uploaded_by: user.id,
-            is_main: index === 0,
-            status: 'pending',
+            filePath: photo.filePath,
+            isMain: index === 0,
           }));
-          await supabase.from('business_photos').insert(photoRecords);
+
+          // Server-side insert (service role) to avoid silent RLS failures.
+          const { data: attachData, error: attachErr } = await invokeWithRetry(
+            'manage-business',
+            {
+              action: 'attach_pending_photos',
+              userId: user.id,
+              pendingId: directData.id,
+              photos: photoData,
+            },
+            2,
+            'attach_pending_photos'
+          );
+          if (attachErr || attachData?.error) {
+            throw new Error(
+              attachData?.error ||
+              attachErr?.message ||
+              'Business created, but failed to save photo records'
+            );
+          }
         }
         toast.success('Business submitted for approval!');
         setSubmitForm({

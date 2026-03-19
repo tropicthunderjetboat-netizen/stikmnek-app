@@ -265,6 +265,46 @@ Deno.serve(async (req) => {
       return jsonResponse({ businesses: data || [] });
     }
 
+    // ─── ATTACH_PENDING_PHOTOS ───
+    // Attach uploaded photo rows to an existing pending_businesses record.
+    // Used after RPC insert_pending_business to guarantee business_photos rows are created server-side.
+    if (action === 'attach_pending_photos') {
+      const userId = body.userId || authUser.id;
+      const pendingId = body.pendingId;
+      const photos = Array.isArray(body.photos) ? body.photos : [];
+      if (!userId || !pendingId) return errorResponse('Missing userId or pendingId', 400);
+      if (photos.length === 0) return jsonResponse({ success: true, inserted: 0 });
+
+      const { data: pending, error: pendingErr } = await supabase
+        .from('pending_businesses')
+        .select('id, owner_id')
+        .eq('id', pendingId)
+        .single();
+      if (pendingErr || !pending) return errorResponse('Pending business not found', 404);
+      if (String(pending.owner_id) !== String(userId)) return errorResponse('Access denied', 403);
+
+      const validPhotos = photos.filter((p: any) => !!p?.url);
+      if (validPhotos.length === 0) return jsonResponse({ success: true, inserted: 0 });
+
+      // Replace existing rows for this pending listing to avoid duplicates on retries.
+      await supabase.from('business_photos').delete().eq('business_id', pendingId);
+
+      const photoRecords = validPhotos.map((p: any, i: number) => ({
+        business_id: pendingId,
+        url: p.url,
+        file_path: p.filePath || null,
+        uploaded_by: userId,
+        is_main: p.isMain ?? i === 0,
+        status: 'pending',
+      }));
+      const { error: insertErr } = await supabase.from('business_photos').insert(photoRecords);
+      if (insertErr) {
+        console.error('[manage-business] attach_pending_photos insert error:', insertErr);
+        return errorResponse('Failed to attach photos: ' + insertErr.message, 500);
+      }
+      return jsonResponse({ success: true, inserted: photoRecords.length });
+    }
+
     // ─── GET_PENDING_EDITS ───
     if (action === 'get_pending_edits') {
       const userId = body.userId || authUser.id;

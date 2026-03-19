@@ -280,20 +280,22 @@ const BusinessListingForm: React.FC = () => {
         const directData = { id: rpcId };
         if (directData.id && photos.length > 0) {
           try {
-            const photoRecords = photos.map((p, i) => ({
-              business_id: String(directData.id),
+            const photoData = photos.map((p, i) => ({
               url: p.url,
-              file_path: p.filePath,
-              uploaded_by: user.id,
-              is_main: i === 0,
-              status: 'pending',
+              filePath: p.filePath,
+              isMain: i === 0,
             }));
-            const { error: photoErr } = await supabase
-              .from('business_photos')
-              .insert(photoRecords);
-            if (photoErr) console.warn('[BusinessForm] Photo insert warning (non-blocking):', photoErr.message);
+            const { data: attachData, error: attachErr } = await invokeWithRetry('manage-business', {
+              action: 'attach_pending_photos',
+              userId: user.id,
+              pendingId: String(directData.id),
+              photos: photoData,
+            }, 2, 'attach_pending_photos');
+            if (attachErr || attachData?.error) {
+              throw new Error(attachData?.error || attachErr?.message || 'Failed to save photo rows');
+            }
           } catch (photoEx) {
-            console.warn('[BusinessForm] Photo insert exception (non-blocking):', photoEx);
+            throw photoEx;
           }
         }
         setSubmitted(true);
