@@ -48,9 +48,14 @@ This document describes the fixes applied to resolve core business lifecycle iss
 - **Admin Approval:** When admin approves a business, RPC now updates `business_photos` with `business_id = new_biz_id` and `status = 'approved'`
 - **Admin Photo Moderation:** Already implemented — approve/reject via `manage-business` (`approve_photo` / `reject_photo`)
 
-### Admin multi-photo display (fix for "only one photo visible")
-- **Grouping key:** Photos are grouped by `business_id` using a consistent string key (`String(photo.business_id)`) so lookup by `biz.id` matches.
-- **Per-card refetch:** When the pending list is shown, any business with no photos in state triggers a direct fetch for that `business_id` from `business_photos`, so all uploaded photos appear even if the initial bulk load missed them.
+### Admin multi-photo display — definitive fix ("only one photo visible")
+- **Root cause:** The Admin Panel was loading photos via a direct Supabase query. RLS on `business_photos` only allows admins to see all rows if the "Admins read all business_photos" policy exists *and* the user has `role = 'admin'` in `user_profiles`. Otherwise the client sees 0 rows for other users' pending photos, so the UI fell back to showing only the single cover image (`biz.image`).
+- **Fix:** Load photos via an RPC that **bypasses RLS** so the admin always gets all rows:
+  1. **Migration `20250311600000_get_business_photos_for_admin_rpc.sql`** — Adds `get_business_photos_for_admin()` (SECURITY DEFINER). It checks the caller is admin via `user_profiles`, then returns **all** rows from `business_photos`. Run this migration in the Supabase SQL Editor.
+  2. **AdminPanel** now tries, in order: (1) RPC `get_business_photos_for_admin`, (2) Edge Function `get_all_photos`, (3) direct query. So the RPC is used first and returns every photo for every pending listing.
+  3. **"Reload photos"** button in the Pending Business Approvals header refetches all photos via the same RPC-first flow.
+  4. When the gallery still fails to load (e.g. migration not run), the fallback message tells the admin to run the migration and use "Reload photos", with a per-card **"Retry load all photos (uses admin RPC)"** button.
+  5. **No `user_profiles` table needed:** The RPC checks admin by the **logged-in user’s email** (from `auth.users`). If your login email is one of `admin@stikmnek.com`, `testadmin@example.com`, or `stikmnek@gmail.com`, you are treated as admin. To add another admin, add their email to the list inside the RPC (see migration file) and re-run the function.
 
 ---
 

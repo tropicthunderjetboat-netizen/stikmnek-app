@@ -84,6 +84,8 @@ const AdminPanel: React.FC = () => {
   const [searchBiz, setSearchBiz] = useState('');
   const [pendingBusinesses, setPendingBusinesses] = useState<PendingBusiness[]>([]);
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, BusinessPhoto[]>>({});
+  const [rpcPhotoMap, setRpcPhotoMap] = useState<Record<string, BusinessPhoto[]>>({});
+  const [loadingRpcPhotos, setLoadingRpcPhotos] = useState(false);
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [processingPhotoId, setProcessingPhotoId] = useState<string | null>(null);
@@ -241,7 +243,7 @@ const AdminPanel: React.FC = () => {
       if (error) { if (pendingBusinesses.length === 0) toast.error('Could not load submissions.'); return; }
       if (data && data.length > 0) {
         setPendingBusinesses(data as PendingBusiness[]);
-        loadAllPhotosDirect();
+        loadAllPhotos(data as PendingBusiness[]);
         if (showToast) toast.success(`Loaded ${data.length} pending submission(s)`);
       } else {
         setPendingBusinesses([]);
@@ -250,44 +252,68 @@ const AdminPanel: React.FC = () => {
     } catch (err) { console.error('[Admin] Direct fallback failed:', err); }
   }, []);
 
-  const loadAllPhotos = async (businesses: PendingBusiness[]) => {
-    const groupPhotos = (photos: BusinessPhoto[]) => {
-      const grouped: Record<string, BusinessPhoto[]> = {};
-      for (const photo of photos) {
-        const key = String(photo.business_id ?? '');
-        if (!grouped[key]) grouped[key] = [];
-        grouped[key].push(photo);
-      }
-      return grouped;
-    };
+  const groupPhotosByBusinessId = useCallback((photos: BusinessPhoto[]) => {
+    const grouped: Record<string, BusinessPhoto[]> = {};
+    for (const photo of photos) {
+      const key = String(photo.business_id ?? '');
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(photo);
+    }
+    return grouped;
+  }, []);
 
-    // Strategy 1: Direct DB query (admin RLS allows reading all photos)
+  const loadPhotosFromAdminRpc = useCallback(async (businesses: PendingBusiness[]) => {
+    setLoadingRpcPhotos(true);
+    try {
+      const { data, error } = await supabase.rpc('get_business_photos_for_admin');
+      if (error) throw error;
+      const allPhotos = (Array.isArray(data) ? (data as BusinessPhoto[]) : []);
+      const grouped = groupPhotosByBusinessId(allPhotos);
+      setRpcPhotoMap(grouped);
+      setBusinessPhotos(grouped);
+      return true;
+    } catch (err) {
+      console.warn('[Admin] get_business_photos_for_admin RPC failed:', err);
+      return false;
+    } finally {
+      setLoadingRpcPhotos(false);
+    }
+  }, [groupPhotosByBusinessId]);
+
+  const loadAllPhotos = async (businesses: PendingBusiness[]) => {
+    // REQUIRED path: explicit RPC call
+    const rpcOk = await loadPhotosFromAdminRpc(businesses);
+    if (rpcOk) return;
+
+    // Fallback: Edge Function
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        body: { action: 'get_all_photos', userId: user?.id },
+      });
+      if (!error && data?.photos && Array.isArray(data.photos)) {
+        const grouped = groupPhotosByBusinessId(data.photos as BusinessPhoto[]);
+        setBusinessPhotos(grouped);
+        return;
+      }
+    } catch (err) {
+      console.warn('[Admin] get_all_photos failed:', err);
+    }
+
+    // Final fallback: direct query
     try {
       const { data, error } = await supabase
         .from('business_photos')
         .select('*')
         .order('created_at', { ascending: true });
-      if (!error && data && data.length > 0) {
-        setBusinessPhotos(groupPhotos(data as BusinessPhoto[]));
-        return;
-      }
-    } catch (err) {
-      console.warn('[Admin] Direct photo load failed:', err);
-    }
-
-    // Strategy 2: Edge Function fallback
-    try {
-      const { data, error } = await supabase.functions.invoke('manage-business', {
-        body: { action: 'get_all_photos', userId: user?.id },
-      });
-      if (!error && data?.photos && data.photos.length > 0) {
-        setBusinessPhotos(groupPhotos(data.photos));
+      if (!error && data && Array.isArray(data)) {
+        const grouped = groupPhotosByBusinessId(data as BusinessPhoto[]);
+        setBusinessPhotos(grouped);
       } else if (businesses.length > 0) {
         setBusinessPhotos({});
       }
     } catch (err) {
-      console.warn('[Admin] get_all_photos failed:', err);
-      setBusinessPhotos({});
+      console.warn('[Admin] Direct photo load failed:', err);
+      if (businesses.length > 0) setBusinessPhotos({});
     }
   };
 
@@ -346,6 +372,12 @@ const AdminPanel: React.FC = () => {
       if (!businessPhotos[key]?.length) loadPhotosForPendingId(key);
     });
   }, [pendingIdsKey, loadPhotosForPendingId]);
+
+  // Explicitly refresh admin photos from RPC whenever pending list changes
+  useEffect(() => {
+    if (!user || pendingBusinesses.length === 0) return;
+    loadPhotosFromAdminRpc(pendingBusinesses);
+  }, [user, pendingIdsKey, loadPhotosFromAdminRpc]);
 
   const editsLoadedRef = useRef(false);
   useEffect(() => {
@@ -1110,6 +1142,20 @@ const AdminPanel: React.FC = () => {
                   <RefreshCw className={`w-3.5 h-3.5 ${loadingPending ? 'animate-spin' : ''}`} />
                   {loadingPending ? 'Loading...' : 'Refresh'}
                 </button>
+                <button
+                  onClick={() => {
+                    if (pendingBusinesses.length > 0) {
+                      loadAllPhotos(pendingBusinesses);
+                      toast.info('Reloading all photos…');
+                    }
+                  }}
+                  disabled={pendingBusinesses.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  title="Reload photo gallery for all pending listings (bypasses cache)"
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  Reload photos
+                </button>
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-50 text-yellow-700 font-semibold">
                   <AlertCircle className="w-4 h-4" />
                   {pendingCount} Pending Business{pendingCount !== 1 ? 'es' : ''}
@@ -1137,7 +1183,13 @@ const AdminPanel: React.FC = () => {
             {pendingBusinesses.length > 0 ? (
               <div className="space-y-4">
                 {pendingBusinesses.map(biz => {
-                  const photos = businessPhotos[biz.id] || [];
+                  const photos = (rpcPhotoMap[String(biz.id)] || businessPhotos[String(biz.id)] || [])
+                    .filter(p => String(p.business_id) === String(biz.id))
+                    .sort((a, b) => {
+                      if (a.is_main && !b.is_main) return -1;
+                      if (!a.is_main && b.is_main) return 1;
+                      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                    });
                   const pendingPhotos = photos.filter(p => p.status === 'pending');
                   const approvedPhotos = photos.filter(p => p.status === 'approved');
                   const rejectedPhotos = photos.filter(p => p.status === 'rejected');
@@ -1177,7 +1229,27 @@ const AdminPanel: React.FC = () => {
 
                         <p className="text-sm text-gray-600 mb-4">{biz.description}</p>
 
-                        {/* ═══ ALL Uploaded Photos with Individual Approval ═══ */}
+                        {/* ═══ Uploaded Photos (RPC-driven, individual moderation) ═══ */}
+                        <div className="mb-4 p-3 rounded-lg border border-gray-200 bg-gray-50">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                              <ImageIcon className="w-4 h-4 text-gray-500" />
+                              Uploaded Photos
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => loadPhotosFromAdminRpc(pendingBusinesses)}
+                              className="text-xs px-2.5 py-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-100 flex items-center gap-1"
+                            >
+                              <RefreshCw className={`w-3 h-3 ${loadingRpcPhotos ? 'animate-spin' : ''}`} />
+                              {loadingRpcPhotos ? 'Loading...' : 'Reload from RPC'}
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Showing {photos.length} photo{photos.length === 1 ? '' : 's'} from `get_business_photos_for_admin`.
+                          </p>
+                        </div>
+
                         {photos.length > 0 && (
                           <div className="mb-4">
                             <div className="flex items-center justify-between mb-3">
@@ -1320,12 +1392,12 @@ const AdminPanel: React.FC = () => {
                         )}
 
 
-                        {/* Show single image fallback if no photos in business_photos but biz.image exists */}
+                        {/* Fallback: only cover image when gallery could not be loaded (e.g. RLS or RPC not run) */}
                         {photos.length === 0 && biz.image && (
                           <div className="mb-4">
-                            <p className="text-[10px] text-gray-400 font-medium uppercase mb-2 flex items-center gap-1">
-                              <ImageIcon className="w-3 h-3" />
-                              Uploaded Photo
+                            <p className="text-xs text-amber-700 font-medium mb-2 flex items-center gap-2">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              Gallery could not be loaded — showing cover only. Run the &quot;get_business_photos_for_admin&quot; migration and click Reload photos above.
                             </p>
                             <div className="relative rounded-xl overflow-hidden w-full max-w-sm border border-gray-200">
                               <img
@@ -1337,6 +1409,14 @@ const AdminPanel: React.FC = () => {
                                 }}
                               />
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => loadAllPhotos(pendingBusinesses)}
+                              className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium hover:bg-amber-100"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              Retry load all photos (uses admin RPC)
+                            </button>
                           </div>
                         )}
 
