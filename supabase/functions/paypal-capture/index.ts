@@ -28,6 +28,14 @@ function errorResponse(message: string, status = 400) {
   return jsonResponse({ success: false, error: message }, status);
 }
 
+function passTypeToBrandDisplay(passType: string): string {
+  const t = String(passType ?? '').toLowerCase().trim();
+  if (t === 'daily') return 'Family Explorer Pass';
+  if (t === 'weekly') return 'Extended Group Adventure Pass';
+  if (t === 'monthly') return 'Ultimate Crew Experience Pass';
+  return 'StikmNek Pass';
+}
+
 async function sendReceiptEmail(params: {
   toEmail: string;
   toName?: string | null;
@@ -47,14 +55,7 @@ async function sendReceiptEmail(params: {
   const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
   const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
 
-  const passLabel =
-    params.passType === 'daily'
-      ? 'Family Explorer Pass (1 day)'
-      : params.passType === 'weekly'
-        ? 'Extended Group Adventure Pass (6 days)'
-        : params.passType === 'monthly'
-          ? 'Ultimate Crew Experience Pass (6 days)'
-          : params.passType;
+  const passLabel = passTypeToBrandDisplay(params.passType);
 
   const subject = `StikmNek receipt — ${passLabel}`;
   const html = `

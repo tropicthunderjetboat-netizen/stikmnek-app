@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import { getPassDisplayTitle } from '@/data/pricing';
 import { QrCode, X, Calendar, Shield, Ticket, Copy, Check, ChevronUp } from 'lucide-react';
 
 const FloatingPassButton: React.FC = () => {
-  const { user, currentView } = useAppContext();
+  const { user, currentView, language } = useAppContext();
   const [showPass, setShowPass] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pulseAnim, setPulseAnim] = useState(true);
@@ -42,6 +43,7 @@ const FloatingPassButton: React.FC = () => {
   };
 
   const colors = passColors[user.pass] || passColors.weekly;
+  const passTitle = getPassDisplayTitle(user.pass, language);
 
   // Generate QR code data
   const qrPayload = JSON.stringify({
@@ -105,7 +107,7 @@ const FloatingPassButton: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-extrabold text-lg">StikmNek Pass</h3>
-                    <p className="text-white/80 text-xs capitalize">{user.pass} Pass</p>
+                    <p className="text-white/80 text-xs leading-snug">{passTitle}</p>
                   </div>
                 </div>
                 <button
@@ -163,7 +165,7 @@ const FloatingPassButton: React.FC = () => {
                     <Ticket className="w-4 h-4 text-teal-600" />
                     <span className="text-xs text-gray-500">Pass Type</span>
                   </div>
-                  <span className="text-sm font-bold text-gray-900 capitalize">{user.pass} Pass</span>
+                  <span className="text-sm font-bold text-gray-900 text-right leading-snug">{passTitle}</span>
                 </div>
               </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import { getPassDisplayTitle } from '@/data/pricing';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
@@ -92,6 +93,15 @@ interface QRScannerProps {
 // ═══ PASS TIER STYLING ═══
 const getPassTierConfig = (passType: string) => {
   const type = (passType || '').toLowerCase();
+  if (type === 'daily') {
+    return { gradient: 'from-sky-500 to-blue-600', bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-800', badge: 'bg-gradient-to-r from-sky-500 to-blue-600', icon: <Zap className="w-4 h-4" />, label: getPassDisplayTitle('daily', 'en') };
+  }
+  if (type === 'weekly') {
+    return { gradient: 'from-teal-500 to-emerald-600', bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-800', badge: 'bg-gradient-to-r from-teal-500 to-emerald-600', icon: <Star className="w-4 h-4" />, label: getPassDisplayTitle('weekly', 'en') };
+  }
+  if (type === 'monthly') {
+    return { gradient: 'from-orange-500 to-amber-600', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', badge: 'bg-gradient-to-r from-orange-500 to-amber-600', icon: <Crown className="w-4 h-4" />, label: getPassDisplayTitle('monthly', 'en') };
+  }
   if (type.includes('gold') || type.includes('premium') || type.includes('vip')) {
     return { gradient: 'from-yellow-400 via-amber-500 to-yellow-600', bg: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-800', badge: 'bg-gradient-to-r from-yellow-400 to-amber-500', icon: <Crown className="w-4 h-4" />, label: 'GOLD' };
   }
@@ -101,8 +111,7 @@ const getPassTierConfig = (passType: string) => {
   if (type.includes('bronze') || type.includes('basic')) {
     return { gradient: 'from-orange-400 via-amber-600 to-orange-700', bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-800', badge: 'bg-gradient-to-r from-orange-400 to-amber-600', icon: <Star className="w-4 h-4" />, label: 'BRONZE' };
   }
-  // Default tier
-  return { gradient: 'from-teal-400 via-emerald-500 to-teal-600', bg: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-800', badge: 'bg-gradient-to-r from-teal-500 to-emerald-500', icon: <Ticket className="w-4 h-4" />, label: type.toUpperCase() || 'PASS' };
+  return { gradient: 'from-teal-400 via-emerald-500 to-teal-600', bg: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-800', badge: 'bg-gradient-to-r from-teal-500 to-emerald-500', icon: <Ticket className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
 };
 
 // ═══ FAILURE REASON CONFIG ═══
@@ -532,9 +541,9 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
             <p className="text-green-100 text-sm font-medium">Discount successfully applied</p>
 
             {/* Pass tier badge */}
-            <div className="inline-flex items-center gap-1.5 mt-3 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-sm border border-white/30">
-              <span className="text-white">{tierConfig.icon}</span>
-              <span className="text-white text-xs font-bold tracking-wider">{r.passType.toUpperCase()} PASS</span>
+            <div className="inline-flex items-center gap-1.5 mt-3 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 max-w-[90%]">
+              <span className="text-white shrink-0">{tierConfig.icon}</span>
+              <span className="text-white text-xs font-bold text-center leading-tight">{getPassDisplayTitle(r.passType, 'en')}</span>
             </div>
           </div>
         </div>
@@ -696,7 +705,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
                   <Ticket className={`w-5 h-5 ${failConfig.color}`} />
                   <div>
                     <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Pass Type</p>
-                    <p className="text-sm font-bold text-gray-900 capitalize">{result.passType} Pass</p>
+                    <p className="text-sm font-bold text-gray-900 leading-snug">{getPassDisplayTitle(result.passType, 'en')}</p>
                   </div>
                   {result.status && (
                     <span className={`ml-auto px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase ${

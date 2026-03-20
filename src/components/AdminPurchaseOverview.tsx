@@ -11,6 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area, LineChart, Line
 } from 'recharts';
+import { PASS_PRODUCTS } from '@/data/pricing';
 
 interface PassPurchase {
   id: string;
@@ -42,9 +43,9 @@ const PASS_COLORS: Record<string, string> = {
 };
 
 const PASS_LABELS: Record<string, string> = {
-  daily: 'Family Explorer',
-  weekly: 'Group Adventure',
-  monthly: 'Crew Experience',
+  daily: PASS_PRODUCTS.daily.title,
+  weekly: PASS_PRODUCTS.weekly.title,
+  monthly: PASS_PRODUCTS.monthly.title,
 };
 
 const PASS_PRICES: Record<string, number> = {
@@ -220,7 +221,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
   const pieData = revenueByType
     .filter(r => r.value > 0)
     .map(r => ({
-      name: r.shortName,
+      name: r.name,
       value: r.value,
       color: r.color,
       count: r.count,
@@ -555,9 +556,9 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
                 <ShoppingBag className="w-4 h-4 text-indigo-600" />
-                Daily Pass Sales
+                Pass sales by day
               </h3>
-              <p className="text-xs text-gray-400 mb-4">Number of passes sold per day by type</p>
+              <p className="text-xs text-gray-400 mb-4">Number of passes sold per day (by product)</p>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={formattedTrendData.slice(-14)}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -566,16 +567,16 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
                   <Tooltip
                     contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }}
                   />
-                  <Bar dataKey="daily" name="Daily" fill={PASS_COLORS.daily} radius={[4, 4, 0, 0]} stackId="stack" />
-                  <Bar dataKey="weekly" name="Weekly" fill={PASS_COLORS.weekly} radius={[0, 0, 0, 0]} stackId="stack" />
-                  <Bar dataKey="monthly" name="Monthly" fill={PASS_COLORS.monthly} radius={[4, 4, 0, 0]} stackId="stack" />
+                  <Bar dataKey="daily" name={PASS_PRODUCTS.daily.title} fill={PASS_COLORS.daily} radius={[4, 4, 0, 0]} stackId="stack" />
+                  <Bar dataKey="weekly" name={PASS_PRODUCTS.weekly.title} fill={PASS_COLORS.weekly} radius={[0, 0, 0, 0]} stackId="stack" />
+                  <Bar dataKey="monthly" name={PASS_PRODUCTS.monthly.title} fill={PASS_COLORS.monthly} radius={[4, 4, 0, 0]} stackId="stack" />
                 </BarChart>
               </ResponsiveContainer>
               <div className="flex items-center gap-4 mt-3">
                 {Object.entries(PASS_COLORS).map(([type, color]) => (
                   <div key={type} className="flex items-center gap-1.5">
                     <div className="w-3 h-3 rounded" style={{ backgroundColor: color }} />
-                    <span className="text-[11px] text-gray-500 capitalize">{type}</span>
+                    <span className="text-[11px] text-gray-600 leading-tight">{PASS_LABELS[type] ?? type}</span>
                   </div>
                 ))}
               </div>
@@ -649,15 +650,15 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
           <div className="flex items-center justify-center gap-3 mt-6">
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-semibold">
               <CreditCard className="w-3.5 h-3.5" />
-              Daily Pass: $15
+              {PASS_PRODUCTS.daily.title}: ${PASS_PRODUCTS.daily.priceAUD}
             </div>
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-50 text-purple-700 text-xs font-semibold">
               <CreditCard className="w-3.5 h-3.5" />
-              Weekly Pass: $45
+              {PASS_PRODUCTS.weekly.title}: ${PASS_PRODUCTS.weekly.priceAUD}
             </div>
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 text-amber-700 text-xs font-semibold">
               <CreditCard className="w-3.5 h-3.5" />
-              Monthly Pass: $99
+              {PASS_PRODUCTS.monthly.title}: ${PASS_PRODUCTS.monthly.priceAUD}
             </div>
           </div>
         </div>

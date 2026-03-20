@@ -32,9 +32,9 @@ export const translations: Record<string, Record<Language, string>> = {
   // Passes
   'pass.title': { en: 'Choose Your Pass', fr: 'Choisissez votre pass', bi: 'Jusem Pas Blong Yu' },
   'pass.subtitle': { en: 'Unlock exclusive deals across Vanuatu', fr: 'Débloquez des offres exclusives à travers le Vanuatu', bi: 'Openem ekslusiv dils long Vanuatu' },
-  'pass.daily': { en: 'Day Pass', fr: 'Pass Journalier', bi: 'Dei Pas' },
-  'pass.weekly': { en: 'Week Pass', fr: 'Pass Hebdomadaire', bi: 'Wik Pas' },
-  'pass.monthly': { en: 'Month Pass', fr: 'Pass Mensuel', bi: 'Mant Pas' },
+  'pass.daily': { en: 'Family Explorer Pass', fr: 'Pass Explorateur Familial', bi: 'Famili Eksplora Pas' },
+  'pass.weekly': { en: 'Extended Group Adventure Pass', fr: 'Pass Aventure Groupe Étendu', bi: 'Grup Advenija Pas' },
+  'pass.monthly': { en: 'Ultimate Crew Experience Pass', fr: 'Pass Expérience Ultime Équipe', bi: 'Ultimet Kru Eksperiens Pas' },
   'pass.popular': { en: 'Most Popular', fr: 'Le plus populaire', bi: 'Mos Populer' },
   'pass.buy': { en: 'Buy Now', fr: 'Acheter', bi: 'Baem Nao' },
   'pass.feature1': { en: 'Access all deals', fr: 'Accès à toutes les offres', bi: 'Akses olgeta dils' },

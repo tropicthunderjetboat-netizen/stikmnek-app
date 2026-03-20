@@ -7,7 +7,7 @@ import {
   CalendarRange, Users, Share2, Gift, Baby, Sparkles, PartyPopper
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { PASS_PRODUCTS } from '@/data/pricing';
+import { PASS_PRODUCTS, getPassDisplayTitle } from '@/data/pricing';
 
 interface PaymentResult {
   receiptNumber: string;
@@ -28,12 +28,6 @@ interface PaymentResult {
   shareBonusApplied?: boolean;
   peopleCount?: number;
 }
-
-const PASS_LABELS: Record<string, string> = {
-  daily: PASS_PRODUCTS.daily.title,
-  weekly: PASS_PRODUCTS.weekly.title,
-  monthly: PASS_PRODUCTS.monthly.title,
-};
 
 const PASS_GROUPS: Record<string, string> = {
   daily: `Up to ${PASS_PRODUCTS.daily.basePeople} people`,
@@ -227,6 +221,7 @@ const ShareCTA: React.FC<{
   userId: string;
   onBonusApplied?: (bonus: ShareBonusApplied) => void;
 }> = ({ passType, userId, onBonusApplied }) => {
+  const { language } = useAppContext();
   const [shareState, setShareState] = useState<'idle' | 'sharing' | 'success' | 'already-claimed' | 'error'>(() => {
     try {
       const stored = localStorage.getItem('stikmnek-shared-passes');
@@ -327,7 +322,7 @@ const ShareCTA: React.FC<{
     
     setShareState('sharing');
 
-    const passLabel = PASS_LABELS[passType] || passType;
+    const passLabel = getPassDisplayTitle(passType, language);
     const shareData = {
       title: `StikmNek - ${passLabel}`,
       text: `Check out StikmNek! Get amazing deals in Vanuatu with the ${passLabel}. ${bonus.description}`,
@@ -594,7 +589,7 @@ function addDaysToDate(dateStr: string | undefined, days: number): string {
 
 // ─── Main PaymentConfirmation Component ───
 const PaymentConfirmation: React.FC = () => {
-  const { user, setCurrentView } = useAppContext();
+  const { user, setCurrentView, language } = useAppContext();
   const [payment, setPayment] = useState<PaymentResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -698,7 +693,7 @@ const PaymentConfirmation: React.FC = () => {
     );
   }
 
-  const passLabel = payment.passLabel || PASS_LABELS[payment.passType] || `${payment.passType} Pass`;
+  const passLabel = payment.passLabel || getPassDisplayTitle(payment.passType, language);
   const passGroup = payment.group || PASS_GROUPS[payment.passType] || '';
   const shareBonusApplied = payment.shareBonusApplied ?? false;
   const peopleCount = payment.peopleCount ?? (payment.passType && PASS_PRODUCTS[payment.passType as keyof typeof PASS_PRODUCTS] ? PASS_PRODUCTS[payment.passType as keyof typeof PASS_PRODUCTS].basePeople : 4);

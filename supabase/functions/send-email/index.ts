@@ -25,6 +25,15 @@ function errorResponse(message: string, status = 400) {
   return jsonResponse({ success: false, error: message }, status);
 }
 
+/** StikmNek branded pass names (DB keys: daily | weekly | monthly — never show raw keys to users). */
+function passTypeToBrandDisplay(passType: unknown): string {
+  const t = String(passType ?? '').toLowerCase().trim();
+  if (t === 'daily') return 'Family Explorer Pass';
+  if (t === 'weekly') return 'Extended Group Adventure Pass';
+  if (t === 'monthly') return 'Ultimate Crew Experience Pass';
+  return 'StikmNek Pass';
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -150,14 +159,7 @@ Deno.serve(async (req) => {
         return errorResponse('Missing user_email');
       }
 
-      const passLabel =
-        pass_type === 'daily'
-          ? 'Family Explorer Pass (1 day)'
-          : pass_type === 'weekly'
-            ? 'Extended Group Adventure Pass (6 days)'
-            : pass_type === 'monthly'
-              ? 'Ultimate Crew Experience Pass (6 days)'
-              : pass_type || 'Pass';
+      const passLabel = passTypeToBrandDisplay(pass_type);
 
       const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
       const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';

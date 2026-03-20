@@ -103,6 +103,24 @@ export function getPassTitle(passType: PassType, lang: 'en' | 'fr' | 'bi' = 'en'
   return lang === 'fr' ? p.titleFr : lang === 'bi' ? p.titleBi : p.title;
 }
 
+/**
+ * Safe display title for any string coming from DB / API (`daily` | `weekly` | `monthly`).
+ * Never surfaces raw keys like "monthly" to users — unknown values fall back to generic StikmNek Pass.
+ */
+export function getPassDisplayTitle(
+  passType: string | null | undefined,
+  lang: 'en' | 'fr' | 'bi' = 'en'
+): string {
+  if (passType == null || String(passType).trim() === '') {
+    return lang === 'fr' ? 'Pass StikmNek' : lang === 'bi' ? 'StikmNek Pas' : 'StikmNek Pass';
+  }
+  const key = String(passType).toLowerCase().trim();
+  if (key === 'daily' || key === 'weekly' || key === 'monthly') {
+    return getPassTitle(key, lang);
+  }
+  return lang === 'fr' ? 'Pass StikmNek' : lang === 'bi' ? 'StikmNek Pas' : 'StikmNek Pass';
+}
+
 export function getPassPrice(passType: PassType): number {
   return PASS_PRODUCTS[passType]?.priceAUD ?? 0;
 }

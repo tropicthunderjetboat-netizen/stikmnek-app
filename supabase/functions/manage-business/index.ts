@@ -592,22 +592,51 @@ Deno.serve(async (req) => {
     if (action === 'respond_to_review') {
       const reviewId = body.reviewId;
       const businessId = body.businessId;
-      const response = body.response || '';
+      const response = (body.response || '').trim();
 
-      if (!reviewId || !businessId || !response.trim()) {
+      if (!reviewId || !businessId || !response) {
         return errorResponse('Missing reviewId, businessId, or response');
       }
 
+      const { data: business, error: bizErr } = await supabase
+        .from('businesses')
+        .select('id, owner_id')
+        .eq('id', businessId)
+        .maybeSingle();
+      if (bizErr || !business) {
+        return errorResponse('Business not found', 404);
+      }
+      if (String(business.owner_id) !== String(authUser.id)) {
+        return errorResponse('Only the business owner can respond to reviews', 403);
+      }
+
+      const { data: review, error: revErr } = await supabase
+        .from('reviews')
+        .select('id, business_id')
+        .eq('id', reviewId)
+        .maybeSingle();
+      if (revErr || !review) {
+        return errorResponse('Review not found', 404);
+      }
+      if (String(review.business_id) !== String(businessId)) {
+        return errorResponse('Review does not belong to this business', 400);
+      }
+
+      const row = {
+        review_id: reviewId,
+        business_id: businessId,
+        user_id: authUser.id,
+        response,
+      };
+
       const { error } = await supabase
         .from('review_responses')
-        .insert({
-          review_id: reviewId,
-          business_id: businessId,
-          user_id: authUser.id,
-          response: response.trim(),
-        });
+        .upsert(row, { onConflict: 'review_id' });
 
-      if (error) return errorResponse(error.message, 500);
+      if (error) {
+        console.error('[manage-business] respond_to_review upsert error:', error);
+        return errorResponse(error.message, 500);
+      }
       return jsonResponse({ success: true });
     }
 

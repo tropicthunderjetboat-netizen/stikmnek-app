@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import { getPassDisplayTitle } from '@/data/pricing';
 import { t } from '@/data/translations';
 import { businesses as localBusinesses } from '@/data/businesses';
 import {
@@ -226,7 +227,7 @@ const Dashboard: React.FC = () => {
                             <span className="text-white/80 text-sm font-medium uppercase tracking-wider">StikmNek Pass</span>
                             <QrCode className="w-6 h-6 text-white/80" />
                           </div>
-                          <h4 className="text-2xl font-bold mb-1 capitalize">{user.pass} Pass</h4>
+                          <h4 className="text-2xl font-bold mb-1 leading-snug">{user.pass ? getPassDisplayTitle(user.pass, language) : ''}</h4>
                           <div className="flex items-center gap-4 text-sm text-white/80">
                             <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{language === 'en' ? 'Expires: ' : 'Expire: '}{user.passExpiry}</span>
                           </div>

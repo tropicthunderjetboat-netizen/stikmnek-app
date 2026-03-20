@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { getBasePeople, getShareBonusTotalPeople } from '@/data/pricing';
+import { getBasePeople, getShareBonusTotalPeople, getPassDisplayTitle } from '@/data/pricing';
 import { QrCode, Calendar, Shield, Ticket, Copy, Check } from 'lucide-react';
 
 const QRCodeDisplay: React.FC = () => {
-  const { user } = useAppContext();
+  const { user, language } = useAppContext();
   const [copied, setCopied] = React.useState(false);
 
   // Generate the QR code data payload (includes maxPeople for scanner to validate capacity)
@@ -67,7 +67,8 @@ const QRCodeDisplay: React.FC = () => {
             </div>
             <div>
               <h3 className="font-bold text-lg">Your Pass QR Code</h3>
-              <p className="text-white/80 text-xs">Show this to businesses to redeem discounts</p>
+              <p className="text-white/90 text-xs font-semibold leading-snug">{getPassDisplayTitle(user.pass, language)}</p>
+              <p className="text-white/75 text-[11px] mt-0.5">Show this to businesses to redeem discounts</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-xs font-bold">

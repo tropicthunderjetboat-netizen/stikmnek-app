@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, QrCode, Share2, X, MessageSquarePlus, Sparkles, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, QrCode, Share2, X, MessageSquarePlus, Sparkles, ExternalLink, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import ReviewForm from '@/components/ReviewForm';
 import PhotoGallery from '@/components/PhotoGallery';
 import { formatVT } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+
+type ReviewResponseRow = { review_id: string; response: string; created_at: string };
 
 // WhatsApp SVG icon component
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
@@ -41,12 +44,36 @@ const BusinessDetail: React.FC = () => {
   } = useAppContext();
   const [showQR, setShowQR] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewResponsesById, setReviewResponsesById] = useState<Record<string, ReviewResponseRow>>({});
 
   if (!selectedBusiness) return null;
 
   const biz = selectedBusiness;
   const isFav = favorites.includes(biz.id);
-  const reviews = dbReviews.filter(r => r.business_id === biz.id);
+  const reviews = useMemo(() => dbReviews.filter(r => r.business_id === biz.id), [dbReviews, biz.id]);
+
+  useEffect(() => {
+    if (reviews.length === 0) {
+      setReviewResponsesById({});
+      return;
+    }
+    const ids = reviews.map(r => r.id);
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('review_responses')
+        .select('review_id, response, created_at')
+        .in('review_id', ids)
+        .order('created_at', { ascending: false });
+      if (error || cancelled) return;
+      const map: Record<string, ReviewResponseRow> = {};
+      (data || []).forEach((row: ReviewResponseRow) => {
+        if (!map[row.review_id]) map[row.review_id] = row;
+      });
+      if (!cancelled) setReviewResponsesById(map);
+    })();
+    return () => { cancelled = true; };
+  }, [biz.id, reviews]);
   const desc = language === 'fr' ? biz.descriptionFr : language === 'bi' ? biz.descriptionBi : biz.description;
   const hasWhatsApp = !!biz.whatsappNumber;
 
@@ -328,11 +355,11 @@ const BusinessDetail: React.FC = () => {
                           ? 'bg-gradient-to-br from-purple-500 to-violet-600'
                           : 'bg-gradient-to-br from-teal-500 to-emerald-500'
                       }`}>
-                        {review.user_name.split(' ').map(w => w[0]).join('').slice(0, 2)}
+                        {(review.user_name || '?').split(' ').map(w => w[0]).join('').slice(0, 2)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                          <span className="font-semibold text-sm text-gray-900">{review.user_name}</span>
+                          <span className="font-semibold text-sm text-gray-900">{review.user_name || 'Anonymous'}</span>
                           <div className="flex items-center gap-0.5">
                             {Array.from({ length: 5 }).map((_, i) => (
                               <Star
@@ -357,6 +384,17 @@ const BusinessDetail: React.FC = () => {
                           <span className="text-xs text-gray-400">{new Date(review.created_at).toLocaleDateString()}</span>
                         </div>
                         <p className="text-sm text-gray-600 leading-relaxed">{review.comment}</p>
+                        {reviewResponsesById[review.id] && (
+                          <div className="mt-3 rounded-xl border border-teal-100 bg-gradient-to-r from-teal-50/90 to-emerald-50/50 px-3 py-2.5">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Store className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                              <span className="text-[10px] font-bold text-teal-800 uppercase tracking-wide">
+                                {language === 'en' ? 'Response from business' : language === 'fr' ? 'Réponse de l\'établissement' : 'Bisnis i talem'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-teal-900 leading-relaxed whitespace-pre-wrap">{reviewResponsesById[review.id].response}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

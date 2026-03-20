@@ -633,21 +633,35 @@ const BusinessOwnerDashboard: React.FC = () => {
 
   useEffect(() => { loadPendingEdits(); }, [loadPendingEdits]);
 
-  // Load review responses
+  const loadReviewResponses = useCallback(async () => {
+    if (!selectedBusiness?.id || !selectedIsApproved) return;
+    try {
+      const { data, error } = await supabase
+        .from('review_responses')
+        .select('id, review_id, response, created_at')
+        .eq('business_id', selectedBusiness.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const byReview = new Map<string, ReviewResponse>();
+      (data || []).forEach((row: { id: string; review_id: string; response: string; created_at: string }) => {
+        if (!byReview.has(row.review_id)) {
+          byReview.set(row.review_id, {
+            id: row.id,
+            review_id: row.review_id,
+            response: row.response,
+            created_at: row.created_at,
+          });
+        }
+      });
+      setReviewResponses(Array.from(byReview.values()));
+    } catch (err) {
+      console.error('Failed to load review responses:', err);
+    }
+  }, [selectedBusiness?.id, selectedIsApproved]);
+
   useEffect(() => {
-    const loadResponses = async () => {
-      if (!selectedBusiness || !selectedIsApproved) return;
-      try {
-        const { data } = await supabase.functions.invoke('manage-business', {
-          body: { action: 'get_analytics', businessId: selectedBusiness.id, userId: user?.id },
-        });
-        if (data?.responses) setReviewResponses(data.responses);
-      } catch (err) {
-        console.error('Failed to load responses:', err);
-      }
-    };
-    loadResponses();
-  }, [selectedBusiness, selectedIsApproved]);
+    void loadReviewResponses();
+  }, [loadReviewResponses]);
 
   // Load gallery photos
   useEffect(() => {
@@ -778,16 +792,22 @@ const BusinessOwnerDashboard: React.FC = () => {
   };
 
   const handleRespondToReview = async (reviewId: string) => {
-    if (!selectedBusiness || !responseText[reviewId]?.trim()) return;
+    if (!selectedBusiness || !user || !responseText[reviewId]?.trim()) return;
     try {
-      await supabase.functions.invoke('manage-business', {
-        body: { action: 'respond_to_review', userId: user?.id, reviewId, businessId: selectedBusiness.id, response: responseText[reviewId] },
+      const { data, error } = await invokeWithRetry('manage-business', {
+        action: 'respond_to_review',
+        userId: user.id,
+        reviewId,
+        businessId: selectedBusiness.id,
+        response: responseText[reviewId],
       });
-      setReviewResponses(prev => [...prev, { id: Date.now().toString(), review_id: reviewId, response: responseText[reviewId], created_at: new Date().toISOString() }]);
+      if (error) throw error instanceof Error ? error : new Error(String(error?.message || error));
+      if (data?.error) throw new Error(data.error);
       setResponseText(prev => ({ ...prev, [reviewId]: '' }));
       toast.success('Response posted!');
+      await loadReviewResponses();
     } catch (err: any) {
-      toast.error('Failed to post response');
+      toast.error(err?.message || 'Failed to post response');
     }
   };
 
