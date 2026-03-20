@@ -16,6 +16,7 @@ async function invokeWithRetry(
   label = ''
 ): Promise<{ data: any; error: any }> {
   let lastError: any = null;
+  let lastData: any = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       if (attempt > 0) {
@@ -33,11 +34,13 @@ async function invokeWithRetry(
       });
       if (result.error) {
         lastError = result.error;
+        lastData = result.data ?? lastData; // keep response body from non-2xx
         console.warn(`[BusinessForm] ${label} Edge function error:`, result.error.message || result.error);
         continue;
       }
       if (result.data?.error) {
         lastError = new Error(result.data.error);
+        lastData = result.data;
         console.warn(`[BusinessForm] ${label} Server error:`, result.data.error);
         continue;
       }
@@ -47,7 +50,7 @@ async function invokeWithRetry(
       console.warn(`[BusinessForm] ${label} attempt ${attempt} threw:`, err.message);
     }
   }
-  return { data: null, error: lastError };
+  return { data: lastData, error: lastError };
 }
 
 const DURATION_OPTIONS = [

@@ -39,10 +39,10 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-    // CRITICAL: Service role key must be set — Supabase auto-injects it for Edge Functions.
-    // If empty, the client would not bypass RLS. Check Edge Functions → manage-business → Secrets.
-    if (!supabaseServiceKey || supabaseServiceKey.length < 50) {
-      console.error('[manage-business] SUPABASE_SERVICE_ROLE_KEY is missing or invalid');
+    // SUPABASE_SERVICE_ROLE_KEY is a reserved secret in Supabase and is auto-injected at runtime.
+    // Do not enforce arbitrary length checks here; just ensure it exists.
+    if (!supabaseServiceKey) {
+      console.error('[manage-business] SUPABASE_SERVICE_ROLE_KEY is missing');
       return errorResponse('Server configuration error: missing service role key', 500);
     }
     if (!supabaseUrl) {

@@ -86,6 +86,53 @@ export interface DBReview {
   has_super_star?: boolean;
 }
 
+// ─── Review list helpers (module scope: stable for loadReviews / realtime) ───
+
+/** Normalize DB / realtime / PostgREST row so list state stays consistent */
+export function reviewRowToDBReview(row: Record<string, unknown> | null | undefined): DBReview | null {
+  if (!row || row.id == null) return null;
+  const hasSuper = !!(row.has_super_star);
+  const rawRating = Number(row.rating);
+  const displayRating = hasSuper && rawRating === 5 ? 6 : rawRating;
+  return {
+    id: String(row.id),
+    business_id: String(row.business_id),
+    user_name: (row.user_name != null && String(row.user_name).trim()) ? String(row.user_name).trim() : 'Anonymous',
+    rating: displayRating,
+    comment: row.comment != null ? String(row.comment) : '',
+    created_at: row.created_at != null ? String(row.created_at) : new Date().toISOString(),
+    has_super_star: hasSuper,
+  };
+}
+
+function reviewFingerprint(r: DBReview): string {
+  const createdDate = r.created_at ? String(r.created_at).slice(0, 10) : '';
+  const name = (r.user_name || 'Anonymous').trim().toLowerCase();
+  const cmt = (r.comment || '').trim();
+  const ratingKey = r.has_super_star ? 'super' : String(r.rating);
+  return `fp:${r.business_id}|${name}|${ratingKey}|${cmt}|${createdDate}`;
+}
+
+export function dedupeReviewsList(list: DBReview[]): DBReview[] {
+  const out: DBReview[] = [];
+  const seenId = new Set<string>();
+  const seenFp = new Set<string>();
+
+  for (const r of list) {
+    const idKey = r?.id ? `id:${String(r.id)}` : '';
+    const fpKey = reviewFingerprint(r);
+
+    if (idKey && seenId.has(idKey)) continue;
+    if (seenFp.has(fpKey)) continue;
+
+    if (idKey) seenId.add(idKey);
+    seenFp.add(fpKey);
+    out.push(r);
+  }
+
+  return out;
+}
+
 interface AppContextType {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
@@ -275,20 +322,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .order('created_at', { ascending: false });
       if (error) throw error;
       if (data) {
-        setDbReviews(data.map((r: any) => ({
-          id: r.id,
-          business_id: r.business_id,
-          user_name: r.user_name || 'Anonymous',
-          rating: r.rating,
-          comment: r.comment,
-          created_at: r.created_at,
-          has_super_star: r.has_super_star || false,
-        })));
+        const mapped = data
+          .map((r: Record<string, unknown>) => reviewRowToDBReview(r))
+          .filter(Boolean) as DBReview[];
+        setDbReviews(dedupeReviewsList(mapped));
       }
     } catch (err) {
       console.error('Failed to load reviews:', err);
     }
   }, []);
+
+  /** Always call latest loadReviews from realtime (avoids stale useEffect closures) */
+  const loadReviewsRef = useRef(loadReviews);
+  loadReviewsRef.current = loadReviews;
 
   const loadFavorites = useCallback(async (userId: string) => {
     try {
@@ -829,24 +875,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [showAuth, user]);
 
-  // Realtime subscriptions for reviews
+  // Realtime: refetch reviews instead of merging payload — merging raced with loadReviews()
+  // after submit and could still show duplicates when ids/shapes differ slightly.
   useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleReload = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        void loadReviewsRef.current?.();
+      }, 120);
+    };
+
     const channel = supabase
-      .channel('realtime-reviews')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reviews' }, (payload) => {
-        const r = payload.new as any;
-        setDbReviews(prev => [{
-          id: r.id,
-          business_id: r.business_id,
-          user_name: r.user_name || 'Anonymous',
-          rating: r.rating,
-          comment: r.comment,
-          created_at: r.created_at,
-          has_super_star: r.has_super_star || false,
-        }, ...prev]);
-      })
+      .channel('realtime-reviews-refetch')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, scheduleReload)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   // Realtime subscriptions for businesses
@@ -1154,20 +1203,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      let data: any;
-
       if (isSuperStar || rating === 6) {
         // Superstar: use RPC (atomic decrement credit + insert)
-        const { data: rpcData, error } = await supabase.rpc('submit_superstar_review', {
+        const { error } = await supabase.rpc('submit_superstar_review', {
           p_business_id: businessId,
           p_user_name: user.name,
           p_comment: comment,
         });
         if (error) throw error;
-        data = rpcData;
       } else {
         // Standard 1-5: direct insert
-        const { data: insertData, error } = await supabase
+        const { error } = await supabase
           .from('reviews')
           .insert({
             business_id: businessId,
@@ -1181,23 +1227,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .select()
           .single();
         if (error) throw error;
-        data = insertData;
       }
 
-      const newReview: DBReview = {
-        id: data?.id || `temp-${Date.now()}`,
-        business_id: businessId,
-        user_name: user.name,
-        rating: isSuperStar || rating === 6 ? 6 : rating,
-        comment,
-        created_at: data?.created_at || new Date().toISOString(),
-        has_super_star: isSuperStar || rating === 6,
-      };
-
-      setDbReviews(prev => {
-        if (prev.some(r => r.id === newReview.id)) return prev;
-        return [newReview, ...prev];
-      });
+      // Reload from DB instead of optimistic merge — avoids double cards when realtime
+      // fires with a slightly different payload shape than the client-built row.
+      await loadReviews();
 
       // Refresh superstar credits after using one
       if (isSuperStar || rating === 6) {
@@ -1210,7 +1244,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast.error(err.message || 'Failed to submit review');
       throw err;
     }
-  }, [user, refreshUserProfile]);
+  }, [user, refreshUserProfile, loadReviews]);
 
   const refreshBusinesses = useCallback(async () => {
     await loadBusinesses();
