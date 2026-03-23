@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { Business } from '@/data/businesses';
+import { getBusinessImageUrl } from '@/lib/utils';
 import {
   Clock, CheckCircle, XCircle, AlertCircle, FileText, RefreshCw,
   MapPin, Phone, Mail, Tag, DollarSign, Calendar, ChevronDown,
@@ -33,8 +35,37 @@ interface MySubmissionsProps {
   onNewStatusChange?: (count: number) => void;
 }
 
+/** Map DB row → app Business (matches AppContext loadBusinesses). */
+function mapDbRowToBusiness(row: Record<string, unknown>): Business {
+  return {
+    id: String(row.id),
+    name: String(row.name ?? ''),
+    category: (row.category as Business['category']) || 'dining',
+    description: String(row.description ?? ''),
+    descriptionFr: String(row.description_fr || row.description || ''),
+    descriptionBi: String(row.description_bi || row.description || ''),
+    image: getBusinessImageUrl((row.image_url || row.image) as string, SUPABASE_URL),
+    rating: Number(row.rating) || 0,
+    reviewCount: Number(row.review_count) || 0,
+    discount: String(row.discount ?? row.deal ?? ''),
+    originalPrice: Number(row.original_price) || 0,
+    dealPrice: Number(row.discounted_price ?? row.deal_price) || 0,
+    location: String(row.location ?? ''),
+    lat: Number(row.lat) || 0,
+    lng: Number(row.lng) || 0,
+    hours: String(row.opening_hours || row.hours || ''),
+    phone: String(row.phone ?? ''),
+    contactEmail: (row.email || row.contact_email || row.business_email) as string | null | undefined,
+    whatsappNumber: (row.whatsapp_number as string) || null,
+    tags: (row.tags as string[]) || [],
+    featured: Boolean(row.featured),
+    ownerId: (row.owner_id as string) || null,
+    superStarCount: Number(row.super_star_count) || 0,
+  };
+}
+
 const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
-  const { user, language, setCurrentView } = useAppContext();
+  const { user, language, setCurrentView, setSelectedBusiness, dbBusinesses } = useAppContext();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -42,6 +73,48 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
   const [unseenChanges, setUnseenChanges] = useState<Set<string>>(new Set());
   const previousStatusesRef = useRef<Map<string, string>>(new Map());
   const initialLoadDone = useRef(false);
+
+  const handleViewLiveListing = useCallback(
+    async (submission: Submission) => {
+      if (!user?.id) return;
+      const norm = (s: string) => s.trim().toLowerCase();
+      const targetName = norm(submission.name);
+
+      let biz: Business | undefined = dbBusinesses.find(
+        (b) => b.ownerId === user.id && norm(b.name) === targetName,
+      );
+
+      if (!biz) {
+        const { data: rows, error } = await supabase.from('businesses').select('*').eq('owner_id', user.id);
+        if (error) {
+          console.error('[MySubmissions] businesses lookup:', error);
+          toast.error(
+            language === 'en'
+              ? 'Could not load your listing. Please try again.'
+              : 'Impossible de charger votre annonce.',
+          );
+          return;
+        }
+        const row = (rows || []).find((r: Record<string, unknown>) => norm(String(r.name ?? '')) === targetName);
+        if (row) {
+          biz = mapDbRowToBusiness(row);
+        }
+      }
+
+      if (!biz) {
+        toast.error(
+          language === 'en'
+            ? 'Live listing not found. If you were just approved, refresh the page or open your listing from Explore Deals.'
+            : 'Annonce introuvable. Actualisez la page ou ouvrez-la depuis les offres.',
+        );
+        return;
+      }
+
+      setSelectedBusiness(biz);
+      setCurrentView('business-detail');
+    },
+    [user, dbBusinesses, language, setSelectedBusiness, setCurrentView],
+  );
 
   // Load submissions from DB
   const loadSubmissions = useCallback(async () => {
@@ -752,7 +825,8 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
                     <div className="flex flex-wrap gap-2 mt-4">
                       {submission.status === 'approved' && (
                         <button
-                          onClick={() => setCurrentView('deals')}
+                          type="button"
+                          onClick={() => void handleViewLiveListing(submission)}
                           className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-50 text-teal-700 text-xs font-semibold hover:bg-teal-100 transition-colors"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />

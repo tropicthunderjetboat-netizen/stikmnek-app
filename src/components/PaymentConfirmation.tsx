@@ -8,6 +8,14 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PASS_PRODUCTS, getPassDisplayTitle } from '@/data/pricing';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import TouristProfileForm from '@/components/TouristProfileForm';
 
 interface PaymentResult {
   receiptNumber: string;
@@ -589,8 +597,9 @@ function addDaysToDate(dateStr: string | undefined, days: number): string {
 
 // ─── Main PaymentConfirmation Component ───
 const PaymentConfirmation: React.FC = () => {
-  const { user, setCurrentView, language } = useAppContext();
+  const { user, setCurrentView, language, userProfile, refreshUserProfile, authLoading } = useAppContext();
   const [payment, setPayment] = useState<PaymentResult | null>(null);
+  const [showTouristProfileModal, setShowTouristProfileModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -607,6 +616,20 @@ const PaymentConfirmation: React.FC = () => {
       }
     }
   }, []);
+
+  // After pass purchase: prompt tourists to complete demographic profile (once)
+  useEffect(() => {
+    if (!payment || !user?.id || authLoading) {
+      setShowTouristProfileModal(false);
+      return;
+    }
+    if (user.type !== 'tourist') {
+      setShowTouristProfileModal(false);
+      return;
+    }
+    const done = userProfile?.post_pass_profile_completed === true;
+    setShowTouristProfileModal(!done);
+  }, [payment, user?.id, user?.type, userProfile?.post_pass_profile_completed, authLoading]);
 
   const handleShareBonusApplied = React.useCallback((bonus: ShareBonusApplied) => {
     setPayment((prev) => {
@@ -792,6 +815,50 @@ Enjoy your deals in Vanuatu!
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20 pb-16">
+      <Dialog
+        open={showTouristProfileModal}
+        onOpenChange={(open) => {
+          // Block overlay / escape close — use form actions only
+          if (open) setShowTouristProfileModal(true);
+        }}
+      >
+        <DialogContent
+          className="max-w-md sm:max-w-lg [&>button]:hidden"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'en'
+                ? 'Complete your traveller profile'
+                : language === 'fr'
+                  ? 'Complétez votre profil voyageur'
+                  : 'Komplitim profil blong yu'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'en'
+                ? 'A few details help us tailor deals and contact you the way you prefer.'
+                : language === 'fr'
+                  ? 'Quelques détails nous aident à personnaliser les offres et à vous joindre comme vous préférez.'
+                  : 'Smol infomesen i helpem mifala blong givim dils mo kontakt yu.'}
+            </DialogDescription>
+          </DialogHeader>
+          {user?.id && (
+            <TouristProfileForm
+              userId={user.id}
+              language={language}
+              embedded
+              hideTitle
+              onSuccess={async () => {
+                setShowTouristProfileModal(false);
+                await refreshUserProfile();
+              }}
+              onSkip={() => setShowTouristProfileModal(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
         {/* Success Animation */}
         <div className="text-center mb-8">

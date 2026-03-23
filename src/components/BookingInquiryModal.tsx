@@ -56,10 +56,12 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
   const [contactName, setContactName] = useState(user.name || '');
-  const [contactEmail, setContactEmail] = useState(user.email || '');
-  const [contactWhatsapp, setContactWhatsapp] = useState(userProfile?.phone || '');
   const [message, setMessage] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+
+  /** Used for email reply-to & inquiry body (account — not shown as editable inputs). */
+  const accountEmail = (user.email || '').trim();
+  const accountWhatsapp = (userProfile?.phone || '').trim();
 
   useEffect(() => {
     if (!open) return;
@@ -67,10 +69,8 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
     setAdults(1);
     setChildren(0);
     setContactName(user.name || '');
-    setContactEmail(user.email || '');
-    setContactWhatsapp(userProfile?.phone || '');
     setMessage('');
-  }, [open, user.name, user.email, userProfile?.phone, today]);
+  }, [open, user.name, today]);
 
   const totalPax = Math.max(0, adults) + Math.max(0, children);
   const original = Number(biz.originalPrice) || 0;
@@ -100,9 +100,12 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
     const dateLabel = visitDate || '—';
     const paxLabel = totalPax > 0 ? String(totalPax) : '—';
     const priceLabel = formatVT(totalDeal);
-    const text = `Hi, I'm ${userLabel} from StikmNek. I'd like to book ${biz.name} for ${dateLabel} with ${paxLabel} people. My calculated StikmNek price is ${priceLabel}.`;
+    let text = `Hi, I'm ${userLabel} from StikmNek. I'd like to book ${biz.name} for ${dateLabel} with ${paxLabel} people. My calculated StikmNek price is ${priceLabel}.`;
+    if (accountWhatsapp) {
+      text += ` You can reach me on WhatsApp: ${accountWhatsapp}.`;
+    }
     return `https://wa.me/${businessWaDigits}?text=${encodeURIComponent(text)}`;
-  }, [showWhatsApp, businessWaDigits, biz.name, contactName, visitDate, totalPax, totalDeal]);
+  }, [showWhatsApp, businessWaDigits, biz.name, contactName, visitDate, totalPax, totalDeal, accountWhatsapp]);
 
   const telHref = useMemo(() => {
     if (!showPhone) return '';
@@ -119,22 +122,34 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
           : 'Bukin ask long',
     intro:
       language === 'en'
-        ? 'Fill in your visit details and how the business can reach you. Then use the buttons below to contact this business using their own phone, WhatsApp, or listing email.'
+        ? 'Enter your visit details, then contact this business using the buttons below. Your account email and phone on file are used when you email or message them — update those in your profile if needed.'
         : language === 'fr'
-          ? 'Indiquez votre visite et vos coordonnées pour que le commerce puisse vous répondre. Utilisez ensuite les boutons ci-dessous pour joindre ce commerce (téléphone, WhatsApp ou e-mail du commerce).'
-          : 'Putum detaels blong visit mo kontakt blong yu. Bihain yusum baten ya blong kolem o WhatsApp o imel blong bisnis.',
+          ? 'Indiquez votre visite, puis contactez ce commerce avec les boutons ci-dessous. Votre e-mail et WhatsApp du compte sont utilisés pour la réponse — modifiez-les dans votre profil si besoin.'
+          : 'Putum detaels blong visit, bihain yusum baten blong kontaktem bisnis. Imel mo fon blong akaunt bae yusum — jenjem long profil sapos yu nidim.',
     yourDetails:
       language === 'en'
-        ? 'Your contact details'
+        ? 'Your details'
         : language === 'fr'
-          ? 'Vos coordonnées'
-          : 'Kontakt blong yu',
+          ? 'Vos informations'
+          : 'Infomesen blong yu',
     yourDetailsHint:
       language === 'en'
-        ? 'The business will use these to reply to you.'
+        ? 'Confirm your name for the business. Email and WhatsApp are taken from your StikmNek account.'
         : language === 'fr'
-          ? 'Le commerce utilisera ces informations pour vous répondre.'
-          : 'Bisnis bae yusum olgeta blong beken long yu.',
+          ? 'Confirmez votre nom. L’e-mail et le WhatsApp viennent de votre compte StikmNek.'
+          : 'Konfirm nem. Imel mo WhatsApp i kam long akaunt blong yu.',
+    accountNote:
+      language === 'en'
+        ? 'Account email (for replies):'
+        : language === 'fr'
+          ? 'E-mail du compte (réponses) :'
+          : 'Imel blong akaunt:',
+    accountWaNote:
+      language === 'en'
+        ? 'WhatsApp on file:'
+        : language === 'fr'
+          ? 'WhatsApp enregistré :'
+          : 'WhatsApp long profil:',
     reachBusiness:
       language === 'en'
         ? 'Contact this business'
@@ -143,10 +158,10 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
           : 'Kontaktem bisnis',
     reachBusinessHint:
       language === 'en'
-        ? 'Uses this listing’s phone, WhatsApp, or email — not your number above.'
+        ? 'These actions use the business’s own contact details — not your account info above.'
         : language === 'fr'
-          ? 'Utilise le téléphone, WhatsApp ou l’e-mail de cette fiche — pas vos coordonnées ci-dessus.'
-          : 'Yusum fon o WhatsApp o imel blong lisiting — no long namba blong yu.',
+          ? 'Ces actions utilisent les coordonnées du commerce — pas les vôtres ci-dessus.'
+          : 'Olgeta i yusum kontakt blong bisnis — no blong yu.',
     date: language === 'en' ? 'Visit date' : language === 'fr' ? 'Date de visite' : 'Dei blong visit',
     adults: language === 'en' ? 'Adults' : language === 'fr' ? 'Adultes' : 'Ol man',
     children: language === 'en' ? 'Children' : language === 'fr' ? 'Enfants' : 'Pikinini',
@@ -154,8 +169,6 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
     stikmnek: language === 'en' ? 'Total StikmNek price' : language === 'fr' ? 'Prix StikmNek total' : 'StikmNek praes',
     save: language === 'en' ? 'Your savings' : language === 'fr' ? 'Vos économies' : 'Sevin blong yu',
     name: language === 'en' ? 'Your name' : language === 'fr' ? 'Votre nom' : 'Nem blong yu',
-    email: language === 'en' ? 'Your email' : language === 'fr' ? 'Votre e-mail' : 'Imel blong yu',
-    wa: language === 'en' ? 'Your WhatsApp (optional)' : language === 'fr' ? 'Votre WhatsApp (optionnel)' : 'WhatsApp blong yu',
     msg: language === 'en' ? 'Message to the business (optional)' : language === 'fr' ? 'Message au commerce (optionnel)' : 'Mesej long bisnis',
     emailBtn: language === 'en' ? 'Send request by email' : language === 'fr' ? 'Envoyer la demande par e-mail' : 'Send ask long imel',
     waBtn: language === 'en' ? 'Chat on business WhatsApp' : language === 'fr' ? 'WhatsApp du commerce' : 'WhatsApp blong bisnis',
@@ -179,8 +192,12 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
       toast.error(copy.paxHint);
       return;
     }
-    if (!contactEmail.trim()) {
-      toast.error(language === 'en' ? 'Please enter your email' : 'Entrez votre e-mail');
+    if (!accountEmail) {
+      toast.error(
+        language === 'en'
+          ? 'Add an email to your StikmNek account to send booking requests by email.'
+          : 'Ajoutez un e-mail à votre compte pour envoyer une demande par e-mail.',
+      );
       return;
     }
     setSendingEmail(true);
@@ -193,8 +210,8 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
           adults,
           children,
           tourist_name: contactName.trim(),
-          tourist_email: contactEmail.trim(),
-          tourist_whatsapp: contactWhatsapp.trim() || null,
+          tourist_email: accountEmail,
+          tourist_whatsapp: accountWhatsapp || null,
           message: message.trim() || null,
           total_standard_vt: totalStandard,
           total_deal_vt: totalDeal,
@@ -318,26 +335,15 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
               <Label htmlFor="inquiry-name">{copy.name}</Label>
               <Input id="inquiry-name" value={contactName} onChange={(e) => setContactName(e.target.value)} />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="inquiry-email">{copy.email}</Label>
-              <Input
-                id="inquiry-email"
-                type="email"
-                autoComplete="email"
-                value={contactEmail}
-                onChange={(e) => setContactEmail(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="inquiry-wa">{copy.wa}</Label>
-              <Input
-                id="inquiry-wa"
-                type="tel"
-                autoComplete="tel"
-                placeholder={language === 'en' ? '+678 …' : '+678 …'}
-                value={contactWhatsapp}
-                onChange={(e) => setContactWhatsapp(e.target.value)}
-              />
+            <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-xs text-gray-700 space-y-1">
+              <p>
+                <span className="font-semibold text-gray-800">{copy.accountNote}</span>{' '}
+                <span className="break-all">{accountEmail || '—'}</span>
+              </p>
+              <p>
+                <span className="font-semibold text-gray-800">{copy.accountWaNote}</span>{' '}
+                <span className="break-all">{accountWhatsapp || (language === 'en' ? 'Not set' : 'Non renseigné')}</span>
+              </p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="inquiry-msg">{copy.msg}</Label>
