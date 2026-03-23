@@ -24,6 +24,7 @@ import QRScanner from './QRScanner';
 import BusinessHomeScreen from './BusinessHomeScreen';
 import DashboardFeedback from './DashboardFeedback';
 import DealExpiryWarningBanner from './DealExpiryWarningBanner';
+import BusinessListingForm from './BusinessListingForm';
 
 // ─── Retry helper for edge function calls (matches BusinessListingForm) ───
 async function invokeWithRetry(
@@ -1339,6 +1340,12 @@ const BusinessOwnerDashboard: React.FC = () => {
   function renderSubmitTab() {
     if (!user) return null;
     const isResubmit = !!resubmitSubmission;
+
+    // Standardize "New Listing" with the public List a Business form.
+    if (!isResubmit) {
+      return <BusinessListingForm />;
+    }
+
     return (
       <div className="max-w-3xl space-y-6">
         {isResubmit && resubmitSubmission?.admin_notes && (

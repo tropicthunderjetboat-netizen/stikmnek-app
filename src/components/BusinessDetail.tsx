@@ -5,8 +5,8 @@ import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, Mes
 import { toast } from 'sonner';
 import ReviewForm from '@/components/ReviewForm';
 import PhotoGallery from '@/components/PhotoGallery';
-import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
-import { supabase } from '@/lib/supabase';
+import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe, getPhotoDisplayUrl } from '@/lib/utils';
+import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import BookingInquiryModal from '@/components/BookingInquiryModal';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
@@ -45,12 +45,17 @@ const BusinessDetail: React.FC = () => {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewResponsesById, setReviewResponsesById] = useState<Record<string, ReviewResponseRow>>({});
+  const [displayCoverImage, setDisplayCoverImage] = useState('');
 
   if (!selectedBusiness) return null;
 
   const biz = selectedBusiness;
   const isFav = favorites.includes(biz.id);
   const reviews = useMemo(() => dbReviews.filter(r => r.business_id === biz.id), [dbReviews, biz.id]);
+
+  useEffect(() => {
+    setDisplayCoverImage(biz.image || '');
+  }, [biz.id, biz.image]);
 
   useEffect(() => {
     if (reviews.length === 0) {
@@ -97,25 +102,49 @@ const BusinessDetail: React.FC = () => {
         email?: string | null;
         contact_email?: string | null;
       };
-      setSelectedBusiness((prev) => {
-        if (!prev || prev.id !== biz.id) return prev;
-        const wa = row.whatsapp_number?.trim();
-        return {
-          ...prev,
-          whatsappNumber: wa || prev.whatsappNumber,
-          phone: row.phone?.trim() || prev.phone,
-          contactEmail:
-            row.contact_email?.trim() ||
-            row.email?.trim() ||
-            prev.contactEmail ||
-            null,
-        };
+      const wa = row.whatsapp_number?.trim();
+      setSelectedBusiness({
+        ...biz,
+        whatsappNumber: wa || biz.whatsappNumber,
+        phone: row.phone?.trim() || biz.phone,
+        contactEmail:
+          row.contact_email?.trim() ||
+          row.email?.trim() ||
+          biz.contactEmail ||
+          null,
       });
     })();
     return () => {
       cancelled = true;
     };
-  }, [biz.id, setSelectedBusiness]);
+  }, [biz, setSelectedBusiness]);
+
+  // Public moderation safety: only use approved photos for the primary cover when available.
+  useEffect(() => {
+    if (!biz?.id) return;
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from('business_photos')
+        .select('url, file_path')
+        .eq('business_id', biz.id)
+        .eq('status', 'approved')
+        .order('is_main', { ascending: false })
+        .order('created_at', { ascending: true })
+        .limit(1);
+      if (cancelled || error) return;
+      const first = data?.[0] as { url?: string; file_path?: string } | undefined;
+      if (!first) {
+        setDisplayCoverImage(biz.image || '');
+        return;
+      }
+      const resolved = getPhotoDisplayUrl(first, SUPABASE_URL) || first.url || biz.image || '';
+      setDisplayCoverImage(resolved);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [biz.id, biz.image]);
 
   // Compute super star count: use DB field if available, otherwise count from reviews
   const superStarCount = (biz.superStarCount && biz.superStarCount > 0)
@@ -187,7 +216,7 @@ const BusinessDetail: React.FC = () => {
 
       <div className="max-w-4xl mx-auto px-4 pb-16">
         <div className="relative rounded-2xl overflow-hidden mb-6 shadow-lg">
-          <img src={biz.image} alt={biz.name} className="w-full h-64 sm:h-80 object-cover" />
+          <img src={displayCoverImage || biz.image} alt={biz.name} className="w-full h-64 sm:h-80 object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           <div className="absolute bottom-4 left-4 right-4">
             <div className="flex items-center gap-2 mb-2">
@@ -301,7 +330,7 @@ const BusinessDetail: React.FC = () => {
             {/* Photo Gallery */}
             <PhotoGallery
               businessId={biz.id}
-              coverImage={biz.image}
+              coverImage={displayCoverImage || biz.image}
               businessName={biz.name}
             />
 

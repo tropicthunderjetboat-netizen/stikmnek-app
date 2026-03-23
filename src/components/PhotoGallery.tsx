@@ -27,23 +27,29 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ businessId, coverImage, bus
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
 
-  // Build the full gallery: cover image first, then DB photos (excluding duplicates of cover)
+  // Build the public gallery from approved DB photos.
+  // If approved photos exist, use their main/first photo as the primary cover to avoid
+  // showing a stale/rejected businesses.image value.
   const allPhotos = React.useMemo(() => {
     const gallery: { id: string; url: string; isMain: boolean }[] = [];
+    const resolvedApproved = photos
+      .map((p) => ({
+        id: p.id,
+        url: getPhotoDisplayUrl(p, SUPABASE_URL) || p.url,
+        isMain: p.is_main,
+      }))
+      .filter((p) => !!p.url);
 
-    // Always include cover image as first
+    if (resolvedApproved.length > 0) {
+      // Approved main photo first (query is ordered by is_main DESC, created_at ASC).
+      resolvedApproved.forEach((p) => gallery.push(p));
+      return gallery;
+    }
+
+    // Fallback only when there are no approved gallery photos.
     if (coverImage) {
       gallery.push({ id: 'cover', url: coverImage, isMain: true });
     }
-
-    // Add DB photos, skip any that match the cover image URL
-    // Use getPhotoDisplayUrl for proper URL resolution (handles file_path when url is broken)
-    photos.forEach(p => {
-      const resolvedUrl = getPhotoDisplayUrl(p, SUPABASE_URL) || p.url;
-      if (resolvedUrl && resolvedUrl !== coverImage) {
-        gallery.push({ id: p.id, url: resolvedUrl, isMain: p.is_main });
-      }
-    });
 
     return gallery;
   }, [photos, coverImage]);
