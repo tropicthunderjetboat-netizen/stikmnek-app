@@ -1609,11 +1609,11 @@ const BusinessOwnerDashboard: React.FC = () => {
         <span className="text-sm hidden sm:inline">Scan QR</span>
       </button>
 
-      {showScanner && selectedBusiness && (
+      {showScanner && (
         <QRScanner
-          businessId={selectedBusiness.id}
-          businessName={selectedBusiness.name}
           onClose={() => setShowScanner(false)}
+          preferredBusinessId={selectedBusiness?.id ?? null}
+          preferredBusinessName={selectedBusiness?.name ?? null}
         />
       )}
     </div>

@@ -1,4 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 /**
  * send-email Edge Function
  * Handles email notifications via SendGrid.
@@ -227,6 +229,181 @@ Deno.serve(async (req) => {
       }
 
       console.log('[send-email] Pass confirmation sent to', user_email);
+      return jsonResponse({ success: true, sent: true });
+    }
+
+    // ─── SEND_BOOKING_INQUIRY (tourist → business owner via SendGrid) ───
+    if (action === 'send_booking_inquiry') {
+      const apiKey = Deno.env.get('SENDGRID_API_KEY');
+      if (!apiKey) {
+        return jsonResponse({
+          success: false,
+          error: 'Email not configured. Set SENDGRID_API_KEY in Supabase secrets.',
+        }, 500);
+      }
+
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+      if (!supabaseUrl || !serviceKey) {
+        return errorResponse('Server misconfiguration', 500);
+      }
+
+      const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+      const { data: { user: tourist }, error: touristErr } = await supabaseAdmin.auth.getUser(token);
+      if (touristErr || !tourist) {
+        return errorResponse('Invalid or expired session', 401);
+      }
+
+      const {
+        business_id,
+        visit_date,
+        adults,
+        children,
+        tourist_name,
+        tourist_email,
+        tourist_whatsapp,
+        message,
+        total_standard_vt,
+        total_deal_vt,
+        savings_vt,
+      } = body;
+
+      if (!business_id || typeof business_id !== 'string') {
+        return errorResponse('Missing business_id');
+      }
+
+      const a = Number(adults);
+      const c = Number(children);
+      if (!Number.isFinite(a) || a < 0 || !Number.isFinite(c) || c < 0 || a + c < 1) {
+        return errorResponse('Invalid adults/children');
+      }
+
+      const nowIso = new Date().toISOString();
+      const { data: passRows, error: passErr } = await supabaseAdmin
+        .from('passes')
+        .select('id')
+        .eq('user_id', tourist.id)
+        .eq('active', true)
+        .gt('expires_at', nowIso)
+        .order('purchased_at', { ascending: false })
+        .limit(1);
+
+      if (passErr) {
+        console.error('[send-email] send_booking_inquiry pass check:', passErr);
+        return errorResponse('Could not verify pass', 500);
+      }
+      if (!passRows?.length) {
+        return errorResponse('Active pass required to send booking inquiries', 403);
+      }
+
+      const { data: biz, error: bizErr } = await supabaseAdmin
+        .from('businesses')
+        .select('*')
+        .eq('id', business_id)
+        .maybeSingle();
+
+      if (bizErr || !biz) {
+        return errorResponse('Business not found', 404);
+      }
+
+      const row = biz as Record<string, unknown>;
+      const pickListingEmail = (): string | null => {
+        for (const key of ['email', 'contact_email', 'business_email']) {
+          const v = row[key];
+          if (typeof v === 'string' && v.trim()) return v.trim();
+        }
+        return null;
+      };
+
+      let ownerEmail: string | null = pickListingEmail();
+      const ownerId = row.owner_id as string | undefined;
+      if (!ownerEmail && ownerId) {
+        const { data: prof } = await supabaseAdmin
+          .from('user_profiles')
+          .select('email')
+          .eq('user_id', ownerId)
+          .maybeSingle();
+        const em = prof?.email;
+        ownerEmail = typeof em === 'string' && em.trim() ? em.trim() : null;
+      }
+
+      if (!ownerEmail) {
+        return errorResponse(
+          'No business email on file for this listing. Please use WhatsApp or phone.',
+          400,
+        );
+      }
+
+      const esc = (s: unknown) =>
+        String(s ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+      const bizName = typeof row.name === 'string' ? row.name : 'Listing';
+      const subject = `StikmNek booking inquiry — ${bizName}`;
+      const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111;">
+      <h2 style="margin: 0 0 12px;">New booking inquiry</h2>
+      <p style="margin: 0 0 8px;"><strong>Listing:</strong> ${esc(bizName)}</p>
+      <p style="margin: 0 0 8px;"><strong>Preferred visit date:</strong> ${esc(visit_date)}</p>
+      <p style="margin: 0 0 8px;"><strong>Party:</strong> ${esc(adults)} adult(s), ${esc(children)} child(ren)</p>
+      <table style="border-collapse: collapse; margin: 12px 0; max-width: 480px;">
+        <tr><td style="padding: 4px 12px 4px 0; color: #555;">Total standard (VT)</td><td style="padding: 4px 0; font-weight: 700;">${esc(total_standard_vt)}</td></tr>
+        <tr><td style="padding: 4px 12px 4px 0; color: #555;">Total StikmNek (VT)</td><td style="padding: 4px 0; font-weight: 700;">${esc(total_deal_vt)}</td></tr>
+        <tr><td style="padding: 4px 12px 4px 0; color: #555;">Guest savings (VT)</td><td style="padding: 4px 0; font-weight: 700; color: #0d9488;">${esc(savings_vt)}</td></tr>
+      </table>
+      <p style="margin: 12px 0 4px;"><strong>From</strong></p>
+      <p style="margin: 0 0 4px;">${esc(tourist_name)}</p>
+      <p style="margin: 0 0 4px;">Email: ${esc(tourist_email)}</p>
+      ${tourist_whatsapp ? `<p style="margin: 0 0 4px;">WhatsApp: ${esc(tourist_whatsapp)}</p>` : ''}
+      ${message ? `<p style="margin: 12px 0 0;"><strong>Message</strong></p><p style="margin: 4px 0 0; white-space: pre-wrap;">${esc(message)}</p>` : ''}
+      <p style="margin: 16px 0 0; color: #555; font-size: 12px;">Sent via StikmNek. Reply directly to this email to reach the guest.</p>
+    </div>
+      `.trim();
+
+      const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
+      const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
+
+      const mailPayload: Record<string, unknown> = {
+        personalizations: [{ to: [{ email: ownerEmail }] }],
+        from: { email: fromEmail, name: fromName },
+        subject,
+        content: [{ type: 'text/html', value: html }],
+      };
+
+      const reply = typeof tourist_email === 'string' && tourist_email.trim();
+      if (reply) {
+        mailPayload.reply_to = {
+          email: tourist_email.trim(),
+          name: typeof tourist_name === 'string' && tourist_name.trim() ? tourist_name.trim() : undefined,
+        };
+      }
+
+      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(mailPayload),
+      });
+
+      if (!res.ok) {
+        let errText = '';
+        try {
+          errText = await res.text();
+        } catch {
+          errText = '(could not read response body)';
+        }
+        console.error('[send-email] send_booking_inquiry SendGrid FAILED', res.status, errText);
+        return jsonResponse(
+          { success: false, error: `SendGrid error: ${res.status}`, details: errText },
+          500,
+        );
+      }
+
       return jsonResponse({ success: true, sent: true });
     }
 

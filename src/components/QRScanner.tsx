@@ -84,10 +84,34 @@ interface ValidityResult {
   error?: string;
 }
 
+export type OwnerListingOffer = {
+  id: string;
+  name: string;
+  discount: string | null;
+  original_price: number | null;
+  deal_price: number | null;
+};
+
 interface QRScannerProps {
-  businessId: string;
-  businessName: string;
   onClose: () => void;
+  /** If the owner had a listing selected in the dashboard, pre-select it in the offer picker. */
+  preferredBusinessId?: string | null;
+  preferredBusinessName?: string | null;
+}
+
+function formatOfferDiscountLine(listing: OwnerListingOffer): string {
+  const disc = (listing.discount ?? '').trim();
+  const title = (listing.name ?? '').trim();
+  if (disc && title) return `${disc} — ${title}`;
+  if (disc) return disc;
+  return title || 'Discount';
+}
+
+function savedAmountForListing(listing: OwnerListingOffer): number {
+  const o = Number(listing.original_price);
+  const d = Number(listing.deal_price);
+  if (!Number.isFinite(o) || !Number.isFinite(d)) return 0;
+  return Math.max(0, o - d);
 }
 
 // ═══ PASS TIER STYLING ═══
@@ -131,7 +155,13 @@ const getFailureConfig = (status: string) => {
   }
 };
 
-const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose }) => {
+type RedeemSubStep = 'none' | 'pick_offer' | 'no_offers';
+
+const QRScanner: React.FC<QRScannerProps> = ({
+  onClose,
+  preferredBusinessId = null,
+  preferredBusinessName = null,
+}) => {
   const { user } = useAppContext();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -151,6 +181,14 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
   const [manualCode, setManualCode] = useState('');
   const [cameraReady, setCameraReady] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+
+  /** After pass is valid, owner picks which listing / offer was redeemed */
+  const [redeemSubStep, setRedeemSubStep] = useState<RedeemSubStep>('none');
+  const [ownerListings, setOwnerListings] = useState<OwnerListingOffer[]>([]);
+  const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
+  const [pendingRedeemQr, setPendingRedeemQr] = useState<string | null>(null);
+  /** Pass check result while choosing an offer (avoid showing full validity success screen). */
+  const [verifiedForOfferFlow, setVerifiedForOfferFlow] = useState<ValidityResult | null>(null);
 
   // Initialize BarcodeDetector if available
   useEffect(() => {
@@ -220,9 +258,11 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
 
   // Start camera when component mounts in camera mode
   useEffect(() => {
-    if (inputMode === 'camera' && !result && !validityResult) { startCamera(); }
+    if (inputMode === 'camera' && !result && !validityResult && redeemSubStep === 'none' && !verifying) {
+      startCamera();
+    }
     return () => { stopCamera(); };
-  }, [inputMode, result, validityResult]);
+  }, [inputMode, result, validityResult, redeemSubStep, verifying]);
 
   // Animated verify steps
   useEffect(() => {
@@ -238,20 +278,114 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
     return () => clearInterval(interval);
   }, [verifying, scanPurpose]);
 
+  const executeRedeemForListing = async (rawData: string, listing: OwnerListingOffer) => {
+    const discountLine = formatOfferDiscountLine(listing);
+    const saved = savedAmountForListing(listing);
+    const { data, error } = await supabase.functions.invoke('verify-redemption', {
+      body: {
+        action: 'verify_and_redeem',
+        qrData: rawData,
+        businessId: listing.id,
+        businessName: listing.name,
+        discount: discountLine,
+        discountLabel: discountLine,
+        savedAmount: saved,
+        originalPrice: listing.original_price,
+        dealPrice: listing.deal_price,
+        verifiedBy: user?.id,
+      },
+    });
+    if (error) {
+      setResult({ success: false, error: 'Failed to record redemption. Please try again.' });
+      setRedeemSubStep('none');
+      setOwnerListings([]);
+      setVerifiedForOfferFlow(null);
+      return;
+    }
+    const payload = data as RedemptionResult & { status?: string };
+    setResult(payload);
+    if (!payload?.success) {
+      setRedeemSubStep('none');
+      setOwnerListings([]);
+      setSelectedListingId(null);
+      setPendingRedeemQr(null);
+      setVerifiedForOfferFlow(null);
+      if (payload?.error) toast.error(payload.error);
+      return;
+    }
+    setRedeemSubStep('none');
+    setOwnerListings([]);
+    setSelectedListingId(null);
+    setPendingRedeemQr(null);
+    setVerifiedForOfferFlow(null);
+    setShowSuccessAnimation(true);
+    toast.success('Discount redeemed successfully!');
+  };
+
+  const proceedAfterPassValidForRedeem = async (rawData: string, checkData: ValidityResult) => {
+    if (!user?.id) {
+      toast.error('You must be signed in to redeem.');
+      setResult({ success: false, error: 'Not signed in.' });
+      return;
+    }
+
+    const { data: listings, error: listErr } = await supabase
+      .from('businesses')
+      .select('id, name, discount, original_price, deal_price')
+      .eq('owner_id', user.id)
+      .eq('active', true)
+      .order('name', { ascending: true });
+
+    if (listErr) {
+      console.error('[QRScanner] load owner listings:', listErr);
+      toast.error('Could not load your listings.');
+      setResult({ success: false, error: 'Could not load your active listings.' });
+      return;
+    }
+
+    const rows = (listings ?? []) as OwnerListingOffer[];
+
+    if (rows.length === 0) {
+      setPendingRedeemQr(rawData);
+      setRedeemSubStep('no_offers');
+      setVerifiedForOfferFlow(checkData);
+      return;
+    }
+
+    if (rows.length === 1) {
+      await executeRedeemForListing(rawData, rows[0]);
+      return;
+    }
+
+    setPendingRedeemQr(rawData);
+    setOwnerListings(rows);
+    const preferred =
+      preferredBusinessId && rows.some((r) => r.id === preferredBusinessId)
+        ? preferredBusinessId
+        : null;
+    setSelectedListingId(preferred);
+    setRedeemSubStep('pick_offer');
+    setVerifiedForOfferFlow(checkData);
+  };
+
   // Handle scanned QR data
   const handleQRData = async (rawData: string) => {
     lastScannedDataRef.current = rawData;
     setVerifying(true);
     setVerifyStep(0);
     setShowSuccessAnimation(false);
+    setRedeemSubStep('none');
+    setOwnerListings([]);
+    setSelectedListingId(null);
+    setPendingRedeemQr(null);
+    setVerifiedForOfferFlow(null);
     try {
       if (scanPurpose === 'check') {
         const { data, error } = await supabase.functions.invoke('verify-redemption', {
           body: {
             action: 'check_voucher_validity',
             qrData: rawData,
-            businessId,
-            businessName,
+            ...(preferredBusinessId ? { businessId: preferredBusinessId, businessName: preferredBusinessName ?? '' } : {}),
           },
         });
         if (error) {
@@ -267,22 +401,25 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
       } else {
         const { data, error } = await supabase.functions.invoke('verify-redemption', {
           body: {
-            action: 'verify_and_redeem',
+            action: 'check_voucher_validity',
             qrData: rawData,
-            businessId,
-            businessName,
-            verifiedBy: user?.id,
           },
         });
         if (error) {
           setResult({ success: false, error: 'Failed to verify pass. Please try again.' });
           return;
         }
-        setResult(data as RedemptionResult);
-        if (data?.success) {
-          setShowSuccessAnimation(true);
-          toast.success('Discount redeemed successfully!');
+        const v = data as ValidityResult;
+        if (!v?.success || !v.canRedeem) {
+          setResult({
+            success: false,
+            error: v?.pass?.message || v?.error || 'Pass cannot be redeemed right now.',
+            status: v?.pass?.status,
+            passType: v?.pass?.type,
+          });
+          return;
         }
+        await proceedAfterPassValidForRedeem(rawData, v);
       }
     } catch (err: any) {
       if (scanPurpose === 'check') {
@@ -310,6 +447,11 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
     setVerifying(false);
     setVerifyStep(0);
     setShowSuccessAnimation(false);
+    setRedeemSubStep('none');
+    setOwnerListings([]);
+    setSelectedListingId(null);
+    setPendingRedeemQr(null);
+    setVerifiedForOfferFlow(null);
     lastScannedDataRef.current = '';
     if (inputMode === 'camera') { startCamera(); }
   };
@@ -319,17 +461,53 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
     if (!validityResult || !validityResult.canRedeem) return;
     const savedData = lastScannedDataRef.current;
     setScanPurpose('redeem');
+    const savedValidity = validityResult;
     setValidityResult(null);
     if (savedData) {
-      handleQRData(savedData);
+      (async () => {
+        lastScannedDataRef.current = savedData;
+        setVerifying(true);
+        setVerifyStep(0);
+        setShowSuccessAnimation(false);
+        setRedeemSubStep('none');
+        setOwnerListings([]);
+        setSelectedListingId(null);
+        setPendingRedeemQr(null);
+        try {
+          await proceedAfterPassValidForRedeem(savedData, savedValidity);
+        } catch (e: any) {
+          setResult({ success: false, error: e?.message || 'Redemption failed.' });
+        } finally {
+          setVerifying(false);
+        }
+      })();
     } else {
       toast.info('Please scan or enter the code again to redeem.');
       handleReset();
     }
   };
 
+  const confirmSelectedOffer = async () => {
+    const raw = pendingRedeemQr || lastScannedDataRef.current;
+    if (!raw || !selectedListingId) {
+      toast.error('Select an offer to continue.');
+      return;
+    }
+    const listing = ownerListings.find((l) => l.id === selectedListingId);
+    if (!listing) return;
+    setVerifying(true);
+    try {
+      await executeRedeemForListing(raw, listing);
+    } catch (e: any) {
+      setResult({ success: false, error: e?.message || 'Redemption failed.' });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const hasBarcodeDetector = 'BarcodeDetector' in window;
-  const hasResult = result || validityResult;
+  const inOfferFlow = redeemSubStep === 'pick_offer' || redeemSubStep === 'no_offers';
+  const hasResult = !!(result || validityResult);
 
   // ═══ VERIFY STEP LABELS ═══
   const verifySteps = scanPurpose === 'redeem'
@@ -581,7 +759,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2"><Tag className="w-4 h-4 text-gray-400" /><span className="text-xs text-gray-500">Discount</span></div>
-                <span className="text-sm font-bold text-orange-600">{r.discountApplied}</span>
+                <span className="text-sm font-bold text-orange-600">{r.discountApplied?.trim() ? r.discountApplied : '—'}</span>
               </div>
 
               {(r.originalPrice != null && r.dealPrice != null && r.originalPrice > 0) && (
@@ -944,9 +1122,21 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
               </div>
               <div>
                 <h2 className="font-bold text-gray-900">
-                  {scanPurpose === 'check' ? 'Check Voucher Validity' : 'Scan & Redeem'}
+                  {redeemSubStep === 'pick_offer'
+                    ? 'Select offer redeemed'
+                    : redeemSubStep === 'no_offers'
+                      ? 'Pass verified'
+                      : scanPurpose === 'check'
+                        ? 'Check Voucher Validity'
+                        : 'Scan & Redeem'}
                 </h2>
-                <p className="text-xs text-gray-500">{businessName}</p>
+                <p className="text-xs text-gray-500">
+                  {redeemSubStep === 'pick_offer'
+                    ? 'Tap the listing this discount applies to'
+                    : redeemSubStep === 'no_offers'
+                      ? 'No active listing on your account'
+                      : preferredBusinessName || 'Your active listings'}
+                </p>
               </div>
             </div>
             <button
@@ -969,7 +1159,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
         )}
 
         {/* Purpose Toggle */}
-        {!hasResult && !verifying && (
+        {!hasResult && !verifying && !inOfferFlow && (
           <div className="px-5 pt-4">
             <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl">
               <button
@@ -1004,7 +1194,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
         )}
 
         {/* Input Mode Toggle */}
-        {!hasResult && !verifying && (
+        {!hasResult && !verifying && !inOfferFlow && (
           <div className="flex items-center gap-2 px-5 pt-3 pb-0">
             <button
               onClick={() => { setInputMode('camera'); setCameraError(null); }}
@@ -1034,7 +1224,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
         {/* Content */}
         <div className="p-5">
           {/* ═══ CAMERA MODE ═══ */}
-          {inputMode === 'camera' && !hasResult && !verifying && (
+          {inputMode === 'camera' && !hasResult && !verifying && !inOfferFlow && (
             <div>
               {cameraError ? (
                 <div className="text-center py-8">
@@ -1091,7 +1281,7 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
           )}
 
           {/* ═══ MANUAL ENTRY MODE ═══ */}
-          {inputMode === 'manual' && !hasResult && !verifying && (
+          {inputMode === 'manual' && !hasResult && !verifying && !inOfferFlow && (
             <form onSubmit={handleManualSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Paste Tourist's Pass Code</label>
@@ -1119,6 +1309,100 @@ const QRScanner: React.FC<QRScannerProps> = ({ businessId, businessName, onClose
                 {scanPurpose === 'check' ? 'Check Voucher Validity' : 'Verify & Redeem Discount'}
               </button>
             </form>
+          )}
+
+          {/* ═══ OFFER SELECTION (after pass verified, redeem flow) ═══ */}
+          {redeemSubStep === 'pick_offer' && verifiedForOfferFlow && !result && (
+            <div className="space-y-4">
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <BadgeCheck className="w-5 h-5 text-emerald-600" />
+                  <span className="text-sm font-extrabold text-emerald-900">Valid pass</span>
+                </div>
+                <p className="text-xs text-emerald-800">
+                  {verifiedForOfferFlow.tourist?.name} · {getPassDisplayTitle(verifiedForOfferFlow.pass?.type || 'weekly', 'en')}
+                </p>
+              </div>
+              <p className="text-sm font-bold text-gray-900">Which listing was this discount for?</p>
+              <div className="space-y-2 max-h-[min(50vh,320px)] overflow-y-auto pr-1">
+                {ownerListings.map((listing) => {
+                  const selected = selectedListingId === listing.id;
+                  const line = formatOfferDiscountLine(listing);
+                  return (
+                    <button
+                      key={listing.id}
+                      type="button"
+                      onClick={() => setSelectedListingId(listing.id)}
+                      className={`w-full text-left rounded-xl border-2 p-3 transition-all ${
+                        selected
+                          ? 'border-teal-500 bg-teal-50 shadow-sm'
+                          : 'border-gray-200 bg-white hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="text-sm font-extrabold text-gray-900">{listing.name}</p>
+                      <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{line}</p>
+                      {(listing.original_price != null && listing.deal_price != null) && (
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          {Number(listing.original_price)} VT → {Number(listing.deal_price)} VT
+                        </p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                disabled={!selectedListingId || verifying}
+                onClick={() => void confirmSelectedOffer()}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
+                Record redemption
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {redeemSubStep === 'no_offers' && verifiedForOfferFlow && !result && (
+            <div className="space-y-4 text-center py-2">
+              <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 flex items-center justify-center">
+                <BadgeCheck className="w-8 h-8 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-extrabold text-gray-900">Valid pass</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {verifiedForOfferFlow.tourist?.name} — pass is active, but you have no active listings to attach this redemption to.
+                </p>
+              </div>
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-left">
+                <p className="text-xs font-bold text-amber-900 mb-1">No active discounts found</p>
+                <p className="text-xs text-amber-800">
+                  Activate a listing in your dashboard or contact support. Redemption was not recorded.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="flex-1 py-3 rounded-xl bg-teal-600 text-white font-bold hover:bg-teal-700"
+                >
+                  Scan another
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { stopCamera(); onClose(); }}
+                  className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           )}
 
           {/* ═══ VERIFYING STATE (ENHANCED) ═══ */}

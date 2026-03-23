@@ -249,23 +249,74 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Block duplicate redemption same tourist + business + calendar day (matches check_voucher_validity)
+      {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const { data: dupToday } = await supabase
+          .from('redemptions')
+          .select('id')
+          .eq('user_id', touristUserId)
+          .eq('business_id', businessId)
+          .gte('redeemed_at', startOfDay.toISOString())
+          .lte('redeemed_at', endOfDay.toISOString())
+          .limit(1);
+
+        if (dupToday && dupToday.length > 0) {
+          return jsonResponse(
+            {
+              success: false,
+              error: 'This pass was already redeemed at this business today.',
+              status: 'already_redeemed_today',
+            },
+            200
+          );
+        }
+      }
+
       const savedAmount = Number(body?.savedAmount ?? 0) || 0;
+      const discountLabelRaw = body?.discount ?? body?.discountLabel ?? '';
+      const discount_label =
+        typeof discountLabelRaw === 'string' ? discountLabelRaw.trim() : String(discountLabelRaw ?? '').trim();
+
+      const insertRow: Record<string, unknown> = {
+        user_id: touristUserId,
+        business_id: businessId,
+        pass_id: pass.id,
+        saved_amount: savedAmount,
+      };
+      if (discount_label) insertRow.discount_label = discount_label;
 
       const { data: redemption, error: redErr } = await supabase
         .from('redemptions')
-        .insert({
-          user_id: touristUserId,
-          business_id: businessId,
-          pass_id: pass.id,
-          saved_amount: savedAmount,
-        })
-        .select('id, redeemed_at, saved_amount')
+        .insert(insertRow)
+        .select('id, redeemed_at, saved_amount, discount_label')
         .single();
 
       if (redErr || !redemption) {
         console.error('[verify-redemption] insert redemption error:', redErr);
         return errorResponse('Failed to record redemption', 500);
       }
+
+      const { data: bizNameRow } = await supabase
+        .from('businesses')
+        .select('name')
+        .eq('id', businessId)
+        .maybeSingle();
+
+      const resolvedBusinessName =
+        (typeof businessName === 'string' && businessName.trim()) ||
+        (typeof body?.businessName === 'string' && (body.businessName as string).trim()) ||
+        bizNameRow?.name ||
+        '';
+
+      const appliedDiscount =
+        (redemption as any).discount_label ||
+        discount_label ||
+        (typeof body?.discount === 'string' ? body.discount : '');
 
       return jsonResponse(
         {
@@ -278,8 +329,8 @@ Deno.serve(async (req) => {
             passType: pass.pass_type,
             validFrom,
             validUntil,
-            businessName,
-            discountApplied: body?.discount || '',
+            businessName: resolvedBusinessName,
+            discountApplied: appliedDiscount,
             savedAmount: Number(redemption.saved_amount) || 0,
             redeemedAt: redemption.redeemed_at,
             originalPrice: body?.originalPrice ?? null,

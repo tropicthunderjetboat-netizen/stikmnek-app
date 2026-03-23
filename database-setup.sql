@@ -329,7 +329,8 @@ CREATE TABLE IF NOT EXISTS public.redemptions (
   business_id   uuid NOT NULL REFERENCES public.businesses(id) ON DELETE CASCADE,
   pass_id       uuid REFERENCES public.passes(id) ON DELETE SET NULL,
   saved_amount  numeric(12,2) NOT NULL DEFAULT 0,
-  redeemed_at   timestamptz NOT NULL DEFAULT now()
+  redeemed_at   timestamptz NOT NULL DEFAULT now(),
+  discount_label text
 );
 
 ALTER TABLE public.redemptions ENABLE ROW LEVEL SECURITY;

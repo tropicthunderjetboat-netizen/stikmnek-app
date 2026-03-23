@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, QrCode, Share2, X, MessageSquarePlus, Sparkles, ExternalLink, Store } from 'lucide-react';
+import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, MessageSquarePlus, Sparkles, ExternalLink, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import ReviewForm from '@/components/ReviewForm';
 import PhotoGallery from '@/components/PhotoGallery';
 import { formatVT } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import BookingInquiryModal from '@/components/BookingInquiryModal';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
 
@@ -39,10 +40,10 @@ function formatWhatsAppDisplay(number: string): string {
 const BusinessDetail: React.FC = () => {
   const {
     language, selectedBusiness, setCurrentView, setSelectedBusiness,
-    favorites, toggleFavorite, user, setShowAuth, setAuthMode,
+    favorites, toggleFavorite, user, userProfile, setShowAuth, setAuthMode,
     dbReviews
   } = useAppContext();
-  const [showQR, setShowQR] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewResponsesById, setReviewResponsesById] = useState<Record<string, ReviewResponseRow>>({});
 
@@ -90,18 +91,24 @@ const BusinessDetail: React.FC = () => {
     setCurrentView('deals');
   };
 
-  const handleRedeem = () => {
+  const handleRequestBooking = () => {
     if (!user) {
       setShowAuth(true);
       setAuthMode('signin');
       return;
     }
     if (!user.pass) {
-      toast.error(language === 'en' ? 'You need an active pass to redeem deals' : 'Vous avez besoin d\'un pass actif');
+      toast.error(
+        language === 'en'
+          ? 'You need an active pass to request bookings and get discounts!'
+          : language === 'fr'
+            ? 'Vous avez besoin d’un pass actif pour demander une réservation et bénéficier des réductions !'
+            : 'Yu nidim aktiv pas blong askem bukin mo kasem diskaon!',
+      );
       setCurrentView('passes');
       return;
     }
-    setShowQR(true);
+    setShowBookingModal(true);
   };
 
   const handleWhatsApp = () => {
@@ -128,34 +135,6 @@ const BusinessDetail: React.FC = () => {
     }
   };
 
-
-  const QRCodeSVG = () => {
-    const size = 200;
-    const modules = 21;
-    const cellSize = size / modules;
-    const cells: React.ReactNode[] = [];
-    const seed = biz.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-    for (let row = 0; row < modules; row++) {
-      for (let col = 0; col < modules; col++) {
-        const isPosition = (row < 7 && col < 7) || (row < 7 && col >= modules - 7) || (row >= modules - 7 && col < 7);
-        const isBorder = isPosition && (row === 0 || row === 6 || col === 0 || col === 6 || (row >= modules - 7 && (row === modules - 7 || row === modules - 1)) || (col >= modules - 7 && (col === modules - 7 || col === modules - 1)));
-        const isInner = isPosition && row >= 2 && row <= 4 && col >= 2 && col <= 4;
-        const isInner2 = isPosition && row >= 2 && row <= 4 && col >= modules - 5 && col <= modules - 3;
-        const isInner3 = isPosition && row >= modules - 5 && row <= modules - 3 && col >= 2 && col <= 4;
-        const hash = ((row * 31 + col * 17 + seed) % 100);
-        const filled = isBorder || isInner || isInner2 || isInner3 || (!isPosition && hash < 45);
-        if (filled) {
-          cells.push(<rect key={`${row}-${col}`} x={col * cellSize} y={row * cellSize} width={cellSize} height={cellSize} fill="#1a1a1a" rx={1} />);
-        }
-      }
-    }
-    return (
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="mx-auto">
-        <rect width={size} height={size} fill="white" />
-        {cells}
-      </svg>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
@@ -442,9 +421,13 @@ const BusinessDetail: React.FC = () => {
                 </div>
               )}
 
-              <button onClick={handleRedeem} className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-sm hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200 mb-3 flex items-center justify-center gap-2">
-                <QrCode className="w-4 h-4" />
-                {language === 'en' ? 'Redeem Deal' : language === 'fr' ? 'Utiliser l\'offre' : 'Yusim Dil'}
+              <button
+                type="button"
+                onClick={handleRequestBooking}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-sm hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200 mb-3 flex items-center justify-center gap-2"
+              >
+                <CalendarDays className="w-4 h-4" />
+                {language === 'en' ? 'Request booking' : language === 'fr' ? 'Demander une réservation' : 'Askem bukin'}
               </button>
 
               {/* WhatsApp Button in Sidebar */}
@@ -489,25 +472,15 @@ const BusinessDetail: React.FC = () => {
         </div>
       </div>
 
-      {showQR && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowQR(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center">
-            <button onClick={() => setShowQR(false)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200">
-              <X className="w-4 h-4" />
-            </button>
-            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center">
-              <QrCode className="w-7 h-7 text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-1">{biz.name}</h3>
-            <p className="text-sm text-gray-500 mb-6">{biz.discount} - {language === 'en' ? 'Show this QR code to redeem' : 'Montrez ce QR code pour utiliser'}</p>
-            <div className="bg-white p-4 rounded-xl border-2 border-dashed border-teal-200 inline-block mb-4">
-              <QRCodeSVG />
-            </div>
-            <p className="text-xs text-gray-400">{language === 'en' ? 'Valid until ' : 'Valide jusqu\'au '}{user?.passExpiry || '2026-02-19'}</p>
-            <p className="text-[10px] text-gray-300 mt-2">ID: SNK-{biz.id.toUpperCase()}-{Date.now().toString(36).toUpperCase()}</p>
-          </div>
-        </div>
+      {user && (
+        <BookingInquiryModal
+          open={showBookingModal}
+          onOpenChange={setShowBookingModal}
+          business={biz}
+          user={user}
+          userProfile={userProfile}
+          language={language}
+        />
       )}
     </div>
   );

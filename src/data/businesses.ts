@@ -18,6 +18,8 @@ export interface Business {
   lng: number;
   hours: string;
   phone: string;
+  /** Public contact email from listing (if column exists in DB). */
+  contactEmail?: string | null;
   whatsappNumber?: string | null;
   tags: string[];
   featured: boolean;
