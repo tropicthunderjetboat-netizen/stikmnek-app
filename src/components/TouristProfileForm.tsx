@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Loader2, Users, Building2, Phone, Mail, MessageCircle } from 'lucide-react';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Language } from '@/data/translations';
+import type { UserProfile } from '@/contexts/AppContext';
 
 export type PreferredContact = 'email' | 'whatsapp' | 'phone';
 
@@ -18,6 +19,10 @@ export interface TouristProfileFormProps {
   embedded?: boolean;
   /** Hide the built-in title block (e.g. when Dialog supplies the title) */
   hideTitle?: boolean;
+  /** Auth email fallback when profile row has no email yet */
+  accountEmail?: string | null;
+  /** Seeds party counts, contact prefs, resort, and contact detail fields */
+  userProfile?: UserProfile | null;
 }
 
 const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
@@ -27,13 +32,37 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
   onSkip,
   embedded,
   hideTitle,
+  accountEmail,
+  userProfile,
 }) => {
   const [numAdults, setNumAdults] = useState(1);
   const [numChildren, setNumChildren] = useState(0);
   const [numInfants, setNumInfants] = useState(0);
   const [preferredContact, setPreferredContact] = useState<PreferredContact>('email');
   const [resortName, setResortName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactWhatsapp, setContactWhatsapp] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const p = userProfile;
+    if (!p) {
+      setContactEmail((accountEmail || '').trim());
+      setContactWhatsapp('');
+      setContactPhone('');
+      return;
+    }
+    setNumAdults(p.num_adults ?? 1);
+    setNumChildren(p.num_children ?? 0);
+    setNumInfants(p.num_infants ?? 0);
+    const method = (p.preferred_contact_method || 'email') as PreferredContact;
+    setPreferredContact(['email', 'whatsapp', 'phone'].includes(method) ? method : 'email');
+    setResortName((p.resort_name || '').trim());
+    setContactEmail((p.email || accountEmail || '').trim());
+    setContactWhatsapp((p.whatsapp_number || '').trim() || (p.phone || '').trim());
+    setContactPhone((p.phone || '').trim());
+  }, [userProfile, accountEmail]);
 
   const t = {
     title:
@@ -72,6 +101,18 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
         : language === 'fr'
           ? 'Moyen de contact préféré'
           : 'We blong kontakt',
+    contactHint:
+      language === 'en'
+        ? 'Enter the details for how you prefer to be reached.'
+        : language === 'fr'
+          ? 'Saisissez les coordonnées pour votre moyen de contact choisi.'
+          : 'Putum detaels blong we yu laik long kontakt.',
+    emailLabel:
+      language === 'en' ? 'Your email' : language === 'fr' ? 'Votre e-mail' : 'Imel blong yu',
+    waLabel:
+      language === 'en' ? 'Your WhatsApp number' : language === 'fr' ? 'Votre numéro WhatsApp' : 'Namba WhatsApp blong yu',
+    phoneLabel:
+      language === 'en' ? 'Your phone number' : language === 'fr' ? 'Votre numéro de téléphone' : 'Fon namba blong yu',
     resort:
       language === 'en'
         ? 'Where are you staying? (Resort name)'
@@ -87,6 +128,25 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
     e.preventDefault();
     setSubmitting(true);
     try {
+      const emailTrim = contactEmail.trim();
+      const waTrim = contactWhatsapp.trim();
+      const phoneTrim = contactPhone.trim();
+
+      if (preferredContact === 'email' && !emailTrim) {
+        toast.error(language === 'en' ? 'Please enter your email.' : 'Entrez votre e-mail.');
+        return;
+      }
+      if (preferredContact === 'whatsapp' && !waTrim) {
+        toast.error(
+          language === 'en' ? 'Please enter your WhatsApp number.' : 'Entrez votre numéro WhatsApp.',
+        );
+        return;
+      }
+      if (preferredContact === 'phone' && !phoneTrim) {
+        toast.error(language === 'en' ? 'Please enter your phone number.' : 'Entrez votre numéro.');
+        return;
+      }
+
       const { error } = await supabase
         .from('user_profiles')
         .update({
@@ -97,6 +157,9 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
           resort_name: resortName.trim() || null,
           post_pass_profile_completed: true,
           updated_at: new Date().toISOString(),
+          email: emailTrim || null,
+          whatsapp_number: waTrim || null,
+          phone: phoneTrim || '',
         })
         .eq('user_id', userId);
 
@@ -110,6 +173,53 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
       setSubmitting(false);
     }
   };
+
+  const contactFields = (
+    <div className="grid gap-2 rounded-lg border border-gray-100 bg-gray-50/80 p-3">
+      <p className="text-xs text-gray-600">{t.contactHint}</p>
+      {preferredContact === 'email' && (
+        <div className="grid gap-2">
+          <Label htmlFor="tp-email">{t.emailLabel}</Label>
+          <Input
+            id="tp-email"
+            type="email"
+            autoComplete="email"
+            value={contactEmail}
+            onChange={(e) => setContactEmail(e.target.value)}
+            placeholder={language === 'en' ? 'you@example.com' : ''}
+          />
+        </div>
+      )}
+      {preferredContact === 'whatsapp' && (
+        <div className="grid gap-2">
+          <Label htmlFor="tp-wa">{t.waLabel}</Label>
+          <Input
+            id="tp-wa"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            value={contactWhatsapp}
+            onChange={(e) => setContactWhatsapp(e.target.value)}
+            placeholder={language === 'en' ? 'e.g. +678 12345' : ''}
+          />
+        </div>
+      )}
+      {preferredContact === 'phone' && (
+        <div className="grid gap-2">
+          <Label htmlFor="tp-phone">{t.phoneLabel}</Label>
+          <Input
+            id="tp-phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            value={contactPhone}
+            onChange={(e) => setContactPhone(e.target.value)}
+            placeholder={language === 'en' ? 'e.g. +678 12345' : ''}
+          />
+        </div>
+      )}
+    </div>
+  );
 
   const inner = (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -175,6 +285,8 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
           ))}
         </div>
       </div>
+
+      {contactFields}
 
       <div className="grid gap-2">
         <Label htmlFor="tp-resort">{t.resort}</Label>

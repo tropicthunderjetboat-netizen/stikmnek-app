@@ -847,6 +847,8 @@ Enjoy your deals in Vanuatu!
             <TouristProfileForm
               userId={user.id}
               language={language}
+              accountEmail={user.email}
+              userProfile={userProfile}
               embedded
               hideTitle
               onSuccess={async () => {

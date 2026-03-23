@@ -53,6 +53,8 @@ export interface UserProfile {
   num_children?: number;
   num_infants?: number;
   preferred_contact_method?: string | null;
+  /** Tourist WhatsApp (may differ from `phone`). */
+  whatsapp_number?: string | null;
   resort_name?: string | null;
   post_pass_profile_completed?: boolean;
   created_at: string;
@@ -1099,7 +1101,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'business_location', 'business_phone', 'business_email', 'business_hours',
         'onboarding_complete',
         'num_adults', 'num_children', 'num_infants', 'preferred_contact_method', 'resort_name',
-        'post_pass_profile_completed',
+        'post_pass_profile_completed', 'whatsapp_number', 'email',
       ];
       const safeUpdates: Record<string, any> = { updated_at: new Date().toISOString() };
       for (const key of safeFields) {

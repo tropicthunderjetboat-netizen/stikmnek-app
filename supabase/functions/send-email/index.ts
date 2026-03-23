@@ -282,9 +282,11 @@ Deno.serve(async (req) => {
         visit_date,
         adults,
         children,
+        infants,
         tourist_name,
         tourist_email,
         tourist_whatsapp,
+        tourist_phone,
         message,
         total_standard_vt,
         total_deal_vt,
@@ -297,8 +299,12 @@ Deno.serve(async (req) => {
 
       const a = Number(adults);
       const c = Number(children);
+      const inf = infants !== undefined && infants !== null ? Number(infants) : 0;
       if (!Number.isFinite(a) || a < 0 || !Number.isFinite(c) || c < 0 || a + c < 1) {
         return errorResponse('Invalid adults/children');
+      }
+      if (!Number.isFinite(inf) || inf < 0) {
+        return errorResponse('Invalid infants');
       }
 
       const nowIso = new Date().toISOString();
@@ -394,7 +400,7 @@ Deno.serve(async (req) => {
       <h2 style="margin: 0 0 12px;">New booking inquiry</h2>
       <p style="margin: 0 0 8px;"><strong>Listing:</strong> ${esc(bizName)}</p>
       <p style="margin: 0 0 8px;"><strong>Preferred visit date:</strong> ${esc(visit_date)}</p>
-      <p style="margin: 0 0 8px;"><strong>Party:</strong> ${esc(adults)} adult(s), ${esc(children)} child(ren)</p>
+      <p style="margin: 0 0 8px;"><strong>Party:</strong> ${esc(adults)} adult(s), ${esc(children)} child(ren)${inf > 0 ? `, ${esc(inf)} infant(s)` : ''}</p>
       <table style="border-collapse: collapse; margin: 12px 0; max-width: 480px;">
         <tr><td style="padding: 4px 12px 4px 0; color: #555;">Total standard (VT)</td><td style="padding: 4px 0; font-weight: 700;">${esc(total_standard_vt)}</td></tr>
         <tr><td style="padding: 4px 12px 4px 0; color: #555;">Total StikmNek (VT)</td><td style="padding: 4px 0; font-weight: 700;">${esc(total_deal_vt)}</td></tr>
@@ -404,6 +410,7 @@ Deno.serve(async (req) => {
       <p style="margin: 0 0 4px;">${esc(tourist_name)}</p>
       <p style="margin: 0 0 4px;">Email: ${esc(tourist_email)}</p>
       ${tourist_whatsapp ? `<p style="margin: 0 0 4px;">WhatsApp: ${esc(tourist_whatsapp)}</p>` : ''}
+      ${tourist_phone ? `<p style="margin: 0 0 4px;">Phone: ${esc(tourist_phone)}</p>` : ''}
       ${message ? `<p style="margin: 12px 0 0;"><strong>Message</strong></p><p style="margin: 4px 0 0; white-space: pre-wrap;">${esc(message)}</p>` : ''}
       <p style="margin: 16px 0 0; color: #555; font-size: 12px;">Sent via StikmNek. Reply directly to this email to reach the guest.</p>
     </div>
