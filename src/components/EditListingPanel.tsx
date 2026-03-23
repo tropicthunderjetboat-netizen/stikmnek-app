@@ -9,8 +9,18 @@ import {
   Tag, DollarSign, FileText, ShieldCheck, Loader2,
   CheckCircle, XCircle, AlertCircle, ArrowRight, History,
   RefreshCw, Power, Undo2, Info, Star,
-  Hash, Sparkles, Percent, Type, MessageCircle
+  Hash, Sparkles, Percent, Type, MessageCircle, Trash2,
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 
 interface PendingEdit {
@@ -27,6 +37,8 @@ interface PendingEdit {
 interface EditListingPanelProps {
   selectedBusiness: Business;
   onToggleActive: (active: boolean) => void;
+  /** Called after the listing is successfully deleted (refresh parent list). */
+  onListingDeleted?: () => void | Promise<void>;
   initialSection?: 'basic' | 'pricing' | 'contact' | 'media';
 }
 
@@ -76,9 +88,12 @@ const validateWhatsAppNumber = (number: string): { valid: boolean; message: stri
 const EditListingPanel: React.FC<EditListingPanelProps> = ({
   selectedBusiness,
   onToggleActive,
+  onListingDeleted,
   initialSection,
 }) => {
   const { user } = useAppContext();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [activeSection, setActiveSection] = useState<EditSection>(initialSection || 'basic');
 
   // Update active section when initialSection prop changes (e.g., from deal expiry banner)
@@ -250,6 +265,39 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
   const handleToggle = async (active: boolean) => {
     setIsActive(active);
     onToggleActive(active);
+  };
+
+  const isOwner =
+    !!user?.id &&
+    selectedBusiness.ownerId != null &&
+    String(selectedBusiness.ownerId) === String(user.id);
+
+  const handleConfirmDelete = async () => {
+    if (!user || !isOwner) {
+      toast.error('Only the listing owner can delete this business.');
+      return;
+    }
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        body: { action: 'delete_own_business', businessId: selectedBusiness.id },
+      });
+      const res = data as { success?: boolean; error?: string } | null | undefined;
+      if (error) {
+        throw new Error(res?.error || error.message || 'Failed to delete listing');
+      }
+      if (!res?.success) {
+        throw new Error(res?.error || 'Failed to delete listing');
+      }
+      toast.success(`“${selectedBusiness.name}” has been removed.`);
+      setDeleteDialogOpen(false);
+      await onListingDeleted?.();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to delete listing';
+      toast.error(msg);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Calculate savings percentage
@@ -1127,6 +1175,65 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
       )}
 
       {/* Edit History */}
+      {/* Danger zone — delete listing (owner only) */}
+      {isOwner && (
+        <div className="bg-red-50/80 rounded-2xl border border-red-200 p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-bold text-red-900 flex items-center gap-2">
+                <Trash2 className="w-4 h-4" />
+                Delete listing
+              </h3>
+              <p className="text-xs text-red-800/90 mt-1 max-w-xl">
+                Permanently remove this listing from StikmNek, including gallery photos. Reviews and favorites linked to
+                this listing will be removed. This cannot be undone.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDeleteDialogOpen(true)}
+              className="shrink-0 px-4 py-2.5 rounded-xl border-2 border-red-300 bg-white text-red-700 text-sm font-bold hover:bg-red-100 transition-colors"
+            >
+              Delete listing…
+            </button>
+          </div>
+        </div>
+      )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete “{selectedBusiness.name}”?</AlertDialogTitle>
+            <AlertDialogDescription className="text-left space-y-2">
+              <span className="block">
+                This will permanently delete your listing and its photos. Related reviews and saved favorites for this
+                listing will also be removed. This action cannot be undone.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmDelete();
+              }}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                  Deleting…
+                </>
+              ) : (
+                'Yes, delete listing'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {editHistory.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-5 border-b border-gray-100 flex items-center justify-between">

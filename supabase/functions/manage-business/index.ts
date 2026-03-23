@@ -25,6 +25,48 @@ function errorResponse(message: string, status = 400) {
   return jsonResponse({ success: false, error: message }, status);
 }
 
+/**
+ * Remove gallery rows + Storage objects for a business, then caller deletes `businesses` row.
+ * `business_photos` may not have ON DELETE CASCADE in all deployments.
+ */
+async function purgeBusinessPhotosAndStorage(
+  supabase: ReturnType<typeof createClient>,
+  businessId: string,
+): Promise<{ error: string | null }> {
+  const { data: photos, error: listErr } = await supabase
+    .from('business_photos')
+    .select('file_path')
+    .eq('business_id', businessId);
+
+  if (listErr) {
+    console.error('[manage-business] purgeBusinessPhotosAndStorage list:', listErr);
+    return { error: listErr.message };
+  }
+
+  const paths = (photos || [])
+    .map((p: { file_path?: string | null }) => p.file_path)
+    .filter((p: string | null | undefined): p is string => typeof p === 'string' && p.trim().length > 0);
+
+  if (paths.length > 0) {
+    const { error: rmErr } = await supabase.storage.from('business-photos').remove(paths);
+    if (rmErr) {
+      console.warn('[manage-business] storage remove (continuing):', rmErr.message);
+    }
+  }
+
+  const { error: delPhErr } = await supabase
+    .from('business_photos')
+    .delete()
+    .eq('business_id', businessId);
+
+  if (delPhErr) {
+    console.error('[manage-business] purgeBusinessPhotosAndStorage delete rows:', delPhErr);
+    return { error: 'Failed to delete photo records: ' + delPhErr.message };
+  }
+
+  return { error: null };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -449,10 +491,62 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true });
     }
 
+    // ─── DELETE_OWN_BUSINESS (owner only; photos + storage + row) ───
+    if (action === 'delete_own_business') {
+      const businessId = body.businessId;
+      if (!businessId) return errorResponse('Missing businessId');
+
+      const { data: bizRow, error: fetchErr } = await supabase
+        .from('businesses')
+        .select('id, owner_id, name')
+        .eq('id', businessId)
+        .maybeSingle();
+
+      if (fetchErr || !bizRow) {
+        return errorResponse('Business not found', 404);
+      }
+      if (!bizRow.owner_id || String(bizRow.owner_id) !== String(authUser.id)) {
+        return errorResponse('You can only delete your own listings', 403);
+      }
+
+      const purge = await purgeBusinessPhotosAndStorage(supabase, businessId);
+      if (purge.error) {
+        return errorResponse(purge.error, 500);
+      }
+
+      const { error: delErr } = await supabase
+        .from('businesses')
+        .delete()
+        .eq('id', businessId)
+        .eq('owner_id', authUser.id);
+
+      if (delErr) {
+        console.error('[manage-business] delete_own_business:', delErr);
+        return errorResponse(delErr.message || 'Failed to delete listing', 500);
+      }
+
+      console.log('[manage-business] delete_own_business OK:', businessId, bizRow.name);
+      return jsonResponse({ success: true, deletedName: bizRow.name });
+    }
+
     // ─── ADMIN_DELETE_BUSINESS ───
     if (action === 'admin_delete_business') {
       const businessId = body.businessId;
       if (!businessId) return errorResponse('Missing businessId');
+
+      const { data: adminProfile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('user_id', authUser.id)
+        .maybeSingle();
+      if (adminProfile?.role !== 'admin') {
+        return errorResponse('Admin access required', 403);
+      }
+
+      const purge = await purgeBusinessPhotosAndStorage(supabase, businessId);
+      if (purge.error) {
+        return errorResponse(purge.error, 500);
+      }
 
       const { error } = await supabase.from('businesses').delete().eq('id', businessId);
       if (error) return errorResponse(error.message, 500);

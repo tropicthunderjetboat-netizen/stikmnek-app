@@ -477,6 +477,13 @@ const BusinessOwnerDashboard: React.FC = () => {
     }
   }, [user, selectedBusinessId]);
 
+  const handleListingDeleted = useCallback(async () => {
+    setSelectedBusinessId('');
+    await refreshBusinesses();
+    await loadAllOwnerData(false);
+    setActiveTab('overview');
+  }, [refreshBusinesses, loadAllOwnerData]);
+
   // Initial load
   useEffect(() => {
     loadAllOwnerData();
@@ -1584,7 +1591,14 @@ const BusinessOwnerDashboard: React.FC = () => {
 
             {activeTab === 'analytics' && selectedBusiness && selectedIsApproved && (<DashboardAnalytics selectedBusiness={selectedBusiness as any} />)}
             {activeTab === 'analytics' && selectedBusiness && !selectedIsApproved && renderPendingOnlyNotice('Analytics are available once your listing is approved.')}
-            {activeTab === 'edit' && selectedBusiness && selectedIsApproved && (<EditListingPanel selectedBusiness={selectedBusiness as any} onToggleActive={handleToggleActive} initialSection={editInitialSection} />)}
+            {activeTab === 'edit' && selectedBusiness && selectedIsApproved && (
+              <EditListingPanel
+                selectedBusiness={selectedBusiness as any}
+                onToggleActive={handleToggleActive}
+                onListingDeleted={handleListingDeleted}
+                initialSection={editInitialSection}
+              />
+            )}
             {activeTab === 'edit' && selectedBusiness && !selectedIsApproved && renderPendingOnlyNotice('Editing is available once your listing is approved.')}
             {activeTab === 'reviews' && selectedBusiness && renderReviewsTab()}
             {activeTab === 'photos' && selectedBusiness && renderPhotosTab()}
