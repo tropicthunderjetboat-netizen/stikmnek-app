@@ -23,8 +23,14 @@ const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' 
   </svg>
 );
 
+/** Digits only for wa.me (international, no leading +). */
 function digitsForWaMe(raw: string): string {
   return raw.replace(/\D/g, '');
+}
+
+/** Display business phone without hiding meaningful characters. */
+function formatBusinessPhoneDisplay(phone: string): string {
+  return phone.replace(/[^\d+\s()-]/g, '').trim() || phone.trim();
 }
 
 export interface BookingInquiryModalProps {
@@ -73,42 +79,74 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
   const totalDeal = totalPax > 0 ? deal * totalPax : 0;
   const savings = Math.max(0, totalStandard - totalDeal);
 
-  const showEmail =
+  /** Listing email fields (mapped to contactEmail) or claimed listing → edge function can deliver. */
+  const hasListingOrOwnerEmailPath =
     Boolean(biz.ownerId) || Boolean(biz.contactEmail && String(biz.contactEmail).trim());
-  const showWhatsApp = Boolean(biz.whatsappNumber && String(biz.whatsappNumber).trim());
-  const showPhone = Boolean(biz.phone && String(biz.phone).replace(/\s/g, ''));
+
+  /** WhatsApp: field present and enough digits for wa.me (min 5). */
+  const businessWaDigits = useMemo(() => digitsForWaMe(biz.whatsappNumber || ''), [biz.whatsappNumber]);
+  const showWhatsApp = businessWaDigits.length >= 5;
+
+  const businessPhoneRaw = (biz.phone || '').trim();
+  const businessPhoneDigits = businessPhoneRaw.replace(/[^\d+]/g, '');
+  const showPhone = Boolean(businessPhoneRaw && businessPhoneDigits.length >= 3);
+  const businessPhoneDisplay = formatBusinessPhoneDisplay(biz.phone || '');
+
+  const showEmail = hasListingOrOwnerEmailPath;
 
   const whatsappBookingUrl = useMemo(() => {
-    if (!biz.whatsappNumber) return '';
-    const digits = digitsForWaMe(biz.whatsappNumber);
-    if (!digits) return '';
+    if (!showWhatsApp) return '';
     const userLabel = contactName.trim() || 'a guest';
     const dateLabel = visitDate || '—';
     const paxLabel = totalPax > 0 ? String(totalPax) : '—';
     const priceLabel = formatVT(totalDeal);
     const text = `Hi, I'm ${userLabel} from StikmNek. I'd like to book ${biz.name} for ${dateLabel} with ${paxLabel} people. My calculated StikmNek price is ${priceLabel}.`;
-    return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
-  }, [biz.whatsappNumber, biz.name, contactName, visitDate, totalPax, totalDeal]);
+    return `https://wa.me/${businessWaDigits}?text=${encodeURIComponent(text)}`;
+  }, [showWhatsApp, businessWaDigits, biz.name, contactName, visitDate, totalPax, totalDeal]);
 
   const telHref = useMemo(() => {
-    if (!biz.phone) return '';
-    const cleaned = biz.phone.replace(/[^\d+]/g, '');
+    if (!showPhone) return '';
+    const cleaned = biz.phone!.replace(/[^\d+]/g, '');
     return cleaned ? `tel:${cleaned}` : '';
-  }, [biz.phone]);
+  }, [showPhone, biz.phone]);
 
   const copy = {
-    title:
+    titlePrefix:
       language === 'en'
-        ? 'Booking inquiry'
+        ? 'Booking inquiry for'
         : language === 'fr'
-          ? 'Demande de réservation'
-          : 'Bukin ask',
-    desc:
+          ? 'Demande de réservation pour'
+          : 'Bukin ask long',
+    intro:
       language === 'en'
-        ? 'Choose how to reach this business with your details below.'
+        ? 'Fill in your visit details and how the business can reach you. Then use the buttons below to contact this business using their own phone, WhatsApp, or listing email.'
         : language === 'fr'
-          ? 'Choisissez comment contacter ce commerce avec vos informations ci-dessous.'
-          : 'Jusum we blong kontaktem bisnis wetem infomesen blong yu.',
+          ? 'Indiquez votre visite et vos coordonnées pour que le commerce puisse vous répondre. Utilisez ensuite les boutons ci-dessous pour joindre ce commerce (téléphone, WhatsApp ou e-mail du commerce).'
+          : 'Putum detaels blong visit mo kontakt blong yu. Bihain yusum baten ya blong kolem o WhatsApp o imel blong bisnis.',
+    yourDetails:
+      language === 'en'
+        ? 'Your contact details'
+        : language === 'fr'
+          ? 'Vos coordonnées'
+          : 'Kontakt blong yu',
+    yourDetailsHint:
+      language === 'en'
+        ? 'The business will use these to reply to you.'
+        : language === 'fr'
+          ? 'Le commerce utilisera ces informations pour vous répondre.'
+          : 'Bisnis bae yusum olgeta blong beken long yu.',
+    reachBusiness:
+      language === 'en'
+        ? 'Contact this business'
+        : language === 'fr'
+          ? 'Contacter ce commerce'
+          : 'Kontaktem bisnis',
+    reachBusinessHint:
+      language === 'en'
+        ? 'Uses this listing’s phone, WhatsApp, or email — not your number above.'
+        : language === 'fr'
+          ? 'Utilise le téléphone, WhatsApp ou l’e-mail de cette fiche — pas vos coordonnées ci-dessus.'
+          : 'Yusum fon o WhatsApp o imel blong lisiting — no long namba blong yu.',
     date: language === 'en' ? 'Visit date' : language === 'fr' ? 'Date de visite' : 'Dei blong visit',
     adults: language === 'en' ? 'Adults' : language === 'fr' ? 'Adultes' : 'Ol man',
     children: language === 'en' ? 'Children' : language === 'fr' ? 'Enfants' : 'Pikinini',
@@ -116,12 +154,12 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
     stikmnek: language === 'en' ? 'Total StikmNek price' : language === 'fr' ? 'Prix StikmNek total' : 'StikmNek praes',
     save: language === 'en' ? 'Your savings' : language === 'fr' ? 'Vos économies' : 'Sevin blong yu',
     name: language === 'en' ? 'Your name' : language === 'fr' ? 'Votre nom' : 'Nem blong yu',
-    email: language === 'en' ? 'Email' : language === 'fr' ? 'E-mail' : 'Imel',
-    wa: language === 'en' ? 'WhatsApp (optional)' : language === 'fr' ? 'WhatsApp (optionnel)' : 'WhatsApp',
-    msg: language === 'en' ? 'Message (optional)' : language === 'fr' ? 'Message (optionnel)' : 'Mesej',
-    emailBtn: language === 'en' ? 'Send via email' : language === 'fr' ? 'Envoyer par e-mail' : 'Send long imel',
-    waBtn: language === 'en' ? 'Chat on WhatsApp' : language === 'fr' ? 'Discuter sur WhatsApp' : 'Toktok long WhatsApp',
-    callBtn: language === 'en' ? 'Call business' : language === 'fr' ? 'Appeler' : 'Kolem bisnis',
+    email: language === 'en' ? 'Your email' : language === 'fr' ? 'Votre e-mail' : 'Imel blong yu',
+    wa: language === 'en' ? 'Your WhatsApp (optional)' : language === 'fr' ? 'Votre WhatsApp (optionnel)' : 'WhatsApp blong yu',
+    msg: language === 'en' ? 'Message to the business (optional)' : language === 'fr' ? 'Message au commerce (optionnel)' : 'Mesej long bisnis',
+    emailBtn: language === 'en' ? 'Send request by email' : language === 'fr' ? 'Envoyer la demande par e-mail' : 'Send ask long imel',
+    waBtn: language === 'en' ? 'Chat on business WhatsApp' : language === 'fr' ? 'WhatsApp du commerce' : 'WhatsApp blong bisnis',
+    callBtn: language === 'en' ? 'Call' : language === 'fr' ? 'Appeler' : 'Kolem',
     noContact:
       language === 'en'
         ? 'This listing has no email, WhatsApp, or phone on file. Please try again later.'
@@ -187,19 +225,20 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
     }
   };
 
+  const hasAnyBusinessContact = showEmail || showWhatsApp || showPhone;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{copy.title}</DialogTitle>
-          <DialogDescription>{copy.desc}</DialogDescription>
+          <DialogTitle className="text-left leading-snug">
+            {copy.titlePrefix}{' '}
+            <span className="text-teal-700">{biz.name}</span>
+          </DialogTitle>
+          <DialogDescription className="text-left text-sm">{copy.intro}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
-          <div className="rounded-lg border border-teal-100 bg-teal-50/50 px-3 py-2">
-            <p className="text-sm font-semibold text-gray-900">{biz.name}</p>
-          </div>
-
+        <div className="space-y-5 pt-1">
           <div className="grid gap-2">
             <Label htmlFor="visit-date">{copy.date}</Label>
             <Input
@@ -253,72 +292,100 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
             </div>
           )}
 
-          <div className="grid gap-2">
-            <Label htmlFor="inquiry-name">{copy.name}</Label>
-            <Input id="inquiry-name" value={contactName} onChange={(e) => setContactName(e.target.value)} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="inquiry-email">{copy.email}</Label>
-            <Input
-              id="inquiry-email"
-              type="email"
-              value={contactEmail}
-              onChange={(e) => setContactEmail(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="inquiry-wa">{copy.wa}</Label>
-            <Input
-              id="inquiry-wa"
-              type="tel"
-              placeholder="+678 ..."
-              value={contactWhatsapp}
-              onChange={(e) => setContactWhatsapp(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="inquiry-msg">{copy.msg}</Label>
-            <textarea
-              id="inquiry-msg"
-              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-            />
+          <div className="border-t border-gray-100 pt-4 space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">{copy.yourDetails}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{copy.yourDetailsHint}</p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="inquiry-name">{copy.name}</Label>
+              <Input id="inquiry-name" value={contactName} onChange={(e) => setContactName(e.target.value)} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="inquiry-email">{copy.email}</Label>
+              <Input
+                id="inquiry-email"
+                type="email"
+                autoComplete="email"
+                value={contactEmail}
+                onChange={(e) => setContactEmail(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="inquiry-wa">{copy.wa}</Label>
+              <Input
+                id="inquiry-wa"
+                type="tel"
+                autoComplete="tel"
+                placeholder={language === 'en' ? '+678 …' : '+678 …'}
+                value={contactWhatsapp}
+                onChange={(e) => setContactWhatsapp(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="inquiry-msg">{copy.msg}</Label>
+              <textarea
+                id="inquiry-msg"
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+            </div>
           </div>
 
-          {!showEmail && !showWhatsApp && !showPhone ? (
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-3">{copy.noContact}</p>
-          ) : (
-            <div className="flex flex-col gap-2 pt-2">
-              {showEmail && (
-                <Button
-                  type="button"
-                  className="w-full gap-2 bg-teal-600 hover:bg-teal-700"
-                  disabled={sendingEmail || totalPax < 1}
-                  onClick={handleSendEmail}
-                >
-                  {sendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                  {copy.emailBtn}
-                </Button>
-              )}
-              {showWhatsApp && whatsappBookingUrl && (
-                <Button type="button" variant="outline" className="w-full gap-2 border-green-600 text-green-700 hover:bg-green-50" asChild>
-                  <a href={whatsappBookingUrl} target="_blank" rel="noopener noreferrer">
-                    <WhatsAppIcon className="h-4 w-4" />
-                    {copy.waBtn}
-                  </a>
-                </Button>
-              )}
-              {showPhone && telHref && (
-                <Button type="button" variant="outline" className="w-full gap-2" asChild>
-                  <a href={telHref}>
-                    <Phone className="h-4 w-4" />
-                    {copy.callBtn}
-                  </a>
-                </Button>
-              )}
+          <div className="border-t border-gray-200 pt-4 space-y-2">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">{copy.reachBusiness}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{copy.reachBusinessHint}</p>
             </div>
-          )}
+
+            {!hasAnyBusinessContact ? (
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-3">{copy.noContact}</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {showEmail && (
+                  <Button
+                    type="button"
+                    className="w-full justify-center gap-2 bg-teal-600 hover:bg-teal-700 h-auto min-h-10 py-2.5 px-3"
+                    disabled={sendingEmail || totalPax < 1}
+                    onClick={handleSendEmail}
+                  >
+                    {sendingEmail ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Mail className="h-4 w-4 shrink-0" />}
+                    <span className="text-left leading-tight">{copy.emailBtn}</span>
+                  </Button>
+                )}
+                {showWhatsApp && whatsappBookingUrl && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-center gap-2 border-green-600 text-green-800 hover:bg-green-50 h-auto min-h-10 py-2.5 px-3"
+                    asChild
+                  >
+                    <a href={whatsappBookingUrl} target="_blank" rel="noopener noreferrer">
+                      <WhatsAppIcon className="h-4 w-4 shrink-0" />
+                      <span className="text-left leading-tight">{copy.waBtn}</span>
+                    </a>
+                  </Button>
+                )}
+                {showPhone && telHref && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-center gap-2 h-auto min-h-10 py-2.5 px-3"
+                    asChild
+                  >
+                    <a href={telHref}>
+                      <Phone className="h-4 w-4 shrink-0" />
+                      <span className="text-left leading-tight">
+                        {copy.callBtn} <span className="font-semibold text-gray-900">{businessPhoneDisplay}</span>
+                      </span>
+                    </a>
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
