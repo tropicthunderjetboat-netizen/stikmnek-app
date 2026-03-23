@@ -21,6 +21,8 @@ export interface Business {
   /** Public contact email from listing (if column exists in DB). */
   contactEmail?: string | null;
   whatsappNumber?: string | null;
+  /** Same as DB `whatsapp_number` when row is passed through without mapping. */
+  whatsapp_number?: string | null;
   tags: string[];
   featured: boolean;
   ownerId?: string | null;

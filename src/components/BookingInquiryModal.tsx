@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Business } from '@/data/businesses';
 import type { User, UserProfile } from '@/contexts/AppContext';
 import type { Language } from '@/data/translations';
-import { formatVT } from '@/lib/utils';
+import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Mail, Phone, Loader2 } from 'lucide-react';
@@ -23,20 +23,9 @@ const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' 
   </svg>
 );
 
-/** Digits only for wa.me (international, no leading +). */
-function digitsForWaMe(raw: string): string {
-  return raw.replace(/\D/g, '');
-}
-
 /** Display business phone without hiding meaningful characters. */
 function formatBusinessPhoneDisplay(phone: string): string {
   return phone.replace(/[^\d+\s()-]/g, '').trim() || phone.trim();
-}
-
-/** Resolve business WhatsApp from app model (camelCase) or raw DB (snake_case). */
-function getBusinessWhatsAppRaw(biz: Business): string {
-  const b = biz as Business & { whatsapp_number?: string | null };
-  return String(biz.whatsappNumber ?? b.whatsapp_number ?? '').trim();
 }
 
 export interface BookingInquiryModalProps {
@@ -70,19 +59,71 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
   const [sendingEmail, setSendingEmail] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !user?.id) return;
+    let cancelled = false;
     setVisitDate(today);
-    const p = userProfile;
-    setAdults(Math.max(0, p?.num_adults ?? 1));
-    setChildren(Math.max(0, p?.num_children ?? 0));
-    setInfants(Math.max(0, p?.num_infants ?? 0));
     setContactName(user.name || '');
-    setContactEmail((p?.email || user.email || '').trim());
-    const wa = (p?.whatsapp_number || '').trim() || (p?.phone || '').trim();
-    setContactWhatsapp(wa);
-    setContactPhone((p?.phone || '').trim());
     setMessage('');
-  }, [open, user.name, user.email, today, userProfile]);
+
+    const applyFromProfile = (row: {
+      phone?: string | null;
+      whatsapp_number?: string | null;
+      email?: string | null;
+      num_adults?: number | null;
+      num_children?: number | null;
+      num_infants?: number | null;
+    }) => {
+      setAdults(Math.max(0, row.num_adults ?? 1));
+      setChildren(Math.max(0, row.num_children ?? 0));
+      setInfants(Math.max(0, row.num_infants ?? 0));
+      setContactEmail((row.email || user.email || '').trim());
+      const phoneStr = String(row.phone ?? '').trim();
+      const waStr = String(row.whatsapp_number ?? '').trim();
+      setContactPhone(phoneStr);
+      setContactWhatsapp(waStr || phoneStr);
+    };
+
+    if (userProfile) {
+      applyFromProfile({
+        phone: userProfile.phone,
+        whatsapp_number: userProfile.whatsapp_number,
+        email: userProfile.email,
+        num_adults: userProfile.num_adults,
+        num_children: userProfile.num_children,
+        num_infants: userProfile.num_infants,
+      });
+    } else {
+      setAdults(1);
+      setChildren(0);
+      setInfants(0);
+      setContactEmail((user.email || '').trim());
+      setContactWhatsapp('');
+      setContactPhone('');
+    }
+
+    void (async () => {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('phone, whatsapp_number, email, num_adults, num_children, num_infants')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (cancelled || error || !data) return;
+      applyFromProfile(
+        data as {
+          phone?: string | null;
+          whatsapp_number?: string | null;
+          email?: string | null;
+          num_adults?: number | null;
+          num_children?: number | null;
+          num_infants?: number | null;
+        },
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, user?.id, user.name, user.email, today, userProfile]);
 
   const totalPax = Math.max(0, adults) + Math.max(0, children);
   const original = Number(biz.originalPrice) || 0;
@@ -95,8 +136,11 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
   const hasListingOrOwnerEmailPath =
     Boolean(biz.ownerId) || Boolean(biz.contactEmail && String(biz.contactEmail).trim());
 
-  /** Business WhatsApp: listing field (camelCase or snake_case) with enough digits for wa.me. */
-  const businessWaDigits = useMemo(() => digitsForWaMe(getBusinessWhatsAppRaw(biz)), [biz]);
+  /** Business WhatsApp: camelCase + snake_case; min digit length for valid wa.me. */
+  const businessWaDigits = useMemo(
+    () => digitsForWaMe(getBusinessWhatsAppRaw(biz)),
+    [biz.id, biz.whatsappNumber, biz.whatsapp_number],
+  );
   const showWhatsApp = businessWaDigits.length >= 5;
 
   const businessPhoneRaw = (biz.phone || '').trim();

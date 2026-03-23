@@ -55,3 +55,16 @@ export function getBusinessImageUrl(
   const storagePath = path.startsWith('images/') ? path.slice(7) : path;
   return `${base}/storage/v1/object/public/${bucket}/${storagePath}`;
 }
+
+/** WhatsApp from app model (`whatsappNumber`) or DB column (`whatsapp_number`). */
+export function getBusinessWhatsAppRaw(biz: {
+  whatsappNumber?: string | null;
+  whatsapp_number?: string | null;
+}): string {
+  return String(biz.whatsappNumber ?? biz.whatsapp_number ?? '').trim();
+}
+
+/** Digits only for `wa.me` links (international, no +). */
+export function digitsForWaMe(raw: string): string {
+  return raw.replace(/\D/g, '');
+}

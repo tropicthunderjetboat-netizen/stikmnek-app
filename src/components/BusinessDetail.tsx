@@ -5,7 +5,7 @@ import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, Mes
 import { toast } from 'sonner';
 import ReviewForm from '@/components/ReviewForm';
 import PhotoGallery from '@/components/PhotoGallery';
-import { formatVT } from '@/lib/utils';
+import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import BookingInquiryModal from '@/components/BookingInquiryModal';
 
@@ -20,8 +20,7 @@ const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' 
 
 // Helper to format WhatsApp number for URL
 function getWhatsAppUrl(number: string, businessName?: string): string {
-  const cleaned = number.replace(/[^\d+]/g, '');
-  const digits = cleaned.startsWith('+') ? cleaned.slice(1) : cleaned;
+  const digits = digitsForWaMe(number);
   const message = encodeURIComponent(
     businessName
       ? `Hi, I found ${businessName} on StikmNek and would like to inquire about your services.`
@@ -41,7 +40,7 @@ const BusinessDetail: React.FC = () => {
   const {
     language, selectedBusiness, setCurrentView, setSelectedBusiness,
     favorites, toggleFavorite, user, userProfile, setShowAuth, setAuthMode,
-    dbReviews
+    dbReviews,
   } = useAppContext();
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -76,7 +75,47 @@ const BusinessDetail: React.FC = () => {
     return () => { cancelled = true; };
   }, [biz.id, reviews]);
   const desc = language === 'fr' ? biz.descriptionFr : language === 'bi' ? biz.descriptionBi : biz.description;
-  const hasWhatsApp = !!biz.whatsappNumber;
+
+  /** Normalize WhatsApp from camelCase + DB snake_case; wa.me needs enough digits. */
+  const businessWhatsAppRaw = getBusinessWhatsAppRaw(biz);
+  const hasWhatsApp = digitsForWaMe(businessWhatsAppRaw).length >= 5;
+
+  /** Refresh listing contact fields from DB so `whatsapp_number` is never stale in UI/modal. */
+  useEffect(() => {
+    if (!biz?.id) return;
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('whatsapp_number, phone, email, contact_email')
+        .eq('id', biz.id)
+        .maybeSingle();
+      if (cancelled || error || !data) return;
+      const row = data as {
+        whatsapp_number?: string | null;
+        phone?: string | null;
+        email?: string | null;
+        contact_email?: string | null;
+      };
+      setSelectedBusiness((prev) => {
+        if (!prev || prev.id !== biz.id) return prev;
+        const wa = row.whatsapp_number?.trim();
+        return {
+          ...prev,
+          whatsappNumber: wa || prev.whatsappNumber,
+          phone: row.phone?.trim() || prev.phone,
+          contactEmail:
+            row.contact_email?.trim() ||
+            row.email?.trim() ||
+            prev.contactEmail ||
+            null,
+        };
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [biz.id, setSelectedBusiness]);
 
   // Compute super star count: use DB field if available, otherwise count from reviews
   const superStarCount = (biz.superStarCount && biz.superStarCount > 0)
@@ -112,8 +151,9 @@ const BusinessDetail: React.FC = () => {
   };
 
   const handleWhatsApp = () => {
-    if (biz.whatsappNumber) {
-      window.open(getWhatsAppUrl(biz.whatsappNumber, biz.name), '_blank', 'noopener,noreferrer');
+    const raw = getBusinessWhatsAppRaw(biz);
+    if (raw && digitsForWaMe(raw).length >= 5) {
+      window.open(getWhatsAppUrl(raw, biz.name), '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -209,7 +249,7 @@ const BusinessDetail: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-green-200 flex-1 min-w-0">
                     <WhatsAppIcon className="w-4 h-4 text-green-600 shrink-0" />
-                    <span className="text-sm font-medium text-gray-700 truncate">{formatWhatsAppDisplay(biz.whatsappNumber!)}</span>
+                    <span className="text-sm font-medium text-gray-700 truncate">{formatWhatsAppDisplay(businessWhatsAppRaw)}</span>
                   </div>
                   <button
                     onClick={handleWhatsApp}
@@ -462,7 +502,7 @@ const BusinessDetail: React.FC = () => {
                     className="flex items-center gap-3 text-sm text-green-600 hover:text-green-700 transition-colors w-full text-left group"
                   >
                     <WhatsAppIcon className="w-4 h-4 shrink-0" />
-                    <span className="group-hover:underline">{formatWhatsAppDisplay(biz.whatsappNumber!)}</span>
+                    <span className="group-hover:underline">{formatWhatsAppDisplay(businessWhatsAppRaw)}</span>
                     <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
                 )}
