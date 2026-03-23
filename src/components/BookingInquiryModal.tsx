@@ -185,7 +185,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
     }
     setSendingEmail(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-email', {
+      const { data, error: invokeError } = await supabase.functions.invoke('send-email', {
         body: {
           action: 'send_booking_inquiry',
           business_id: biz.id,
@@ -201,7 +201,23 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
           savings_vt: savings,
         },
       });
-      if (data && typeof data === 'object' && (data as { success?: boolean }).success) {
+
+      const payload = data as { success?: boolean; error?: string; details?: string } | null | undefined;
+      const bodyError =
+        typeof payload?.error === 'string' ? payload.error : undefined;
+
+      // Non-2xx: invokeError is set; body may still be in `data` with JSON error
+      if (invokeError) {
+        console.error('[BookingInquiry] send-email invoke error:', invokeError, 'data:', data);
+        toast.error(
+          bodyError ||
+            invokeError.message ||
+            (language === 'en' ? 'Could not send email' : 'Échec de l’envoi'),
+        );
+        return;
+      }
+
+      if (payload?.success) {
         toast.success(
           language === 'en'
             ? 'Request sent! The business will contact you shortly.'
@@ -212,11 +228,11 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
         onOpenChange(false);
         return;
       }
-      const failMsg =
-        typeof (data as { error?: string } | null)?.error === 'string'
-          ? (data as { error: string }).error
-          : error?.message || 'Could not send email';
-      toast.error(failMsg);
+
+      toast.error(
+        bodyError ||
+          (language === 'en' ? 'Could not send email' : 'Échec de l’envoi'),
+      );
     } catch (e) {
       console.error(e);
       toast.error(language === 'en' ? 'Could not send email' : 'Échec de l’envoi');
