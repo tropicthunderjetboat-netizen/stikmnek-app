@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -254,7 +254,10 @@ const BusinessOwnerDashboard: React.FC = () => {
     if (!categoryUsesTieredPricing(submitForm.category)) setPricingTiers([]);
   }, [submitForm.category]);
 
-
+  const tierDiscountPercent = useMemo(() => {
+    const p = parseFloat(submitForm.discountPercent);
+    return Number.isFinite(p) && p >= 0 ? p : null;
+  }, [submitForm.discountPercent]);
 
   // ═══ LOAD ALL OWNER DATA (UNIFIED) ═══
   const loadAllOwnerData = useCallback(async (showToast = false) => {
@@ -1443,6 +1446,7 @@ const BusinessOwnerDashboard: React.FC = () => {
                 tiers={pricingTiers}
                 onChange={setPricingTiers}
                 language={language}
+                discountPercent={tierDiscountPercent}
               />
             )}
 

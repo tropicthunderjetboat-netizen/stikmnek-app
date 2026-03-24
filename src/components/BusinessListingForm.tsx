@@ -99,6 +99,11 @@ const BusinessListingForm: React.FC = () => {
 
 
   // Auto-calculate deal price and discount label when original price or discount % changes
+  const tierDiscountPercent = useMemo(() => {
+    const p = parseFloat(form.discountPercent);
+    return Number.isFinite(p) && p >= 0 ? p : null;
+  }, [form.discountPercent]);
+
   const calculatedDealPrice = useMemo(() => {
     const orig = parseFloat(form.originalPrice);
     const pct = parseFloat(form.discountPercent);
@@ -701,6 +706,7 @@ const BusinessListingForm: React.FC = () => {
               tiers={pricingTiers}
               onChange={setPricingTiers}
               language={language}
+              discountPercent={tierDiscountPercent}
             />
           )}
 

@@ -464,6 +464,7 @@ Deno.serve(async (req) => {
           discount_valid_from: pending.discount_valid_from || null,
           discount_valid_until: pending.discount_valid_until || null,
           whatsapp_number: pending.whatsapp_number || null,
+          pricing_tiers: pending.pricing_tiers ?? null,
         };
 
         const { data: newBiz, error: insertErr } = await supabase
@@ -477,7 +478,22 @@ Deno.serve(async (req) => {
           return errorResponse('Approved but failed to create business record: ' + insertErr.message, 500);
         }
 
-        // Update business_photos: point to new business id AND set status = 'approved' so they're visible
+        // Move gallery rows to the live business. Preserve admin rejections — only non-rejected
+        // rows become approved (matches review_pending_business RPC).
+        const { error: rejErr } = await supabase
+          .from('business_photos')
+          .update({ business_id: newBiz.id })
+          .eq('business_id', businessId)
+          .eq('status', 'rejected');
+
+        if (rejErr) {
+          console.error('[manage-business] Photo update (rejected) failed after business approval:', rejErr);
+          return errorResponse(
+            'Business approved but rejected photos could not be relinked. Error: ' + rejErr.message,
+            500
+          );
+        }
+
         const { error: photoErr } = await supabase
           .from('business_photos')
           .update({ business_id: newBiz.id, status: 'approved' })

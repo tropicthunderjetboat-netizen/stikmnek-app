@@ -109,3 +109,47 @@ export function categoryUsesTieredPricing(category: string): boolean {
   const c = (category || '').toLowerCase();
   return c === 'tours' || c === 'activities';
 }
+
+/**
+ * Booking inquiry totals from tier rows × Adults / Children / Infants.
+ * Single tier: all guests use that per-person price.
+ * Multiple tiers: match row labels (adult / child / infant keywords) or fall back by index.
+ */
+export function computeTieredBookingTotals(
+  tiers: PricingTierInput[],
+  adults: number,
+  children: number,
+  infants: number,
+): { totalStandard: number; totalDeal: number } {
+  const a = Math.max(0, adults);
+  const ch = Math.max(0, children);
+  const inf = Math.max(0, infants);
+  const usable = tiers.filter((t) => t.original_price_vt > 0 && t.deal_price_vt >= 0);
+  if (usable.length === 0) return { totalStandard: 0, totalDeal: 0 };
+
+  if (usable.length === 1) {
+    const t = usable[0];
+    const pax = a + ch + inf;
+    return {
+      totalStandard: pax * t.original_price_vt,
+      totalDeal: pax * t.deal_price_vt,
+    };
+  }
+
+  const low = (s: string) => s.toLowerCase();
+  const pick = (pred: (label: string) => boolean, indexFallback: number): PricingTierInput => {
+    const found = usable.find((t) => pred(low(t.label)));
+    if (found) return found;
+    return usable[Math.min(indexFallback, usable.length - 1)] ?? usable[0];
+  };
+
+  const tAdult = pick((l) => /adult|13\+|adulte|senior|grown/.test(l), 0);
+  const tChild = pick((l) => /child|kid|enfant|pikinini|minor|2-12|5-12|6-12|7-12|school/.test(l), 1);
+  const tInfant = pick((l) => /infant|baby|b[eé]b[eé]|0-4|0–4|toddler|smol/.test(l), 2);
+
+  return {
+    totalStandard:
+      a * tAdult.original_price_vt + ch * tChild.original_price_vt + inf * tInfant.original_price_vt,
+    totalDeal: a * tAdult.deal_price_vt + ch * tChild.deal_price_vt + inf * tInfant.deal_price_vt,
+  };
+}

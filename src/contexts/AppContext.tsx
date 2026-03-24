@@ -164,7 +164,7 @@ interface AppContextType {
   setCart: (item: CartItem | null) => void;
   purchasePass: (passType: 'daily' | 'weekly' | 'monthly') => void;
   selectedBusiness: Business | null;
-  setSelectedBusiness: (biz: Business | null) => void;
+  setSelectedBusiness: React.Dispatch<React.SetStateAction<Business | null>>;
   showAuth: boolean;
   setShowAuth: (show: boolean) => void;
   authMode: 'signin' | 'signup' | 'signup-tourist' | 'signup-business';

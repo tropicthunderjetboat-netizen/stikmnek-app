@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, MessageSquarePlus, Sparkles, ExternalLink, Store } from 'lucide-react';
+import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, MessageSquarePlus, Sparkles, ExternalLink, Store, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import ReviewForm from '@/components/ReviewForm';
 import PhotoGallery from '@/components/PhotoGallery';
@@ -9,6 +9,7 @@ import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe, getPhotoDisplayUrl } f
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import BookingInquiryModal from '@/components/BookingInquiryModal';
+import { categoryUsesTieredPricing, pricingTiersFromDb } from '@/lib/pricingTiers';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
 
@@ -70,6 +71,12 @@ const BusinessDetail: React.FC = () => {
   }, [biz.id, reviews]);
   const desc = language === 'fr' ? biz.descriptionFr : language === 'bi' ? biz.descriptionBi : biz.description;
 
+  const pricingTiers = useMemo(
+    () => pricingTiersFromDb(biz.pricingTiers ?? (biz as { pricing_tiers?: unknown }).pricing_tiers),
+    [biz.id, biz.pricingTiers],
+  );
+  const showTieredTable = categoryUsesTieredPricing(biz.category) && pricingTiers.length > 0;
+
   /** Normalize WhatsApp from camelCase + DB snake_case; wa.me needs enough digits. */
   const businessWhatsAppRaw = getBusinessWhatsAppRaw(biz);
   const hasWhatsApp = digitsForWaMe(businessWhatsAppRaw).length >= 5;
@@ -77,12 +84,13 @@ const BusinessDetail: React.FC = () => {
   /** Refresh listing contact fields from DB so `whatsapp_number` is never stale in UI/modal. */
   useEffect(() => {
     if (!biz?.id) return;
+    const businessId = biz.id;
     let cancelled = false;
     void (async () => {
       const { data, error } = await supabase
         .from('businesses')
         .select('whatsapp_number, phone, email, contact_email')
-        .eq('id', biz.id)
+        .eq('id', businessId)
         .maybeSingle();
       if (cancelled || error || !data) return;
       const row = data as {
@@ -91,22 +99,26 @@ const BusinessDetail: React.FC = () => {
         email?: string | null;
         contact_email?: string | null;
       };
-      const wa = row.whatsapp_number?.trim();
-      setSelectedBusiness({
-        ...biz,
-        whatsappNumber: wa || biz.whatsappNumber,
-        phone: row.phone?.trim() || biz.phone,
-        contactEmail:
-          row.contact_email?.trim() ||
-          row.email?.trim() ||
-          biz.contactEmail ||
-          null,
+      const wa = (row.whatsapp_number ?? '').trim();
+      setSelectedBusiness((current) => {
+        if (!current || current.id !== businessId) return current;
+        return {
+          ...current,
+          whatsappNumber: wa || current.whatsappNumber || null,
+          whatsapp_number: wa || current.whatsapp_number || null,
+          phone: (row.phone ?? '').trim() || current.phone,
+          contactEmail:
+            (row.contact_email ?? '').trim() ||
+            (row.email ?? '').trim() ||
+            current.contactEmail ||
+            null,
+        };
       });
     })();
     return () => {
       cancelled = true;
     };
-  }, [biz, setSelectedBusiness]);
+  }, [biz.id, setSelectedBusiness]);
 
   // Public moderation safety: only use approved photos for the primary cover when available.
   useEffect(() => {
@@ -252,6 +264,61 @@ const BusinessDetail: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {showTieredTable && (
+              <div className="bg-white rounded-xl p-5 shadow-sm border border-violet-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-9 h-9 rounded-lg bg-violet-100 flex items-center justify-center">
+                    <Layers className="w-4 h-4 text-violet-700" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-violet-900 text-sm">
+                      {language === 'en' ? 'Per-person pricing (VT)' : language === 'fr' ? 'Tarifs par personne (VT)' : 'Praes long wanwan man (VT)'}
+                    </h3>
+                    <p className="text-xs text-violet-700/85">
+                      {language === 'en'
+                        ? 'Rates by guest type. Use Request booking to estimate totals for your party.'
+                        : language === 'fr'
+                          ? 'Tarifs selon le type de visiteur. Utilisez « Demander une réservation » pour le total.'
+                          : 'Praes blong wanwan kaen man. Yusum Askem bukin blong lukim totel.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-violet-100">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-violet-100 text-left text-[10px] uppercase tracking-wide text-gray-500">
+                        <th className="px-3 py-2 font-semibold">
+                          {language === 'en' ? 'Tier' : language === 'fr' ? 'Palier' : 'Ta'}
+                        </th>
+                        <th className="px-3 py-2 font-semibold">
+                          {language === 'en' ? 'Pax' : language === 'fr' ? 'Pers.' : 'Man'}
+                        </th>
+                        <th className="px-3 py-2 font-semibold">
+                          {language === 'en' ? 'Standard' : language === 'fr' ? 'Standard' : 'Stanad'}
+                        </th>
+                        <th className="px-3 py-2 font-semibold text-teal-800">
+                          StikmNek
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pricingTiers.map((row, i) => (
+                        <tr key={i} className="border-b border-gray-50 last:border-0">
+                          <td className="px-3 py-2 font-medium text-gray-900">{row.label || '—'}</td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {row.min_pax}
+                            {row.max_pax != null ? `–${row.max_pax}` : '+'}
+                          </td>
+                          <td className="px-3 py-2 text-gray-800">{formatVT(row.original_price_vt)}</td>
+                          <td className="px-3 py-2 font-semibold text-teal-700">{formatVT(row.deal_price_vt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* WhatsApp Contact Card */}
             {hasWhatsApp && (
@@ -468,10 +535,25 @@ const BusinessDetail: React.FC = () => {
 
           <div className="space-y-4">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 sticky top-20">
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className="text-3xl font-extrabold text-teal-700">{formatVT(biz.dealPrice)}</span>
-                <span className="text-lg text-gray-400 line-through">{formatVT(biz.originalPrice)}</span>
-              </div>
+              {showTieredTable ? (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                    {language === 'en' ? 'Pricing' : language === 'fr' ? 'Tarifs' : 'Praes'}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    {language === 'en'
+                      ? 'Tiered per-person rates — see the table in the description for Adult / Child / Infant VT.'
+                      : language === 'fr'
+                        ? 'Tarifs par palier — voir le tableau sous la description.'
+                        : 'Praes long wanwan man — lukim tebol long diskripsen.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-baseline gap-2 mb-4">
+                  <span className="text-3xl font-extrabold text-teal-700">{formatVT(biz.dealPrice)}</span>
+                  <span className="text-lg text-gray-400 line-through">{formatVT(biz.originalPrice)}</span>
+                </div>
+              )}
 
               <div className="flex items-center gap-1 mb-2">
                 <Star className="w-5 h-5 text-amber-400 fill-amber-400" />

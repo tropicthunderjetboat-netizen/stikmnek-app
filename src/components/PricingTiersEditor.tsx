@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Plus, Trash2, Layers } from 'lucide-react';
 import type { Language } from '@/data/translations';
 import type { PricingTierInput } from '@/lib/pricingTiers';
@@ -8,9 +8,20 @@ export interface PricingTiersEditorProps {
   tiers: PricingTierInput[];
   onChange: (next: PricingTierInput[]) => void;
   language: Language;
+  /** When set (0–100), StikmNek VT per tier follows standard VT × (1 − pct/100). */
+  discountPercent?: number | null;
 }
 
-const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({ tiers, onChange, language }) => {
+function dealFromOriginal(original: number, pct: number): number {
+  return Math.max(0, Math.round(original * (1 - pct / 100)));
+}
+
+const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
+  tiers,
+  onChange,
+  language,
+  discountPercent = null,
+}) => {
   const t = {
     title:
       language === 'en'
@@ -38,10 +49,44 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({ tiers, onChange
       language === 'en' ? 'Add tier' : language === 'fr' ? 'Ajouter un palier' : 'Addem wan ta',
     remove:
       language === 'en' ? 'Remove' : language === 'fr' ? 'Supprimer' : 'Kivim',
+    autoHint:
+      language === 'en'
+        ? 'StikmNek VT updates from your discount % and standard VT.'
+        : language === 'fr'
+          ? 'Le prix StikmNek suit votre remise % et le prix standard.'
+          : 'StikmNek VT i folem diskaon % mo stanad VT.',
   };
 
+  // Recalculate deal VT when the listing discount % changes only (tiers intentionally omitted).
+  useEffect(() => {
+    if (discountPercent == null || !Number.isFinite(discountPercent) || discountPercent < 0) return;
+    if (tiers.length === 0) return;
+    const pct = discountPercent;
+    onChange(
+      tiers.map((t) => ({
+        ...t,
+        deal_price_vt: dealFromOriginal(t.original_price_vt, pct),
+      }))
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only discount % should trigger a full tier recalculation
+  }, [discountPercent]);
+
   const updateTier = (index: number, patch: Partial<PricingTierInput>) => {
-    const next = tiers.map((row, i) => (i === index ? { ...row, ...patch } : row));
+    const row = tiers[index];
+    if (!row) return;
+    let merged: PricingTierInput = { ...row, ...patch };
+    if (
+      discountPercent != null &&
+      Number.isFinite(discountPercent) &&
+      discountPercent >= 0 &&
+      Object.prototype.hasOwnProperty.call(patch, 'original_price_vt')
+    ) {
+      merged = {
+        ...merged,
+        deal_price_vt: dealFromOriginal(merged.original_price_vt, discountPercent),
+      };
+    }
+    const next = tiers.map((r, i) => (i === index ? merged : r));
     onChange(next);
   };
 
@@ -62,6 +107,9 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({ tiers, onChange
         <div>
           <h3 className="text-sm font-bold text-violet-900">{t.title}</h3>
           <p className="text-xs text-violet-700/80 mt-0.5">{t.hint}</p>
+          {discountPercent != null && Number.isFinite(discountPercent) && discountPercent >= 0 && (
+            <p className="text-[11px] text-violet-600/90 mt-1">{t.autoHint}</p>
+          )}
         </div>
       </div>
 

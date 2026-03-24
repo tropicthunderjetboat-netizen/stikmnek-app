@@ -8,11 +8,12 @@ import {
   BarChart3, Users, TrendingUp, DollarSign, Store, Eye, Download,
   Plus, Search, Filter, ChevronDown, ArrowUpRight, ArrowDownRight,
   CheckCircle, XCircle, AlertCircle, Clock, FileText, MessageSquare,
-  Image as ImageIcon, Calendar, Loader2, RefreshCw, Edit3, ArrowRight,
+  Image as ImageIcon, Calendar, Loader2, RefreshCw, Edit3, ArrowRight, Layers,
   Wifi, WifiOff, Mail, Trash2, AlertTriangle, X, MapPin, Phone, Tag, Save,
   Globe, Percent, CreditCard
 } from 'lucide-react';
 import { formatVT, getPhotoDisplayUrl } from '@/lib/utils';
+import { pricingTiersFromDb } from '@/lib/pricingTiers';
 import PricingDiscountFields from './PricingDiscountFields';
 
 import EmailReceiptManager from './EmailReceiptManager';
@@ -48,6 +49,7 @@ interface PendingBusiness {
   created_at: string;
   discount_valid_from?: string;
   discount_valid_until?: string;
+  pricing_tiers?: unknown;
 }
 
 interface BusinessPhoto {
@@ -1228,6 +1230,47 @@ const AdminPanel: React.FC = () => {
                         </div>
 
                         <p className="text-sm text-gray-600 mb-4">{biz.description}</p>
+
+                        {pricingTiersFromDb(biz.pricing_tiers).length > 0 && (
+                          <div className="mb-4 p-4 rounded-xl border border-violet-200 bg-violet-50/60">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
+                                <Layers className="w-4 h-4 text-violet-700" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-violet-900">Tiered pricing (VT)</p>
+                                <p className="text-[11px] text-violet-700/85">
+                                  Per-person bands submitted with this listing — review before approve.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="overflow-x-auto rounded-lg border border-violet-100 bg-white">
+                              <table className="min-w-full text-sm">
+                                <thead>
+                                  <tr className="border-b border-violet-100 text-left text-[10px] uppercase tracking-wide text-gray-500">
+                                    <th className="px-3 py-2 font-semibold">Label</th>
+                                    <th className="px-3 py-2 font-semibold">Pax</th>
+                                    <th className="px-3 py-2 font-semibold">Standard VT</th>
+                                    <th className="px-3 py-2 font-semibold">StikmNek VT</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {pricingTiersFromDb(biz.pricing_tiers).map((row, i) => (
+                                    <tr key={i} className="border-b border-gray-50 last:border-0">
+                                      <td className="px-3 py-2 font-medium text-gray-900">{row.label || '—'}</td>
+                                      <td className="px-3 py-2 text-gray-700">
+                                        {row.min_pax}
+                                        {row.max_pax != null ? `–${row.max_pax}` : '+'}
+                                      </td>
+                                      <td className="px-3 py-2 text-gray-800">{row.original_price_vt}</td>
+                                      <td className="px-3 py-2 font-semibold text-teal-700">{row.deal_price_vt}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
 
                         {/* ═══ Uploaded Photos (RPC-driven, individual moderation) ═══ */}
                         <div className="mb-4 p-3 rounded-lg border border-gray-200 bg-gray-50">

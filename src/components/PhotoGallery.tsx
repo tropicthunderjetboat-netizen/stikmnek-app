@@ -70,7 +70,10 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ businessId, coverImage, bus
         if (error) {
           console.error('Failed to load business photos:', error);
         } else if (data) {
-          setPhotos(data as BusinessPhoto[]);
+          const approvedOnly = (data as BusinessPhoto[]).filter(
+            (p) => String(p.status || '').toLowerCase() === 'approved',
+          );
+          setPhotos(approvedOnly);
         }
       } catch (err) {
         console.error('Error fetching business photos:', err);

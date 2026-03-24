@@ -13,6 +13,11 @@ import { Business } from '@/data/businesses';
 import type { User, UserProfile } from '@/contexts/AppContext';
 import type { Language } from '@/data/translations';
 import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
+import {
+  categoryUsesTieredPricing,
+  computeTieredBookingTotals,
+  pricingTiersFromDb,
+} from '@/lib/pricingTiers';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -82,6 +87,14 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
       setContactWhatsapp(waStr || phoneStr);
     };
 
+    // Defaults before DB returns (avoid empty phone when context profile is stale)
+    setAdults(1);
+    setChildren(0);
+    setInfants(0);
+    setContactEmail((user.email || '').trim());
+    setContactWhatsapp('');
+    setContactPhone('');
+
     if (userProfile) {
       applyFromProfile({
         phone: userProfile.phone,
@@ -91,13 +104,6 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
         num_children: userProfile.num_children,
         num_infants: userProfile.num_infants,
       });
-    } else {
-      setAdults(1);
-      setChildren(0);
-      setInfants(0);
-      setContactEmail((user.email || '').trim());
-      setContactWhatsapp('');
-      setContactPhone('');
     }
 
     void (async () => {
@@ -106,7 +112,12 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
         .select('phone, whatsapp_number, email, num_adults, num_children, num_infants')
         .eq('user_id', user.id)
         .maybeSingle();
-      if (cancelled || error || !data) return;
+      if (cancelled) return;
+      if (error) {
+        console.warn('[BookingInquiryModal] user_profiles fetch:', error.message);
+        return;
+      }
+      if (!data) return;
       applyFromProfile(
         data as {
           phone?: string | null;
@@ -125,10 +136,37 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
   }, [open, user?.id, user.name, user.email, today, userProfile]);
 
   const totalPax = Math.max(0, adults) + Math.max(0, children);
-  const original = Number(biz.originalPrice) || 0;
-  const deal = Number(biz.dealPrice) || 0;
-  const totalStandard = totalPax > 0 ? original * totalPax : 0;
-  const totalDeal = totalPax > 0 ? deal * totalPax : 0;
+  const totalGuests = Math.max(0, adults) + Math.max(0, children) + Math.max(0, infants);
+  const tierRows = useMemo(
+    () => pricingTiersFromDb(biz.pricingTiers ?? (biz as { pricing_tiers?: unknown }).pricing_tiers),
+    [biz.id, biz.pricingTiers],
+  );
+  const useTiered =
+    categoryUsesTieredPricing(biz.category) && tierRows.length > 0;
+
+  const { totalStandard, totalDeal } = useMemo(() => {
+    if (useTiered) {
+      if (totalGuests < 1) return { totalStandard: 0, totalDeal: 0 };
+      return computeTieredBookingTotals(tierRows, adults, children, infants);
+    }
+    if (totalPax < 1) return { totalStandard: 0, totalDeal: 0 };
+    const original = Number(biz.originalPrice) || 0;
+    const deal = Number(biz.dealPrice) || 0;
+    return {
+      totalStandard: original * totalPax,
+      totalDeal: deal * totalPax,
+    };
+  }, [
+    totalPax,
+    totalGuests,
+    useTiered,
+    tierRows,
+    adults,
+    children,
+    infants,
+    biz.originalPrice,
+    biz.dealPrice,
+  ]);
   const savings = Math.max(0, totalStandard - totalDeal);
 
   /** Listing email fields (mapped to contactEmail) or claimed listing → edge function can deliver. */
@@ -249,7 +287,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
   };
 
   const handleSendEmail = async () => {
-    if (totalPax < 1) {
+    if (totalGuests < 1) {
       toast.error(copy.paxHint);
       return;
     }
@@ -379,7 +417,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
             </div>
           </div>
 
-          {totalPax < 1 ? (
+          {totalGuests < 1 ? (
             <p className="text-sm text-amber-700">{copy.paxHint}</p>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-1 text-sm">
@@ -458,7 +496,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
                   <Button
                     type="button"
                     className="w-full justify-center gap-2 bg-teal-600 hover:bg-teal-700 h-auto min-h-10 py-2.5 px-3"
-                    disabled={sendingEmail || totalPax < 1}
+                    disabled={sendingEmail || totalGuests < 1}
                     onClick={handleSendEmail}
                   >
                     {sendingEmail ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Mail className="h-4 w-4 shrink-0" />}
