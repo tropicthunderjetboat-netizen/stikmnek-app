@@ -14,7 +14,7 @@ import BusinessDetailMap from '@/components/BusinessDetailMap';
 import {
   displayWebsiteForInput,
   effectiveBusinessCoords,
-  googleMapsUrlFromLatLng,
+  googleMapsExternalOpenUrl,
   normalizeWebsiteForStorage,
 } from '@/lib/urlHelpers';
 
@@ -86,8 +86,16 @@ const BusinessDetail: React.FC = () => {
 
   const mapCoords = useMemo(() => effectiveBusinessCoords(biz), [biz.lat, biz.lng, biz.mapUrl, biz.map_url]);
   const savedMapUrlTrimmed = ((biz.mapUrl ?? biz.map_url) || '').trim();
-  const googleMapsOpenHref =
-    savedMapUrlTrimmed || (mapCoords ? googleMapsUrlFromLatLng(mapCoords.lat, mapCoords.lng) : '');
+  const googleMapsOpenHref = useMemo(() => {
+    if (mapCoords) {
+      return googleMapsExternalOpenUrl({
+        lat: mapCoords.lat,
+        lng: mapCoords.lng,
+        savedMapUrl: savedMapUrlTrimmed || null,
+      });
+    }
+    return savedMapUrlTrimmed;
+  }, [mapCoords, savedMapUrlTrimmed]);
   const websiteUrl = (biz.website || '').trim();
   const websiteHref = websiteUrl ? normalizeWebsiteForStorage(websiteUrl) : null;
 

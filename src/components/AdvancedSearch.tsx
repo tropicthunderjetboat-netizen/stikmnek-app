@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as localBusinesses } from '@/data/businesses';
-import { supabase } from '@/lib/supabase';
 import { Search, SlidersHorizontal, X, Clock, TrendingUp, ArrowUpDown, Star, ChevronDown, ChevronUp, DollarSign, Navigation, Loader2, Award, Tag, Sparkles, MessageCircle } from 'lucide-react';
 
 export type SortOption = 'featured' | 'leaderboard' | 'price-low' | 'price-high' | 'rating' | 'savings' | 'reviews' | 'near-me';
@@ -139,27 +138,15 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       .map(([tag]) => tag);
   }, [allBusinesses]);
 
-  // Load search history
+  // Local search history only (no DB table dependency)
   useEffect(() => {
-    if (!user) return;
-    const loadHistory = async () => {
-      try {
-        const { data } = await supabase
-          .from('search_history')
-          .select('query')
-          .eq('user_id', user.id)
-          .order('searched_at', { ascending: false })
-          .limit(5);
-        if (data) {
-          setSearchHistory([...new Set(data.map(d => d.query))]);
-        }
-      } catch (err) {
-        const local = JSON.parse(localStorage.getItem('searchHistory') || '[]');
-        setSearchHistory(local.slice(0, 5));
-      }
-    };
-    loadHistory();
-  }, [user]);
+    try {
+      const local = JSON.parse(localStorage.getItem('searchHistory') || '[]');
+      setSearchHistory(Array.isArray(local) ? local.slice(0, 5) : []);
+    } catch {
+      setSearchHistory([]);
+    }
+  }, [user?.id]);
 
   // Save search to history
   const saveSearch = useCallback(async (query: string) => {
@@ -169,15 +156,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     const updated = [query, ...local.filter((q: string) => q !== query)].slice(0, 10);
     localStorage.setItem('searchHistory', JSON.stringify(updated));
     setSearchHistory(updated.slice(0, 5));
-
-    if (user) {
-      try {
-        await supabase.from('search_history').insert({ user_id: user.id, query, results_count: 0 });
-      } catch (err) {
-        // Ignore
-      }
-    }
-  }, [user]);
+  }, []);
 
   // Close suggestions on outside click
   useEffect(() => {
@@ -210,9 +189,6 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const clearHistory = () => {
     setSearchHistory([]);
     localStorage.removeItem('searchHistory');
-    if (user) {
-      supabase.from('search_history').delete().eq('user_id', user.id).then(() => {});
-    }
   };
 
   const handleNearMeSort = () => {

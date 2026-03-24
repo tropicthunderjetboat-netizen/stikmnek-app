@@ -5,16 +5,13 @@ import { t } from '@/data/translations';
 import { businesses as localBusinesses } from '@/data/businesses';
 import {
   Ticket, Heart, History, QrCode, Calendar, ChevronRight, Wifi,
-  LayoutDashboard, TrendingUp, PiggyBank, BarChart3,
+  LayoutDashboard, TrendingUp, BarChart3,
   MapPin, Star, Zap, Target, Clock, Flame,
-  MessageCircle
 } from 'lucide-react';
 
 import QRCodeDisplay from './QRCodeDisplay';
-import SavingsTracker from './SavingsTracker';
-import DashboardFeedback from './DashboardFeedback';
 
-type DashboardTab = 'overview' | 'savings' | 'analytics' | 'feedback';
+type DashboardTab = 'overview' | 'analytics';
 
 const Dashboard: React.FC = () => {
   const {
@@ -109,7 +106,6 @@ const Dashboard: React.FC = () => {
 
   const tabLabels = {
     overview: { en: 'Overview', fr: 'Aperçu', bi: 'Ovaviu' },
-    savings: { en: 'Savings Tracker', fr: 'Suivi des économies', bi: 'Sevin Traka' },
     analytics: { en: 'My Analytics', fr: 'Mes analyses', bi: 'Analitiks blong mi' },
   };
 
@@ -141,22 +137,6 @@ const Dashboard: React.FC = () => {
             {tabLabels.overview[language]}
           </button>
           <button
-            onClick={() => setActiveTab('savings')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'savings'
-                ? 'bg-teal-600 text-white shadow-md shadow-teal-200'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <PiggyBank className="w-4 h-4" />
-            {tabLabels.savings[language]}
-            {totalSaved > 0 && activeTab !== 'savings' && (
-              <span className="ml-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-bold">
-                {totalSaved.toLocaleString()} VT
-              </span>
-            )}
-          </button>
-          <button
             onClick={() => setActiveTab('analytics')}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
               activeTab === 'analytics'
@@ -166,17 +146,6 @@ const Dashboard: React.FC = () => {
           >
             <BarChart3 className="w-4 h-4" />
             {tabLabels.analytics[language]}
-          </button>
-          <button
-            onClick={() => setActiveTab('feedback')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
-              activeTab === 'feedback'
-                ? 'bg-teal-600 text-white shadow-md shadow-teal-200'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <MessageCircle className="w-4 h-4" />
-            {language === 'en' ? 'Feedback' : language === 'fr' ? 'Retours' : 'Fidbak'}
           </button>
         </div>
 
@@ -200,19 +169,15 @@ const Dashboard: React.FC = () => {
                 <p className="text-2xl font-bold text-gray-900">{redemptions.length}</p>
                 <p className="text-xs text-gray-500">{language === 'en' ? 'Redeemed' : language === 'fr' ? 'Utilisés' : 'Yusim'}</p>
               </div>
-              <button
-                onClick={() => setActiveTab('savings')}
-                className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 shadow-sm border border-green-100 hover:shadow-md hover:border-green-200 transition-all text-left group"
-              >
-                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 shadow-sm border border-green-100 text-left">
+                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mb-2">
                   <TrendingUp className="w-5 h-5 text-green-600" />
                 </div>
                 <p className="text-2xl font-bold text-green-700">{totalSaved.toLocaleString()}<span className="text-xs font-semibold text-green-500 ml-1">VT</span></p>
-                <p className="text-xs text-green-600 font-medium flex items-center gap-1">
-                  {language === 'en' ? 'Total Saved' : language === 'fr' ? 'Total économisé' : 'Total Sevem'}
-                  <ChevronRight className="w-3 h-3" />
+                <p className="text-xs text-green-600 font-medium">
+                  {language === 'en' ? 'Total saved (redemptions)' : language === 'fr' ? 'Total économisé (utilisations)' : 'Total sevem (redim)'}
                 </p>
-              </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -279,10 +244,11 @@ const Dashboard: React.FC = () => {
                     <h3 className="font-bold text-gray-900 flex items-center gap-2"><History className="w-5 h-5 text-purple-600" />{t('dash.history', language)}</h3>
                     {redemptions.length > 0 && (
                       <button
-                        onClick={() => setActiveTab('savings')}
+                        type="button"
+                        onClick={() => setActiveTab('analytics')}
                         className="text-xs text-teal-600 font-semibold hover:text-teal-700 flex items-center gap-1 transition-colors"
                       >
-                        {language === 'en' ? 'View All' : language === 'fr' ? 'Voir tout' : 'Lukim Olgeta'}
+                        {language === 'en' ? 'Insights' : language === 'fr' ? 'Analyses' : 'Analitiks'}
                         <ChevronRight className="w-3 h-3" />
                       </button>
                     )}
@@ -310,10 +276,11 @@ const Dashboard: React.FC = () => {
                       })}
                       {redemptions.length > 5 && (
                         <button
-                          onClick={() => setActiveTab('savings')}
+                          type="button"
+                          onClick={() => setActiveTab('analytics')}
                           className="w-full p-3 text-center text-sm text-teal-600 font-semibold hover:bg-teal-50 transition-colors"
                         >
-                          {language === 'en' ? `View all ${redemptions.length} redemptions` : language === 'fr' ? `Voir les ${redemptions.length} utilisations` : `Lukim olgeta ${redemptions.length} yusim`}
+                          {language === 'en' ? `More stats (${redemptions.length} redemptions)` : language === 'fr' ? `Plus de stats (${redemptions.length})` : `Moa stats (${redemptions.length})`}
                         </button>
                       )}
                     </div>
@@ -331,25 +298,26 @@ const Dashboard: React.FC = () => {
                   <QRCodeDisplay />
                 )}
 
-                {/* Savings Quick Glance */}
+                {/* Savings quick glance → analytics */}
                 {totalSaved > 0 && (
                   <button
-                    onClick={() => setActiveTab('savings')}
+                    type="button"
+                    onClick={() => setActiveTab('analytics')}
                     className="w-full bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl p-5 text-white text-left shadow-lg shadow-teal-200/50 hover:shadow-xl hover:shadow-teal-200/60 transition-all group"
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
-                        <PiggyBank className="w-5 h-5" />
+                        <TrendingUp className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold">{language === 'en' ? 'Your Savings' : language === 'fr' ? 'Vos économies' : 'Sevin blong yu'}</p>
-                        <p className="text-xs text-white/60">{language === 'en' ? 'Tap to see details' : language === 'fr' ? 'Appuyez pour les détails' : 'Presem blong lukim moa'}</p>
+                        <p className="text-sm font-bold">{language === 'en' ? 'Your savings' : language === 'fr' ? 'Vos économies' : 'Sevin blong yu'}</p>
+                        <p className="text-xs text-white/60">{language === 'en' ? 'Open analytics' : language === 'fr' ? 'Voir les analyses' : 'Openem analitiks'}</p>
                       </div>
                     </div>
                     <p className="text-3xl font-black">{totalSaved.toLocaleString()} <span className="text-lg font-bold text-white/70">VT</span></p>
                     <div className="flex items-center gap-1 mt-2 text-xs text-white/70 group-hover:text-white/90 transition-colors">
-                      <TrendingUp className="w-3.5 h-3.5" />
-                      <span>{language === 'en' ? `from ${redemptions.length} deals` : language === 'fr' ? `de ${redemptions.length} offres` : `long ${redemptions.length} dils`}</span>
+                      <BarChart3 className="w-3.5 h-3.5" />
+                      <span>{language === 'en' ? `from ${redemptions.length} redemptions` : language === 'fr' ? `${redemptions.length} utilisations` : `long ${redemptions.length} redim`}</span>
                       <ChevronRight className="w-3 h-3 ml-auto group-hover:translate-x-1 transition-transform" />
                     </div>
                   </button>
@@ -401,11 +369,6 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           </>
-        )}
-
-        {/* ─── SAVINGS TRACKER TAB ─── */}
-        {activeTab === 'savings' && (
-          <SavingsTracker />
         )}
 
         {/* ─── ANALYTICS TAB ─── */}
@@ -557,10 +520,6 @@ const Dashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ─── FEEDBACK TAB ─── */}
-        {activeTab === 'feedback' && (
-          <DashboardFeedback />
-        )}
       </div>
     </div>
   );

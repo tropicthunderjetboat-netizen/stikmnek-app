@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { MapPin, Mail, Phone, Send, Shield, Globe, HelpCircle, Ticket, Book, FileText, Lock, Cookie, Database, RefreshCw } from 'lucide-react';
+import { MapPin, Mail, Phone, Send, Shield, Globe, HelpCircle, Book, FileText, Lock, Cookie, Database, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 // App version - bump this on every deploy so users can verify they have latest code
@@ -156,7 +156,6 @@ const Footer: React.FC = () => {
                 { label: t('nav.deals', language), view: 'deals' as const },
                 { label: t('nav.map', language), view: 'map' as const },
                 { label: t('nav.passes', language), view: 'passes' as const },
-                { label: language === 'en' ? 'Community' : language === 'fr' ? 'Communauté' : 'Komuniti', view: 'community' as const },
                 { label: t('footer.business', language), view: 'home' as const },
               ].map((link, i) => (
                 <li key={i}>
@@ -177,9 +176,7 @@ const Footer: React.FC = () => {
             <ul className="space-y-2.5">
               {[
                 { label: language === 'en' ? 'Help Center' : language === 'fr' ? 'Centre d\'aide' : 'Help Senta', view: 'help' as const, icon: <Book className="w-3.5 h-3.5" /> },
-                { label: language === 'en' ? 'Support Tickets' : language === 'fr' ? 'Tickets de support' : 'Sapot Tikets', view: 'support' as const, icon: <Ticket className="w-3.5 h-3.5" /> },
                 { label: t('footer.faq', language), view: 'help' as const, icon: <HelpCircle className="w-3.5 h-3.5" /> },
-                { label: t('footer.contact', language), view: 'support' as const, icon: <Mail className="w-3.5 h-3.5" /> },
                 { label: language === 'en' ? 'Business Guide' : language === 'fr' ? 'Guide entreprise' : 'Bisnis Gaed', view: 'help' as const, icon: <FileText className="w-3.5 h-3.5" /> },
               ].map((item, i) => (
                 <li key={i}>
@@ -192,6 +189,17 @@ const Footer: React.FC = () => {
                   </button>
                 </li>
               ))}
+              <li>
+                <a
+                  href="mailto:support@stikm.nek"
+                  className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-gray-500">
+                    <Mail className="w-3.5 h-3.5" />
+                  </span>
+                  {t('footer.contact', language)}
+                </a>
+              </li>
             </ul>
           </div>
 

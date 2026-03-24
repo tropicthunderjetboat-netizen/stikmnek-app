@@ -154,8 +154,7 @@ const HelpCenter: React.FC = () => {
       content: 'Keep the platform running smoothly.',
       steps: [
         'Check error logs regularly for recurring issues',
-        'Monitor support tickets and respond promptly',
-        'Review feedback submissions from users',
+        'Respond to support email (support@stikm.nek) promptly',
         'Track email delivery rates and fix any failures',
       ],
     },
@@ -311,15 +310,15 @@ const HelpCenter: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-teal-500" />
-                  <span>Use the feedback button</span>
+                  <span>Email us — we typically reply within one business day</span>
                 </div>
               </div>
-              <button
-                onClick={() => setCurrentView('support' as any)}
-                className="w-full mt-4 py-2.5 rounded-xl bg-teal-50 text-teal-700 text-sm font-semibold hover:bg-teal-100 transition-colors"
+              <a
+                href="mailto:support@stikm.nek?subject=StikmNek%20support"
+                className="block w-full mt-4 py-2.5 rounded-xl bg-teal-50 text-teal-700 text-sm font-semibold hover:bg-teal-100 transition-colors text-center"
               >
-                Open Support Ticket
-              </button>
+                Email support
+              </a>
             </div>
           </div>
 

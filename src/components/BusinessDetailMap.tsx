@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import { ExternalLink, MapPin } from 'lucide-react';
-import { googleMapsUrlFromLatLng } from '@/lib/urlHelpers';
+import { googleMapsExternalOpenUrl } from '@/lib/urlHelpers';
 
 interface BusinessDetailMapProps {
   lat: number;
@@ -23,10 +23,15 @@ const BusinessDetailMap: React.FC<BusinessDetailMapProps> = ({
     setMounted(true);
   }, []);
 
-  const openHref = useMemo(() => {
-    const s = (savedMapUrl || '').trim();
-    return s || googleMapsUrlFromLatLng(lat, lng);
-  }, [savedMapUrl, lat, lng]);
+  const openHref = useMemo(
+    () =>
+      googleMapsExternalOpenUrl({
+        lat,
+        lng,
+        savedMapUrl: savedMapUrl || null,
+      }),
+    [savedMapUrl, lat, lng],
+  );
 
   const pinIcon = useMemo(
     () =>

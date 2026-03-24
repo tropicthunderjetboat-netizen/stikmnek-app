@@ -183,7 +183,7 @@ interface AppContextType {
   dataLoaded: boolean;
   refreshBusinesses: () => Promise<void>;
   refreshUserPass: () => Promise<void>;
-  /** Reload pass redemptions from DB (call after QR redemption or when opening Savings Tracker). */
+  /** Reload pass redemptions from DB (e.g. after QR redemption). */
   refreshRedemptions: () => Promise<void>;
   userLocation: GeoPosition | null;
   locationLoading: boolean;
