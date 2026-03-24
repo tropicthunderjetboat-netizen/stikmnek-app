@@ -13,6 +13,7 @@ import { Business } from '@/data/businesses';
 import type { User, UserProfile } from '@/contexts/AppContext';
 import type { Language } from '@/data/translations';
 import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
+import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Mail, Phone, Loader2 } from 'lucide-react';
@@ -152,16 +153,27 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
 
   const whatsappBookingUrl = useMemo(() => {
     if (!showWhatsApp) return '';
-    const userLabel = contactName.trim() || 'a guest';
-    const dateLabel = visitDate || '—';
-    const paxLabel = totalPax > 0 ? String(totalPax) : '—';
-    const priceLabel = formatVT(totalDeal);
-    let text = `Hi, I'm ${userLabel} from StikmNek. I'd like to book ${biz.name} for ${dateLabel} with ${paxLabel} people. My calculated StikmNek price is ${priceLabel}.`;
-    if (contactWhatsapp.trim()) {
-      text += ` You can reach me on WhatsApp: ${contactWhatsapp.trim()}.`;
-    }
-    return `https://wa.me/${businessWaDigits}?text=${encodeURIComponent(text)}`;
-  }, [showWhatsApp, businessWaDigits, biz.name, contactName, visitDate, totalPax, totalDeal, contactWhatsapp]);
+    return buildBookingInquiryWhatsAppUrl(businessWaDigits, {
+      businessName: biz.name,
+      visitDate,
+      adults,
+      children,
+      infants,
+      estimatedPriceWithDiscount: formatVT(totalDeal),
+      userName: contactName.trim() || user.name || 'Guest',
+    });
+  }, [
+    showWhatsApp,
+    businessWaDigits,
+    biz.name,
+    visitDate,
+    adults,
+    children,
+    infants,
+    totalDeal,
+    contactName,
+    user.name,
+  ]);
 
   const telHref = useMemo(() => {
     if (!showPhone) return '';
@@ -223,7 +235,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
     name: language === 'en' ? 'Your name' : language === 'fr' ? 'Votre nom' : 'Nem blong yu',
     msg: language === 'en' ? 'Message to the business (optional)' : language === 'fr' ? 'Message au commerce (optionnel)' : 'Mesej long bisnis',
     emailBtn: language === 'en' ? 'Send request by email' : language === 'fr' ? 'Envoyer la demande par e-mail' : 'Send ask long imel',
-    waBtn: language === 'en' ? 'Chat on business WhatsApp' : language === 'fr' ? 'WhatsApp du commerce' : 'WhatsApp blong bisnis',
+    waBtn: language === 'en' ? 'Chat on WhatsApp' : language === 'fr' ? 'Discuter sur WhatsApp' : 'Toktok long WhatsApp',
     callBtn: language === 'en' ? 'Call' : language === 'fr' ? 'Appeler' : 'Kolem',
     noContact:
       language === 'en'
@@ -504,3 +516,5 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
 };
 
 export default BookingInquiryModal;
+
+export { buildBookingInquiryMessage, buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';

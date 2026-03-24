@@ -3,7 +3,8 @@ import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { Business } from '@/data/businesses';
 import { Star, Heart, MapPin, Clock, Share2, Sparkles, MessageCircle } from 'lucide-react';
-import { formatVT } from '@/lib/utils';
+import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
+import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { toast } from 'sonner';
 
 interface BusinessCardProps {
@@ -28,21 +29,6 @@ const SuperStarBadge: React.FC<{ count: number }> = ({ count }) => {
   );
 };
 
-// Helper to format WhatsApp number for URL
-function getWhatsAppUrl(number: string, businessName?: string): string {
-  // Strip all non-digit characters except leading +
-  const cleaned = number.replace(/[^\d+]/g, '');
-  // Remove leading + for the URL
-  const digits = cleaned.startsWith('+') ? cleaned.slice(1) : cleaned;
-  const message = encodeURIComponent(
-    businessName
-      ? `Hi, I found ${businessName} on StikmNek and would like to inquire about your services.`
-      : `Hi, I found your business on StikmNek and would like to inquire about your services.`
-  );
-  return `https://wa.me/${digits}?text=${message}`;
-}
-
-
 const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false }) => {
   const { language, favorites, toggleFavorite, setSelectedBusiness, setCurrentView, user, setShowAuth, setAuthMode, dbReviews } = useAppContext();
 
@@ -51,7 +37,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
     ? business.superStarCount
     : dbReviews.filter(r => r.business_id === business.id && r.has_super_star).length;
 
-  const hasWhatsApp = !!business.whatsappNumber;
+  const hasWhatsApp = digitsForWaMe(getBusinessWhatsAppRaw(business)).length >= 5;
 
   const handleViewDeal = () => {
     setSelectedBusiness(business);
@@ -70,9 +56,18 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
 
   const handleWhatsApp = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (business.whatsappNumber) {
-      window.open(getWhatsAppUrl(business.whatsappNumber, business.name), '_blank', 'noopener,noreferrer');
-    }
+    const d = digitsForWaMe(getBusinessWhatsAppRaw(business));
+    if (d.length < 5) return;
+    const url = buildBookingInquiryWhatsAppUrl(d, {
+      businessName: business.name,
+      visitDate: 'To be confirmed',
+      adults: 1,
+      children: 0,
+      infants: 0,
+      estimatedPriceWithDiscount: formatVT(business.dealPrice),
+      userName: user?.name?.trim() || 'Guest',
+    });
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleShare = async (e: React.MouseEvent) => {
