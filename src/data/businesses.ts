@@ -16,6 +16,10 @@ export interface Business {
   location: string;
   lat: number;
   lng: number;
+  /** Google Maps share / pin URL from listing (DB `map_url`). */
+  mapUrl?: string | null;
+  map_url?: string | null;
+  website?: string | null;
   hours: string;
   phone: string;
   /** Public contact email from listing (if column exists in DB). */

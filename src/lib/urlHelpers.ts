@@ -6,6 +6,29 @@ export function googleMapsUrlFromLatLng(lat: number, lng: number): string {
 }
 
 /** Best-effort parse of coordinates from common Google Maps URL shapes */
+export interface BusinessLikeForMap {
+  lat?: number;
+  lng?: number;
+  mapUrl?: string | null;
+  map_url?: string | null;
+}
+
+/**
+ * Prefer coordinates parsed from owner-set `map_url` (Google Maps link);
+ * otherwise fall back to DB `lat`/`lng` when non-zero.
+ */
+export function effectiveBusinessCoords(biz: BusinessLikeForMap): { lat: number; lng: number } | null {
+  const url = (biz.mapUrl ?? biz.map_url ?? '').trim();
+  const parsed = url ? parseLatLngFromMapUrl(url) : null;
+  if (parsed) return parsed;
+  const lat = Number(biz.lat);
+  const lng = Number(biz.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0)) {
+    return { lat, lng };
+  }
+  return null;
+}
+
 export function parseLatLngFromMapUrl(url: string): { lat: number; lng: number } | null {
   if (!url?.trim()) return null;
   const s = url.trim();

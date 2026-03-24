@@ -6,6 +6,7 @@ import BusinessCard from './BusinessCard';
 import AdvancedSearch, { SortOption } from './AdvancedSearch';
 import { Search, SlidersHorizontal, LayoutGrid, List, Navigation, Loader2, Award } from 'lucide-react';
 import { haversineDistance } from '@/hooks/useGeolocation';
+import { effectiveBusinessCoords } from '@/lib/urlHelpers';
 
 interface BusinessGridProps {
   showFeaturedOnly?: boolean;
@@ -180,8 +181,13 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
       case 'near-me':
         if (userLocation) {
           result.sort((a, b) => {
-            const distA = haversineDistance(userLocation.lat, userLocation.lng, a.lat, a.lng);
-            const distB = haversineDistance(userLocation.lat, userLocation.lng, b.lat, b.lng);
+            const ca = effectiveBusinessCoords(a);
+            const cb = effectiveBusinessCoords(b);
+            if (!ca && !cb) return 0;
+            if (!ca) return 1;
+            if (!cb) return -1;
+            const distA = haversineDistance(userLocation.lat, userLocation.lng, ca.lat, ca.lng);
+            const distB = haversineDistance(userLocation.lat, userLocation.lng, cb.lat, cb.lng);
             return distA - distB;
           });
         }

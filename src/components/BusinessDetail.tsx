@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, MessageSquarePlus, Sparkles, ExternalLink, Store, Layers } from 'lucide-react';
+import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, MessageSquarePlus, Sparkles, ExternalLink, Store, Layers, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import ReviewForm from '@/components/ReviewForm';
 import PhotoGallery from '@/components/PhotoGallery';
@@ -10,6 +10,13 @@ import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import BookingInquiryModal from '@/components/BookingInquiryModal';
 import { categoryUsesTieredPricing, pricingTiersFromDb } from '@/lib/pricingTiers';
+import BusinessDetailMap from '@/components/BusinessDetailMap';
+import {
+  displayWebsiteForInput,
+  effectiveBusinessCoords,
+  googleMapsUrlFromLatLng,
+  normalizeWebsiteForStorage,
+} from '@/lib/urlHelpers';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
 
@@ -77,6 +84,13 @@ const BusinessDetail: React.FC = () => {
   );
   const showTieredTable = categoryUsesTieredPricing(biz.category) && pricingTiers.length > 0;
 
+  const mapCoords = useMemo(() => effectiveBusinessCoords(biz), [biz.lat, biz.lng, biz.mapUrl, biz.map_url]);
+  const savedMapUrlTrimmed = ((biz.mapUrl ?? biz.map_url) || '').trim();
+  const googleMapsOpenHref =
+    savedMapUrlTrimmed || (mapCoords ? googleMapsUrlFromLatLng(mapCoords.lat, mapCoords.lng) : '');
+  const websiteUrl = (biz.website || '').trim();
+  const websiteHref = websiteUrl ? normalizeWebsiteForStorage(websiteUrl) : null;
+
   /** Normalize WhatsApp from camelCase + DB snake_case; wa.me needs enough digits. */
   const businessWhatsAppRaw = getBusinessWhatsAppRaw(biz);
   const hasWhatsApp = digitsForWaMe(businessWhatsAppRaw).length >= 5;
@@ -89,7 +103,7 @@ const BusinessDetail: React.FC = () => {
     void (async () => {
       const { data, error } = await supabase
         .from('businesses')
-        .select('whatsapp_number, phone, email, contact_email')
+        .select('whatsapp_number, phone, email, contact_email, map_url, website')
         .eq('id', businessId)
         .maybeSingle();
       if (cancelled || error || !data) return;
@@ -98,8 +112,12 @@ const BusinessDetail: React.FC = () => {
         phone?: string | null;
         email?: string | null;
         contact_email?: string | null;
+        map_url?: string | null;
+        website?: string | null;
       };
       const wa = (row.whatsapp_number ?? '').trim();
+      const mapUrl = (row.map_url ?? '').trim();
+      const site = (row.website ?? '').trim();
       setSelectedBusiness((current) => {
         if (!current || current.id !== businessId) return current;
         return {
@@ -112,6 +130,9 @@ const BusinessDetail: React.FC = () => {
             (row.email ?? '').trim() ||
             current.contactEmail ||
             null,
+          mapUrl: mapUrl || current.mapUrl || null,
+          map_url: mapUrl || current.map_url || null,
+          website: site || current.website || null,
         };
       });
     })();
@@ -603,6 +624,39 @@ const BusinessDetail: React.FC = () => {
               </div>
               <div className="mt-5 space-y-3 pt-5 border-t border-gray-100">
                 <div className="flex items-center gap-3 text-sm text-gray-600"><MapPin className="w-4 h-4 text-teal-600 shrink-0" />{biz.location}</div>
+                {mapCoords && (
+                  <BusinessDetailMap
+                    lat={mapCoords.lat}
+                    lng={mapCoords.lng}
+                    savedMapUrl={savedMapUrlTrimmed || null}
+                    language={language}
+                  />
+                )}
+                {websiteHref && (
+                  <a
+                    href={websiteHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 text-sm text-teal-700 hover:text-teal-800 font-medium group"
+                  >
+                    <Globe className="w-4 h-4 text-teal-600 shrink-0" />
+                    <span className="underline-offset-2 group-hover:underline break-all">
+                      {displayWebsiteForInput(websiteUrl)}
+                    </span>
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                  </a>
+                )}
+                {!mapCoords && googleMapsOpenHref ? (
+                  <a
+                    href={googleMapsOpenHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full py-2 rounded-lg border border-teal-200 text-teal-700 text-xs font-semibold hover:bg-teal-50"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    {language === 'en' ? 'View on Google Maps' : language === 'fr' ? 'Voir sur Google Maps' : 'Lukim long Google Maps'}
+                  </a>
+                ) : null}
                 <div className="flex items-center gap-3 text-sm text-gray-600"><Clock className="w-4 h-4 text-teal-600 shrink-0" />{biz.hours}</div>
                 <div className="flex items-center gap-3 text-sm text-gray-600"><Phone className="w-4 h-4 text-teal-600 shrink-0" />{biz.phone}</div>
                 {hasWhatsApp && (

@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 
 import { formatDistance, estimateWalkingTime, estimateDrivingTime } from '@/hooks/useGeolocation';
+import { effectiveBusinessCoords } from '@/lib/urlHelpers';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
@@ -263,13 +264,23 @@ const MapView: React.FC = () => {
     // Apply radius filter
     if (radiusFilter !== 'all' && userLocation) {
       result = result.filter(biz => {
-        const dist = getDistanceTo(biz.lat, biz.lng);
+        const c = effectiveBusinessCoords(biz);
+        if (!c) return false;
+        const dist = getDistanceTo(c.lat, c.lng);
         return dist !== null && dist <= radiusFilter;
       });
     }
 
     return result;
   }, [allBusinesses, radiusFilter, userLocation, getDistanceTo, showFavoritesOnly, favorites]);
+
+  const businessesWithMapCoords = useMemo(
+    () =>
+      filteredBusinesses
+        .map((biz) => ({ biz, c: effectiveBusinessCoords(biz) }))
+        .filter((x): x is { biz: Business; c: { lat: number; lng: number } } => x.c !== null),
+    [filteredBusinesses],
+  );
 
 
   // Map center and zoom based on user location and radius
@@ -562,13 +573,13 @@ const MapView: React.FC = () => {
               zoomToBoundsOnClick={true}
               disableClusteringAtZoom={16}
             >
-              {filteredBusinesses.map(biz => {
-                const dist = getDistanceTo(biz.lat, biz.lng);
+              {businessesWithMapCoords.map(({ biz, c }) => {
+                const dist = getDistanceTo(c.lat, c.lng);
                 const isFav = favorites.includes(biz.id);
                 return (
                   <Marker
                     key={biz.id}
-                    position={[biz.lat, biz.lng]}
+                    position={[c.lat, c.lng]}
                     icon={createCategoryIcon(biz.category, biz.featured)}
                     eventHandlers={{
                       click: () => setSelectedMapBiz(biz),

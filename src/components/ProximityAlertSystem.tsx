@@ -4,6 +4,7 @@ import { businesses as localBusinesses, Business } from '@/data/businesses';
 import { haversineDistance, formatDistance, estimateWalkingTime } from '@/hooks/useGeolocation';
 import { MapPin, X, ChevronRight, Navigation, Tag, Footprints, Bell, BellOff } from 'lucide-react';
 import { formatVT } from '@/lib/utils';
+import { effectiveBusinessCoords } from '@/lib/urlHelpers';
 
 const PROXIMITY_RADIUS = 200; // meters
 const ALERT_DISPLAY_DURATION = 8000; // ms
@@ -49,14 +50,14 @@ const ProximityAlertSystem: React.FC = () => {
       // Skip if already notified or dismissed in this session
       if (notifiedBusinessIds.has(business.id)) return;
       if (dismissedAlerts.has(business.id)) return;
-      // Skip businesses without valid coordinates
-      if (!business.lat || !business.lng) return;
+      const c = effectiveBusinessCoords(business);
+      if (!c) return;
 
       const distance = haversineDistance(
         userLocation.lat,
         userLocation.lng,
-        business.lat,
-        business.lng
+        c.lat,
+        c.lng
       );
 
       if (distance <= PROXIMITY_RADIUS) {
