@@ -1,5 +1,7 @@
 import React, { useMemo, useEffect } from 'react';
-import { Tag, Percent, ArrowRight, Calendar, Globe, MapPin } from 'lucide-react';
+import { Tag, Percent, ArrowRight, Calendar, Globe } from 'lucide-react';
+import LocationMapPicker from '@/components/LocationMapPicker';
+import WebsiteUrlInput from '@/components/WebsiteUrlInput';
 import { formatVT } from '@/lib/utils';
 
 const DURATION_OPTIONS = [
@@ -340,46 +342,21 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
           </div>
           <p className="text-xs text-gray-500 mb-3">
             {language === 'en'
-              ? 'Add your Google Maps link and website so tourists can easily find and learn more about your business.'
-              : 'Ajoutez votre lien Google Maps et votre site web.'}
+              ? 'Set your location on the map and add your website so tourists can find you easily.'
+              : 'Indiquez votre emplacement sur la carte et votre site web.'}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1.5">
-                <MapPin className="w-3 h-3 text-red-500" />
-                {language === 'en' ? 'Google Maps Link' : 'Lien Google Maps'}
-              </label>
-              <input
-                type="url"
-                value={mapUrl}
-                onChange={(e) => onMapUrlChange?.(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-                placeholder="https://maps.google.com/..."
-              />
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                {language === 'en'
-                  ? 'Paste your Google Maps share link so tourists can navigate to you'
-                  : 'Collez votre lien Google Maps'}
-              </p>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1.5">
-                <Globe className="w-3 h-3 text-blue-500" />
-                {language === 'en' ? 'Website' : 'Site Web'}
-              </label>
-              <input
-                type="url"
-                value={website}
-                onChange={(e) => onWebsiteChange?.(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-                placeholder="https://www.yourbusiness.com"
-              />
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                {language === 'en'
-                  ? 'Your business website or social media page'
-                  : 'Votre site web ou page de médias sociaux'}
-              </p>
-            </div>
+            <LocationMapPicker
+              mapUrl={mapUrl}
+              onMapUrlChange={(v) => onMapUrlChange?.(v)}
+              language={language}
+            />
+            <WebsiteUrlInput
+              website={website}
+              onWebsiteChange={(v) => onWebsiteChange?.(v)}
+              language={language}
+              id="pricing-discount-website"
+            />
           </div>
         </div>
       )}

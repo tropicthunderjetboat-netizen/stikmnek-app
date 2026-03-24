@@ -32,6 +32,7 @@ import {
   pricingTiersFromDb,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
+import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 
 // ─── Retry helper for edge function calls (matches BusinessListingForm) ───
 async function invokeWithRetry(
@@ -888,6 +889,7 @@ const BusinessOwnerDashboard: React.FC = () => {
 
     setLoading(true);
     try {
+      const normalizedWebsite = normalizeWebsiteForStorage(submitForm.website) ?? null;
       const mainImageUrl = submitPhotos.length > 0 ? submitPhotos[0].url : submitForm.image;
 
       // Calculate discount valid until from duration
@@ -925,7 +927,7 @@ const BusinessOwnerDashboard: React.FC = () => {
             image: mainImageUrl,
             photos: photoData.length > 0 ? photoData : undefined,
             mapUrl: submitForm.mapUrl,
-            website: submitForm.website,
+            website: normalizedWebsite,
             discountValidFrom: submitForm.discountValidFrom,
             discountValidUntil: discountValidUntil,
             pricingTiers: tiersPayload,
@@ -963,7 +965,7 @@ const BusinessOwnerDashboard: React.FC = () => {
         p_hours: submitForm.hours,
         p_image: mainImageUrl,
         p_map_url: submitForm.mapUrl || null,
-        p_website: submitForm.website || null,
+        p_website: normalizedWebsite,
         p_discount_valid_from: submitForm.discountValidFrom || null,
         p_discount_valid_until: discountValidUntil || null,
         p_whatsapp_number: submitForm.whatsappNumber || null,
@@ -1038,7 +1040,7 @@ const BusinessOwnerDashboard: React.FC = () => {
           image: mainImageUrl,
           photos: photoData,
           mapUrl: submitForm.mapUrl,
-          website: submitForm.website,
+          website: normalizedWebsite,
           discountValidFrom: submitForm.discountValidFrom,
           discountValidUntil: discountValidUntil,
           pricingTiers: tiersPayload,

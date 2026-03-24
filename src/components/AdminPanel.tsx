@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { formatVT, getPhotoDisplayUrl } from '@/lib/utils';
 import { pricingTiersFromDb } from '@/lib/pricingTiers';
+import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 import PricingDiscountFields from './PricingDiscountFields';
 
 import EmailReceiptManager from './EmailReceiptManager';
@@ -548,7 +549,7 @@ const AdminPanel: React.FC = () => {
           discount: addForm.discount, originalPrice: Number(addForm.originalPrice) || 0,
           dealPrice: Number(addForm.dealPrice) || 0, location: addForm.location || 'Port Vila, Vanuatu',
           phone: addForm.phone, hours: addForm.hours, image: addForm.image,
-          mapUrl: addForm.mapUrl, website: addForm.website,
+          mapUrl: addForm.mapUrl, website: normalizeWebsiteForStorage(addForm.website) ?? '',
           discountValidFrom: validFrom, discountValidUntil: validUntil,
           featured: false,
         },
@@ -599,7 +600,7 @@ const AdminPanel: React.FC = () => {
         deal_price: Number(editForm.dealPrice) || 0,
         location: editForm.location, phone: editForm.phone,
         hours: editForm.hours,
-        map_url: editForm.mapUrl, website: editForm.website,
+        map_url: editForm.mapUrl, website: normalizeWebsiteForStorage(editForm.website) ?? '',
       };
       if (editForm.image) updates.image = editForm.image;
 

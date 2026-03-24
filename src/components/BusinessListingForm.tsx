@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
-import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, AlertTriangle, Globe, MapPin, Info } from 'lucide-react';
+import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, AlertTriangle, Globe, Info } from 'lucide-react';
 
 import { formatVT } from '@/lib/utils';
 import { toast } from 'sonner';
 import PhotoUploader, { UploadedPhoto } from './PhotoUploader';
 import PricingTiersEditor from './PricingTiersEditor';
+import LocationMapPicker from './LocationMapPicker';
+import WebsiteUrlInput from './WebsiteUrlInput';
+import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 import {
   categoryUsesTieredPricing,
   validatePricingTiersForSubmit,
@@ -250,6 +253,7 @@ const BusinessListingForm: React.FC = () => {
       // For no-discount listings, set dealPrice = originalPrice
       const finalOriginalPrice = form.originalPrice ? Number(form.originalPrice) : 0;
       const finalDealPrice = form.dealPrice ? Number(form.dealPrice) : finalOriginalPrice;
+      const normalizedWebsite = normalizeWebsiteForStorage(form.website) ?? null;
 
       const submissionPayload = {
         action: 'submit_business',
@@ -269,7 +273,7 @@ const BusinessListingForm: React.FC = () => {
         image: mainImageUrl,
         photos: photoData,
         mapUrl: form.mapUrl,
-        website: form.website,
+        website: normalizedWebsite,
         discountValidFrom: form.discountValidFrom,
         discountValidUntil: discountValidUntil,
         pricingTiers: tiersPayload,
@@ -298,7 +302,7 @@ const BusinessListingForm: React.FC = () => {
         p_hours: form.hours,
         p_image: mainImageUrl,
         p_map_url: form.mapUrl || null,
-        p_website: form.website || null,
+        p_website: normalizedWebsite,
         p_discount_valid_from: form.discountValidFrom || null,
         p_discount_valid_until: discountValidUntil || null,
         p_whatsapp_number: form.whatsappNumber || null,
@@ -894,42 +898,21 @@ const BusinessListingForm: React.FC = () => {
             </div>
             <p className="text-xs text-gray-500 mb-3">
               {language === 'en'
-                ? 'Add your Google Maps link and website so tourists can easily find and learn more about your business.'
-                : 'Ajoutez votre lien Google Maps et votre site web pour que les touristes puissent vous trouver facilement.'}
+                ? 'Set your location on the map and add your website so tourists can find you easily.'
+                : 'Indiquez votre emplacement sur la carte et votre site web pour que les touristes vous trouvent facilement.'}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1.5">
-                  <MapPin className="w-3 h-3 text-red-500" />
-                  {language === 'en' ? 'Google Maps Link' : 'Lien Google Maps'}
-                </label>
-                <input
-                  type="url"
-                  value={form.mapUrl}
-                  onChange={(e) => setForm({ ...form, mapUrl: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="https://maps.google.com/..."
-                />
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  {language === 'en' ? 'Paste your Google Maps share link so tourists can navigate to you' : 'Collez votre lien Google Maps'}
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1.5">
-                  <Globe className="w-3 h-3 text-blue-500" />
-                  {language === 'en' ? 'Website' : 'Site Web'}
-                </label>
-                <input
-                  type="url"
-                  value={form.website}
-                  onChange={(e) => setForm({ ...form, website: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="https://www.yourbusiness.com"
-                />
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  {language === 'en' ? 'Your business website or social media page' : 'Votre site web ou page de médias sociaux'}
-                </p>
-              </div>
+              <LocationMapPicker
+                mapUrl={form.mapUrl}
+                onMapUrlChange={(v) => setForm({ ...form, mapUrl: v })}
+                language={language}
+              />
+              <WebsiteUrlInput
+                website={form.website}
+                onWebsiteChange={(v) => setForm({ ...form, website: v })}
+                language={language}
+                id="listing-website"
+              />
             </div>
           </div>
 
