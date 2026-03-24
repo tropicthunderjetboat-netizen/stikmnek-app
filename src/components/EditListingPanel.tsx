@@ -21,7 +21,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
+import {
+  plainTextFromHtml,
+  BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX,
+  BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
+} from '@/lib/businessDescriptionHtml';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 
@@ -239,8 +243,10 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
 
     if (changedFields.includes('description')) {
       const descLen = plainTextFromHtml(form.description).length;
-      if (descLen > 500) {
-        toast.error('Description must be 500 characters or fewer (plain text).');
+      if (descLen > BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX) {
+        toast.error(
+          `Description must be ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} characters or fewer (plain text).`,
+        );
         return;
       }
     }
@@ -476,10 +482,12 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                   <p className="text-[11px] text-gray-400">Write a compelling description for tourists</p>
                   <span
                     className={`text-[11px] font-medium ${
-                      plainTextFromHtml(form.description).length > 450 ? 'text-orange-500' : 'text-gray-400'
+                      plainTextFromHtml(form.description).length > BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT
+                        ? 'text-orange-500'
+                        : 'text-gray-400'
                     }`}
                   >
-                    {plainTextFromHtml(form.description).length}/500
+                    {plainTextFromHtml(form.description).length}/{BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX}
                   </span>
                 </div>
               </div>

@@ -20,6 +20,8 @@ import {
   plainTextFromHtml,
   sanitizeBusinessDescriptionHtml,
   looksLikeRichDescriptionHtml,
+  BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX,
+  BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
 import PricingDiscountFields from './PricingDiscountFields';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
@@ -539,6 +541,12 @@ const AdminPanel: React.FC = () => {
   const handleAddBusinessSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addForm.name || !hasMeaningfulDescriptionContent(addForm.description)) { toast.error('Please fill in the business name and description.'); return; }
+    if (plainTextFromHtml(addForm.description).length > BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX) {
+      toast.error(
+        `Description must be ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} characters or fewer (plain text).`,
+      );
+      return;
+    }
     if (!addForm.originalPrice || !addForm.discountPercent) { toast.error('Please enter the original price and discount percentage.'); return; }
     setAddingBusiness(true);
     try {
@@ -598,6 +606,12 @@ const AdminPanel: React.FC = () => {
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editBusinessId || !editForm.name) { toast.error('Business name is required.'); return; }
+    if (plainTextFromHtml(editForm.description).length > BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX) {
+      toast.error(
+        `Description must be ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} characters or fewer (plain text).`,
+      );
+      return;
+    }
     setSavingEdit(true);
     try {
       // Use canonical schema (image, discount, deal_price, hours) to avoid "column not found"
@@ -1974,6 +1988,19 @@ const AdminPanel: React.FC = () => {
                     onChange={(html) => setAddForm((p) => ({ ...p, description: html }))}
                     placeholder="Describe the business..."
                   />
+                  <div className="flex items-center justify-end mt-1">
+                    <span
+                      className={`text-[11px] font-medium ${
+                        plainTextFromHtml(addForm.description).length >
+                        BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT
+                          ? 'text-orange-500'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {plainTextFromHtml(addForm.description).length}/{BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX}{' '}
+                      (plain text)
+                    </span>
+                  </div>
                 </div>
 
                 {/* ─── Auto-Calculate Pricing (same as homepage form) ─── */}
@@ -2039,6 +2066,19 @@ const AdminPanel: React.FC = () => {
                     className="focus-within:ring-blue-500"
                     placeholder="Describe the business..."
                   />
+                  <div className="flex items-center justify-end mt-1">
+                    <span
+                      className={`text-[11px] font-medium ${
+                        plainTextFromHtml(editForm.description).length >
+                        BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT
+                          ? 'text-orange-500'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {plainTextFromHtml(editForm.description).length}/{BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX}{' '}
+                      (plain text)
+                    </span>
+                  </div>
                 </div>
 
                 {/* ─── Auto-Calculate Pricing (same as homepage form) ─── */}

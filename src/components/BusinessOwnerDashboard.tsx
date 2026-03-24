@@ -32,7 +32,12 @@ import {
   type PricingTierInput,
 } from '@/lib/pricingTiers';
 import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
-import { hasMeaningfulDescriptionContent } from '@/lib/businessDescriptionHtml';
+import {
+  hasMeaningfulDescriptionContent,
+  plainTextFromHtml,
+  BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX,
+  BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
+} from '@/lib/businessDescriptionHtml';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 // ─── Retry helper for edge function calls (matches BusinessListingForm) ───
@@ -850,6 +855,16 @@ const BusinessOwnerDashboard: React.FC = () => {
       return;
     }
 
+    const submitDescPlainLen = plainTextFromHtml(submitForm.description).length;
+    if (submitDescPlainLen > BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX) {
+      toast.error(
+        language === 'en'
+          ? `Description must be ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} characters or fewer (plain text).`
+          : `La description doit comporter au plus ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} caractères (texte brut).`,
+      );
+      return;
+    }
+
     // If discount fields are provided, validate them
     const hasDiscountFields = submitForm.originalPrice || submitForm.discountPercent;
     let origPrice = 0;
@@ -1424,6 +1439,19 @@ const BusinessOwnerDashboard: React.FC = () => {
                 onChange={(html) => setSubmitForm({ ...submitForm, description: html })}
                 placeholder="Describe your business and what makes it special..."
               />
+              <div className="flex items-center justify-end mt-1">
+                <span
+                  className={`text-[11px] font-medium ${
+                    plainTextFromHtml(submitForm.description).length >
+                    BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT
+                      ? 'text-orange-500'
+                      : 'text-gray-400'
+                  }`}
+                >
+                  {plainTextFromHtml(submitForm.description).length}/{BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX}
+                  {language === 'en' ? ' (plain text)' : ' (texte brut)'}
+                </span>
+              </div>
             </div>
 
             {/* ─── Pricing & Discount (PricingDiscountFields component) ─── */}

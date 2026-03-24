@@ -1,5 +1,13 @@
 import DOMPurify from 'dompurify';
 
+/** Max plain-text length (after stripping HTML) for business descriptions across forms and API payloads. */
+export const BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX = 2000;
+
+/** Plain-text length at or above which the UI shows a “near limit” hint (~90% of max). */
+export const BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT = Math.floor(
+  BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX * 0.9,
+);
+
 const SANITIZE_CONFIG = {
   ALLOWED_TAGS: [
     'p',

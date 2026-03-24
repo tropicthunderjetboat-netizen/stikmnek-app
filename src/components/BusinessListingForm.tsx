@@ -15,7 +15,12 @@ import {
   validatePricingTiersForSubmit,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
-import { hasMeaningfulDescriptionContent } from '@/lib/businessDescriptionHtml';
+import {
+  hasMeaningfulDescriptionContent,
+  plainTextFromHtml,
+  BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX,
+  BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
+} from '@/lib/businessDescriptionHtml';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 
@@ -177,6 +182,16 @@ const BusinessListingForm: React.FC = () => {
         language === 'en'
           ? 'Please fill in all required fields (name and description)'
           : 'Veuillez remplir tous les champs obligatoires (nom et description)'
+      );
+      return;
+    }
+
+    const descPlainLen = plainTextFromHtml(form.description).length;
+    if (descPlainLen > BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX) {
+      toast.error(
+        language === 'en'
+          ? `Description must be ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} characters or fewer (plain text).`
+          : `La description doit comporter au plus ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} caractères (texte brut).`,
       );
       return;
     }
@@ -553,6 +568,18 @@ const BusinessListingForm: React.FC = () => {
                   : 'Décrivez votre entreprise...'
               }
             />
+            <div className="flex items-center justify-end mt-1">
+              <span
+                className={`text-[11px] font-medium ${
+                  plainTextFromHtml(form.description).length > BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT
+                    ? 'text-orange-500'
+                    : 'text-gray-400'
+                }`}
+              >
+                {plainTextFromHtml(form.description).length}/{BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX}
+                {language === 'en' ? ' (plain text)' : ' (texte brut)'}
+              </span>
+            </div>
           </div>
           {/* ─── Pricing & Discount Section ─── */}
           <div className="p-5 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
