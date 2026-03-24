@@ -15,6 +15,8 @@ import {
   validatePricingTiersForSubmit,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
+import { hasMeaningfulDescriptionContent } from '@/lib/businessDescriptionHtml';
+import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 
 // ─── Retry helper for edge function calls ───
@@ -170,7 +172,7 @@ const BusinessListingForm: React.FC = () => {
       return;
     }
     // Validate required fields - discount is now optional
-    if (!form.name || !form.description) {
+    if (!form.name || !hasMeaningfulDescriptionContent(form.description)) {
       toast.error(
         language === 'en'
           ? 'Please fill in all required fields (name and description)'
@@ -542,11 +544,14 @@ const BusinessListingForm: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {language === 'en' ? 'Description *' : 'Description *'}
             </label>
-            <textarea
+            <BusinessDescriptionEditor
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none h-24"
-              placeholder={language === 'en' ? 'Describe your business and what makes it special...' : 'Décrivez votre entreprise...'}
+              onChange={(html) => setForm({ ...form, description: html })}
+              placeholder={
+                language === 'en'
+                  ? 'Describe your business and what makes it special...'
+                  : 'Décrivez votre entreprise...'
+              }
             />
           </div>
           {/* ─── Pricing & Discount Section ─── */}

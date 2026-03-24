@@ -7,6 +7,7 @@ import AdvancedSearch, { SortOption } from './AdvancedSearch';
 import { Search, SlidersHorizontal, LayoutGrid, List, Navigation, Loader2, Award } from 'lucide-react';
 import { haversineDistance } from '@/hooks/useGeolocation';
 import { effectiveBusinessCoords } from '@/lib/urlHelpers';
+import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
 
 interface BusinessGridProps {
   showFeaturedOnly?: boolean;
@@ -125,7 +126,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
 
         // Enhanced search: name, description, location, tags, category, whatsappNumber
         const nameMatch = fuzzyMatch(q, biz.name);
-        const descMatch = fuzzyMatch(q, biz.description);
+        const descMatch = fuzzyMatch(q, plainTextFromHtml(biz.description || ''));
         const locationMatch = fuzzyMatch(q, biz.location);
         const categoryMatch = (biz.category ?? '').toLowerCase().includes(q);
         const tagMatch = (biz.tags ?? []).some(tag => {

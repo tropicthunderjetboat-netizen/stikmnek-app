@@ -3,6 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { businesses as localBusinesses } from '@/data/businesses';
 import { Star, TrendingUp, Award, Crown, Sparkles, ArrowRight, ChevronDown, ChevronUp, Flame, Eye, Info, Trophy, Medal } from 'lucide-react';
 import { formatVT } from '@/lib/utils';
+import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
 import { toast } from 'sonner';
 
 // ─── Leaderboard Scoring Algorithm ───
@@ -289,7 +290,13 @@ const FeaturedLeaderboard: React.FC = () => {
                         </div>
 
                         <p className="text-sm text-gray-500 line-clamp-1 hidden sm:block">
-                          {language === 'fr' ? business.descriptionFr : language === 'bi' ? business.descriptionBi : business.description}
+                          {plainTextFromHtml(
+                            language === 'fr'
+                              ? business.descriptionFr || ''
+                              : language === 'bi'
+                                ? business.descriptionBi || ''
+                                : business.description || '',
+                          )}
                         </p>
                       </div>
 

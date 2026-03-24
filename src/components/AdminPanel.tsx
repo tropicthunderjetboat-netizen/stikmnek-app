@@ -15,7 +15,14 @@ import {
 import { formatVT, getPhotoDisplayUrl } from '@/lib/utils';
 import { pricingTiersFromDb } from '@/lib/pricingTiers';
 import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
+import {
+  hasMeaningfulDescriptionContent,
+  plainTextFromHtml,
+  sanitizeBusinessDescriptionHtml,
+  looksLikeRichDescriptionHtml,
+} from '@/lib/businessDescriptionHtml';
 import PricingDiscountFields from './PricingDiscountFields';
+import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 import EmailReceiptManager from './EmailReceiptManager';
 import EmailNotificationCenter from './EmailNotificationCenter';
@@ -517,7 +524,7 @@ const AdminPanel: React.FC = () => {
       const headers = ['Name', 'Category', 'Description', 'Discount', 'Original Price', 'Deal Price', 'Location', 'Phone', 'Hours', 'Rating', 'Reviews', 'Source'];
       const rows = allBusinesses.map(b => {
         const isFromDb = dbBusinesses.some(db => db.id === b.id);
-        return [`"${(b.name||'').replace(/"/g,'""')}"`,b.category,`"${(b.description||'').replace(/"/g,'""')}"`,b.discount||'',String(b.originalPrice||0),String(b.dealPrice||0),`"${(b.location||'').replace(/"/g,'""')}"`,b.phone||'',`"${(b.hours||'').replace(/"/g,'""')}"`,String(b.rating||0),String(b.reviewCount||0),isFromDb?'Database':'Sample'].join(',');
+        return [`"${(b.name||'').replace(/"/g,'""')}"`,b.category,`"${plainTextFromHtml(b.description||'').replace(/"/g,'""')}"`,b.discount||'',String(b.originalPrice||0),String(b.dealPrice||0),`"${(b.location||'').replace(/"/g,'""')}"`,b.phone||'',`"${(b.hours||'').replace(/"/g,'""')}"`,String(b.rating||0),String(b.reviewCount||0),isFromDb?'Database':'Sample'].join(',');
       });
       const csv = [headers.join(','), ...rows].join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -531,7 +538,7 @@ const AdminPanel: React.FC = () => {
   // ─── Add Business (admin bypass — auto-calculate pricing) ───
   const handleAddBusinessSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addForm.name || !addForm.description) { toast.error('Please fill in the business name and description.'); return; }
+    if (!addForm.name || !hasMeaningfulDescriptionContent(addForm.description)) { toast.error('Please fill in the business name and description.'); return; }
     if (!addForm.originalPrice || !addForm.discountPercent) { toast.error('Please enter the original price and discount percentage.'); return; }
     setAddingBusiness(true);
     try {
@@ -1230,7 +1237,7 @@ const AdminPanel: React.FC = () => {
                           </span>
                         </div>
 
-                        <p className="text-sm text-gray-600 mb-4">{biz.description}</p>
+                        <p className="text-sm text-gray-600 mb-4 line-clamp-4">{plainTextFromHtml(biz.description || '')}</p>
 
                         {pricingTiersFromDb(biz.pricing_tiers).length > 0 && (
                           <div className="mb-4 p-4 rounded-xl border border-violet-200 bg-violet-50/60">
@@ -1960,7 +1967,14 @@ const AdminPanel: React.FC = () => {
                   <div><label className="block text-xs font-semibold text-gray-600 mb-1">Business Name *</label><input type="text" value={addForm.name} onChange={e => setAddForm(p => ({...p, name: e.target.value}))} required className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="e.g. Island Café" /></div>
                   <div><label className="block text-xs font-semibold text-gray-600 mb-1">Category</label><select value={addForm.category} onChange={e => setAddForm(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">{['dining','activities','tours','shopping','spa','accommodation'].map(c => <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}</select></div>
                 </div>
-                <div><label className="block text-xs font-semibold text-gray-600 mb-1">Description *</label><textarea value={addForm.description} onChange={e => setAddForm(p => ({...p, description: e.target.value}))} required rows={3} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Describe the business..." /></div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Description *</label>
+                  <BusinessDescriptionEditor
+                    value={addForm.description}
+                    onChange={(html) => setAddForm((p) => ({ ...p, description: html }))}
+                    placeholder="Describe the business..."
+                  />
+                </div>
 
                 {/* ─── Auto-Calculate Pricing (same as homepage form) ─── */}
                 <PricingDiscountFields
@@ -2017,7 +2031,15 @@ const AdminPanel: React.FC = () => {
                   <div><label className="block text-xs font-semibold text-gray-600 mb-1">Business Name *</label><input type="text" value={editForm.name} onChange={e => setEditForm(p => ({...p, name: e.target.value}))} required className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
                   <div><label className="block text-xs font-semibold text-gray-600 mb-1">Category</label><select value={editForm.category} onChange={e => setEditForm(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">{['dining','activities','tours','shopping','spa','accommodation'].map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}</select></div>
                 </div>
-                <div><label className="block text-xs font-semibold text-gray-600 mb-1">Description</label><textarea value={editForm.description} onChange={e => setEditForm(p => ({...p, description: e.target.value}))} rows={3} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
+                  <BusinessDescriptionEditor
+                    value={editForm.description}
+                    onChange={(html) => setEditForm((p) => ({ ...p, description: html }))}
+                    className="focus-within:ring-blue-500"
+                    placeholder="Describe the business..."
+                  />
+                </div>
 
                 {/* ─── Auto-Calculate Pricing (same as homepage form) ─── */}
                 <PricingDiscountFields
@@ -2075,7 +2097,14 @@ const AdminPanel: React.FC = () => {
                     </div>
                     {biz.discount && <span className="px-3 py-1.5 rounded-lg bg-orange-50 text-orange-700 text-sm font-bold border border-orange-200">{biz.discount}</span>}
                   </div>
-                  <p className="text-sm text-gray-600 mb-4 leading-relaxed">{biz.description}</p>
+                  {looksLikeRichDescriptionHtml(biz.description || '') ? (
+                    <div
+                      className="prose prose-sm max-w-none text-gray-600 mb-4 leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: sanitizeBusinessDescriptionHtml(biz.description || '') }}
+                    />
+                  ) : (
+                    <p className="text-sm text-gray-600 mb-4 leading-relaxed whitespace-pre-wrap">{biz.description}</p>
+                  )}
                   <div className="grid grid-cols-2 gap-3 mb-4">
                     {biz.location && <div className="flex items-start gap-2 p-3 rounded-xl bg-gray-50"><MapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" /><div><p className="text-[10px] text-gray-400 font-medium uppercase">Location</p><p className="text-sm font-semibold text-gray-700">{biz.location}</p></div></div>}
                     {biz.phone && <div className="flex items-start gap-2 p-3 rounded-xl bg-gray-50"><Phone className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" /><div><p className="text-[10px] text-gray-400 font-medium uppercase">Phone</p><p className="text-sm font-semibold text-gray-700">{biz.phone}</p></div></div>}

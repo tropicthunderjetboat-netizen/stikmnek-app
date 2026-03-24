@@ -17,6 +17,11 @@ import {
   googleMapsExternalOpenUrl,
   normalizeWebsiteForStorage,
 } from '@/lib/urlHelpers';
+import {
+  looksLikeRichDescriptionHtml,
+  plainTextFromHtml,
+  sanitizeBusinessDescriptionHtml,
+} from '@/lib/businessDescriptionHtml';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
 
@@ -226,7 +231,8 @@ const BusinessDetail: React.FC = () => {
   };
 
   const handleShare = async () => {
-    const shareData = { title: biz.name, text: biz.description, url: window.location.href };
+    const shareBody = plainTextFromHtml(desc || '') || biz.name;
+    const shareData = { title: biz.name, text: shareBody, url: window.location.href };
     try {
       if (navigator.share) {
         await navigator.share(shareData);
@@ -286,7 +292,14 @@ const BusinessDetail: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              <p className="text-gray-700 leading-relaxed">{desc}</p>
+              {looksLikeRichDescriptionHtml(desc || '') ? (
+                <div
+                  className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: sanitizeBusinessDescriptionHtml(desc || '') }}
+                />
+              ) : (
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{desc}</p>
+              )}
               <div className="flex flex-wrap gap-2 mt-4">
                 {biz.tags.map(tag => (
                   <span key={tag} className="px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-medium">{tag}</span>

@@ -6,6 +6,7 @@ import { Star, Heart, MapPin, Clock, Share2, Sparkles, MessageCircle } from 'luc
 import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { toast } from 'sonner';
+import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
 
 interface BusinessCardProps {
   business: Business;
@@ -153,7 +154,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
                 </button>
               </div>
             </div>
-            <p className="text-sm text-gray-500 mb-3 line-clamp-2">{desc}</p>
+            <p className="text-sm text-gray-500 mb-3 line-clamp-2">{plainTextFromHtml(desc || '')}</p>
             <div className="flex items-center justify-between">
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-bold text-teal-700">{formatVT(business.dealPrice)}</span>
@@ -258,7 +259,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
           </div>
         </div>
 
-        <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">{desc}</p>
+        <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">{plainTextFromHtml(desc || '')}</p>
 
         <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
           <span className="flex items-center gap-1">

@@ -9,6 +9,10 @@ import {
   Globe, Target, Award, Sparkles, Activity, ShoppingBag, ScanLine,
   Plus, Home
 } from 'lucide-react';
+import {
+  looksLikeRichDescriptionHtml,
+  sanitizeBusinessDescriptionHtml,
+} from '@/lib/businessDescriptionHtml';
 
 
 interface DashboardOverviewProps {
@@ -298,7 +302,18 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
 
             <div className="p-5">
-              <p className="text-sm text-gray-600 leading-relaxed">{selectedBusiness.description}</p>
+              {looksLikeRichDescriptionHtml(selectedBusiness.description || '') ? (
+                <div
+                  className="prose prose-sm max-w-none text-gray-600 leading-relaxed"
+                  dangerouslySetInnerHTML={{
+                    __html: sanitizeBusinessDescriptionHtml(selectedBusiness.description || ''),
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
+                  {selectedBusiness.description}
+                </p>
+              )}
 
               <div className="flex flex-wrap items-center gap-3 mt-4">
                 <span className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 text-orange-700 text-sm font-bold">

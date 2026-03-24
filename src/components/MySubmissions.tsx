@@ -10,6 +10,10 @@ import {
   ChevronUp, Store, Loader2, Bell, BellRing, Eye, MessageSquare,
   ArrowRight, ExternalLink, Info, Sparkles, ShieldCheck, X
 } from 'lucide-react';
+import {
+  looksLikeRichDescriptionHtml,
+  sanitizeBusinessDescriptionHtml,
+} from '@/lib/businessDescriptionHtml';
 
 export interface Submission {
   id: string;
@@ -755,7 +759,16 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
                           <p className="text-xs font-medium text-gray-500 mb-0.5">
                             {language === 'en' ? 'Description' : 'Description'}
                           </p>
-                          <p className="text-sm text-gray-700">{submission.description}</p>
+                          {looksLikeRichDescriptionHtml(submission.description) ? (
+                            <div
+                              className="prose prose-sm max-w-none text-sm text-gray-700"
+                              dangerouslySetInnerHTML={{
+                                __html: sanitizeBusinessDescriptionHtml(submission.description),
+                              }}
+                            />
+                          ) : (
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{submission.description}</p>
+                          )}
                         </div>
                       )}
 

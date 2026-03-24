@@ -32,6 +32,8 @@ import {
   type PricingTierInput,
 } from '@/lib/pricingTiers';
 import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
+import { hasMeaningfulDescriptionContent } from '@/lib/businessDescriptionHtml';
+import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 // ─── Retry helper for edge function calls (matches BusinessListingForm) ───
 async function invokeWithRetry(
@@ -843,7 +845,7 @@ const BusinessOwnerDashboard: React.FC = () => {
     e.preventDefault();
 
     // Only name and description are required
-    if (!submitForm.name.trim() || !submitForm.description.trim()) {
+    if (!submitForm.name.trim() || !hasMeaningfulDescriptionContent(submitForm.description)) {
       toast.error('Please fill in the required fields (business name and description)');
       return;
     }
@@ -1417,7 +1419,11 @@ const BusinessOwnerDashboard: React.FC = () => {
             {/* Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Description *</label>
-              <textarea value={submitForm.description} onChange={(e) => setSubmitForm({ ...submitForm, description: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none h-24" placeholder="Describe your business and what makes it special..." />
+              <BusinessDescriptionEditor
+                value={submitForm.description}
+                onChange={(html) => setSubmitForm({ ...submitForm, description: html })}
+                placeholder="Describe your business and what makes it special..."
+              />
             </div>
 
             {/* ─── Pricing & Discount (PricingDiscountFields component) ─── */}

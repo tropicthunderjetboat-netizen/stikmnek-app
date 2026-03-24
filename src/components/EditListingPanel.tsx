@@ -21,6 +21,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
+import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 
 interface PendingEdit {
@@ -235,6 +237,14 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
       }
     }
 
+    if (changedFields.includes('description')) {
+      const descLen = plainTextFromHtml(form.description).length;
+      if (descLen > 500) {
+        toast.error('Description must be 500 characters or fewer (plain text).');
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const changes: Record<string, any> = {};
@@ -442,19 +452,20 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                   )}
                 </label>
                 <div className="relative">
-                  <textarea
+                  <BusinessDescriptionEditor
                     value={form.description}
-                    onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
-                    className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none h-32 transition-colors ${
-                      isFieldChanged('description') ? 'border-orange-300 bg-orange-50/30' : 'border-gray-200'
-                    }`}
+                    onChange={(html) => setForm((prev) => ({ ...prev, description: html }))}
                     placeholder="Describe your business to tourists..."
-                    maxLength={500}
+                    quillClassName="[&_.ql-editor]:min-h-[8rem]"
+                    className={
+                      isFieldChanged('description') ? 'border-orange-300 bg-orange-50/30' : undefined
+                    }
                   />
                   {isFieldChanged('description') && (
                     <button
+                      type="button"
                       onClick={() => resetField('description')}
-                      className="absolute top-2 right-2 p-1 rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-colors"
+                      className="absolute top-10 right-2 z-10 p-1 rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-colors"
                       title="Undo changes"
                     >
                       <Undo2 className="w-3.5 h-3.5" />
@@ -463,8 +474,12 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                 </div>
                 <div className="flex items-center justify-between mt-1">
                   <p className="text-[11px] text-gray-400">Write a compelling description for tourists</p>
-                  <span className={`text-[11px] font-medium ${form.description.length > 450 ? 'text-orange-500' : 'text-gray-400'}`}>
-                    {form.description.length}/500
+                  <span
+                    className={`text-[11px] font-medium ${
+                      plainTextFromHtml(form.description).length > 450 ? 'text-orange-500' : 'text-gray-400'
+                    }`}
+                  >
+                    {plainTextFromHtml(form.description).length}/500
                   </span>
                 </div>
               </div>
@@ -1002,7 +1017,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                       {form.location || selectedBusiness.location}
                     </p>
                     <p className="text-sm text-gray-600 mt-2 line-clamp-2">
-                      {form.description || selectedBusiness.description}
+                      {plainTextFromHtml(form.description || selectedBusiness.description || '')}
                     </p>
                     <div className="flex items-center gap-2 mt-3">
                       <span className="text-sm line-through text-gray-400">
