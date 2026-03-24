@@ -329,21 +329,39 @@ const QRScanner: React.FC<QRScannerProps> = ({
       return;
     }
 
-    const { data: listings, error: listErr } = await supabase
-      .from('businesses')
-      .select('id, name, discount, original_price, deal_price')
-      .eq('owner_id', user.id)
-      .eq('active', true)
-      .order('name', { ascending: true });
+    // Use Edge Function (service role) so this works even when RLS or missing `active` column
+    // breaks direct PostgREST queries — same pattern as dashboard get_all_owner_data.
+    const { data: mbData, error: mbErr } = await supabase.functions.invoke('manage-business', {
+      body: { action: 'get_owner_businesses', userId: user.id },
+    });
 
-    if (listErr) {
-      console.error('[QRScanner] load owner listings:', listErr);
+    if (mbErr) {
+      console.error('[QRScanner] load owner listings (edge):', mbErr);
       toast.error('Could not load your listings.');
       setResult({ success: false, error: 'Could not load your active listings.' });
       return;
     }
 
-    const rows = (listings ?? []) as OwnerListingOffer[];
+    const mbPayload = mbData as { businesses?: Record<string, unknown>[]; error?: string };
+    if (mbPayload?.error) {
+      console.error('[QRScanner] load owner listings:', mbPayload.error);
+      toast.error('Could not load your listings.');
+      setResult({ success: false, error: 'Could not load your active listings.' });
+      return;
+    }
+
+    const rawList = mbPayload.businesses ?? [];
+    const rows: OwnerListingOffer[] = rawList
+      .filter((b) => b.active !== false)
+      .map((b) => ({
+        id: String(b.id ?? ''),
+        name: String(b.name ?? ''),
+        discount: b.discount != null ? String(b.discount) : null,
+        original_price: b.original_price != null ? Number(b.original_price) : null,
+        deal_price: b.deal_price != null ? Number(b.deal_price) : null,
+      }))
+      .filter((r) => r.id.length > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     if (rows.length === 0) {
       setPendingRedeemQr(rawData);
