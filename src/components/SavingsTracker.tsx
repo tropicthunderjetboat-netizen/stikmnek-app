@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as localBusinesses } from '@/data/businesses';
 import {
@@ -27,9 +27,15 @@ const SavingsTracker: React.FC = () => {
     dbBusinesses,
     setSelectedBusiness,
     setCurrentView,
+    refreshRedemptions,
   } = useAppContext();
 
   const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
+
+  // Fresh data when opening Savings Tracker (redemptions change server-side after QR scan)
+  useEffect(() => {
+    void refreshRedemptions();
+  }, [refreshRedemptions]);
 
   // Pass prices in AUD
   const passPrices: Record<string, number> = {

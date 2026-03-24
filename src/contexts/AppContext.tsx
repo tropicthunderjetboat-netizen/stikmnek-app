@@ -183,6 +183,8 @@ interface AppContextType {
   dataLoaded: boolean;
   refreshBusinesses: () => Promise<void>;
   refreshUserPass: () => Promise<void>;
+  /** Reload pass redemptions from DB (call after QR redemption or when opening Savings Tracker). */
+  refreshRedemptions: () => Promise<void>;
   userLocation: GeoPosition | null;
   locationLoading: boolean;
   locationError: string | null;
@@ -420,6 +422,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Failed to load redemptions:', err);
     }
   }, []);
+
+  const loadRedemptionsRef = useRef(loadRedemptions);
+  loadRedemptionsRef.current = loadRedemptions;
 
   const loadUserData = useCallback((userId: string) => {
     loadFavorites(userId);
@@ -950,6 +955,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // Realtime: refetch redemptions when server inserts a row for this user (QR redemption, etc.)
+  useEffect(() => {
+    const uid = user?.id;
+    if (!uid) return;
+
+    const channel = supabase
+      .channel(`realtime-redemptions-${uid}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'redemptions',
+          filter: `user_id=eq.${uid}`,
+        },
+        () => {
+          void loadRedemptionsRef.current(uid);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const toggleSidebar = () => setSidebarOpen(prev => !prev);
 
   // ═══════════════════════════════════════════════════════════
@@ -1271,6 +1302,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user?.id, loadUserPass]);
 
+  const refreshRedemptions = useCallback(async () => {
+    if (user?.id) {
+      await loadRedemptions(user.id);
+    }
+  }, [user?.id, loadRedemptions]);
+
   return (
     <AppContext.Provider
       value={{
@@ -1292,6 +1329,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dbBusinesses, dbReviews, submitReview, dataLoaded,
         refreshBusinesses,
         refreshUserPass,
+        refreshRedemptions,
         refreshUserProfile,
         userLocation, locationLoading, locationError,
         requestUserLocation, getDistanceTo,

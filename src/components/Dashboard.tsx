@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getPassDisplayTitle } from '@/data/pricing';
 import { t } from '@/data/translations';
@@ -19,8 +19,13 @@ type DashboardTab = 'overview' | 'savings' | 'analytics' | 'feedback';
 const Dashboard: React.FC = () => {
   const {
     language, user, favorites, redemptions, setSelectedBusiness, setCurrentView, dbBusinesses,
+    refreshRedemptions,
   } = useAppContext();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+
+  useEffect(() => {
+    void refreshRedemptions();
+  }, [refreshRedemptions]);
 
   if (!user) return null;
 
