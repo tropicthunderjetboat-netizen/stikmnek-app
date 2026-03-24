@@ -39,18 +39,24 @@ export function buildBookingInquiryMessage(p: BookingInquiryMessageParams): stri
   const a = Math.max(0, Math.floor(Number(p.adults) || 0));
   const c = Math.max(0, Math.floor(Number(p.children) || 0));
   const inf = Math.max(0, Math.floor(Number(p.infants ?? 0) || 0));
-  let party = `${a} Adults, ${c} Children`;
-  if (inf > 0) party += `, ${inf} Infants`;
+  const partyCore = `${a} Adults, ${c} Children`;
+  const partyLine =
+    inf > 0 ? `${partyCore} (+ ${inf} Infants)` : partyCore;
   const price = (p.estimatedPriceWithDiscount || 'VT 0').trim();
   const signer = (p.userName || 'Guest').trim();
 
+  // Plain text only (no emojis) — renders reliably in WhatsApp wa.me links.
   return [
     `Hi ${business},`,
+    '',
     'I found you on StikmNek and would like to inquire about a booking.',
-    `📅 *Date:* ${dateLabel}`,
-    `👥 *Party:* ${party}`,
-    `💰 *Estimated Price (with discount):* ${price}`,
+    '',
+    `Date: ${dateLabel}`,
+    `Party: ${partyLine}`,
+    `Estimated Price (with discount): ${price}`,
+    '',
     'Is this date available?',
+    '',
     'Thanks,',
     signer,
   ].join('\n');
