@@ -56,7 +56,6 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
   const [contactEmail, setContactEmail] = useState('');
   const [contactWhatsapp, setContactWhatsapp] = useState('');
   const [contactPhone, setContactPhone] = useState('');
-  const [message, setMessage] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
 
   useEffect(() => {
@@ -64,7 +63,6 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
     let cancelled = false;
     setVisitDate(today);
     setContactName(user.name || '');
-    setMessage('');
 
     const applyFromProfile = (row: {
       phone?: string | null;
@@ -233,7 +231,6 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
     stikmnek: language === 'en' ? 'Total StikmNek price' : language === 'fr' ? 'Prix StikmNek total' : 'StikmNek praes',
     save: language === 'en' ? 'Your savings' : language === 'fr' ? 'Vos économies' : 'Sevin blong yu',
     name: language === 'en' ? 'Your name' : language === 'fr' ? 'Votre nom' : 'Nem blong yu',
-    msg: language === 'en' ? 'Message to the business (optional)' : language === 'fr' ? 'Message au commerce (optionnel)' : 'Mesej long bisnis',
     emailBtn: language === 'en' ? 'Send request by email' : language === 'fr' ? 'Envoyer la demande par e-mail' : 'Send ask long imel',
     waBtn: language === 'en' ? 'Chat on WhatsApp' : language === 'fr' ? 'Discuter sur WhatsApp' : 'Toktok long WhatsApp',
     callBtn: language === 'en' ? 'Call' : language === 'fr' ? 'Appeler' : 'Kolem',
@@ -279,7 +276,6 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
           tourist_email: emailTrim,
           tourist_whatsapp: contactWhatsapp.trim() || null,
           tourist_phone: contactPhone.trim() || null,
-          message: message.trim() || null,
           total_standard_vt: totalStandard,
           total_deal_vt: totalDeal,
           savings_vt: savings,
@@ -444,15 +440,6 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
                 placeholder={language === 'en' ? '+678 …' : ''}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="inquiry-msg">{copy.msg}</Label>
-              <textarea
-                id="inquiry-msg"
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
               />
             </div>
           </div>
