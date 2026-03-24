@@ -27,6 +27,8 @@ export interface Business {
   featured: boolean;
   ownerId?: string | null;
   superStarCount?: number;
+  /** Tiered pricing JSON from `pricing_tiers` (Tours / Activities). */
+  pricingTiers?: unknown;
 }
 
 

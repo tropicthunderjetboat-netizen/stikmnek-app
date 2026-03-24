@@ -25,6 +25,13 @@ import BusinessHomeScreen from './BusinessHomeScreen';
 import DashboardFeedback from './DashboardFeedback';
 import DealExpiryWarningBanner from './DealExpiryWarningBanner';
 import BusinessListingForm from './BusinessListingForm';
+import PricingTiersEditor from './PricingTiersEditor';
+import {
+  categoryUsesTieredPricing,
+  validatePricingTiersForSubmit,
+  pricingTiersFromDb,
+  type PricingTierInput,
+} from '@/lib/pricingTiers';
 
 // ─── Retry helper for edge function calls (matches BusinessListingForm) ───
 async function invokeWithRetry(
@@ -184,6 +191,7 @@ const BusinessOwnerDashboard: React.FC = () => {
 
   // Submit form photo state
   const [submitPhotos, setSubmitPhotos] = useState<UploadedPhoto[]>([]);
+  const [pricingTiers, setPricingTiers] = useState<PricingTierInput[]>([]);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -233,9 +241,18 @@ const BusinessOwnerDashboard: React.FC = () => {
         listingDuration: '1_month',
       });
       setSubmitPhotos([]);
+      setPricingTiers(pricingTiersFromDb(s.pricing_tiers));
     }
     if (!resubmitSubmission) lastResubmitIdRef.current = null;
   }, [resubmitSubmission, activeTab]);
+
+  useEffect(() => {
+    if (!resubmitSubmission) setPricingTiers([]);
+  }, [resubmitSubmission]);
+
+  useEffect(() => {
+    if (!categoryUsesTieredPricing(submitForm.category)) setPricingTiers([]);
+  }, [submitForm.category]);
 
 
 
@@ -856,6 +873,16 @@ const BusinessOwnerDashboard: React.FC = () => {
       dlPrice = Number(submitForm.dealPrice) || 0;
     }
 
+    let tiersPayload: unknown[] | null = null;
+    if (categoryUsesTieredPricing(submitForm.category)) {
+      const { data, error: tierErr } = validatePricingTiersForSubmit(pricingTiers);
+      if (tierErr) {
+        toast.error(tierErr);
+        return;
+      }
+      tiersPayload = data;
+    }
+
     setLoading(true);
     try {
       const mainImageUrl = submitPhotos.length > 0 ? submitPhotos[0].url : submitForm.image;
@@ -898,6 +925,7 @@ const BusinessOwnerDashboard: React.FC = () => {
             website: submitForm.website,
             discountValidFrom: submitForm.discountValidFrom,
             discountValidUntil: discountValidUntil,
+            pricingTiers: tiersPayload,
           },
           2,
           'resubmit'
@@ -909,6 +937,7 @@ const BusinessOwnerDashboard: React.FC = () => {
           setResubmitSubmission(null);
           setSubmitForm({ name: '', category: 'dining', description: '', discount: '', originalPrice: '', discountPercent: '', dealPrice: '', location: '', phone: '', email: '', hours: '', image: '', whatsappNumber: '', mapUrl: '', website: '', discountValidFrom: todayStr(), listingDuration: '1_month' });
           setSubmitPhotos([]);
+          setPricingTiers([]);
           await loadAllOwnerData();
           setActiveTab('submissions');
           setLoading(false);
@@ -935,6 +964,7 @@ const BusinessOwnerDashboard: React.FC = () => {
         p_discount_valid_from: submitForm.discountValidFrom || null,
         p_discount_valid_until: discountValidUntil || null,
         p_whatsapp_number: submitForm.whatsappNumber || null,
+        p_pricing_tiers: tiersPayload,
       });
 
       if (!rpcError && rpcId) {
@@ -977,6 +1007,7 @@ const BusinessOwnerDashboard: React.FC = () => {
           listingDuration: '1_month',
         });
         setSubmitPhotos([]);
+        setPricingTiers([]);
         await loadAllOwnerData();
         setActiveTab('submissions');
         setLoading(false);
@@ -1007,6 +1038,7 @@ const BusinessOwnerDashboard: React.FC = () => {
           website: submitForm.website,
           discountValidFrom: submitForm.discountValidFrom,
           discountValidUntil: discountValidUntil,
+          pricingTiers: tiersPayload,
         },
         2,
         'submit_business'
@@ -1024,6 +1056,7 @@ const BusinessOwnerDashboard: React.FC = () => {
           listingDuration: '1_month',
         });
         setSubmitPhotos([]);
+        setPricingTiers([]);
         await loadAllOwnerData();
         setActiveTab('submissions');
         setLoading(false);
@@ -1404,6 +1437,14 @@ const BusinessOwnerDashboard: React.FC = () => {
               onWebsiteChange={(val) => setSubmitForm(prev => ({ ...prev, website: val }))}
               language={language}
             />
+
+            {categoryUsesTieredPricing(submitForm.category) && (
+              <PricingTiersEditor
+                tiers={pricingTiers}
+                onChange={setPricingTiers}
+                language={language}
+              />
+            )}
 
             {/* Location & Hours */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

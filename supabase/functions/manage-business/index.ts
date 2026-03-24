@@ -142,6 +142,7 @@ Deno.serve(async (req) => {
         discount_valid_from: body.discountValidFrom || null,
         discount_valid_until: body.discountValidUntil || null,
         whatsapp_number: body.whatsappNumber || null,
+        pricing_tiers: body.pricingTiers ?? body.pricing_tiers ?? null,
       };
 
       const { data: pending, error } = await supabase
@@ -214,6 +215,9 @@ Deno.serve(async (req) => {
         if (body.discountValidFrom !== undefined || body.discount_valid_from !== undefined || existing.discount_valid_from !== undefined) updates.discount_valid_from = body.discountValidFrom ?? body.discount_valid_from ?? existing.discount_valid_from;
         if (body.discountValidUntil !== undefined || body.discount_valid_until !== undefined || existing.discount_valid_until !== undefined) updates.discount_valid_until = body.discountValidUntil ?? body.discount_valid_until ?? existing.discount_valid_until;
         if (body.whatsappNumber !== undefined || body.whatsapp_number !== undefined || existing.whatsapp_number !== undefined) updates.whatsapp_number = body.whatsappNumber ?? body.whatsapp_number ?? existing.whatsapp_number;
+        if (body.pricingTiers !== undefined || body.pricing_tiers !== undefined) {
+          updates.pricing_tiers = body.pricingTiers ?? body.pricing_tiers ?? null;
+        }
 
         const { data: updated, error: updateErr } = await supabase
           .from('pending_businesses')

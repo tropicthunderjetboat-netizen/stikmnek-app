@@ -6,6 +6,12 @@ import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, AlertTriangl
 import { formatVT } from '@/lib/utils';
 import { toast } from 'sonner';
 import PhotoUploader, { UploadedPhoto } from './PhotoUploader';
+import PricingTiersEditor from './PricingTiersEditor';
+import {
+  categoryUsesTieredPricing,
+  validatePricingTiersForSubmit,
+  type PricingTierInput,
+} from '@/lib/pricingTiers';
 
 
 // ─── Retry helper for edge function calls ───
@@ -79,6 +85,7 @@ const BusinessListingForm: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
+  const [pricingTiers, setPricingTiers] = useState<PricingTierInput[]>([]);
   const [form, setForm] = useState({
     name: '', category: 'dining', description: '', discount: '',
     originalPrice: '', discountPercent: '', dealPrice: '',
@@ -127,7 +134,11 @@ const BusinessListingForm: React.FC = () => {
     }
   }, [calculatedDealPrice, calculatedDiscountLabel]);
 
-
+  useEffect(() => {
+    if (!categoryUsesTieredPricing(form.category)) {
+      setPricingTiers([]);
+    }
+  }, [form.category]);
 
   // Auto-calculate end date
   const selectedDuration = DURATION_OPTIONS.find(d => d.value === form.listingDuration);
@@ -209,6 +220,15 @@ const BusinessListingForm: React.FC = () => {
       }
     }
 
+    let tiersPayload: unknown[] | null = null;
+    if (categoryUsesTieredPricing(form.category)) {
+      const { data, error: tierErr } = validatePricingTiersForSubmit(pricingTiers);
+      if (tierErr) {
+        toast.error(tierErr);
+        return;
+      }
+      tiersPayload = data;
+    }
 
     setSubmitting(true);
 
@@ -247,6 +267,7 @@ const BusinessListingForm: React.FC = () => {
         website: form.website,
         discountValidFrom: form.discountValidFrom,
         discountValidUntil: discountValidUntil,
+        pricingTiers: tiersPayload,
       };
 
 
@@ -276,6 +297,7 @@ const BusinessListingForm: React.FC = () => {
         p_discount_valid_from: form.discountValidFrom || null,
         p_discount_valid_until: discountValidUntil || null,
         p_whatsapp_number: form.whatsappNumber || null,
+        p_pricing_tiers: tiersPayload,
       });
 
       if (!rpcError && rpcId) {
@@ -317,6 +339,7 @@ const BusinessListingForm: React.FC = () => {
           listingDuration: '1_month',
         });
         setPhotos([]);
+        setPricingTiers([]);
         return;
       }
 
@@ -347,6 +370,7 @@ const BusinessListingForm: React.FC = () => {
           listingDuration: '1_month',
         });
         setPhotos([]);
+        setPricingTiers([]);
         return;
       }
 
@@ -517,7 +541,6 @@ const BusinessListingForm: React.FC = () => {
             />
           </div>
           {/* ─── Pricing & Discount Section ─── */}
-          {/* ─── Pricing & Discount Section ─── */}
           <div className="p-5 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
             <div className="flex items-center gap-2 mb-1">
               <Tag className="w-4 h-4 text-teal-600" />
@@ -673,9 +696,13 @@ const BusinessListingForm: React.FC = () => {
             )}
           </div>
 
-
-
-
+          {categoryUsesTieredPricing(form.category) && (
+            <PricingTiersEditor
+              tiers={pricingTiers}
+              onChange={setPricingTiers}
+              language={language}
+            />
+          )}
 
           {/* ─── Discount Validity Date Range ─── */}
           <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">

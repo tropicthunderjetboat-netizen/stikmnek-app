@@ -314,6 +314,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           featured: b.featured || false,
           ownerId: b.owner_id || null,
           superStarCount: Number(b.super_star_count) || 0,
+          pricingTiers: b.pricing_tiers ?? null,
         }));
         setDbBusinesses(mapped);
         setDataLoaded(true);
@@ -938,6 +939,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           featured: b.featured || false,
           ownerId: b.owner_id || null,
           superStarCount: Number(b.super_star_count) || 0,
+          pricingTiers: b.pricing_tiers ?? null,
         };
         setDbBusinesses(prev => {
           if (prev.some(existing => existing.id === newBiz.id)) return prev;
