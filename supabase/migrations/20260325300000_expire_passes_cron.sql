@@ -1,32 +1,37 @@
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Pass expiry: mark expired passes inactive (hourly via pg_cron)
 --
--- Requires pg_cron (Supabase: Database → Extensions → enable "pg_cron").
--- On some plans, pg_cron may already exist under the `extensions` schema.
--- If this migration fails on extension, run the UPDATE manually or use a
--- Supabase Scheduled Edge Function instead.
+-- Schedule: every hour at minute 0 — cron expression: 0 * * * *
+-- Command:   UPDATE public.passes SET active = false
+--            WHERE active IS TRUE AND expires_at < NOW();
+--
+-- Prerequisites (Supabase):
+--   • Enable extension "pg_cron" (Database → Extensions), OR rely on the
+--     CREATE EXTENSION below (requires a role allowed to create extensions).
+--   • pg_cron is available on paid plans; verify your project supports it.
+--
+-- Idempotent: removes any existing job named stikmnek_expire_passes_hourly,
+-- then schedules a fresh one (safe to re-run in SQL Editor).
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- Omit SCHEMA so it matches your project's default (Supabase often uses `extensions`).
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
--- Idempotent: drop previous job name if re-applying migration
+-- Unschedule every pg_cron job with this name (handles duplicates / re-runs).
 DO $$
 DECLARE
-  jid int;
+  jid bigint;
 BEGIN
-  SELECT jobid INTO jid
-  FROM cron.job
-  WHERE jobname = 'stikmnek_expire_passes_hourly'
-  LIMIT 1;
-  IF jid IS NOT NULL THEN
+  FOR jid IN
+    SELECT jobid FROM cron.job WHERE jobname = 'stikmnek_expire_passes_hourly'
+  LOOP
     PERFORM cron.unschedule(jid);
-  END IF;
+  END LOOP;
 END;
 $$;
 
+-- Hourly: top of each hour (UTC, per pg_cron server timezone — typically UTC on Supabase).
 SELECT cron.schedule(
   'stikmnek_expire_passes_hourly',
   '0 * * * *',
-  $cmd$UPDATE public.passes SET active = false WHERE active IS TRUE AND expires_at < NOW()$cmd$
+  $$UPDATE public.passes SET active = false WHERE active IS TRUE AND expires_at < NOW()$$
 );
