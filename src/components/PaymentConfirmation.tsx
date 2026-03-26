@@ -649,15 +649,10 @@ const PaymentConfirmation: React.FC = () => {
       } catch {}
       return updated;
     });
-
     // Refresh the real pass from DB so PassCards / QR reflects the new max_people / validity.
     // (The receipt itself is localStorage-based, so we update both.)
-    try {
-      setTimeout(() => {
-        refreshUserPass?.().catch?.(() => {});
-      }, 800);
-    } catch {}
-  }, []);
+    void refreshUserPass?.().catch?.(() => {});
+  }, [refreshUserPass]);
 
   // Auto-send confirmation email when payment loads
   useEffect(() => {

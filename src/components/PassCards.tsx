@@ -351,6 +351,8 @@ const PassCards: React.FC = () => {
     setSharingPassId(pass.id);
     // Track whether we triggered a celebration in this invocation
     let celebrationTriggered = false;
+    // Track whether the bonus was actually claimed on the backend (avoid false “unlocked” states)
+    let bonusClaimed = false;
 
     try {
       // ═══ STEP 1: Share the app via Web Share API or clipboard ═══
@@ -445,6 +447,7 @@ const PassCards: React.FC = () => {
           if (data?.success) {
             // ═══ SUCCESS: Pass extended! ═══
             console.log('[PassCards] Pass extended successfully:', data);
+            bonusClaimed = true;
             
             const passName = language === 'fr' ? pass.nameFr : language === 'bi' ? pass.nameBi : pass.name;
             const bonusDays = data.bonus?.days ?? pass.shareBonus.extraDays;
@@ -491,6 +494,7 @@ const PassCards: React.FC = () => {
           } else if (errorBody?.already_claimed || data?.already_claimed) {
             // ═══ ALREADY CLAIMED: Share bonus was already used for this pass ═══
             console.log('[PassCards] Share bonus already claimed:', errorBody || data);
+            bonusClaimed = true;
             toast.info(
               language === 'en' ? 'You\'ve already claimed your share bonus for this pass! Thanks for sharing again.' :
               language === 'fr' ? 'Vous avez déjà réclamé votre bonus de partage pour ce pass ! Merci de partager à nouveau.' :
@@ -549,11 +553,14 @@ const PassCards: React.FC = () => {
         }
       }
 
-      // ═══ STEP 3: Mark as shared locally ═══
-      const newShared = new Set(sharedPasses);
-      newShared.add(pass.id);
-      setSharedPasses(newShared);
-      try { localStorage.setItem('stikmnek-shared-passes', JSON.stringify([...newShared])); } catch {}
+      // ═══ STEP 3: Mark locally only if the backend bonus was claimed ═══
+      // Avoid showing “Bonus Unlocked” purely from a share action that did not persist to DB.
+      if (bonusClaimed) {
+        const newShared = new Set(sharedPasses);
+        newShared.add(pass.id);
+        setSharedPasses(newShared);
+        try { localStorage.setItem('stikmnek-shared-passes', JSON.stringify([...newShared])); } catch {}
+      }
 
       // ═══ STEP 4: Show basic success if no celebration was triggered and user has no active pass ═══
       if (!celebrationTriggered && !(user?.pass && user?.passId)) {
@@ -684,7 +691,8 @@ const PassCards: React.FC = () => {
               const passPeriod = language === 'fr' ? pass.periodFr : language === 'bi' ? pass.periodBi : pass.period;
               const color = `from-${pass.colorFrom} to-${pass.colorTo}`;
               const shadow = `shadow-${pass.shadowColor}`;
-              const shared = isShared(pass.id);
+              const isCurrentUserPass = user?.pass === pass.type && Boolean(user?.passId);
+              const shared = isCurrentUserPass ? Boolean(user?.shareBonusApplied) : isShared(pass.id);
               const isSharing = sharingPassId === pass.id;
               const bonus = pass.shareBonus;
               const hasBonusDays = bonus.extraDays > 0;
@@ -863,6 +871,27 @@ const PassCards: React.FC = () => {
                               </>
                             )}
                           </button>
+                        )}
+                        {!shared && (
+                          <a
+                            className="mt-2 w-full inline-flex items-center justify-center gap-2 py-2 rounded-lg bg-white/70 border border-amber-200 text-amber-800 text-xs font-bold hover:bg-white transition-colors"
+                            href={`mailto:?subject=${encodeURIComponent(
+                              language === 'fr'
+                                ? 'StikmNek — bonus gratuit en partageant'
+                                : language === 'bi'
+                                  ? 'StikmNek — fri bonus taem yu serem'
+                                  : 'StikmNek — free share bonus'
+                            )}&body=${encodeURIComponent(
+                              language === 'fr'
+                                ? `🎁 Bonus gratuit : Partagez StikmNek et débloquez +${bonus.extraPeople} personnes${bonus.extraDays > 0 ? ` et +${bonus.extraDays} jour` : ''} sur votre pass.\n\nLien : ${window.location.origin}\n`
+                                : language === 'bi'
+                                  ? `🎁 Fri bonus: Serem StikmNek mo anlokem +${bonus.extraPeople} man${bonus.extraDays > 0 ? ` mo +${bonus.extraDays} dei` : ''} long pas blong yu.\n\nLink: ${window.location.origin}\n`
+                                  : `🎁 Free bonus: Share StikmNek to unlock +${bonus.extraPeople} people${bonus.extraDays > 0 ? ` and +${bonus.extraDays} day` : ''} on your pass.\n\nLink: ${window.location.origin}\n`
+                            )}`}
+                          >
+                            <Share2 className="w-3.5 h-3.5" />
+                            {language === 'fr' ? 'Partager par e-mail' : language === 'bi' ? 'Serem long imel' : 'Share via email'}
+                          </a>
                         )}
                       </div>
                     )}
