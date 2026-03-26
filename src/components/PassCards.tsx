@@ -314,6 +314,66 @@ async function invokeExtendPassWithRetry(
   return { data: null, error: lastError, errorBody: lastErrorBody, statusCode: lastStatusCode };
 }
 
+function getShareAppUrl(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
+  return 'https://stikmnek-app.vercel.app';
+}
+
+type ShareLang = 'en' | 'fr' | 'bi';
+
+/** Rich share / email body: value prop, Share Bonus explanation, pass-specific perk, and app URL (many clients only show `url` unless `text` is self-contained). */
+function buildPassShareContent(pass: PassConfig, language: ShareLang): { title: string; text: string; url: string; mailSubject: string } {
+  const url = getShareAppUrl();
+  const name = language === 'fr' ? pass.nameFr : language === 'bi' ? pass.nameBi : pass.name;
+  const bonusDesc =
+    language === 'fr'
+      ? pass.shareBonus.descriptionFr
+      : language === 'bi'
+        ? pass.shareBonus.descriptionBi
+        : pass.shareBonus.description;
+
+  if (language === 'fr') {
+    const text =
+      `Découvrez StikmNek — votre guide des réductions et bons plans au Vanuatu ! Restaurants, activités, commerces : avantages exclusifs pour les détenteurs de pass.\n\n` +
+      `Bonus de partage : partagez l'application avec vos proches pour débloquer GRATUITEMENT des places supplémentaires sur votre pass groupe et/ou un jour de réductions en plus. ` +
+      `Avec le ${name} : ${bonusDesc}\n\n` +
+      `Ouvrir StikmNek : ${url}`;
+    return {
+      title: 'StikmNek — réductions au Vanuatu',
+      text,
+      url,
+      mailSubject: 'StikmNek — promos au Vanuatu + bonus de partage gratuit',
+    };
+  }
+
+  if (language === 'bi') {
+    const text =
+      `Lukim StikmNek — gaid blong diskaun mo gudfala prais long Vanuatu! Res, aktiviti, bisnis lokal: yu save kasem spesel save wetem pas.\n\n` +
+      `Bonus blong serem: serem app wetem ol pren blong yu blong anlokem fri moa man long grup pas mo o wan ekstra dei blong diskaun. ` +
+      `Long ${name}: ${bonusDesc}\n\n` +
+      `Op StikmNek: ${url}`;
+    return {
+      title: 'StikmNek — diskaun long Vanuatu',
+      text,
+      url,
+      mailSubject: 'StikmNek — prais long Vanuatu + fri bonus taem yu serem',
+    };
+  }
+
+  const text =
+    `Check out StikmNek — your guide to discounts and deals across Vanuatu! Restaurants, activities, and local businesses offer exclusive savings for pass holders.\n\n` +
+    `Share Bonus: share the app with friends to unlock FREE extra people on your group pass and/or an extra day of discounts — at no extra cost. ` +
+    `For the ${name}: ${bonusDesc}\n\n` +
+    `Get the app: ${url}`;
+
+  return {
+    title: 'StikmNek — discounts in Vanuatu',
+    text,
+    url,
+    mailSubject: 'StikmNek — Vanuatu deals + free Share Bonus',
+  };
+}
+
 
 // ─── Main PassCards Component ───
 const PassCards: React.FC = () => {
@@ -338,15 +398,9 @@ const PassCards: React.FC = () => {
   }>({ show: false, passName: '', bonusDays: 0, bonusPeople: 0, bonusKids: 0 });
 
   const handleShare = async (pass: PassConfig) => {
-    const shareData = {
-      title: `StikmNek - ${pass.name}`,
-      text: language === 'en'
-        ? `Check out StikmNek! Get amazing deals in Vanuatu with the ${pass.name}. ${pass.shareBonus.description}`
-        : language === 'fr'
-          ? `Découvrez StikmNek ! Obtenez des offres incroyables au Vanuatu avec le ${pass.nameFr}. ${pass.shareBonus.descriptionFr}`
-          : `Lukim StikmNek! Kasem gudfala dils long Vanuatu wetem ${pass.nameBi}. ${pass.shareBonus.descriptionBi}`,
-      url: window.location.origin,
-    };
+    const shareLang: ShareLang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+    const payload = buildPassShareContent(pass, shareLang);
+    const shareData = { title: payload.title, text: payload.text, url: payload.url };
 
     setSharingPassId(pass.id);
     // Track whether we triggered a celebration in this invocation
@@ -372,7 +426,7 @@ const PassCards: React.FC = () => {
           }
           // Fallback to clipboard
           try {
-            await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+            await navigator.clipboard.writeText(shareData.text);
             shareSucceeded = true;
             platform = 'clipboard';
             toast.success(
@@ -394,7 +448,7 @@ const PassCards: React.FC = () => {
       } else {
         // No Web Share API — use clipboard
         try {
-          await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+          await navigator.clipboard.writeText(shareData.text);
           shareSucceeded = true;
           platform = 'clipboard';
           toast.success(
@@ -695,6 +749,8 @@ const PassCards: React.FC = () => {
               const shared = isCurrentUserPass ? Boolean(user?.shareBonusApplied) : isShared(pass.id);
               const isSharing = sharingPassId === pass.id;
               const bonus = pass.shareBonus;
+              const shareLang: ShareLang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+              const shareContent = buildPassShareContent(pass, shareLang);
               const hasBonusDays = bonus.extraDays > 0;
               const hasBonusPeople = bonus.extraPeople > 0 || bonus.extraKids > 0;
               const hasBonus = hasBonusDays || hasBonusPeople;
@@ -875,19 +931,7 @@ const PassCards: React.FC = () => {
                         {!shared && (
                           <a
                             className="mt-2 w-full inline-flex items-center justify-center gap-2 py-2 rounded-lg bg-white/70 border border-amber-200 text-amber-800 text-xs font-bold hover:bg-white transition-colors"
-                            href={`mailto:?subject=${encodeURIComponent(
-                              language === 'fr'
-                                ? 'StikmNek — bonus gratuit en partageant'
-                                : language === 'bi'
-                                  ? 'StikmNek — fri bonus taem yu serem'
-                                  : 'StikmNek — free share bonus'
-                            )}&body=${encodeURIComponent(
-                              language === 'fr'
-                                ? `🎁 Bonus gratuit : Partagez StikmNek et débloquez +${bonus.extraPeople} personnes${bonus.extraDays > 0 ? ` et +${bonus.extraDays} jour` : ''} sur votre pass.\n\nLien : ${window.location.origin}\n`
-                                : language === 'bi'
-                                  ? `🎁 Fri bonus: Serem StikmNek mo anlokem +${bonus.extraPeople} man${bonus.extraDays > 0 ? ` mo +${bonus.extraDays} dei` : ''} long pas blong yu.\n\nLink: ${window.location.origin}\n`
-                                  : `🎁 Free bonus: Share StikmNek to unlock +${bonus.extraPeople} people${bonus.extraDays > 0 ? ` and +${bonus.extraDays} day` : ''} on your pass.\n\nLink: ${window.location.origin}\n`
-                            )}`}
+                            href={`mailto:?subject=${encodeURIComponent(shareContent.mailSubject)}&body=${encodeURIComponent(shareContent.text)}`}
                           >
                             <Share2 className="w-3.5 h-3.5" />
                             {language === 'fr' ? 'Partager par e-mail' : language === 'bi' ? 'Serem long imel' : 'Share via email'}

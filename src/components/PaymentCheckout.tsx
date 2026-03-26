@@ -211,14 +211,36 @@ const PaymentCheckout: React.FC = () => {
 
   const selectedPass = cart ? PASSES[cart.passType] : null;
 
+  /** When the user’s active pass already has the share bonus and matches the cart pass type, show boosted people/days (same rules as pricing / extend-pass). */
+  const checkoutPassStats = useMemo(() => {
+    if (!cart?.passType) {
+      return { days: 1, groupLabel: 'Up to 4 people', bonusForThisProduct: false };
+    }
+    const pt = cart.passType;
+    const product = PASS_PRODUCTS[pt];
+    const bonusForThisProduct = Boolean(user?.shareBonusApplied && user?.pass === pt);
+    const days = bonusForThisProduct
+      ? product.shareBonus.totalDaysAfterShare ??
+        product.baseDays + (product.shareBonus.extraDays || 0)
+      : product.baseDays;
+    const people = bonusForThisProduct
+      ? user?.passPeopleCount ?? product.shareBonus.totalPeopleAfterShare
+      : product.basePeople;
+    return {
+      days,
+      groupLabel: `Up to ${people} people`,
+      bonusForThisProduct,
+    };
+  }, [cart?.passType, user?.shareBonusApplied, user?.pass, user?.passPeopleCount]);
+
   const endDate = useMemo(() => {
     if (!selectedPass || !startDate) return '';
     const start = new Date(startDate);
-    start.setDate(start.getDate() + selectedPass.days);
+    start.setDate(start.getDate() + checkoutPassStats.days);
     return start.toISOString().split('T')[0];
-  }, [startDate, selectedPass]);
+  }, [startDate, selectedPass, checkoutPassStats.days]);
 
-  const daysCount = selectedPass?.days || 0;
+  const daysCount = checkoutPassStats.days;
   const cardType = detectCardType(cardNumber);
 
   const formatDate = (dateStr: string) => {
@@ -398,7 +420,7 @@ const PaymentCheckout: React.FC = () => {
           validFrom: data.validFrom,
           validUntil: data.validUntil,
           days: data.days,
-          group: data.group || selectedPass.group,
+          group: data.group || checkoutPassStats.groupLabel,
           sessionId: data.sessionId,
           completedAt: new Date().toISOString(),
           cardLast4: data.cardLast4,
@@ -505,12 +527,23 @@ const PaymentCheckout: React.FC = () => {
                     <div className="text-sm text-teal-800">
                       <p className="font-semibold mb-1">How it works</p>
                       <p className="text-teal-700">
-                        Choose your start date and your <strong>{selectedPass.label}</strong> will be valid for <strong>{selectedPass.days} day{selectedPass.days > 1 ? 's' : ''}</strong> for <strong>{selectedPass.group}</strong>. 
-                        The end date is automatically calculated.
+                        {checkoutPassStats.bonusForThisProduct ? (
+                          <>
+                            Your <strong>Share Bonus</strong> is already applied. Choose your start date and your <strong>{selectedPass.label}</strong> will be valid for <strong>{daysCount} day{daysCount > 1 ? 's' : ''}</strong> for <strong>{checkoutPassStats.groupLabel}</strong>.
+                            The end date is automatically calculated.
+                          </>
+                        ) : (
+                          <>
+                            Choose your start date and your <strong>{selectedPass.label}</strong> will be valid for <strong>{daysCount} day{daysCount > 1 ? 's' : ''}</strong> for <strong>{checkoutPassStats.groupLabel}</strong>.
+                            The end date is automatically calculated.
+                          </>
+                        )}
                       </p>
-                      <p className="text-teal-700 mt-2 font-medium">
-                        Share the app (from the Passes page or after purchase) to unlock bonus extra people and/or extra days.
-                      </p>
+                      {!checkoutPassStats.bonusForThisProduct && (
+                        <p className="text-teal-700 mt-2 font-medium">
+                          Share the app (from the Passes page or after purchase) to unlock bonus extra people and/or extra days.
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -518,7 +551,7 @@ const PaymentCheckout: React.FC = () => {
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
                     <Users className="w-5 h-5 text-blue-600 flex-shrink-0" />
                     <div className="text-sm text-blue-800">
-                      <span className="font-semibold">Group Size:</span> {selectedPass.group}
+                      <span className="font-semibold">Group Size:</span> {checkoutPassStats.groupLabel}
                     </div>
                   </div>
 
@@ -918,11 +951,14 @@ const PaymentCheckout: React.FC = () => {
                     <div className="flex items-center gap-2 mt-2">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/20 text-white text-xs font-semibold">
                         <Users className="w-3 h-3" />
-                        {selectedPass.group}
+                        {checkoutPassStats.groupLabel}
                       </span>
                     </div>
                     <p className="text-sm text-white/70 mt-2">
-                      {selectedPass.days} day{selectedPass.days > 1 ? 's' : ''} of unlimited deals
+                      {daysCount} day{daysCount > 1 ? 's' : ''} of unlimited deals
+                      {checkoutPassStats.bonusForThisProduct && (
+                        <span className="block text-xs text-white/60 mt-1">Includes Share Bonus</span>
+                      )}
                     </p>
                   </div>
                 </div>

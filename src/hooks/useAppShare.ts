@@ -21,9 +21,13 @@ export interface AppShareResult {
 /**
  * Triggers the native share dialog (or clipboard fallback).
  * Returns { success, platform }.
+ *
+ * For email targets, put the full pitch and the app link inside `text` (not only in `url`),
+ * since some clients only pre-fill the body from `text` or show `url` alone.
  */
 export async function handleAppShare(options: ShareOptions): Promise<AppShareResult> {
   const { title, text, url } = options;
+  const clipboardBody = !url || text.includes(url) ? text : `${text}\n${url}`;
 
   if (navigator.share) {
     try {
@@ -39,7 +43,7 @@ export async function handleAppShare(options: ShareOptions): Promise<AppShareRes
       }
       // Fallback to clipboard
       try {
-        await navigator.clipboard.writeText(`${text}\n${url}`);
+        await navigator.clipboard.writeText(clipboardBody);
         toast.success('Link copied to clipboard!');
         return { success: true, platform: 'clipboard' };
       } catch {
@@ -51,7 +55,7 @@ export async function handleAppShare(options: ShareOptions): Promise<AppShareRes
 
   // No Web Share API — use clipboard
   try {
-    await navigator.clipboard.writeText(`${text}\n${url}`);
+    await navigator.clipboard.writeText(clipboardBody);
     toast.success('Link copied! Share it to unlock your bonus.');
     return { success: true, platform: 'clipboard' };
   } catch {
