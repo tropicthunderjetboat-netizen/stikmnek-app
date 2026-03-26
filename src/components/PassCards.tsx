@@ -382,6 +382,11 @@ const PassCards: React.FC = () => {
   const { language, purchasePass, user, userProfile, refreshUserPass, refreshUserProfile, setCurrentView } = useAppContext();
 
   const { activePasses } = usePassConfig();
+  useEffect(() => {
+    if (user?.id && !userProfile) {
+      refreshUserProfile();
+    }
+  }, [user?.id, userProfile, refreshUserProfile]);
   const recommendation = useMemo(() => {
     if (!userProfile) return null;
     const products = Object.values(PASS_PRODUCTS);
