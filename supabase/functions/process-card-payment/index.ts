@@ -106,6 +106,21 @@ Deno.serve(async (req) => {
       // gateway call in sandbox), and then creates a row in public.passes with
       // correct validity dates. The frontend treats this response the same way
       // as paypal-capture.
+      //
+      // CRITICAL SAFETY: In production, do NOT allow mock payments to create active passes.
+      // To enable this path intentionally (dev/testing only), set secret:
+      //   CARD_MOCK_ENABLED=true
+
+      const mockEnabled = (Deno.env.get('CARD_MOCK_ENABLED') ?? '').toLowerCase() === 'true';
+      if (!mockEnabled) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Card payments are temporarily unavailable. Please use PayPal.',
+          }),
+          { status: 501, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       const rawPassType = (body?.passType ?? body?.pass_type ?? '').toLowerCase();
       const startDate = body?.startDate ?? body?.start_date;

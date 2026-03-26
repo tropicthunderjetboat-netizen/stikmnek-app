@@ -385,10 +385,8 @@ const ShareCTA: React.FC<{
       // Step 2: Call extend-pass with retry to claim the bonus
       const accessToken = await ensureFreshSession();
       if (!accessToken) {
-        toast.warning('Shared successfully! Sign in again to claim your bonus days.', { duration: 5000 });
-
-        markSharedLocally();
-        setShareState('success');
+        toast.warning('Please sign in again to claim your share bonus.', { duration: 5000 });
+        setShareState('error');
         return;
       }
 
@@ -597,7 +595,7 @@ function addDaysToDate(dateStr: string | undefined, days: number): string {
 
 // ─── Main PaymentConfirmation Component ───
 const PaymentConfirmation: React.FC = () => {
-  const { user, setCurrentView, language, userProfile, refreshUserProfile, authLoading } = useAppContext();
+  const { user, setCurrentView, language, userProfile, refreshUserProfile, refreshUserPass, authLoading } = useAppContext();
   const [payment, setPayment] = useState<PaymentResult | null>(null);
   const [showTouristProfileModal, setShowTouristProfileModal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -651,6 +649,14 @@ const PaymentConfirmation: React.FC = () => {
       } catch {}
       return updated;
     });
+
+    // Refresh the real pass from DB so PassCards / QR reflects the new max_people / validity.
+    // (The receipt itself is localStorage-based, so we update both.)
+    try {
+      setTimeout(() => {
+        refreshUserPass?.().catch?.(() => {});
+      }, 800);
+    } catch {}
   }, []);
 
   // Auto-send confirmation email when payment loads
