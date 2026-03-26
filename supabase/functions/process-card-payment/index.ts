@@ -20,6 +20,11 @@ const SUPERSTAR_PRICE_AUD = 5.0;
 const PASS_DAYS: Record<string, number> = { daily: 1, weekly: 6, monthly: 6 };
 const PASS_MAX_PEOPLE: Record<string, number> = { daily: 4, weekly: 4, monthly: 7 };
 const PASS_PRICES_AUD: Record<string, number> = { daily: 15, weekly: 45, monthly: 99 };
+const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = {
+  daily: { extraPeople: 2, extraDays: 0 },
+  weekly: { extraPeople: 2, extraDays: 1 },
+  monthly: { extraPeople: 1, extraDays: 1 },
+};
 
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T00:00:00');
@@ -140,9 +145,24 @@ Deno.serve(async (req) => {
       }
 
       const passType = rawPassType;
-      const days = PASS_DAYS[passType] ?? 1;
-      const maxPeople = PASS_MAX_PEOPLE[passType] ?? 4;
+      const baseDays = PASS_DAYS[passType] ?? 1;
+      const baseMaxPeople = PASS_MAX_PEOPLE[passType] ?? 4;
       const amount = PASS_PRICES_AUD[passType] ?? 0;
+
+      // If the user unlocked share bonus before purchase, apply it automatically and consume the flag.
+      let applyShareBonus = false;
+      try {
+        const { data: profileRow } = await supabase
+          .from('user_profiles')
+          .select('share_bonus_unlocked')
+          .eq('user_id', authUser.id)
+          .maybeSingle();
+        applyShareBonus = Boolean(profileRow?.share_bonus_unlocked);
+      } catch {}
+
+      const bonus = SHARE_BONUS[passType] ?? { extraPeople: 0, extraDays: 0 };
+      const days = applyShareBonus ? (baseDays + (bonus.extraDays || 0)) : baseDays;
+      const maxPeople = applyShareBonus ? (baseMaxPeople + (bonus.extraPeople || 0)) : baseMaxPeople;
 
       // MOCK charge: in production you would call a real gateway here (Stripe/PayPal).
       // For now we assume the card charge succeeded if we reached this point.
@@ -160,7 +180,7 @@ Deno.serve(async (req) => {
         valid_until: validUntil,
         expires_at: expiresAt,
         max_people: maxPeople,
-        share_bonus_applied: false,
+        share_bonus_applied: applyShareBonus,
         amount_paid: amount,
         currency: 'AUD',
         payment_provider: 'card-mock',
@@ -182,6 +202,14 @@ Deno.serve(async (req) => {
         );
       }
 
+      if (applyShareBonus) {
+        // Consume the pre-purchase share bonus so it can't be reused.
+        await supabase
+          .from('user_profiles')
+          .update({ share_bonus_unlocked: false, updated_at: new Date().toISOString() })
+          .eq('user_id', authUser.id);
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
@@ -193,6 +221,7 @@ Deno.serve(async (req) => {
           validFrom,
           validUntil,
           days,
+          shareBonusApplied: applyShareBonus,
           sessionId: insertedPass?.id ?? receiptNumber,
           purchasedAt: insertedPass?.purchased_at ?? new Date().toISOString(),
         }),

@@ -16,6 +16,11 @@ const corsHeaders = {
 const PASS_DAYS: Record<string, number> = { daily: 1, weekly: 6, monthly: 6 };
 const PASS_MAX_PEOPLE: Record<string, number> = { daily: 4, weekly: 4, monthly: 7 };
 const PASS_PRICES_AUD: Record<string, number> = { daily: 15, weekly: 45, monthly: 99 };
+const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = {
+  daily: { extraPeople: 2, extraDays: 0 },
+  weekly: { extraPeople: 2, extraDays: 1 },
+  monthly: { extraPeople: 1, extraDays: 1 },
+};
 
 function jsonResponse(data: object, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -213,10 +218,24 @@ Deno.serve(async (req) => {
       return errorResponse('PayPal capture failed: ' + (typeof msg === 'string' ? msg.slice(0, 200) : JSON.stringify(msg)), 502);
     }
 
-    const days = PASS_DAYS[passType] ?? 1;
-    const maxPeople = PASS_MAX_PEOPLE[passType] ?? 4;
+    const baseDays = PASS_DAYS[passType] ?? 1;
+    const baseMaxPeople = PASS_MAX_PEOPLE[passType] ?? 4;
     const amount = PASS_PRICES_AUD[passType] ?? 0;
     const validFrom = startDate;
+    // Pre-purchase share bonus: apply automatically if unlocked, then consume the flag.
+    let applyShareBonus = false;
+    try {
+      const { data: profileRow } = await supabase
+        .from('user_profiles')
+        .select('share_bonus_unlocked')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      applyShareBonus = Boolean(profileRow?.share_bonus_unlocked);
+    } catch {}
+
+    const bonus = SHARE_BONUS[passType] ?? { extraPeople: 0, extraDays: 0 };
+    const days = applyShareBonus ? (baseDays + (bonus.extraDays || 0)) : baseDays;
+    const maxPeople = applyShareBonus ? (baseMaxPeople + (bonus.extraPeople || 0)) : baseMaxPeople;
     const validUntil = addDays(startDate, days);
     const expiresAt = endOfDayDate(validUntil);
     const receiptNumber = body?.receiptNumber ?? `STK-${Date.now().toString(36).toUpperCase()}`;
@@ -229,7 +248,7 @@ Deno.serve(async (req) => {
       valid_until: validUntil,
       expires_at: expiresAt,
       max_people: maxPeople,
-      share_bonus_applied: false,
+      share_bonus_applied: applyShareBonus,
       purchased_at: new Date().toISOString(),
     };
 
@@ -242,6 +261,13 @@ Deno.serve(async (req) => {
     if (insertErr) {
       console.error('[paypal-capture] Insert passes error:', insertErr);
       return errorResponse('Payment captured but failed to create pass: ' + insertErr.message, 500);
+    }
+
+    if (applyShareBonus) {
+      await supabase
+        .from('user_profiles')
+        .update({ share_bonus_unlocked: false, updated_at: new Date().toISOString() })
+        .eq('user_id', user.id);
     }
 
     // Send receipt email (best-effort; do not fail purchase if email fails)
@@ -277,6 +303,7 @@ Deno.serve(async (req) => {
       validFrom,
       validUntil,
       days,
+      shareBonusApplied: applyShareBonus,
       sessionId: insertedPass?.id ?? receiptNumber,
       receiptEmail,
     });

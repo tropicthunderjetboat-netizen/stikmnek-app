@@ -218,7 +218,8 @@ const PaymentCheckout: React.FC = () => {
     }
     const pt = cart.passType;
     const product = PASS_PRODUCTS[pt];
-    const bonusForThisProduct = Boolean(user?.shareBonusApplied && user?.pass === pt);
+    // Bonus can be active on an existing pass OR pre-unlocked before purchase.
+    const bonusForThisProduct = Boolean((user?.shareBonusApplied && user?.pass === pt) || user?.shareBonusUnlocked);
     const days = bonusForThisProduct
       ? product.shareBonus.totalDaysAfterShare ??
         product.baseDays + (product.shareBonus.extraDays || 0)
@@ -231,7 +232,7 @@ const PaymentCheckout: React.FC = () => {
       groupLabel: `Up to ${people} people`,
       bonusForThisProduct,
     };
-  }, [cart?.passType, user?.shareBonusApplied, user?.pass, user?.passPeopleCount]);
+  }, [cart?.passType, user?.shareBonusApplied, user?.shareBonusUnlocked, user?.pass, user?.passPeopleCount]);
 
   const endDate = useMemo(() => {
     if (!selectedPass || !startDate) return '';

@@ -377,7 +377,7 @@ function buildPassShareContent(pass: PassConfig, language: ShareLang): { title: 
 
 // ─── Main PassCards Component ───
 const PassCards: React.FC = () => {
-  const { language, purchasePass, user, refreshUserPass, setCurrentView } = useAppContext();
+  const { language, purchasePass, user, refreshUserPass, refreshUserProfile, setCurrentView } = useAppContext();
 
   const { activePasses } = usePassConfig();
   const [sharedPasses, setSharedPasses] = useState<Set<string>>(
@@ -473,8 +473,11 @@ const PassCards: React.FC = () => {
         return;
       }
 
-      // ═══ STEP 2: Call extend-pass edge function if user has an active pass ═══
-      if (user?.pass && user?.passId) {
+      // ═══ STEP 2: Call extend-pass edge function ═══
+      // Backend supports both:
+      // - Active pass → applies bonus to that pass
+      // - No pass yet → records pre-purchase share bonus unlock in user_profiles
+      if (user?.id) {
         const accessToken = await ensureFreshSession();
 
         
@@ -499,9 +502,24 @@ const PassCards: React.FC = () => {
           );
 
           if (data?.success) {
-            // ═══ SUCCESS: Pass extended! ═══
-            console.log('[PassCards] Pass extended successfully:', data);
+            // ═══ SUCCESS: Pass extended OR pre-purchase unlock recorded ═══
+            console.log('[PassCards] extend-pass success:', data);
             bonusClaimed = true;
+
+            if (data?.prepurchase) {
+              toast.success(
+                language === 'en'
+                  ? 'Share Bonus unlocked! It will be applied automatically when you purchase your pass.'
+                  : language === 'fr'
+                    ? 'Bonus de partage débloqué ! Il sera appliqué automatiquement quand vous achèterez votre pass.'
+                    : 'Bonus blong serem i anlokem! Bae i go insaed otomatik taem yu baem pas.',
+                { duration: 6000 }
+              );
+              try { await refreshUserProfile(); } catch {}
+              // No celebration (no pass to extend). Stop here.
+              setSharingPassId(null);
+              return;
+            }
             
             const passName = language === 'fr' ? pass.nameFr : language === 'bi' ? pass.nameBi : pass.name;
             const bonusDays = data.bonus?.days ?? pass.shareBonus.extraDays;
@@ -524,6 +542,7 @@ const PassCards: React.FC = () => {
               await new Promise(resolve => setTimeout(resolve, 1000));
               console.log('[PassCards] Refreshing user pass data after successful share extension...');
               await refreshUserPass();
+              await refreshUserProfile();
               console.log('[PassCards] Pass data refreshed successfully — validity dates updated');
             } catch (refreshErr) {
               console.warn('[PassCards] Failed to refresh pass data, will retry on celebration close:', refreshErr);
@@ -619,9 +638,9 @@ const PassCards: React.FC = () => {
       // ═══ STEP 4: Show basic success if no celebration was triggered and user has no active pass ═══
       if (!celebrationTriggered && !(user?.pass && user?.passId)) {
         toast.success(
-          language === 'en' ? 'Thanks for sharing! Buy a pass to activate your share bonus.' :
-          language === 'fr' ? 'Merci d\'avoir partagé ! Achetez un pass pour activer votre bonus de partage.' :
-          'Tangkiu blong serem! Baem wan pas blong aktivatem bonus blong serem blong yu.',
+          language === 'en' ? 'Thanks for sharing! Your Share Bonus will apply automatically when you purchase a pass.' :
+          language === 'fr' ? 'Merci d\'avoir partagé ! Votre bonus sera appliqué automatiquement quand vous achèterez un pass.' :
+          'Tangkiu blong serem! Bonus bae i go insaed otomatik taem yu baem pas.',
           { duration: 5000 }
         );
       }
@@ -931,7 +950,7 @@ const PassCards: React.FC = () => {
                         {!shared && (
                           <a
                             className="mt-2 w-full inline-flex items-center justify-center gap-2 py-2 rounded-lg bg-white/70 border border-amber-200 text-amber-800 text-xs font-bold hover:bg-white transition-colors"
-                            href={`mailto:?subject=${encodeURIComponent(shareContent.mailSubject)}&body=${encodeURIComponent(shareContent.text)}`}
+                            href={`mailto:?subject=${encodeURIComponent(shareContent.mailSubject)}&body=${encodeURIComponent(shareContent.text.replace(/\n/g, '\r\n'))}`}
                           >
                             <Share2 className="w-3.5 h-3.5" />
                             {language === 'fr' ? 'Partager par e-mail' : language === 'bi' ? 'Serem long imel' : 'Share via email'}

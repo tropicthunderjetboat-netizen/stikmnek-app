@@ -99,7 +99,23 @@ Deno.serve(async (req) => {
 
     const pass = passes?.[0];
     if (!pass) {
-      return errorResponse('No active pass found', 404);
+      // Allow pre-purchase share: store a "share bonus unlocked" flag on the user's profile.
+      // This will be consumed on the next pass purchase (paypal-capture / process-card-payment).
+      const { error: upErr } = await supabase
+        .from('user_profiles')
+        .update({ share_bonus_unlocked: true, updated_at: new Date().toISOString() })
+        .eq('user_id', userId);
+
+      if (upErr) {
+        console.error('[extend-pass] prepurchase update user_profiles error:', upErr);
+        return errorResponse('No active pass found (and failed to record share bonus). Please try again later.', 500);
+      }
+
+      return jsonResponse({
+        success: true,
+        prepurchase: true,
+        message: 'Share bonus unlocked. It will be applied automatically when you purchase your next pass.',
+      });
     }
 
     if (pass.share_bonus_applied === true) {

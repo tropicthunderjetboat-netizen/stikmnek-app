@@ -57,6 +57,8 @@ export interface UserProfile {
   whatsapp_number?: string | null;
   resort_name?: string | null;
   post_pass_profile_completed?: boolean;
+  /** If true, user has unlocked Share Bonus before buying a pass; consumed on purchase. */
+  share_bonus_unlocked?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -76,6 +78,8 @@ export interface User {
   passPeopleCount?: number | null;
   /** Whether share bonus has been applied to this pass. */
   shareBonusApplied?: boolean | null;
+  /** Whether the user has an unused, pre-purchase share bonus to apply on their next pass. */
+  shareBonusUnlocked?: boolean | null;
   /** Super Star review credits (purchased, decremented on use). */
   superstarCredits?: number;
 }
@@ -312,9 +316,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           map_url: b.map_url || null,
           website: b.website || null,
           hours: b.opening_hours || b.hours || '',
-          phone: b.phone || '',
+          phone: b.phone || b.business_phone || b.contact_phone || b.phone_number || '',
           contactEmail: b.email || b.contact_email || b.business_email || null,
-          whatsappNumber: b.whatsapp_number || null,
+          whatsappNumber: b.whatsapp_number || b.whatsapp || b.business_whatsapp || null,
           tags: b.tags || [],
           featured: b.featured || false,
           ownerId: b.owner_id || null,
@@ -593,6 +597,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       passValidUntil: null,
       avatarUrl,
       superstarCredits: profile?.superstar_credits ?? 0,
+      shareBonusUnlocked: profile?.share_bonus_unlocked ?? false,
     };
   }, []);
 
@@ -1238,7 +1243,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (profile) {
         setUserProfile(profile as UserProfile);
         setUser(prev => prev && prev.id === user.id
-          ? { ...prev, superstarCredits: profile.superstar_credits ?? 0 }
+          ? {
+            ...prev,
+            superstarCredits: profile.superstar_credits ?? 0,
+            shareBonusUnlocked: (profile as any).share_bonus_unlocked ?? false,
+          }
           : prev);
       }
     } catch (err) {

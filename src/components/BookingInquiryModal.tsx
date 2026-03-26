@@ -137,6 +137,8 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
 
   const totalPax = Math.max(0, adults) + Math.max(0, children);
   const totalGuests = Math.max(0, adults) + Math.max(0, children) + Math.max(0, infants);
+  const passCapacity = typeof user?.passPeopleCount === 'number' ? user.passPeopleCount : null;
+  const exceedsCapacity = passCapacity != null && totalPax > passCapacity;
   const tierRows = useMemo(
     () => pricingTiersFromDb(biz.pricingTiers ?? (biz as { pricing_tiers?: unknown }).pricing_tiers),
     [biz.id, biz.pricingTiers],
@@ -289,6 +291,16 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
   const handleSendEmail = async () => {
     if (totalGuests < 1) {
       toast.error(copy.paxHint);
+      return;
+    }
+    if (exceedsCapacity) {
+      toast.error(
+        language === 'en'
+          ? `Your group size (${totalPax}) exceeds your pass capacity (${passCapacity}). Please reduce guests or upgrade your pass.`
+          : language === 'fr'
+            ? `La taille de votre groupe (${totalPax}) dépasse la capacité de votre pass (${passCapacity}). Réduisez le nombre de personnes ou changez de pass.`
+            : `Grup size (${totalPax}) i bigwan moa long kapasiti blong pas (${passCapacity}). Plis mekem i smol o jenjem pas.`,
+      );
       return;
     }
     const emailTrim = contactEmail.trim();
@@ -492,18 +504,27 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
               <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-3">{copy.noContact}</p>
             ) : (
               <div className="flex flex-col gap-2">
+                {exceedsCapacity && (
+                  <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-3">
+                    {language === 'en'
+                      ? `Your group size (${totalPax}) is above your pass capacity (${passCapacity}). Please reduce guests or upgrade your pass before contacting this business.`
+                      : language === 'fr'
+                        ? `La taille de votre groupe (${totalPax}) dépasse la capacité de votre pass (${passCapacity}). Réduisez le nombre de personnes ou changez de pass avant de contacter ce commerce.`
+                        : `Grup size (${totalPax}) i bigwan moa long kapasiti blong pas (${passCapacity}). Plis mekem i smol o jenjem pas bifo yu kontaktim bisnis.`}
+                  </p>
+                )}
                 {showEmail && (
                   <Button
                     type="button"
                     className="w-full justify-center gap-2 bg-teal-600 hover:bg-teal-700 h-auto min-h-10 py-2.5 px-3"
-                    disabled={sendingEmail || totalGuests < 1}
+                    disabled={sendingEmail || totalGuests < 1 || exceedsCapacity}
                     onClick={handleSendEmail}
                   >
                     {sendingEmail ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <Mail className="h-4 w-4 shrink-0" />}
                     <span className="text-left leading-tight">{copy.emailBtn}</span>
                   </Button>
                 )}
-                {showWhatsApp && whatsappBookingUrl && (
+                {!exceedsCapacity && showWhatsApp && whatsappBookingUrl && (
                   <Button
                     type="button"
                     variant="outline"
@@ -516,7 +537,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
                     </a>
                   </Button>
                 )}
-                {showPhone && telHref && (
+                {!exceedsCapacity && showPhone && telHref && (
                   <Button
                     type="button"
                     variant="outline"
