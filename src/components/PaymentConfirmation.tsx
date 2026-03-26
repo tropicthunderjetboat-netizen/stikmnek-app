@@ -849,6 +849,7 @@ Enjoy your deals in Vanuatu!
               userId={user.id}
               language={language}
               accountEmail={user.email}
+              accountName={user.name}
               userProfile={userProfile}
               embedded
               hideTitle

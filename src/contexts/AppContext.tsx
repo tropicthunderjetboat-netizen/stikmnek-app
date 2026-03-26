@@ -14,7 +14,19 @@ import { errorLogger } from '@/lib/errorLogger';
 // ═══════════════════════════════════════════════════════════════
 const ADMIN_EMAILS = ['admin@stikmnek.com', 'testadmin@example.com', 'stikmnek@gmail.com'];
 
-export type ViewMode = 'home' | 'deals' | 'map' | 'passes' | 'dashboard' | 'admin' | 'business-detail' | 'checkout' | 'payment-confirmation' | 'business-dashboard' | 'help';
+export type ViewMode =
+  | 'home'
+  | 'deals'
+  | 'map'
+  | 'passes'
+  | 'dashboard'
+  | 'admin'
+  | 'business-detail'
+  | 'checkout'
+  | 'payment-confirmation'
+  | 'business-dashboard'
+  | 'help'
+  | 'complete-profile';
 
 export type PassType = 'daily' | 'weekly' | 'monthly' | null;
 
@@ -56,6 +68,8 @@ export interface UserProfile {
   /** Tourist WhatsApp (may differ from `phone`). */
   whatsapp_number?: string | null;
   resort_name?: string | null;
+  expected_arrival_date?: string | null;
+  expected_departure_date?: string | null;
   post_pass_profile_completed?: boolean;
   /** If true, user has unlocked Share Bonus before buying a pass; consumed on purchase. */
   share_bonus_unlocked?: boolean;
@@ -1145,6 +1159,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'business_location', 'business_phone', 'business_email', 'business_hours',
         'onboarding_complete',
         'num_adults', 'num_children', 'num_infants', 'preferred_contact_method', 'resort_name',
+        'expected_arrival_date', 'expected_departure_date',
         'post_pass_profile_completed', 'whatsapp_number', 'email',
       ];
       const safeUpdates: Record<string, any> = { updated_at: new Date().toISOString() };

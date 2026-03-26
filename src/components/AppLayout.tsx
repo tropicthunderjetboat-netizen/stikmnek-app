@@ -21,6 +21,7 @@ import PaymentConfirmation from './PaymentConfirmation';
 import PayPalReturnHandler from './PayPalReturnHandler';
 import FloatingPassButton from './FloatingPassButton';
 import LoadingSkeleton from './LoadingSkeleton';
+import CompleteTouristProfile from './CompleteTouristProfile';
 
 // ── Lazy-loaded route components ──
 const Dashboard = React.lazy(() => import('./Dashboard'));
@@ -124,6 +125,24 @@ const AppLayout: React.FC = () => {
     }
   }, [currentView, user, userProfile, authLoading, setCurrentView]);
 
+  // ─── Profile-First gating (Tourists) ───
+  useEffect(() => {
+    if (!user || authLoading) return;
+    if (user.type !== 'tourist') return;
+    if (!userProfile) return; // wait for profile load
+
+    const profileDone =
+      userProfile.post_pass_profile_completed === true &&
+      Boolean(userProfile.name || userProfile.full_name || userProfile.display_name) &&
+      (userProfile.num_adults ?? 0) >= 1 &&
+      Boolean((userProfile as any).expected_arrival_date) &&
+      Boolean((userProfile as any).expected_departure_date);
+
+    if (!profileDone && currentView !== 'complete-profile') {
+      setCurrentView('complete-profile');
+    }
+  }, [user, userProfile, authLoading, currentView, setCurrentView]);
+
   // ─── Scroll to top on view change ───
   useEffect(() => {
     if (prevViewRef.current !== currentView) {
@@ -145,6 +164,8 @@ const AppLayout: React.FC = () => {
 
   const renderView = () => {
     switch (currentView) {
+      case 'complete-profile':
+        return <CompleteTouristProfile />;
       case 'business-detail':
         return <BusinessDetail />;
       case 'deals':
@@ -195,8 +216,13 @@ const AppLayout: React.FC = () => {
     }
   };
 
-  const hideMainNav = currentView === 'business-dashboard';
-  const hideFooter = currentView === 'admin' || currentView === 'checkout' || currentView === 'payment-confirmation' || currentView === 'business-dashboard';
+  const hideMainNav = currentView === 'business-dashboard' || currentView === 'complete-profile';
+  const hideFooter =
+    currentView === 'admin' ||
+    currentView === 'checkout' ||
+    currentView === 'payment-confirmation' ||
+    currentView === 'business-dashboard' ||
+    currentView === 'complete-profile';
 
   return (
     <div className="min-h-screen bg-white">

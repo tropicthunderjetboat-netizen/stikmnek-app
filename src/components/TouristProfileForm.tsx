@@ -21,6 +21,8 @@ export interface TouristProfileFormProps {
   hideTitle?: boolean;
   /** Auth email fallback when profile row has no email yet */
   accountEmail?: string | null;
+  /** Auth/display name fallback when profile row has no name yet */
+  accountName?: string | null;
   /** Seeds party counts, contact prefs, resort, and contact detail fields */
   userProfile?: UserProfile | null;
 }
@@ -33,13 +35,17 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
   embedded,
   hideTitle,
   accountEmail,
+  accountName,
   userProfile,
 }) => {
+  const [fullName, setFullName] = useState('');
   const [numAdults, setNumAdults] = useState(1);
   const [numChildren, setNumChildren] = useState(0);
   const [numInfants, setNumInfants] = useState(0);
   const [preferredContact, setPreferredContact] = useState<PreferredContact>('email');
   const [resortName, setResortName] = useState('');
+  const [expectedArrivalDate, setExpectedArrivalDate] = useState('');
+  const [expectedDepartureDate, setExpectedDepartureDate] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactWhatsapp, setContactWhatsapp] = useState('');
   const [contactPhone, setContactPhone] = useState('');
@@ -48,21 +54,27 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
   useEffect(() => {
     const p = userProfile;
     if (!p) {
+      setFullName((accountName || '').trim());
       setContactEmail((accountEmail || '').trim());
       setContactWhatsapp('');
       setContactPhone('');
+      setExpectedArrivalDate('');
+      setExpectedDepartureDate('');
       return;
     }
+    setFullName((p.full_name || p.name || p.display_name || accountName || '').trim());
     setNumAdults(p.num_adults ?? 1);
     setNumChildren(p.num_children ?? 0);
     setNumInfants(p.num_infants ?? 0);
     const method = (p.preferred_contact_method || 'email') as PreferredContact;
     setPreferredContact(['email', 'whatsapp', 'phone'].includes(method) ? method : 'email');
     setResortName((p.resort_name || '').trim());
+    setExpectedArrivalDate((p as any).expected_arrival_date ? String((p as any).expected_arrival_date).slice(0, 10) : '');
+    setExpectedDepartureDate((p as any).expected_departure_date ? String((p as any).expected_departure_date).slice(0, 10) : '');
     setContactEmail((p.email || accountEmail || '').trim());
     setContactWhatsapp((p.whatsapp_number || '').trim() || (p.phone || '').trim());
     setContactPhone((p.phone || '').trim());
-  }, [userProfile, accountEmail]);
+  }, [userProfile, accountEmail, accountName]);
 
   const t = {
     title:
@@ -119,6 +131,24 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
         : language === 'fr'
           ? 'Où séjournez-vous ? (nom de l’hôtel/résidence)'
           : 'We yu stap? (Nem blong resot)',
+    fullName:
+      language === 'en'
+        ? 'Full name'
+        : language === 'fr'
+          ? 'Nom complet'
+          : 'Ful nem',
+    arrival:
+      language === 'en'
+        ? 'Expected arrival date'
+        : language === 'fr'
+          ? 'Date d’arrivée prévue'
+          : 'Dei blong kam',
+    departure:
+      language === 'en'
+        ? 'Expected departure date'
+        : language === 'fr'
+          ? 'Date de départ prévue'
+          : 'Dei blong lego',
     submit:
       language === 'en' ? 'Save profile' : language === 'fr' ? 'Enregistrer' : 'Sevem profil',
     skip: language === 'en' ? 'Later' : language === 'fr' ? 'Plus tard' : 'Bihain',
@@ -131,7 +161,12 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
       const emailTrim = contactEmail.trim();
       const waTrim = contactWhatsapp.trim();
       const phoneTrim = contactPhone.trim();
+      const nameTrim = fullName.trim();
 
+      if (!nameTrim) {
+        toast.error(language === 'en' ? 'Please enter your full name.' : language === 'fr' ? 'Entrez votre nom.' : 'Plis putum ful nem.');
+        return;
+      }
       if (preferredContact === 'email' && !emailTrim) {
         toast.error(language === 'en' ? 'Please enter your email.' : 'Entrez votre e-mail.');
         return;
@@ -147,14 +182,39 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
         return;
       }
 
+      if (!expectedArrivalDate) {
+        toast.error(language === 'en' ? 'Please select your arrival date.' : language === 'fr' ? 'Sélectionnez votre date d’arrivée.' : 'Plis selektem dei blong kam.');
+        return;
+      }
+      if (!expectedDepartureDate) {
+        toast.error(language === 'en' ? 'Please select your departure date.' : language === 'fr' ? 'Sélectionnez votre date de départ.' : 'Plis selektem dei blong lego.');
+        return;
+      }
+      if (expectedDepartureDate < expectedArrivalDate) {
+        toast.error(
+          language === 'en'
+            ? 'Departure date must be on or after your arrival date.'
+            : language === 'fr'
+              ? 'La date de départ doit être après la date d’arrivée.'
+              : 'Dei blong lego i mas biaen o semak long dei blong kam.',
+        );
+        return;
+      }
+
       const { error } = await supabase
         .from('user_profiles')
         .update({
+          name: nameTrim,
+          full_name: nameTrim,
+          display_name: nameTrim,
           num_adults: Math.max(0, numAdults),
           num_children: Math.max(0, numChildren),
           num_infants: Math.max(0, numInfants),
           preferred_contact_method: preferredContact,
           resort_name: resortName.trim() || null,
+          expected_arrival_date: expectedArrivalDate || null,
+          expected_departure_date: expectedDepartureDate || null,
+          onboarding_complete: true,
           post_pass_profile_completed: true,
           updated_at: new Date().toISOString(),
           email: emailTrim || null,
@@ -224,14 +284,24 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
   const inner = (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-2">
+        <Label htmlFor="tp-full-name">{t.fullName}</Label>
+        <Input
+          id="tp-full-name"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          placeholder={language === 'en' ? 'e.g. Jane Smith' : ''}
+          autoComplete="name"
+        />
+      </div>
+      <div className="grid gap-2">
         <Label htmlFor="tp-adults">{t.adults}</Label>
         <Input
           id="tp-adults"
           type="number"
-          min={0}
+          min={1}
           max={99}
           value={numAdults}
-          onChange={(e) => setNumAdults(Math.max(0, parseInt(e.target.value, 10) || 0))}
+          onChange={(e) => setNumAdults(Math.max(1, parseInt(e.target.value, 10) || 1))}
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -296,6 +366,27 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
           onChange={(e) => setResortName(e.target.value)}
           placeholder={language === 'en' ? 'e.g. Iririki Island Resort' : ''}
         />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid gap-2">
+          <Label htmlFor="tp-arrival">{t.arrival}</Label>
+          <Input
+            id="tp-arrival"
+            type="date"
+            value={expectedArrivalDate}
+            onChange={(e) => setExpectedArrivalDate(e.target.value)}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="tp-departure">{t.departure}</Label>
+          <Input
+            id="tp-departure"
+            type="date"
+            value={expectedDepartureDate}
+            onChange={(e) => setExpectedDepartureDate(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="flex flex-col gap-2 pt-2">
