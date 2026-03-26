@@ -16,18 +16,26 @@ function clampInt(n: unknown, fallback: number): number {
   return Math.max(0, Math.floor(x));
 }
 
-function diffDays(arrivalYYYYMMDD: string, departureYYYYMMDD: string): number {
-  // Interpret as local dates; minimum 1 day.
+function diffDaysInclusive(arrivalYYYYMMDD: string, departureYYYYMMDD: string): number {
+  // Interpret as local dates; inclusive day count. Example: Mar 1 → Mar 7 = 7 days.
   const a = new Date(arrivalYYYYMMDD + 'T00:00:00');
   const d = new Date(departureYYYYMMDD + 'T00:00:00');
   const ms = d.getTime() - a.getTime();
   if (!Number.isFinite(ms)) return 1;
-  const days = Math.round(ms / (1000 * 60 * 60 * 24));
-  return Math.max(1, days);
+  const daysBetween = Math.round(ms / (1000 * 60 * 60 * 24));
+  return Math.max(1, daysBetween + 1);
 }
 
 function displayPassTitle(p: PassProductConfig, lang: 'en' | 'fr' | 'bi'): string {
   return lang === 'fr' ? p.titleFr : lang === 'bi' ? p.titleBi : p.title;
+}
+
+function peopleAfterShare(p: PassProductConfig): number {
+  return p.shareBonus?.totalPeopleAfterShare ?? (p.basePeople + (p.shareBonus?.extraPeople || 0));
+}
+
+function daysAfterShare(p: PassProductConfig): number {
+  return p.shareBonus?.totalDaysAfterShare ?? (p.baseDays + (p.shareBonus?.extraDays || 0));
 }
 
 export function getPassRecommendation(
@@ -45,48 +53,63 @@ export function getPassRecommendation(
 
   const arrival = String((userProfile as any).expected_arrival_date ?? '').slice(0, 10);
   const departure = String((userProfile as any).expected_departure_date ?? '').slice(0, 10);
-  const totalDays = arrival && departure ? diffDays(arrival, departure) : 1;
+  const totalDays = arrival && departure ? diffDaysInclusive(arrival, departure) : 1;
 
-  // Sort by price ascending so we naturally pick the cheapest that fits.
+  // Sort by price ascending so we naturally pick the cheapest option within each priority band.
   const sorted = [...passProducts].sort((a, b) => (a.priceAUD ?? 0) - (b.priceAUD ?? 0));
 
-  const fitsWithoutShare = (p: PassProductConfig) =>
-    p.basePeople >= totalPeople && p.baseDays >= totalDays;
+  // A) Cheapest exact fit (no share needed)
+  const exactNoShare = sorted.find((p) => p.basePeople >= totalPeople && p.baseDays >= totalDays) ?? null;
 
-  const fitsWithShare = (p: PassProductConfig) => {
-    const peopleAfter = p.shareBonus?.totalPeopleAfterShare ?? (p.basePeople + (p.shareBonus?.extraPeople || 0));
-    const daysAfter = p.shareBonus?.totalDaysAfterShare ?? (p.baseDays + (p.shareBonus?.extraDays || 0));
-    return peopleAfter >= totalPeople && daysAfter >= totalDays;
-  };
+  // B) Cheapest exact fit (with share bonus)
+  const exactWithShare = sorted.find((p) => peopleAfterShare(p) >= totalPeople && daysAfterShare(p) >= totalDays) ?? null;
 
-  let recommended: PassProductConfig | null =
-    sorted.find(fitsWithoutShare) ?? null;
-
+  let recommended: PassProductConfig;
   let usesShareBonus = false;
-  if (!recommended) {
-    const shareFit = sorted.find(fitsWithShare) ?? null;
-    if (shareFit) {
-      recommended = shareFit;
-      usesShareBonus = true;
-    }
-  }
+  let mode: 'exact-no-share' | 'exact-with-share' | 'best-effort' = 'best-effort';
 
-  // Still nothing fits even with share bonus — fall back to the biggest pass (by people then days).
-  if (!recommended) {
+  if (exactNoShare) {
+    recommended = exactNoShare;
+    usesShareBonus = false;
+    mode = 'exact-no-share';
+  } else if (exactWithShare) {
+    recommended = exactWithShare;
+    usesShareBonus = true;
+    mode = 'exact-with-share';
+  } else {
+    // C) Best effort upsell: pick the cheapest pass that gets *closest* when share is applied,
+    // preferring to satisfy people first, then days, then overall deficit, then price.
     recommended = [...sorted].sort((a, b) => {
-      const aPeople = a.shareBonus?.totalPeopleAfterShare ?? a.basePeople;
-      const bPeople = b.shareBonus?.totalPeopleAfterShare ?? b.basePeople;
-      if (bPeople !== aPeople) return bPeople - aPeople;
-      const aDays = a.shareBonus?.totalDaysAfterShare ?? a.baseDays;
-      const bDays = b.shareBonus?.totalDaysAfterShare ?? b.baseDays;
-      return bDays - aDays;
+      const aPeopleOk = peopleAfterShare(a) >= totalPeople ? 0 : 1;
+      const bPeopleOk = peopleAfterShare(b) >= totalPeople ? 0 : 1;
+      if (aPeopleOk !== bPeopleOk) return aPeopleOk - bPeopleOk; // prefer people-covered
+
+      const aDaysOk = daysAfterShare(a) >= totalDays ? 0 : 1;
+      const bDaysOk = daysAfterShare(b) >= totalDays ? 0 : 1;
+      if (aDaysOk !== bDaysOk) return aDaysOk - bDaysOk; // then days-covered
+
+      const aPeopleDef = Math.max(0, totalPeople - peopleAfterShare(a));
+      const bPeopleDef = Math.max(0, totalPeople - peopleAfterShare(b));
+      if (aPeopleDef !== bPeopleDef) return aPeopleDef - bPeopleDef;
+
+      const aDaysDef = Math.max(0, totalDays - daysAfterShare(a));
+      const bDaysDef = Math.max(0, totalDays - daysAfterShare(b));
+      if (aDaysDef !== bDaysDef) return aDaysDef - bDaysDef;
+
+      return (a.priceAUD ?? 0) - (b.priceAUD ?? 0);
     })[0];
     usesShareBonus = true;
+    mode = 'best-effort';
   }
 
   const title = displayPassTitle(recommended, language);
   const bonusPeople = recommended.shareBonus?.extraPeople || 0;
   const bonusDays = recommended.shareBonus?.extraDays || 0;
+
+  const recPeopleCap = usesShareBonus ? peopleAfterShare(recommended) : recommended.basePeople;
+  const recDaysCap = usesShareBonus ? daysAfterShare(recommended) : recommended.baseDays;
+  const peopleShortBy = Math.max(0, totalPeople - recPeopleCap);
+  const daysShortBy = Math.max(0, totalDays - recDaysCap);
 
   const baseLine =
     language === 'fr'
@@ -98,12 +121,23 @@ export function getPassRecommendation(
   const shareLine = usesShareBonus
     ? (
       language === 'fr'
-        ? ` Astuce : partagez l’app pour débloquer ${bonusPeople > 0 ? `+${bonusPeople} personne${bonusPeople > 1 ? 's' : ''}` : ''}${bonusPeople > 0 && bonusDays > 0 ? ' et ' : ''}${bonusDays > 0 ? `+${bonusDays} jour` : ''} gratuitement.`
+        ? ` Conseil : partagez l’app pour débloquer ${bonusPeople > 0 ? `+${bonusPeople} personne${bonusPeople > 1 ? 's' : ''}` : ''}${bonusPeople > 0 && bonusDays > 0 ? ' et ' : ''}${bonusDays > 0 ? `+${bonusDays} jour` : ''} gratuitement.`
         : language === 'bi'
           ? ` Tip: serem app blong anlokem ${bonusPeople > 0 ? `+${bonusPeople} man` : ''}${bonusPeople > 0 && bonusDays > 0 ? ' mo ' : ''}${bonusDays > 0 ? `+${bonusDays} dei` : ''} fri.`
           : ` Tip: share the app to unlock ${bonusPeople > 0 ? `+${bonusPeople} people` : ''}${bonusPeople > 0 && bonusDays > 0 ? ' and ' : ''}${bonusDays > 0 ? `+${bonusDays} day` : ''} free.`
     )
     : '';
+
+  const bestEffortLine =
+    mode === 'best-effort' && (peopleShortBy > 0 || daysShortBy > 0)
+      ? (
+        language === 'fr'
+          ? ` Note : cette option ne couvre pas entièrement votre voyage (${peopleShortBy > 0 ? `il manque ${peopleShortBy} personne${peopleShortBy > 1 ? 's' : ''}` : ''}${peopleShortBy > 0 && daysShortBy > 0 ? ' et ' : ''}${daysShortBy > 0 ? `il manque ${daysShortBy} jour${daysShortBy > 1 ? 's' : ''}` : ''}). Vous pouvez acheter plusieurs pass ou choisir un pass supérieur.`
+          : language === 'bi'
+            ? ` Notis: hemia i no kavrem ful trip blong yu (${peopleShortBy > 0 ? `${peopleShortBy} man moa i nid` : ''}${peopleShortBy > 0 && daysShortBy > 0 ? ' mo ' : ''}${daysShortBy > 0 ? `${daysShortBy} dei moa i nid` : ''}). Yu save baem plante pas o tekem bigwan moa.`
+            : ` Note: this option won’t fully cover your trip (${peopleShortBy > 0 ? `${peopleShortBy} more people needed` : ''}${peopleShortBy > 0 && daysShortBy > 0 ? ' and ' : ''}${daysShortBy > 0 ? `${daysShortBy} more day${daysShortBy > 1 ? 's' : ''} needed` : ''}). You can buy multiple passes or upgrade.`
+      )
+      : '';
 
   return {
     recommendedPass: recommended,
@@ -111,7 +145,7 @@ export function getPassRecommendation(
     totalPeople,
     totalDays,
     usesShareBonus,
-    recommendationText: (baseLine + shareLine).trim(),
+    recommendationText: (baseLine + shareLine + bestEffortLine).trim(),
   };
 }
 
