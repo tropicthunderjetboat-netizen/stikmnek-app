@@ -71,17 +71,36 @@ export function getPassRecommendation(
   const daysNoShare = sorted.find((p) => p.baseDays >= totalDays) ?? null;
   const daysWithShare = sorted.find((p) => daysAfterShare(p) >= totalDays) ?? null;
 
+  const hasAnyPeopleCoverage =
+    sorted.some((p) => p.basePeople >= totalPeople) || sorted.some((p) => peopleAfterShare(p) >= totalPeople);
+  const hasAnyDaysCoverage =
+    sorted.some((p) => p.baseDays >= totalDays) || sorted.some((p) => daysAfterShare(p) >= totalDays);
+
   let recommended: PassProductConfig =
     exactNoShare ??
     exactWithShare ??
-    // If nothing fits perfectly, prefer covering the group size (cheapest)…
-    peopleNoShare ??
-    peopleWithShare ??
-    // …then prefer covering the trip duration (cheapest)…
-    daysNoShare ??
-    daysWithShare ??
-    // …and finally fall back to the cheapest product.
-    sorted[0];
+    // If this trip doesn't fit in ANY product even with sharing, prefer the
+    // biggest duration/coverage (so you minimize repeat purchases).
+    (!hasAnyPeopleCoverage && !hasAnyDaysCoverage
+      ? [...sorted].sort((a, b) => {
+          const aDays = daysAfterShare(a);
+          const bDays = daysAfterShare(b);
+          if (bDays !== aDays) return bDays - aDays;
+
+          const aPeople = peopleAfterShare(a);
+          const bPeople = peopleAfterShare(b);
+          if (bPeople !== aPeople) return bPeople - aPeople;
+
+          return (a.priceAUD ?? 0) - (b.priceAUD ?? 0);
+        })[0]
+      : // Otherwise: prefer covering the group size (cheapest)…
+        peopleNoShare ??
+        peopleWithShare ??
+        // …then prefer covering the trip duration (cheapest)…
+        daysNoShare ??
+        daysWithShare ??
+        // …and finally fall back to the cheapest product.
+        sorted[0]);
 
   const usesShareBonus =
     recommended === exactWithShare ||
@@ -104,6 +123,11 @@ export function getPassRecommendation(
 
   const passesNeededForDays = recDaysCap > 0 ? Math.ceil(totalDays / recDaysCap) : 1;
 
+  const basePeopleCap = recommended.basePeople;
+  const sharePeopleCap = peopleAfterShare(recommended);
+  const baseDaysCap = recommended.baseDays;
+  const shareDaysCap = daysAfterShare(recommended);
+
   const baseLine =
     language === 'fr'
       ? `Pour votre groupe de ${totalPeople} personne${totalPeople > 1 ? 's' : ''} pour ${totalDays} jour${totalDays > 1 ? 's' : ''}, nous recommandons le ${title}.`
@@ -125,10 +149,10 @@ export function getPassRecommendation(
     mode === 'best-effort'
       ? (
         language === 'fr'
-          ? `${daysShortBy > 0 ? ` Note : ce pass couvre ${recDaysCap} jour${recDaysCap > 1 ? 's' : ''}. Pour ${totalDays} jours, il vous faudra environ ${passesNeededForDays} pass (ou choisissez un pass plus long).` : ''}${peopleShortBy > 0 ? ` Note : ce pass couvre jusqu’à ${recPeopleCap} personne${recPeopleCap > 1 ? 's' : ''}. Pour ${totalPeople}, choisissez un pass supérieur ou achetez un pass supplémentaire.` : ''}`
+          ? `${daysShortBy > 0 ? ` Note : ce pass couvre ${usesShareBonus ? shareDaysCap : baseDaysCap} jour${(usesShareBonus ? shareDaysCap : baseDaysCap) > 1 ? 's' : ''} (${baseDaysCap} sans partage${usesShareBonus && shareDaysCap > baseDaysCap ? `, +${shareDaysCap - baseDaysCap} avec partage` : ''}). Pour ${totalDays} jours, il vous faudra au moins ${passesNeededForDays} pass (ou choisissez un pass plus long).` : ''}${peopleShortBy > 0 ? ` Note : ce pass couvre jusqu’à ${usesShareBonus ? sharePeopleCap : basePeopleCap} personne${(usesShareBonus ? sharePeopleCap : basePeopleCap) > 1 ? 's' : ''} (${basePeopleCap} sans partage${usesShareBonus && sharePeopleCap > basePeopleCap ? `, +${sharePeopleCap - basePeopleCap} avec partage` : ''}). Pour ${totalPeople}, choisissez un pass supérieur ou achetez un pass supplémentaire.` : ''}`
           : language === 'bi'
-            ? `${daysShortBy > 0 ? ` Notis: pas ia i kavrem ${recDaysCap} dei. Blong ${totalDays} dei, yu nidim klosap ${passesNeededForDays} pas (o tekem longfala pas).` : ''}${peopleShortBy > 0 ? ` Notis: pas ia i kavrem kasem ${recPeopleCap} man. Blong ${totalPeople}, tekem bigwan moa o baem wan moa.` : ''}`
-            : `${daysShortBy > 0 ? ` Note: this pass covers ${recDaysCap} day${recDaysCap > 1 ? 's' : ''}. For ${totalDays} days, you’ll need about ${passesNeededForDays} pass${passesNeededForDays > 1 ? 'es' : ''} (or choose a longer pass).` : ''}${peopleShortBy > 0 ? ` Note: this pass covers up to ${recPeopleCap} people. For ${totalPeople}, upgrade or buy an additional pass.` : ''}`
+            ? `${daysShortBy > 0 ? ` Notis: pas ia i kavrem ${usesShareBonus ? shareDaysCap : baseDaysCap} dei (${baseDaysCap} bifo serem${usesShareBonus && shareDaysCap > baseDaysCap ? `, mo +${shareDaysCap - baseDaysCap} taem yu serem` : ''}). Blong ${totalDays} dei, yu nidim aot at least ${passesNeededForDays} pas (o tekem longfala pas).` : ''}${peopleShortBy > 0 ? ` Notis: pas ia i kavrem kasem ${usesShareBonus ? sharePeopleCap : basePeopleCap} man (${basePeopleCap} bifo serem${usesShareBonus && sharePeopleCap > basePeopleCap ? `, mo +${sharePeopleCap - basePeopleCap} taem yu serem` : ''}). Blong ${totalPeople}, tekem bigwan moa o baem wan moa.` : ''}`
+            : `${daysShortBy > 0 ? ` Note: this pass covers ${usesShareBonus ? shareDaysCap : baseDaysCap} day${(usesShareBonus ? shareDaysCap : baseDaysCap) > 1 ? 's' : ''} (${baseDaysCap} without share${usesShareBonus && shareDaysCap > baseDaysCap ? `, +${shareDaysCap - baseDaysCap} with share` : ''}). For ${totalDays} days, you’ll need at least ${passesNeededForDays} pass${passesNeededForDays > 1 ? 'es' : ''} (or choose a longer pass).` : ''}${peopleShortBy > 0 ? ` Note: this pass covers up to ${usesShareBonus ? sharePeopleCap : basePeopleCap} people (${basePeopleCap} without share${usesShareBonus && sharePeopleCap > basePeopleCap ? `, +${sharePeopleCap - basePeopleCap} with share` : ''}). For ${totalPeople}, upgrade or buy an additional pass.` : ''}`
       ).trim()
       : '';
 
