@@ -21,13 +21,45 @@ const ResetPassword: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      // Let Supabase parse the hash and establish session (detectSessionInUrl is true)
-      const { data: { session } } = await supabase.auth.getSession();
-      if (cancelled) return;
-      setSessionReady(!!session?.user);
+    let resolved = false;
+
+    const resolve = (ready: boolean) => {
+      if (cancelled || resolved) return;
+      resolved = true;
+      setSessionReady(ready);
+    };
+
+    // Avoid a flash of "Invalid link" while Supabase is still processing the URL hash.
+    // We wait briefly for auth events / session to materialize, then decide.
+    const MAX_WAIT_MS = 1500;
+    const timer = window.setTimeout(async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        resolve(!!data?.session?.user);
+      } catch {
+        resolve(false);
+      }
+    }, MAX_WAIT_MS);
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) resolve(true);
+    });
+
+    void (async () => {
+      try {
+        // Let Supabase parse the hash and establish session (detectSessionInUrl is true)
+        const { data } = await supabase.auth.getSession();
+        if (data?.session?.user) resolve(true);
+      } catch {
+        // ignore; timer will resolve false if nothing materializes
+      }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      sub?.subscription?.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

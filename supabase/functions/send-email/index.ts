@@ -49,6 +49,52 @@ function passTypeToBrandDisplay(passType: unknown): string {
   return 'StikmNek Pass';
 }
 
+function escapeHtml(v: unknown): string {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatMoney(amount: unknown, currency: unknown): string {
+  const c = String(currency || 'AUD').toUpperCase();
+  const n = typeof amount === 'number' ? amount : Number(amount);
+  if (Number.isFinite(n)) return `${c} ${n.toFixed(2)}`;
+  const s = String(amount ?? '').trim();
+  return s ? `${c} ${s}` : `${c} —`;
+}
+
+function shareBonusPromoText(passType: unknown): { headline: string; body: string } {
+  const t = String(passType ?? '').toLowerCase().trim();
+  // Keep messaging generic enough for all pass types, but slightly more specific when we can.
+  const base =
+    `Log into your dashboard and click “Share App” to instantly upgrade your pass for FREE.`;
+  if (t === 'daily') {
+    return {
+      headline: 'Unlock more value (free upgrade)',
+      body: `${base} You’ll add +2 people to your pass in seconds.`,
+    };
+  }
+  if (t === 'weekly') {
+    return {
+      headline: 'Unlock more value (free upgrade)',
+      body: `${base} You’ll add +2 people and an extra day to your pass.`,
+    };
+  }
+  if (t === 'monthly') {
+    return {
+      headline: 'Unlock more value (free upgrade)',
+      body: `${base} You’ll add extra capacity and an extra day to your pass.`,
+    };
+  }
+  return {
+    headline: 'Unlock more value (free upgrade)',
+    body: `${base} You’ll add extra capacity (and potentially extra time) to your pass.`,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -181,20 +227,110 @@ Deno.serve(async (req) => {
       console.log('[send-email] From address:', fromEmail, '| To:', user_email);
 
       const subject = `StikmNek receipt — ${passLabel}`;
+      const safeName = escapeHtml(user_name || '');
+      const safeReceipt = escapeHtml(receipt_number || '—');
+      const safePayment = escapeHtml(payment_method || '—');
+      const safeValidFrom = escapeHtml(valid_from || '—');
+      const safeValidUntil = escapeHtml(valid_until || '—');
+      const money = escapeHtml(formatMoney(amount, currency));
+      const promo = shareBonusPromoText(pass_type);
+
+      // Premium, mobile-friendly, email-client-safe HTML (tables + inline styles).
       const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111;">
-      <h2 style="margin: 0 0 12px;">Thanks for your purchase!</h2>
-      <p style="margin: 0 0 12px;">Your pass is now active.</p>
-      <table style="border-collapse: collapse; width: 100%; max-width: 520px;">
-        <tr><td style="padding: 6px 0; color: #555;">Receipt</td><td style="padding: 6px 0; font-weight: 700;">${receipt_number || '—'}</td></tr>
-        <tr><td style="padding: 6px 0; color: #555;">Pass</td><td style="padding: 6px 0; font-weight: 700;">${passLabel}</td></tr>
-        <tr><td style="padding: 6px 0; color: #555;">Valid from</td><td style="padding: 6px 0;">${valid_from || '—'}</td></tr>
-        <tr><td style="padding: 6px 0; color: #555;">Valid until</td><td style="padding: 6px 0;">${valid_until || '—'}</td></tr>
-        <tr><td style="padding: 6px 0; color: #555;">Amount</td><td style="padding: 6px 0; font-weight: 700;">${currency || 'AUD'} ${typeof amount === 'number' ? amount.toFixed(2) : amount ?? '—'}</td></tr>
-        <tr><td style="padding: 6px 0; color: #555;">Payment</td><td style="padding: 6px 0;">${payment_method || '—'}</td></tr>
-      </table>
-      <p style="margin: 16px 0 0; color: #555; font-size: 12px;">If you have any issues, reply to this email and we'll help.</p>
-    </div>
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${escapeHtml(subject)}</title>
+  </head>
+  <body style="margin:0; padding:0; background:#f6f7f9;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7f9; padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+            <tr>
+              <td style="padding:0 4px 14px; font-family:Arial, sans-serif; color:#0f172a;">
+                <div style="font-weight:800; letter-spacing:0.2px; font-size:16px; color:#0d9488;">StikmNek</div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(15, 23, 42, 0.08);">
+                <div style="padding:22px 22px 16px; background:linear-gradient(135deg, #0d9488 0%, #059669 100%); color:#ffffff; font-family:Arial, sans-serif;">
+                  <div style="font-size:12px; opacity:0.95; margin-bottom:6px;">Purchase receipt</div>
+                  <div style="font-size:22px; font-weight:800; line-height:1.2;">${escapeHtml(passLabel)}</div>
+                  <div style="margin-top:10px; font-size:13px; opacity:0.92;">
+                    ${safeName ? `Hi ${safeName}, ` : ''}your pass is now active.
+                  </div>
+                </div>
+
+                <div style="padding:18px 22px 8px; font-family:Arial, sans-serif; color:#0f172a;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate; border-spacing:0; width:100%;">
+                    <tr>
+                      <td style="padding:12px 0; border-bottom:1px solid #e5e7eb;">
+                        <div style="font-size:12px; color:#64748b;">Receipt</div>
+                        <div style="font-size:14px; font-weight:700; color:#0f172a;">${safeReceipt}</div>
+                      </td>
+                      <td style="padding:12px 0; border-bottom:1px solid #e5e7eb;" align="right">
+                        <div style="font-size:12px; color:#64748b;">Amount</div>
+                        <div style="font-size:14px; font-weight:800; color:#0f172a;">${money}</div>
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
+                        <div style="font-size:12px; color:#64748b;">Valid from</div>
+                        <div style="font-size:14px; color:#0f172a;">${safeValidFrom}</div>
+                      </td>
+                      <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                        <div style="font-size:12px; color:#64748b;">Valid until</div>
+                        <div style="font-size:14px; color:#0f172a;">${safeValidUntil}</div>
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <td style="padding:12px 0;">
+                        <div style="font-size:12px; color:#64748b;">Payment method</div>
+                        <div style="font-size:14px; color:#0f172a;">${safePayment}</div>
+                      </td>
+                      <td style="padding:12px 0;" align="right">
+                        <div style="font-size:12px; color:#64748b;">Support</div>
+                        <div style="font-size:14px; color:#0f172a;">Reply to this email</div>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+
+                <div style="padding:0 22px 20px; font-family:Arial, sans-serif;">
+                  <div style="background:#ecfeff; border:1px solid #99f6e4; border-radius:14px; padding:14px 14px;">
+                    <div style="display:block; font-weight:800; color:#115e59; font-size:14px; margin-bottom:6px;">
+                      🎁 ${escapeHtml(promo.headline)}
+                    </div>
+                    <div style="color:#0f172a; font-size:13px; line-height:1.45;">
+                      ${escapeHtml(promo.body)}
+                    </div>
+                    <div style="margin-top:12px;">
+                      <a href="https://stikmnek.com" style="display:inline-block; background:#0d9488; color:#ffffff; text-decoration:none; padding:10px 14px; border-radius:10px; font-size:13px; font-weight:700;">
+                        Open StikmNek
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:14px 8px 0; text-align:center; font-family:Arial, sans-serif; color:#94a3b8; font-size:12px;">
+                © ${new Date().getFullYear()} StikmNek • Vanuatu travel deals
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
       `.trim();
 
       const sgBody = {

@@ -58,6 +58,14 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!supabaseUrl) {
+      console.error('[extend-pass] SUPABASE_URL is missing');
+      return errorResponse('Server configuration error: missing Supabase URL', 500);
+    }
+    if (!serviceKey) {
+      console.error('[extend-pass] SUPABASE_SERVICE_ROLE_KEY is missing');
+      return errorResponse('Server configuration error: missing service role key', 500);
+    }
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const token = authHeader.replace('Bearer ', '');
@@ -77,7 +85,7 @@ Deno.serve(async (req) => {
 
     const { data: passes, error: fetchErr } = await supabase
       .from('passes')
-      .select('id, pass_type, valid_until, max_people, share_bonus_applied')
+      .select('id, pass_type, valid_until, expires_at, max_people, share_bonus_applied')
       .eq('user_id', userId)
       .eq('active', true)
       .gte('valid_until', today)
@@ -119,14 +127,26 @@ Deno.serve(async (req) => {
       expires_at: newExpiresAt,
     };
 
-    const { error: updateErr } = await supabase
+    // Atomic apply: ensure we only update if bonus wasn't already applied.
+    // This prevents double-claim in a race if the button is tapped twice quickly.
+    const { data: updated, error: updateErr } = await supabase
       .from('passes')
       .update(updates)
-      .eq('id', pass.id);
+      .eq('id', pass.id)
+      .eq('share_bonus_applied', false)
+      .select('id, pass_type, valid_until, expires_at, max_people, share_bonus_applied')
+      .maybeSingle();
 
     if (updateErr) {
       console.error('[extend-pass] update error:', updateErr);
       return errorResponse('Failed to apply bonus: ' + updateErr.message, 500);
+    }
+    if (!updated) {
+      // Another request likely applied it first.
+      return new Response(
+        JSON.stringify({ success: false, already_claimed: true, error: 'Share bonus already claimed' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     return jsonResponse({
@@ -136,6 +156,7 @@ Deno.serve(async (req) => {
         people: bonus.extraPeople,
         kids: 0,
       },
+      pass: updated,
     });
   } catch (err: any) {
     console.error('[extend-pass]', err);
