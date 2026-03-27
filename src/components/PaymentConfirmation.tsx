@@ -18,6 +18,16 @@ import {
 import TouristProfileForm from '@/components/TouristProfileForm';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 
+const debugLog = (runId: string, hypothesisId: string, location: string, message: string, data: Record<string, unknown>) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba3431' },
+    body: JSON.stringify({ sessionId: 'ba3431', runId, hypothesisId, location, message, data, timestamp: Date.now() }),
+  }).catch(() => {});
+  // #endregion
+};
+
 interface PaymentResult {
   receiptNumber: string;
   passType: string;
@@ -734,6 +744,13 @@ const PaymentConfirmation: React.FC = () => {
     try {
       const durationDays =
         inclusiveCalendarDaysBetween(p.validFrom, p.validUntil) ?? p.days ?? 0;
+      debugLog('pre-fix', 'H4', 'PaymentConfirmation.tsx:748', 'Invoking send-email from confirmation', {
+        hasPayment: Boolean(p),
+        passType: p.passType,
+        receiptNumber: p.receiptNumber,
+        durationDays,
+        shareBonusApplied: p.shareBonusApplied ?? false,
+      });
 
       const { data, error } = await supabase.functions.invoke('send-email', {
         body: {
@@ -753,6 +770,13 @@ const PaymentConfirmation: React.FC = () => {
           duration_days: durationDays,
           share_bonus_applied: p.shareBonusApplied ?? false,
         },
+      });
+      debugLog('pre-fix', 'H4', 'PaymentConfirmation.tsx:771', 'send-email invoke completed', {
+        hasData: Boolean(data),
+        success: data?.success ?? null,
+        errorMessage: data?.error ?? (error as Error | null)?.message ?? null,
+        deliveredTo: data?.deliveredTo ?? null,
+        override: data?.override ?? null,
       });
 
       if (data?.success) {

@@ -10,6 +10,16 @@ import {
 
 import { PASS_PRODUCTS } from '@/data/pricing';
 
+const debugLog = (runId: string, hypothesisId: string, location: string, message: string, data: Record<string, unknown>) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba3431' },
+    body: JSON.stringify({ sessionId: 'ba3431', runId, hypothesisId, location, message, data, timestamp: Date.now() }),
+  }).catch(() => {});
+  // #endregion
+};
+
 const PASSES = {
   daily: {
     price: PASS_PRODUCTS.daily.priceAUD,
@@ -414,6 +424,13 @@ const PaymentCheckout: React.FC = () => {
       }
 
       if (data.success) {
+        debugLog('pre-fix', 'H2', 'PaymentCheckout.tsx:430', 'process-card-payment returned success payload', {
+          passType: data.passType ?? null,
+          days: data.days ?? null,
+          validFrom: data.validFrom ?? null,
+          validUntil: data.validUntil ?? null,
+          shareBonusApplied: data.shareBonusApplied ?? null,
+        });
         // Payment successful!
         console.log('[PaymentCheckout] Payment SUCCESS — receipt:', data.receiptNumber);
         setPaymentResult(data);

@@ -4,6 +4,16 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Loader2, Shield, CheckCircle, XCircle } from 'lucide-react';
 
+const debugLog = (runId: string, hypothesisId: string, location: string, message: string, data: Record<string, unknown>) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba3431' },
+    body: JSON.stringify({ sessionId: 'ba3431', runId, hypothesisId, location, message, data, timestamp: Date.now() }),
+  }).catch(() => {});
+  // #endregion
+};
+
 /**
  * Ensures the Supabase SDK has a valid, fresh session token.
  * We do NOT pass this token as a custom Authorization header.
@@ -131,6 +141,14 @@ const PayPalReturnHandler: React.FC = () => {
       if (error) throw error;
 
       if (data?.success) {
+        debugLog('pre-fix', 'H2', 'PayPalReturnHandler.tsx:146', 'paypal-capture returned success payload', {
+          passType: data.passType ?? null,
+          days: data.days ?? null,
+          validFrom: data.validFrom ?? null,
+          validUntil: data.validUntil ?? null,
+          shareBonusApplied: data.shareBonusApplied ?? null,
+          receiptEmail: data.receiptEmail ?? null,
+        });
         setStatus('success');
         if (typeof refreshUserPass === 'function') {
           refreshUserPass().catch(() => {});
