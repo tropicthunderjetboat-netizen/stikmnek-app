@@ -8,16 +8,6 @@ import { getBusinessImageUrl } from '@/lib/utils';
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
 
-const debugLog = (runId: string, hypothesisId: string, location: string, message: string, data: Record<string, unknown>) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba3431' },
-    body: JSON.stringify({ sessionId: 'ba3431', runId, hypothesisId, location, message, data, timestamp: Date.now() }),
-  }).catch(() => {});
-  // #endregion
-};
-
 
 // ═══════════════════════════════════════════════════════════════
 // ADMIN EMAILS: These always get 'admin' role regardless of DB
@@ -258,15 +248,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const signInCooldownRef = useRef<number>(0);
   const authProcessingRef = useRef<boolean>(false);
 
-  useEffect(() => {
-    debugLog('pre-fix', 'H6', 'AppContext.tsx:264', 'AppProvider mounted (instrumentation heartbeat)', {
-      href: typeof window !== 'undefined' ? window.location.href : null,
-      host: typeof window !== 'undefined' ? window.location.host : null,
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
-    });
-  }, []);
-
-
   // ═══════════════════════════════════════════════════════════
   // GEOLOCATION
   // ═══════════════════════════════════════════════════════════
@@ -416,13 +397,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error) throw error;
       if (data && data.length > 0) {
         const pass = data[0];
-        debugLog('pre-fix', 'H3', 'AppContext.tsx:410', 'loadUserPass selected pass candidate', {
-          candidateCount: data.length,
-          selectedPassId: pass?.id ?? null,
-          selectedPassType: pass?.pass_type ?? null,
-          selectedValidUntil: pass?.valid_until ?? null,
-          candidates: data.map((p: any) => ({ id: p.id, passType: p.pass_type, validUntil: p.valid_until, purchasedAt: p.purchased_at })),
-        });
         const expiry = new Date(pass.expires_at);
         if (expiry > new Date()) {
           const validFrom = pass.valid_from ? new Date(pass.valid_from).toISOString().split('T')[0] : null;

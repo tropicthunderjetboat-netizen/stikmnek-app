@@ -21,16 +21,6 @@ const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = 
   mega_group: { extraPeople: 0, extraDays: 5 },
 };
 
-function debugLog(runId: string, hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
-  // #region agent log
-  fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba3431' },
-    body: JSON.stringify({ sessionId: 'ba3431', runId, hypothesisId, location, message, data, timestamp: Date.now() }),
-  }).catch(() => {});
-  // #endregion
-}
-
 function jsonResponse(data: object, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -109,14 +99,6 @@ Deno.serve(async (req) => {
     }
 
     const pass = passes?.[0];
-    debugLog('pre-fix', 'H1', 'extend-pass/index.ts:113', 'Loaded active pass candidate', {
-      found: Boolean(pass),
-      candidateCount: passes?.length ?? 0,
-      passType: pass?.pass_type ?? null,
-      passId: pass?.id ?? null,
-      validUntil: pass?.valid_until ?? null,
-      shareBonusApplied: pass?.share_bonus_applied ?? null,
-    });
     if (!pass) {
       // Allow pre-purchase share: store a "share bonus unlocked" flag on the user's profile.
       // This will be consumed on the next pass purchase (paypal-capture / process-card-payment).
@@ -145,11 +127,6 @@ Deno.serve(async (req) => {
     }
 
     const bonus = SHARE_BONUS[pass.pass_type] ?? { extraPeople: 0, extraDays: 0 };
-    debugLog('pre-fix', 'H1', 'extend-pass/index.ts:142', 'Resolved share bonus config', {
-      passType: pass.pass_type,
-      extraPeople: bonus.extraPeople,
-      extraDays: bonus.extraDays,
-    });
     if (bonus.extraPeople === 0 && bonus.extraDays === 0) {
       return jsonResponse({ success: true, bonus: { days: 0, people: 0, kids: 0 } });
     }
@@ -188,14 +165,6 @@ Deno.serve(async (req) => {
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    debugLog('pre-fix', 'H2', 'extend-pass/index.ts:187', 'Applied share bonus update', {
-      passId: updated.id,
-      passType: updated.pass_type,
-      updatedValidUntil: updated.valid_until,
-      updatedMaxPeople: updated.max_people,
-      shareBonusApplied: updated.share_bonus_applied,
-    });
 
     return jsonResponse({
       success: true,

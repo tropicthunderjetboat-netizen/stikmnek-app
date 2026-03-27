@@ -23,16 +23,6 @@ const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = 
   mega_group: { extraPeople: 0, extraDays: 5 },
 };
 
-function debugLog(runId: string, hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
-  // #region agent log
-  fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba3431' },
-    body: JSON.stringify({ sessionId: 'ba3431', runId, hypothesisId, location, message, data, timestamp: Date.now() }),
-  }).catch(() => {});
-  // #endregion
-}
-
 function jsonResponse(data: object, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -64,12 +54,6 @@ async function sendReceiptEmail(params: {
   validUntil: string;
 }): Promise<{ sent: boolean; skipped?: boolean; error?: string }> {
   const apiKey = Deno.env.get('SENDGRID_API_KEY');
-  debugLog('pre-fix', 'H4', 'paypal-capture/index.ts:67', 'sendReceiptEmail entered', {
-    hasApiKey: Boolean(apiKey),
-    toEmailPresent: Boolean(params.toEmail),
-    passType: params.passType,
-    receiptNumber: params.receiptNumber,
-  });
   if (!apiKey) {
     console.warn('[paypal-capture] SENDGRID_API_KEY not set - skipping receipt email');
     return { sent: false, skipped: true, error: 'SENDGRID_API_KEY not set' };
@@ -133,17 +117,10 @@ async function sendReceiptEmail(params: {
 
   if (!res.ok) {
     const errText = await res.text();
-    debugLog('pre-fix', 'H4', 'paypal-capture/index.ts:132', 'sendReceiptEmail SendGrid failure', {
-      status: res.status,
-      errorTextPreview: errText.slice(0, 180),
-    });
     console.error('[paypal-capture] SendGrid receipt error:', res.status, errText);
     return { sent: false, error: `SendGrid error: ${res.status}` };
   }
 
-  debugLog('pre-fix', 'H4', 'paypal-capture/index.ts:137', 'sendReceiptEmail SendGrid success', {
-    status: res.status,
-  });
   return { sent: true };
 }
 
@@ -262,18 +239,6 @@ Deno.serve(async (req) => {
     const days = applyShareBonus ? (baseDays + (bonus.extraDays || 0)) : baseDays;
     const maxPeople = applyShareBonus ? (baseMaxPeople + (bonus.extraPeople || 0)) : baseMaxPeople;
     const validUntil = addDays(startDate, days);
-    debugLog('pre-fix', 'H2', 'paypal-capture/index.ts:259', 'Computed purchased pass validity values', {
-      passType,
-      baseDays,
-      bonusExtraDays: bonus.extraDays,
-      applyShareBonus,
-      computedDays: days,
-      startDate,
-      validUntil,
-      baseMaxPeople,
-      bonusExtraPeople: bonus.extraPeople,
-      computedMaxPeople: maxPeople,
-    });
     const expiresAt = endOfDayDate(validUntil);
     const receiptNumber = body?.receiptNumber ?? `STK-${Date.now().toString(36).toUpperCase()}`;
 

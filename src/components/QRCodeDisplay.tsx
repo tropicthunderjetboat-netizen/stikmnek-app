@@ -4,16 +4,6 @@ import { getBasePeople, getShareBonusTotalPeople, getPassDisplayTitle } from '@/
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { QrCode, Calendar, Shield, Ticket, Copy, Check } from 'lucide-react';
 
-const debugLog = (runId: string, hypothesisId: string, location: string, message: string, data: Record<string, unknown>) => {
-  // #region agent log
-  fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba3431' },
-    body: JSON.stringify({ sessionId: 'ba3431', runId, hypothesisId, location, message, data, timestamp: Date.now() }),
-  }).catch(() => {});
-  // #endregion
-};
-
 const QRCodeDisplay: React.FC = () => {
   const { user, language } = useAppContext();
   const [copied, setCopied] = React.useState(false);
@@ -46,19 +36,6 @@ const QRCodeDisplay: React.FC = () => {
     if (!user?.passValidFrom || !user?.passValidUntil) return null;
     return inclusiveCalendarDaysBetween(user.passValidFrom, user.passValidUntil);
   }, [user?.passValidFrom, user?.passValidUntil]);
-
-  React.useEffect(() => {
-    if (!user?.passId) return;
-    debugLog('pre-fix', 'H5', 'QRCodeDisplay.tsx:47', 'QR render with pass validity state', {
-      passId: user.passId,
-      passType: user.pass ?? null,
-      validFrom: user.passValidFrom ?? null,
-      validUntil: user.passValidUntil ?? null,
-      shareBonusApplied: user.shareBonusApplied ?? null,
-      passDurationDays,
-      passPeopleCount: user.passPeopleCount ?? null,
-    });
-  }, [user?.passId, user?.pass, user?.passValidFrom, user?.passValidUntil, user?.shareBonusApplied, user?.passPeopleCount, passDurationDays]);
 
   const handleCopyCode = () => {
     if (qrPayload) {

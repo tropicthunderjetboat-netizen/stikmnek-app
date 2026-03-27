@@ -27,16 +27,6 @@ const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = 
   mega_group: { extraPeople: 0, extraDays: 5 },
 };
 
-function debugLog(runId: string, hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
-  // #region agent log
-  fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba3431' },
-    body: JSON.stringify({ sessionId: 'ba3431', runId, hypothesisId, location, message, data, timestamp: Date.now() }),
-  }).catch(() => {});
-  // #endregion
-}
-
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + days);
@@ -174,17 +164,6 @@ Deno.serve(async (req) => {
       const bonus = SHARE_BONUS[passType] ?? { extraPeople: 0, extraDays: 0 };
       const days = applyShareBonus ? (baseDays + (bonus.extraDays || 0)) : baseDays;
       const maxPeople = applyShareBonus ? (baseMaxPeople + (bonus.extraPeople || 0)) : baseMaxPeople;
-      debugLog('pre-fix', 'H2', 'process-card-payment/index.ts:182', 'Computed card purchase validity values', {
-        passType,
-        baseDays,
-        bonusExtraDays: bonus.extraDays,
-        applyShareBonus,
-        computedDays: days,
-        startDate,
-        baseMaxPeople,
-        bonusExtraPeople: bonus.extraPeople,
-        computedMaxPeople: maxPeople,
-      });
 
       // MOCK charge: in production you would call a real gateway here (Stripe/PayPal).
       // For now we assume the card charge succeeded if we reached this point.

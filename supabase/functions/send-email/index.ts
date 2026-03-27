@@ -104,16 +104,6 @@ function shareBonusPromoText(passType: unknown): { headline: string; body: strin
   };
 }
 
-function debugLog(runId: string, hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
-  // #region agent log
-  fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ba3431' },
-    body: JSON.stringify({ sessionId: 'ba3431', runId, hypothesisId, location, message, data, timestamp: Date.now() }),
-  }).catch(() => {});
-  // #endregion
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -208,12 +198,6 @@ Deno.serve(async (req) => {
     // From address should be a verified sender in SendGrid (e.g. no-reply@stikmnek.com).
     if (action === 'send_pass_confirmation') {
       console.log('[send-email] send_pass_confirmation: started');
-      debugLog('pre-fix', 'H4', 'send-email/index.ts:213', 'send_pass_confirmation entered', {
-        hasUserEmail: Boolean(body?.user_email),
-        passType: body?.pass_type ?? null,
-        receiptNumber: body?.receipt_number ?? null,
-        shareBonusApplied: body?.share_bonus_applied ?? null,
-      });
 
       const apiKey = Deno.env.get('SENDGRID_API_KEY');
       const fromEnv = Deno.env.get('SENDGRID_FROM_EMAIL');
@@ -412,10 +396,6 @@ Deno.serve(async (req) => {
       }
 
       console.log('[send-email] SendGrid response status:', res.status);
-      debugLog('pre-fix', 'H4', 'send-email/index.ts:410', 'SendGrid response for pass confirmation', {
-        status: res.status,
-        toEmailOverridden: Boolean(emailOverride),
-      });
 
       if (!res.ok) {
         let errText = '';
