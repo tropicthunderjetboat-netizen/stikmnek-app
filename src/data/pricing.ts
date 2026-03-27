@@ -7,7 +7,7 @@
 
 export const SUPERSTAR_PRICE_AUD = 5;
 
-export type PassType = 'daily' | 'weekly' | 'monthly';
+export type PassType = 'daily' | 'weekly' | 'monthly' | 'mega_group';
 
 export interface ShareBonusConfig {
   extraPeople: number;
@@ -91,10 +91,31 @@ export const ULTIMATE_CREW_EXPERIENCE_PASS: PassProductConfig = {
   },
 };
 
+/** Product D: Mega Group Pass (7 Days) */
+export const MEGA_GROUP_EXPERIENCE_PASS: PassProductConfig = {
+  type: 'mega_group',
+  title: 'Mega Group Experience Pass',
+  titleFr: 'Pass Expérience Méga Groupe',
+  titleBi: 'Mega Grup Eksperiens Pas',
+  priceAUD: 199,
+  baseDays: 7,
+  basePeople: 20,
+  shareBonus: {
+    extraPeople: 0,
+    extraDays: 5,
+    totalPeopleAfterShare: 20,
+    totalDaysAfterShare: 12,
+    description: 'Share the app to unlock 5 extra days FREE!',
+    descriptionFr: 'Partagez l\'app pour débloquer 5 jours supplémentaires gratuits !',
+    descriptionBi: 'Serem app blong anlokem 5 moa fri dei!',
+  },
+};
+
 export const PASS_PRODUCTS: Record<PassType, PassProductConfig> = {
   daily: FAMILY_EXPLORER_PASS,
   weekly: EXTENDED_GROUP_ADVENTURE_PASS,
   monthly: ULTIMATE_CREW_EXPERIENCE_PASS,
+  mega_group: MEGA_GROUP_EXPERIENCE_PASS,
 };
 
 export function getPassTitle(passType: PassType, lang: 'en' | 'fr' | 'bi' = 'en'): string {
@@ -104,7 +125,7 @@ export function getPassTitle(passType: PassType, lang: 'en' | 'fr' | 'bi' = 'en'
 }
 
 /**
- * Safe display title for any string coming from DB / API (`daily` | `weekly` | `monthly`).
+ * Safe display title for any string coming from DB / API.
  * Never surfaces raw keys like "monthly" to users — unknown values fall back to generic StikmNek Pass.
  */
 export function getPassDisplayTitle(
@@ -115,7 +136,7 @@ export function getPassDisplayTitle(
     return lang === 'fr' ? 'Pass StikmNek' : lang === 'bi' ? 'StikmNek Pas' : 'StikmNek Pass';
   }
   const key = String(passType).toLowerCase().trim();
-  if (key === 'daily' || key === 'weekly' || key === 'monthly') {
+  if (key === 'daily' || key === 'weekly' || key === 'monthly' || key === 'mega_group') {
     return getPassTitle(key, lang);
   }
   return lang === 'fr' ? 'Pass StikmNek' : lang === 'bi' ? 'StikmNek Pas' : 'StikmNek Pass';

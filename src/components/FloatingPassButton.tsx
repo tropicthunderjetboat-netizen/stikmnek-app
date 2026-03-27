@@ -40,6 +40,12 @@ const FloatingPassButton: React.FC = () => {
       border: 'border-orange-200',
       shadow: 'shadow-orange-300/50',
     },
+    mega_group: {
+      gradient: 'from-fuchsia-600 to-purple-700',
+      bg: 'bg-fuchsia-50',
+      border: 'border-fuchsia-200',
+      shadow: 'shadow-fuchsia-300/50',
+    },
   };
 
   const colors = passColors[user.pass] || passColors.weekly;

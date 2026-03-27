@@ -40,18 +40,21 @@ const PASS_COLORS: Record<string, string> = {
   daily: '#0EA5E9',
   weekly: '#8B5CF6',
   monthly: '#F59E0B',
+  mega_group: '#C026D3',
 };
 
 const PASS_LABELS: Record<string, string> = {
   daily: PASS_PRODUCTS.daily.title,
   weekly: PASS_PRODUCTS.weekly.title,
   monthly: PASS_PRODUCTS.monthly.title,
+  mega_group: PASS_PRODUCTS.mega_group.title,
 };
 
 const PASS_PRICES: Record<string, number> = {
   daily: 15,
   weekly: 45,
   monthly: 99,
+  mega_group: 199,
 };
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
@@ -145,7 +148,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
   const avgOrderValue = totalPurchases > 0 ? totalRevenue / totalPurchases : 0;
 
   // Revenue by pass type
-  const revenueByType = ['daily', 'weekly', 'monthly'].map(type => {
+  const revenueByType = ['daily', 'weekly', 'monthly', 'mega_group'].map(type => {
     const typePurchases = completedPurchases.filter(p => p.pass_type === type);
     return {
       name: PASS_LABELS[type] || type,
@@ -160,7 +163,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
 
   // Purchase trends over time (group by day)
   const trendData = (() => {
-    const dayMap: Record<string, { date: string; revenue: number; count: number; daily: number; weekly: number; monthly: number }> = {};
+    const dayMap: Record<string, { date: string; revenue: number; count: number; daily: number; weekly: number; monthly: number; mega_group: number }> = {};
     
     // Determine how many days to show
     const daysToShow = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 180;
@@ -170,7 +173,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
       const d = new Date();
       d.setDate(d.getDate() - i);
       const key = d.toISOString().split('T')[0];
-      dayMap[key] = { date: key, revenue: 0, count: 0, daily: 0, weekly: 0, monthly: 0 };
+      dayMap[key] = { date: key, revenue: 0, count: 0, daily: 0, weekly: 0, monthly: 0, mega_group: 0 };
     }
 
     completedPurchases.forEach(p => {
@@ -181,6 +184,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
         if (p.pass_type === 'daily') dayMap[day].daily += 1;
         if (p.pass_type === 'weekly') dayMap[day].weekly += 1;
         if (p.pass_type === 'monthly') dayMap[day].monthly += 1;
+        if (p.pass_type === 'mega_group') dayMap[day].mega_group += 1;
       }
     });
 
@@ -570,6 +574,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
                   <Bar dataKey="daily" name={PASS_PRODUCTS.daily.title} fill={PASS_COLORS.daily} radius={[4, 4, 0, 0]} stackId="stack" />
                   <Bar dataKey="weekly" name={PASS_PRODUCTS.weekly.title} fill={PASS_COLORS.weekly} radius={[0, 0, 0, 0]} stackId="stack" />
                   <Bar dataKey="monthly" name={PASS_PRODUCTS.monthly.title} fill={PASS_COLORS.monthly} radius={[4, 4, 0, 0]} stackId="stack" />
+                  <Bar dataKey="mega_group" name={PASS_PRODUCTS.mega_group.title} fill={PASS_COLORS.mega_group} radius={[4, 4, 0, 0]} stackId="stack" />
                 </BarChart>
               </ResponsiveContainer>
               <div className="flex items-center gap-4 mt-3">
@@ -659,6 +664,10 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 text-amber-700 text-xs font-semibold">
               <CreditCard className="w-3.5 h-3.5" />
               {PASS_PRODUCTS.monthly.title}: ${PASS_PRODUCTS.monthly.priceAUD}
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-fuchsia-50 text-fuchsia-700 text-xs font-semibold">
+              <CreditCard className="w-3.5 h-3.5" />
+              {PASS_PRODUCTS.mega_group.title}: ${PASS_PRODUCTS.mega_group.priceAUD}
             </div>
           </div>
         </div>

@@ -18,6 +18,7 @@ const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = 
   daily: { extraPeople: 2, extraDays: 0 },
   weekly: { extraPeople: 2, extraDays: 1 },
   monthly: { extraPeople: 1, extraDays: 1 },
+  mega_group: { extraPeople: 0, extraDays: 5 },
 };
 
 function jsonResponse(data: object, status = 200) {

@@ -17,13 +17,14 @@ const corsHeaders = {
 const SUPERSTAR_PRICE_AUD = 5.0;
 
 // Pass configuration (keep in sync with pricing.ts and paypal-capture)
-const PASS_DAYS: Record<string, number> = { daily: 1, weekly: 6, monthly: 6 };
-const PASS_MAX_PEOPLE: Record<string, number> = { daily: 4, weekly: 4, monthly: 7 };
-const PASS_PRICES_AUD: Record<string, number> = { daily: 15, weekly: 45, monthly: 99 };
+const PASS_DAYS: Record<string, number> = { daily: 1, weekly: 6, monthly: 6, mega_group: 7 };
+const PASS_MAX_PEOPLE: Record<string, number> = { daily: 4, weekly: 4, monthly: 7, mega_group: 20 };
+const PASS_PRICES_AUD: Record<string, number> = { daily: 15, weekly: 45, monthly: 99, mega_group: 199 };
 const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = {
   daily: { extraPeople: 2, extraDays: 0 },
   weekly: { extraPeople: 2, extraDays: 1 },
   monthly: { extraPeople: 1, extraDays: 1 },
+  mega_group: { extraPeople: 0, extraDays: 5 },
 };
 
 function addDays(dateStr: string, days: number): string {
@@ -130,7 +131,7 @@ Deno.serve(async (req) => {
       const rawPassType = (body?.passType ?? body?.pass_type ?? '').toLowerCase();
       const startDate = body?.startDate ?? body?.start_date;
 
-      if (!rawPassType || !['daily', 'weekly', 'monthly'].includes(rawPassType)) {
+      if (!rawPassType || !['daily', 'weekly', 'monthly', 'mega_group'].includes(rawPassType)) {
         return new Response(
           JSON.stringify({ success: false, error: 'Missing or invalid passType' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

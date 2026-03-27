@@ -35,6 +35,7 @@ export const translations: Record<string, Record<Language, string>> = {
   'pass.daily': { en: 'Family Explorer Pass', fr: 'Pass Explorateur Familial', bi: 'Famili Eksplora Pas' },
   'pass.weekly': { en: 'Extended Group Adventure Pass', fr: 'Pass Aventure Groupe Étendu', bi: 'Grup Advenija Pas' },
   'pass.monthly': { en: 'Ultimate Crew Experience Pass', fr: 'Pass Expérience Ultime Équipe', bi: 'Ultimet Kru Eksperiens Pas' },
+  'pass.mega_group': { en: 'Mega Group Experience Pass', fr: 'Pass Expérience Méga Groupe', bi: 'Mega Grup Eksperiens Pas' },
   'pass.popular': { en: 'Most Popular', fr: 'Le plus populaire', bi: 'Mos Populer' },
   'pass.buy': { en: 'Buy Now', fr: 'Acheter', bi: 'Baem Nao' },
   'pass.feature1': { en: 'Access all deals', fr: 'Accès à toutes les offres', bi: 'Akses olgeta dils' },

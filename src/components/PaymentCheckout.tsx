@@ -38,6 +38,15 @@ const PASSES = {
     shadow: 'shadow-orange-200',
     group: `Up to ${PASS_PRODUCTS.monthly.basePeople} people`,
   },
+  mega_group: {
+    price: PASS_PRODUCTS.mega_group.priceAUD,
+    days: PASS_PRODUCTS.mega_group.baseDays,
+    label: PASS_PRODUCTS.mega_group.title,
+    icon: Crown,
+    color: 'from-fuchsia-600 to-purple-700',
+    shadow: 'shadow-fuchsia-200',
+    group: `Up to ${PASS_PRODUCTS.mega_group.basePeople} people`,
+  },
 };
 
 /**

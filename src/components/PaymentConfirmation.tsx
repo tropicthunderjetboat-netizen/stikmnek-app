@@ -41,6 +41,7 @@ const PASS_GROUPS: Record<string, string> = {
   daily: `Up to ${PASS_PRODUCTS.daily.basePeople} people`,
   weekly: `Up to ${PASS_PRODUCTS.weekly.basePeople} people`,
   monthly: `Up to ${PASS_PRODUCTS.monthly.basePeople} people`,
+  mega_group: `Up to ${PASS_PRODUCTS.mega_group.basePeople} people`,
 };
 
 const SHARE_BONUSES: Record<string, { extraDays: number; extraPeople: number; extraKids: number; description: string }> = {
@@ -61,6 +62,12 @@ const SHARE_BONUSES: Record<string, { extraDays: number; extraPeople: number; ex
     extraPeople: PASS_PRODUCTS.monthly.shareBonus.extraPeople,
     extraKids: 0,
     description: PASS_PRODUCTS.monthly.shareBonus.description,
+  },
+  mega_group: {
+    extraDays: PASS_PRODUCTS.mega_group.shareBonus.extraDays,
+    extraPeople: PASS_PRODUCTS.mega_group.shareBonus.extraPeople,
+    extraKids: 0,
+    description: PASS_PRODUCTS.mega_group.shareBonus.description,
   },
 };
 
@@ -727,12 +734,14 @@ const PaymentConfirmation: React.FC = () => {
     daily: <Zap className="w-6 h-6" />,
     weekly: <Star className="w-6 h-6" />,
     monthly: <Crown className="w-6 h-6" />,
+    mega_group: <Crown className="w-6 h-6" />,
   };
 
   const passColors: Record<string, string> = {
     daily: 'from-sky-500 to-blue-600',
     weekly: 'from-teal-500 to-emerald-600',
     monthly: 'from-orange-500 to-amber-600',
+    mega_group: 'from-fuchsia-600 to-purple-700',
   };
 
   const expiryDate = new Date(payment.expiresAt);

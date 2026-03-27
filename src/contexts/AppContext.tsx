@@ -28,7 +28,7 @@ export type ViewMode =
   | 'help'
   | 'complete-profile';
 
-export type PassType = 'daily' | 'weekly' | 'monthly' | null;
+export type PassType = 'daily' | 'weekly' | 'monthly' | 'mega_group' | null;
 
 // ═══════════════════════════════════════════════════════════════
 // UserProfile — matches the ACTUAL user_profiles table columns
@@ -99,7 +99,7 @@ export interface User {
 }
 
 export interface CartItem {
-  passType: 'daily' | 'weekly' | 'monthly';
+  passType: 'daily' | 'weekly' | 'monthly' | 'mega_group';
   price: number;
 }
 
@@ -180,7 +180,7 @@ interface AppContextType {
   toggleFavorite: (id: string) => void;
   cart: CartItem | null;
   setCart: (item: CartItem | null) => void;
-  purchasePass: (passType: 'daily' | 'weekly' | 'monthly') => void;
+  purchasePass: (passType: 'daily' | 'weekly' | 'monthly' | 'mega_group') => void;
   selectedBusiness: Business | null;
   setSelectedBusiness: React.Dispatch<React.SetStateAction<Business | null>>;
   showAuth: boolean;
@@ -1231,7 +1231,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   // PURCHASE PASS
   // ═══════════════════════════════════════════════════════════
-  const purchasePass = useCallback(async (passType: 'daily' | 'weekly' | 'monthly') => {
+  const purchasePass = useCallback(async (passType: 'daily' | 'weekly' | 'monthly' | 'mega_group') => {
     if (!user) {
       setShowAuth(true);
       setAuthMode('signup-tourist');
@@ -1241,7 +1241,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast.info('You already have this pass active!');
       return;
     }
-    const prices = { daily: 15, weekly: 45, monthly: 99 };
+    const prices = { daily: 15, weekly: 45, monthly: 99, mega_group: 199 };
     setCart({ passType, price: prices[passType] });
     setCurrentView('checkout');
   }, [user, setCurrentView]);

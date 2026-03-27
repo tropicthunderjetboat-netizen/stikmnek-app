@@ -48,12 +48,14 @@ const QRCodeDisplay: React.FC = () => {
     daily: 'from-sky-500 to-blue-600',
     weekly: 'from-teal-500 to-emerald-600',
     monthly: 'from-orange-500 to-amber-600',
+    mega_group: 'from-fuchsia-600 to-purple-700',
   };
 
   const passBgColors: Record<string, string> = {
     daily: 'bg-sky-50 border-sky-200',
     weekly: 'bg-teal-50 border-teal-200',
     monthly: 'bg-orange-50 border-orange-200',
+    mega_group: 'bg-fuchsia-50 border-fuchsia-200',
   };
 
   return (

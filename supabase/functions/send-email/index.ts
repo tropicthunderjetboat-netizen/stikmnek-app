@@ -40,12 +40,13 @@ function maskEmailForLog(email: string): string {
   return `${show}***@${domain}`;
 }
 
-/** StikmNek branded pass names (DB keys: daily | weekly | monthly — never show raw keys to users). */
+/** StikmNek branded pass names (DB pass_type keys — never show raw keys to users). */
 function passTypeToBrandDisplay(passType: unknown): string {
   const t = String(passType ?? '').toLowerCase().trim();
   if (t === 'daily') return 'Family Explorer Pass';
   if (t === 'weekly') return 'Extended Group Adventure Pass';
   if (t === 'monthly') return 'Ultimate Crew Experience Pass';
+  if (t === 'mega_group') return 'Mega Group Experience Pass';
   return 'StikmNek Pass';
 }
 
@@ -87,6 +88,12 @@ function shareBonusPromoText(passType: unknown): { headline: string; body: strin
     return {
       headline: 'Unlock more value (free upgrade)',
       body: `${base} You’ll add extra capacity and an extra day to your pass.`,
+    };
+  }
+  if (t === 'mega_group') {
+    return {
+      headline: 'Unlock more value (free upgrade)',
+      body: `${base} You’ll unlock +5 extra days on your Mega Group pass.`,
     };
   }
   return {

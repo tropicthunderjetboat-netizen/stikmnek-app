@@ -17,6 +17,7 @@ const PASS_PRICES_AUD: Record<string, number> = {
   daily: 15,
   weekly: 45,
   monthly: 99,
+  mega_group: 199,
 };
 
 function jsonResponse(data: object, status = 200) {

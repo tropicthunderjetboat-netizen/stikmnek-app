@@ -3,6 +3,7 @@ import {
   FAMILY_EXPLORER_PASS,
   EXTENDED_GROUP_ADVENTURE_PASS,
   ULTIMATE_CREW_EXPERIENCE_PASS,
+  MEGA_GROUP_EXPERIENCE_PASS,
 } from '@/data/pricing';
 
 export interface PassFeature {
@@ -23,7 +24,7 @@ export interface ShareBonus {
 
 export interface PassConfig {
   id: string;
-  type: 'daily' | 'weekly' | 'monthly';
+  type: 'daily' | 'weekly' | 'monthly' | 'mega_group';
   name: string;
   nameFr: string;
   nameBi: string;
@@ -70,6 +71,12 @@ export const PASS_NAMES: Record<string, { en: string; fr: string; bi: string; sh
     fr: ULTIMATE_CREW_EXPERIENCE_PASS.titleFr,
     bi: ULTIMATE_CREW_EXPERIENCE_PASS.titleBi,
     short: 'Crew Experience',
+  },
+  mega_group: {
+    en: MEGA_GROUP_EXPERIENCE_PASS.title,
+    fr: MEGA_GROUP_EXPERIENCE_PASS.titleFr,
+    bi: MEGA_GROUP_EXPERIENCE_PASS.titleBi,
+    short: 'Mega Group',
   },
 };
 
@@ -201,10 +208,45 @@ const DEFAULT_PASSES: PassConfig[] = [
     fullDays: 7,
     shareBonus: toShareBonus(ULTIMATE_CREW_EXPERIENCE_PASS.shareBonus),
   },
+  {
+    id: 'pass-mega-group',
+    type: 'mega_group',
+    name: MEGA_GROUP_EXPERIENCE_PASS.title,
+    nameFr: MEGA_GROUP_EXPERIENCE_PASS.titleFr,
+    nameBi: MEGA_GROUP_EXPERIENCE_PASS.titleBi,
+    price: MEGA_GROUP_EXPERIENCE_PASS.priceAUD,
+    period: '/7 days',
+    periodFr: '/7 jours',
+    periodBi: '/7 dei',
+    colorFrom: 'fuchsia-600',
+    colorTo: 'purple-700',
+    shadowColor: 'fuchsia-200',
+    icon: 'crown',
+    features: [
+      { id: 'f1', text: 'Valid for up to 20 people', textFr: 'Valable pour jusqu\'à 20 personnes', textBi: '20 man' },
+      { id: 'f2', text: '7 days of unlimited deals', textFr: '7 jours d\'offres illimitées', textBi: '7 dei blong dils we i no gat limit' },
+      { id: 'f3', text: 'QR code coupons', textFr: 'Coupons QR code', textBi: 'QR kod kupons' },
+      { id: 'f4', text: 'Map navigation', textFr: 'Navigation carte', textBi: 'Map navigesen' },
+      { id: 'f9', text: 'Share app: +5 FREE days (12 total)', textFr: 'Partagez : +5 jours GRATUITS (12 total)', textBi: 'Serem: +5 fri dei (12 evriwan)' },
+    ],
+    popular: false,
+    active: true,
+    description: 'Built for very large groups with extended trip coverage',
+    descriptionFr: 'Conçu pour les très grands groupes avec une couverture prolongée',
+    descriptionBi: 'I gud blong bigfala grup wetem moa dei blong yusum',
+    maxRedemptionsPerDay: 9999,
+    sortOrder: 4,
+    adults: 20,
+    kids: 0,
+    totalPeople: 20,
+    baseDays: 7,
+    fullDays: 12,
+    shareBonus: toShareBonus(MEGA_GROUP_EXPERIENCE_PASS.shareBonus),
+  },
 ];
 
 const STORAGE_KEY = 'stikmnek-pass-config';
-const CONFIG_VERSION = 4; // v4: Finalized business model (Family Explorer, Extended Group, Ultimate Crew)
+const CONFIG_VERSION = 5; // v5: Adds Mega Group Experience Pass
 const VERSION_KEY = 'stikmnek-pass-config-version';
 
 function loadFromStorage(): PassConfig[] {

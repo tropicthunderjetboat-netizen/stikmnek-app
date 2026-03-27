@@ -13,13 +13,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const PASS_DAYS: Record<string, number> = { daily: 1, weekly: 6, monthly: 6 };
-const PASS_MAX_PEOPLE: Record<string, number> = { daily: 4, weekly: 4, monthly: 7 };
-const PASS_PRICES_AUD: Record<string, number> = { daily: 15, weekly: 45, monthly: 99 };
+const PASS_DAYS: Record<string, number> = { daily: 1, weekly: 6, monthly: 6, mega_group: 7 };
+const PASS_MAX_PEOPLE: Record<string, number> = { daily: 4, weekly: 4, monthly: 7, mega_group: 20 };
+const PASS_PRICES_AUD: Record<string, number> = { daily: 15, weekly: 45, monthly: 99, mega_group: 199 };
 const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = {
   daily: { extraPeople: 2, extraDays: 0 },
   weekly: { extraPeople: 2, extraDays: 1 },
   monthly: { extraPeople: 1, extraDays: 1 },
+  mega_group: { extraPeople: 0, extraDays: 5 },
 };
 
 function jsonResponse(data: object, status = 200) {
@@ -38,6 +39,7 @@ function passTypeToBrandDisplay(passType: string): string {
   if (t === 'daily') return 'Family Explorer Pass';
   if (t === 'weekly') return 'Extended Group Adventure Pass';
   if (t === 'monthly') return 'Ultimate Crew Experience Pass';
+  if (t === 'mega_group') return 'Mega Group Experience Pass';
   return 'StikmNek Pass';
 }
 
@@ -184,7 +186,7 @@ Deno.serve(async (req) => {
     if (!paypalOrderId) {
       return errorResponse('Missing paypalOrderId', 400);
     }
-    if (!passType || !['daily', 'weekly', 'monthly'].includes(passType)) {
+    if (!passType || !['daily', 'weekly', 'monthly', 'mega_group'].includes(passType)) {
       return errorResponse('Missing or invalid passType', 400);
     }
     if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {

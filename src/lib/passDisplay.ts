@@ -1,5 +1,5 @@
 /**
- * Pass branding for UI — internal keys remain `daily` | `weekly` | `monthly`.
+ * Pass branding for UI — internal keys remain pass_type values from pricing.ts.
  * Re-exported from pricing (single source of truth).
  */
 export {
@@ -9,5 +9,6 @@ export {
   FAMILY_EXPLORER_PASS,
   EXTENDED_GROUP_ADVENTURE_PASS,
   ULTIMATE_CREW_EXPERIENCE_PASS,
+  MEGA_GROUP_EXPERIENCE_PASS,
   type PassType,
 } from '@/data/pricing';
