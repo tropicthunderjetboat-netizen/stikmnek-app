@@ -55,6 +55,12 @@ interface CostOption {
   totalEstimatedCostAUD: number;
 }
 
+/** When party size exceeds this multiple of the cheapest pass's max people (after share), prefer higher-capacity passes within the cost premium band. */
+const SIGNIFICANT_PEOPLE_EXCESS_FACTOR = 1.5;
+
+/** Max total cost vs absolute-cheapest option when prioritizing fewer / higher-capacity passes (e.g. 1.2 = up to 20% more). */
+const SIMPLICITY_COST_PREMIUM_MAX = 1.2;
+
 function computeCostOption(
   pass: PassProductConfig,
   mode: CapacityMode,
@@ -85,7 +91,10 @@ function computeCostOption(
 /**
  * Cost-optimized recommendation: for each pass type, estimate total AUD to cover
  * party size and trip length using max(people passes, day passes), for both base
- * and post–share-bonus capacity. Pick the lowest totalEstimatedCostAUD.
+ * and post–share-bonus capacity. Pick the lowest totalEstimatedCostAUD, except
+ * when the party is large relative to the cheapest pass’s post-share capacity —
+ * then prefer the highest post-share people capacity among options costing at
+ * most ~20% more than the cheapest.
  */
 export function getPassRecommendation(
   userProfile: UserProfile,
@@ -120,7 +129,40 @@ export function getPassRecommendation(
     return (a.pass.priceAUD ?? 0) - (b.pass.priceAUD ?? 0);
   });
 
-  const winner = candidates[0];
+  const cheapestOpt = candidates[0];
+  const cheapestCost = cheapestOpt.totalEstimatedCostAUD;
+  const capCheapestAfterShare = peopleAfterShare(cheapestOpt.pass);
+  const significantPeopleExcess =
+    totalPeople > SIGNIFICANT_PEOPLE_EXCESS_FACTOR * capCheapestAfterShare;
+
+  const affordable = candidates.filter(
+    (c) => c.totalEstimatedCostAUD <= cheapestCost * SIMPLICITY_COST_PREMIUM_MAX,
+  );
+
+  const bySimplicity = [...affordable].sort((a, b) => {
+    const pa = peopleAfterShare(a.pass);
+    const pb = peopleAfterShare(b.pass);
+    if (pb !== pa) return pb - pa;
+    if (a.totalEstimatedCostAUD !== b.totalEstimatedCostAUD) {
+      return a.totalEstimatedCostAUD - b.totalEstimatedCostAUD;
+    }
+    if (a.totalPassesNeeded !== b.totalPassesNeeded) {
+      return a.totalPassesNeeded - b.totalPassesNeeded;
+    }
+    return (a.pass.priceAUD ?? 0) - (b.pass.priceAUD ?? 0);
+  });
+
+  const simplicityOpt = bySimplicity[0] ?? cheapestOpt;
+  const winner = significantPeopleExcess ? simplicityOpt : cheapestOpt;
+
+  const pickDiffersFromAbsoluteCheapest =
+    winner.pass !== cheapestOpt.pass ||
+    winner.mode !== cheapestOpt.mode ||
+    winner.totalEstimatedCostAUD !== cheapestOpt.totalEstimatedCostAUD;
+
+  const showSimplifyMessage = significantPeopleExcess && pickDiffersFromAbsoluteCheapest;
+  const paidPremiumVsCheapest = winner.totalEstimatedCostAUD > cheapestCost;
+
   const recommended = winner.pass;
   const usesShareBonus = winner.mode === 'share';
   const title = displayPassTitle(recommended, language);
@@ -133,11 +175,17 @@ export function getPassRecommendation(
   if (usesShareBonus) {
     if (shareAddsPeople && shareAddsDays && !partyFitsBasePeople) {
       shareTip =
-        language === 'fr'
-          ? ` Astuce : après l’achat, partagez l’app une fois pour appliquer le bonus (jusqu’à ${peopleAfterShare(recommended)} personnes et ${daysAfterShare(recommended)} jours) — c’est ce qui rend cette option la moins chère.`
-          : language === 'bi'
-            ? ` Tip: bifo baem i finis, serem app wan taem blong bonus (kasem ${peopleAfterShare(recommended)} man mo ${daysAfterShare(recommended)} dei) — hemia i mekem opsen i smol long mani.`
-            : ` Tip: after purchase, share the app once to apply the Share Bonus (up to ${peopleAfterShare(recommended)} people and ${daysAfterShare(recommended)} days) — that’s what makes this the cheapest option.`;
+        paidPremiumVsCheapest
+          ? language === 'fr'
+            ? ` Astuce : après l’achat, partagez l’app une fois pour appliquer le bonus (jusqu’à ${peopleAfterShare(recommended)} personnes et ${daysAfterShare(recommended)} jours) — utilisé dans cette estimation pour faciliter la gestion du groupe.`
+            : language === 'bi'
+              ? ` Tip: bifo baem i finis, serem app wan taem blong bonus (kasem ${peopleAfterShare(recommended)} man mo ${daysAfterShare(recommended)} dei) — long estimate ia blong helpem grup.`
+              : ` Tip: after purchase, share the app once to apply the Share Bonus (up to ${peopleAfterShare(recommended)} people and ${daysAfterShare(recommended)} days) — used in this estimate to simplify group coverage.`
+          : language === 'fr'
+            ? ` Astuce : après l’achat, partagez l’app une fois pour appliquer le bonus (jusqu’à ${peopleAfterShare(recommended)} personnes et ${daysAfterShare(recommended)} jours) — c’est ce qui rend cette option la moins chère.`
+            : language === 'bi'
+              ? ` Tip: bifo baem i finis, serem app wan taem blong bonus (kasem ${peopleAfterShare(recommended)} man mo ${daysAfterShare(recommended)} dei) — hemia i mekem opsen i smol long mani.`
+              : ` Tip: after purchase, share the app once to apply the Share Bonus (up to ${peopleAfterShare(recommended)} people and ${daysAfterShare(recommended)} days) — that’s what makes this the cheapest option.`;
     } else if (shareAddsDays && (!shareAddsPeople || partyFitsBasePeople)) {
       shareTip =
         language === 'fr'
@@ -179,12 +227,27 @@ export function getPassRecommendation(
           : ` Note: You will need to purchase this pass ${winner.totalPassesNeeded} times to cover your whole trip.${mathExplain}`
       : mathExplain.trimStart();
 
+  const simplifyLine =
+    showSimplifyMessage
+      ? language === 'fr'
+        ? ` Cela simplifie la gestion de votre groupe.`
+        : language === 'bi'
+          ? ` Hemia i mekem i isi blong manejem grup blong yu.`
+          : ` This simplifies managing your group.`
+      : '';
+
   const baseLine =
-    language === 'fr'
-      ? `Pour ${totalPeople} personne${totalPeople > 1 ? 's' : ''} et ${totalDays} jour${totalDays > 1 ? 's' : ''}, l’option la moins chère est le ${title}${usesShareBonus ? ' (capacité avec bonus de partage)' : ''}.`
-      : language === 'bi'
-        ? `Blong ${totalPeople} man mo ${totalDays} dei, opsen i smol long mani hem ${title}${usesShareBonus ? ' (wetem bonus taem yu serem)' : ''}.`
-        : `For your party of ${totalPeople} for ${totalDays} day${totalDays > 1 ? 's' : ''}, the cheapest option is the ${title}${usesShareBonus ? ' (using Share Bonus capacity in this estimate)' : ''}.`;
+    showSimplifyMessage
+      ? language === 'fr'
+        ? `Pour ${totalPeople} personne${totalPeople > 1 ? 's' : ''} et ${totalDays} jour${totalDays > 1 ? 's' : ''}, nous recommandons le ${title}${usesShareBonus ? ' (capacité avec bonus de partage dans cette estimation)' : ''}.${simplifyLine}`
+        : language === 'bi'
+          ? `Blong ${totalPeople} man mo ${totalDays} dei, mifala i rekomendem ${title}${usesShareBonus ? ' (wetem bonus taem yu serem long estimate ia)' : ''}.${simplifyLine}`
+          : `For your party of ${totalPeople} for ${totalDays} day${totalDays > 1 ? 's' : ''}, we recommend the ${title}${usesShareBonus ? ' (using Share Bonus capacity in this estimate)' : ''}.${simplifyLine}`
+      : language === 'fr'
+        ? `Pour ${totalPeople} personne${totalPeople > 1 ? 's' : ''} et ${totalDays} jour${totalDays > 1 ? 's' : ''}, l’option la moins chère est le ${title}${usesShareBonus ? ' (capacité avec bonus de partage)' : ''}.`
+        : language === 'bi'
+          ? `Blong ${totalPeople} man mo ${totalDays} dei, opsen i smol long mani hem ${title}${usesShareBonus ? ' (wetem bonus taem yu serem)' : ''}.`
+          : `For your party of ${totalPeople} for ${totalDays} day${totalDays > 1 ? 's' : ''}, the cheapest option is the ${title}${usesShareBonus ? ' (using Share Bonus capacity in this estimate)' : ''}.`;
 
   return {
     recommendedPass: recommended,
