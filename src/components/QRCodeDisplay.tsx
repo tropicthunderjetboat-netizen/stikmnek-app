@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getBasePeople, getShareBonusTotalPeople, getPassDisplayTitle } from '@/data/pricing';
+import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { QrCode, Calendar, Shield, Ticket, Copy, Check } from 'lucide-react';
 
 const QRCodeDisplay: React.FC = () => {
@@ -30,6 +31,11 @@ const QRCodeDisplay: React.FC = () => {
     const encoded = encodeURIComponent(qrPayload);
     return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encoded}&color=0d9488&bgcolor=ffffff&margin=8`;
   }, [qrPayload]);
+
+  const passDurationDays = useMemo(() => {
+    if (!user?.passValidFrom || !user?.passValidUntil) return null;
+    return inclusiveCalendarDaysBetween(user.passValidFrom, user.passValidUntil);
+  }, [user?.passValidFrom, user?.passValidUntil]);
 
   const handleCopyCode = () => {
     if (qrPayload) {
@@ -117,14 +123,20 @@ const QRCodeDisplay: React.FC = () => {
               <Calendar className="w-4 h-4 text-teal-600" />
               <span className="text-sm text-gray-600">Valid Period</span>
             </div>
-            <span className="text-sm font-bold text-gray-900">
+            <span className="text-sm font-bold text-gray-900 text-right">
               {user.passValidFrom
                 ? new Date(user.passValidFrom + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 : '-'}
-              {' - '}
+              {' – '}
               {user.passValidUntil
                 ? new Date(user.passValidUntil + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 : '-'}
+              {passDurationDays != null && (
+                <span className="block text-xs font-semibold text-teal-700 mt-0.5">
+                  {passDurationDays} day{passDurationDays !== 1 ? 's' : ''} total
+                  {user.shareBonusApplied ? ' · Share bonus included' : ''}
+                </span>
+              )}
             </span>
           </div>
 

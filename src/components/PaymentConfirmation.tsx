@@ -16,6 +16,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import TouristProfileForm from '@/components/TouristProfileForm';
+import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 
 interface PaymentResult {
   receiptNumber: string;
@@ -610,17 +611,80 @@ const PaymentConfirmation: React.FC = () => {
   const [sendingEmail, setSendingEmail] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
   const emailSentRef = useRef(false);
+  const paymentRef = useRef<PaymentResult | null>(null);
+  paymentRef.current = payment;
 
   useEffect(() => {
     const stored = localStorage.getItem('lastPayment');
     if (stored) {
       try {
-        setPayment(JSON.parse(stored));
+        const parsed = JSON.parse(stored) as PaymentResult;
+        const span = inclusiveCalendarDaysBetween(parsed.validFrom, parsed.validUntil);
+        if (span != null) {
+          parsed.days = span;
+        }
+        setPayment(parsed);
       } catch {
         setPayment(null);
       }
     }
   }, []);
+
+  // After purchase, `refreshUserPass` loads the real pass row — sync receipt dates/duration/share flag from DB.
+  useEffect(() => {
+    if (!payment || !user?.id) return;
+    if (user.pass !== payment.passType) return;
+    if (!user.passValidFrom || !user.passValidUntil) return;
+
+    setPayment((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      let changed = false;
+      if (user.passValidUntil && user.passValidUntil !== prev.validUntil) {
+        next.validUntil = user.passValidUntil;
+        changed = true;
+      }
+      if (user.passValidFrom && user.passValidFrom !== prev.validFrom) {
+        next.validFrom = user.passValidFrom;
+        changed = true;
+      }
+      if (user.shareBonusApplied && !prev.shareBonusApplied) {
+        next.shareBonusApplied = true;
+        changed = true;
+      }
+      const spanDays = inclusiveCalendarDaysBetween(next.validFrom, next.validUntil);
+      if (spanDays != null && spanDays !== prev.days) {
+        next.days = spanDays;
+        changed = true;
+      }
+      if (user.passPeopleCount != null && user.passPeopleCount !== prev.peopleCount) {
+        next.peopleCount = user.passPeopleCount;
+        next.group = `Up to ${user.passPeopleCount} people`;
+        changed = true;
+      }
+      if (!changed) return prev;
+      try {
+        localStorage.setItem('lastPayment', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, [
+    user?.id,
+    user?.pass,
+    user?.passValidFrom,
+    user?.passValidUntil,
+    user?.shareBonusApplied,
+    user?.passPeopleCount,
+    payment?.receiptNumber,
+    payment?.passType,
+  ]);
+
+  const displayDayCount = React.useMemo(() => {
+    if (!payment) return 0;
+    const fromDates = inclusiveCalendarDaysBetween(payment.validFrom, payment.validUntil);
+    if (fromDates != null) return fromDates;
+    return payment.days ?? 0;
+  }, [payment?.validFrom, payment?.validUntil, payment?.days]);
 
   // After pass purchase: prompt tourists to complete demographic profile (once)
   useEffect(() => {
@@ -644,11 +708,13 @@ const PaymentConfirmation: React.FC = () => {
         : 4;
       const newPeople = (prev.peopleCount ?? basePeople) + (bonus.people ?? 0);
       const newValidUntil = addDaysToDate(prev.validUntil, bonus.days ?? 0) || prev.validUntil;
+      const spanDays = inclusiveCalendarDaysBetween(prev.validFrom, newValidUntil);
       const updated: PaymentResult = {
         ...prev,
         peopleCount: newPeople,
         validUntil: newValidUntil,
         shareBonusApplied: true,
+        days: spanDays ?? (prev.days ?? 0) + (bonus.days ?? 0),
         group: `Up to ${newPeople} people`,
       };
       try {
@@ -661,33 +727,31 @@ const PaymentConfirmation: React.FC = () => {
     void refreshUserPass?.().catch?.(() => {});
   }, [refreshUserPass]);
 
-  // Auto-send confirmation email when payment loads
-  useEffect(() => {
-    if (payment && user?.email && !emailSentRef.current) {
-      emailSentRef.current = true;
-      sendConfirmationEmail();
-    }
-  }, [payment, user]);
-
   const sendConfirmationEmail = async () => {
-    if (!payment || !user?.email) return;
+    const p = paymentRef.current;
+    if (!p || !user?.email) return;
     setSendingEmail(true);
     try {
+      const durationDays =
+        inclusiveCalendarDaysBetween(p.validFrom, p.validUntil) ?? p.days ?? 0;
+
       const { data, error } = await supabase.functions.invoke('send-email', {
         body: {
           action: 'send_pass_confirmation',
           user_id: user.id,
           user_name: user.name,
           user_email: user.email,
-          receipt_number: payment.receiptNumber,
-          pass_type: payment.passType,
-          amount: payment.amount,
+          receipt_number: p.receiptNumber,
+          pass_type: p.passType,
+          amount: p.amount,
           currency: 'AUD',
-          payment_method: payment.paymentMethod === 'card'
-            ? `Credit Card ending ${payment.cardLast4 || '****'}`
+          payment_method: p.paymentMethod === 'card'
+            ? `Credit Card ending ${p.cardLast4 || '****'}`
             : 'PayPal',
-          valid_from: payment.validFrom,
-          valid_until: payment.validUntil,
+          valid_from: p.validFrom,
+          valid_until: p.validUntil,
+          duration_days: durationDays,
+          share_bonus_applied: p.shareBonusApplied ?? false,
         },
       });
 
@@ -703,6 +767,17 @@ const PaymentConfirmation: React.FC = () => {
       setSendingEmail(false);
     }
   };
+
+  // Auto-send after a short delay so `refreshUserPass` can sync Share Bonus dates into `lastPayment`.
+  useEffect(() => {
+    if (!payment || !user?.email || emailSentRef.current) return;
+    const t = window.setTimeout(() => {
+      if (emailSentRef.current) return;
+      emailSentRef.current = true;
+      void sendConfirmationEmail();
+    }, 1600);
+    return () => window.clearTimeout(t);
+  }, [payment?.receiptNumber, user?.email]);
 
   if (!payment) {
     return (
@@ -778,7 +853,7 @@ ITEM DETAILS
 ─────────────────────────────────────
 Pass: ${passLabel}
 Group: ${passGroup}
-Duration: ${payment.days || '?'} day(s)
+Duration: ${displayDayCount || '?'} day(s)
 Valid for: ${peopleCount} people
 Share Bonus Applied: ${shareBonusApplied ? 'Yes' : 'No'}
 
@@ -958,7 +1033,7 @@ Enjoy your deals in Vanuatu!
                 </div>
                 <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
                   <div className="px-3 py-1 rounded-full bg-teal-600 text-white text-[10px] font-bold shadow-sm">
-                    {payment.days || '?'} day{(payment.days || 0) > 1 ? 's' : ''}
+                    {displayDayCount || '?'} day{displayDayCount > 1 ? 's' : ''}
                   </div>
                   <div className="w-8 h-0.5 bg-teal-300 rounded-full" />
                 </div>
@@ -1003,7 +1078,10 @@ Enjoy your deals in Vanuatu!
                   <span className="text-xs text-gray-400 font-medium">Pass Duration</span>
                 </div>
                 <p className="text-sm font-semibold text-gray-900">
-                  {payment.days || '?'} day{(payment.days || 0) > 1 ? 's' : ''}
+                  {displayDayCount || '?'} day{displayDayCount > 1 ? 's' : ''}
+                  {shareBonusApplied && (
+                    <span className="block text-xs font-medium text-emerald-600 mt-0.5">Includes Share Bonus days</span>
+                  )}
                 </p>
               </div>
 

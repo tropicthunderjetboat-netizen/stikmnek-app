@@ -430,6 +430,7 @@ const PaymentCheckout: React.FC = () => {
           validFrom: data.validFrom,
           validUntil: data.validUntil,
           days: data.days,
+          shareBonusApplied: Boolean(data.shareBonusApplied),
           group: data.group || checkoutPassStats.groupLabel,
           sessionId: data.sessionId,
           completedAt: new Date().toISOString(),

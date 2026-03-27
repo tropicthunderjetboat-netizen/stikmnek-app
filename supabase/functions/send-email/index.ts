@@ -12,6 +12,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
  *   SUPABASE_SERVICE_ROLE_KEY — required for send_booking_inquiry (pass check, business row, owner email)
  * Optional:
  *   BOOKING_INQUIRY_BCC — comma-separated emails to BCC on every booking inquiry (e.g. ops inbox for debugging)
+ *   PASS_CONFIRMATION_EMAIL_OVERRIDE — if set, send_pass_confirmation delivers to this address instead of the
+ *     purchaser’s auth email (for one-off QA). Remove after testing.
  */
 
 const corsHeaders = {
@@ -218,6 +220,8 @@ Deno.serve(async (req) => {
         payment_method,
         valid_from,
         valid_until,
+        duration_days,
+        share_bonus_applied,
       } = body;
 
       console.log('[send-email] user_email present:', !!user_email, typeof user_email, user_email ? `${user_email.slice(0, 2)}***@${user_email.split('@')[1] ?? '?'}` : '(missing)');
@@ -231,7 +235,14 @@ Deno.serve(async (req) => {
 
       const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
       const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
-      console.log('[send-email] From address:', fromEmail, '| To:', user_email);
+
+      /** Temporary: set PASS_CONFIRMATION_EMAIL_OVERRIDE in Supabase secrets to receive test receipts at a real inbox. Remove after verification. */
+      const emailOverride = (Deno.env.get('PASS_CONFIRMATION_EMAIL_OVERRIDE') ?? '').trim();
+      const toEmail = emailOverride || user_email;
+      if (emailOverride) {
+        console.warn('[send-email] PASS_CONFIRMATION_EMAIL_OVERRIDE active — sending pass confirmation to:', emailOverride, '(not to user account email)');
+      }
+      console.log('[send-email] From address:', fromEmail, '| To:', toEmail);
 
       const subject = `StikmNek receipt — ${passLabel}`;
       const safeName = escapeHtml(user_name || '');
@@ -241,6 +252,12 @@ Deno.serve(async (req) => {
       const safeValidUntil = escapeHtml(valid_until || '—');
       const money = escapeHtml(formatMoney(amount, currency));
       const promo = shareBonusPromoText(pass_type);
+
+      const durationNum = typeof duration_days === 'number' ? duration_days : Number(duration_days);
+      const durationLabel = Number.isFinite(durationNum) && durationNum > 0
+        ? `${Math.floor(durationNum)} day${durationNum === 1 ? '' : 's'}`
+        : '—';
+      const shareApplied = share_bonus_applied === true || share_bonus_applied === 'true';
 
       // Premium, mobile-friendly, email-client-safe HTML (tables + inline styles).
       const html = `
@@ -297,6 +314,17 @@ Deno.serve(async (req) => {
                     </tr>
 
                     <tr>
+                      <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
+                        <div style="font-size:12px; color:#64748b;">Pass duration</div>
+                        <div style="font-size:14px; font-weight:700; color:#0f172a;">${escapeHtml(durationLabel)}</div>
+                      </td>
+                      <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                        <div style="font-size:12px; color:#64748b;">Share Bonus</div>
+                        <div style="font-size:14px; color:#0f172a;">${shareApplied ? 'Applied ✓' : 'Not applied'}</div>
+                      </td>
+                    </tr>
+
+                    <tr>
                       <td style="padding:12px 0;">
                         <div style="font-size:12px; color:#64748b;">Payment method</div>
                         <div style="font-size:14px; color:#0f172a;">${safePayment}</div>
@@ -341,7 +369,7 @@ Deno.serve(async (req) => {
       `.trim();
 
       const sgBody = {
-        personalizations: [{ to: [{ email: user_email, name: user_name ?? undefined }] }],
+        personalizations: [{ to: [{ email: toEmail, name: user_name ?? undefined }] }],
         from: { email: fromEmail, name: fromName },
         subject,
         content: [{ type: 'text/html', value: html }],
@@ -384,8 +412,8 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log('[send-email] Pass confirmation sent to', user_email);
-      return jsonResponse({ success: true, sent: true });
+      console.log('[send-email] Pass confirmation sent to', toEmail);
+      return jsonResponse({ success: true, sent: true, deliveredTo: toEmail, override: Boolean(emailOverride) });
     }
 
     // ─── SEND_BOOKING_INQUIRY (tourist → business owner via SendGrid) ───

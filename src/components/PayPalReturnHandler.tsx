@@ -146,6 +146,7 @@ const PayPalReturnHandler: React.FC = () => {
           validFrom: data.validFrom,
           validUntil: data.validUntil,
           days: data.days,
+          shareBonusApplied: Boolean(data.shareBonusApplied),
           sessionId: data.sessionId,
           completedAt: new Date().toISOString(),
         };
