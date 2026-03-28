@@ -29,35 +29,44 @@ const ResetPassword: React.FC = () => {
       setSessionReady(ready);
     };
 
-    // Avoid a flash of "Invalid link" while Supabase is still processing the URL hash.
-    // We wait briefly for auth events / session to materialize, then decide.
-    const MAX_WAIT_MS = 1500;
-    const timer = window.setTimeout(async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        resolve(!!data?.session?.user);
-      } catch {
-        resolve(false);
-      }
-    }, MAX_WAIT_MS);
+    // Recovery links put tokens in the hash (or PKCE `code` in search). Hash parsing is async;
+    // a single early getSession() or a short timer can falsely show "Invalid link". We combine
+    // onAuthStateChange with polling getSession() until the session appears or we hit a max wait.
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    const search = typeof window !== 'undefined' ? window.location.search : '';
+    const likelyRecoveryLink =
+      hash.includes('access_token') ||
+      hash.includes('type=recovery') ||
+      hash.includes('refresh_token') ||
+      search.includes('code=');
+
+    const MAX_WAIT_MS = likelyRecoveryLink ? 12000 : 4000;
+    const POLL_MS = 200;
+    const maxPolls = Math.max(1, Math.ceil(MAX_WAIT_MS / POLL_MS));
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return;
       if (session?.user) resolve(true);
     });
 
     void (async () => {
-      try {
-        // Let Supabase parse the hash and establish session (detectSessionInUrl is true)
-        const { data } = await supabase.auth.getSession();
-        if (data?.session?.user) resolve(true);
-      } catch {
-        // ignore; timer will resolve false if nothing materializes
+      for (let i = 0; i < maxPolls && !cancelled && !resolved; i++) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data?.session?.user) {
+            resolve(true);
+            return;
+          }
+        } catch {
+          /* keep polling */
+        }
+        await new Promise((r) => setTimeout(r, POLL_MS));
       }
+      if (!cancelled && !resolved) resolve(false);
     })();
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
       sub?.subscription?.unsubscribe();
     };
   }, []);
