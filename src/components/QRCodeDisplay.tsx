@@ -1,29 +1,102 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getBasePeople, getShareBonusTotalPeople, getPassDisplayTitle } from '@/data/pricing';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
+import { supabase } from '@/lib/supabase';
 import { QrCode, Calendar, Shield, Ticket, Copy, Check } from 'lucide-react';
+
+function toDateOnly(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+}
 
 const QRCodeDisplay: React.FC = () => {
   const { user, language } = useAppContext();
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
+  /** Fresh row from DB so QR + dates update after extend-pass even if context lags. */
+  const [passRow, setPassRow] = useState<{
+    validFrom: string | null;
+    validUntil: string | null;
+    maxPeople: number | null;
+    shareBonusApplied: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!user?.passId) {
+      setPassRow(null);
+      return;
+    }
+    let cancelled = false;
+
+    const load = async () => {
+      const { data, error } = await supabase
+        .from('passes')
+        .select('valid_from, valid_until, max_people, share_bonus_applied')
+        .eq('id', user.passId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || !data) return;
+      setPassRow({
+        validFrom: toDateOnly(data.valid_from),
+        validUntil: toDateOnly(data.valid_until),
+        maxPeople: typeof data.max_people === 'number' ? data.max_people : null,
+        shareBonusApplied: !!data.share_bonus_applied,
+      });
+    };
+
+    void load();
+
+    const channel = supabase
+      .channel(`qr-pass-${user.passId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'passes', filter: `id=eq.${user.passId}` },
+        () => {
+          void load();
+        },
+      )
+      .subscribe();
+
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    document.addEventListener('visibilitychange', onVis);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', onVis);
+      void supabase.removeChannel(channel);
+    };
+  }, [user?.passId, user?.passValidUntil]);
+
+  const validFrom = passRow?.validFrom ?? user?.passValidFrom ?? null;
+  const validUntil = passRow?.validUntil ?? user?.passValidUntil ?? null;
+  const shareApplied =
+    passRow != null ? passRow.shareBonusApplied : !!(user?.shareBonusApplied ?? false);
+
+  const effectiveMaxPeople =
+    user?.pass == null
+      ? null
+      : (passRow?.maxPeople ??
+          user.passPeopleCount ??
+          (shareApplied ? getShareBonusTotalPeople(user.pass) : getBasePeople(user.pass)));
 
   // Generate the QR code data payload (includes maxPeople for scanner to validate capacity)
   const qrPayload = useMemo(() => {
-    if (!user || !user.pass || !user.passId) return null;
-    // Use DB value if available, else derive from pass type (share bonus applied = total, else base)
-    const maxPeople = user.passPeopleCount ?? (user.shareBonusApplied ? getShareBonusTotalPeople(user.pass) : getBasePeople(user.pass));
+    if (!user || !user.pass || !user.passId || effectiveMaxPeople == null) return null;
     return JSON.stringify({
       type: 'stikm_nek_pass',
       userId: user.id,
       passId: user.passId,
       passType: user.pass,
-      validFrom: user.passValidFrom,
-      validUntil: user.passValidUntil,
+      validFrom,
+      validUntil,
       name: user.name,
-      maxPeople,
+      maxPeople: effectiveMaxPeople,
     });
-  }, [user]);
+  }, [user, effectiveMaxPeople, validFrom, validUntil]);
 
   // Generate QR code URL using qrserver.com API
   const qrCodeUrl = useMemo(() => {
@@ -33,9 +106,9 @@ const QRCodeDisplay: React.FC = () => {
   }, [qrPayload]);
 
   const passDurationDays = useMemo(() => {
-    if (!user?.passValidFrom || !user?.passValidUntil) return null;
-    return inclusiveCalendarDaysBetween(user.passValidFrom, user.passValidUntil);
-  }, [user?.passValidFrom, user?.passValidUntil]);
+    if (!validFrom || !validUntil) return null;
+    return inclusiveCalendarDaysBetween(validFrom, validUntil);
+  }, [validFrom, validUntil]);
 
   const handleCopyCode = () => {
     if (qrPayload) {
@@ -111,8 +184,8 @@ const QRCodeDisplay: React.FC = () => {
               <span className="text-sm text-gray-600">Valid for</span>
             </div>
             <span className="text-sm font-bold text-gray-900">
-              {user.passPeopleCount ?? getBasePeople(user.pass)} people
-              {user.shareBonusApplied && (
+              {effectiveMaxPeople ?? getBasePeople(user.pass)} people
+              {shareApplied && (
                 <span className="ml-1.5 text-xs font-medium text-emerald-600">(Share bonus applied)</span>
               )}
             </span>
@@ -124,17 +197,17 @@ const QRCodeDisplay: React.FC = () => {
               <span className="text-sm text-gray-600">Valid Period</span>
             </div>
             <span className="text-sm font-bold text-gray-900 text-right">
-              {user.passValidFrom
-                ? new Date(user.passValidFrom + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              {validFrom
+                ? new Date(validFrom + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 : '-'}
               {' – '}
-              {user.passValidUntil
-                ? new Date(user.passValidUntil + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              {validUntil
+                ? new Date(validUntil + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 : '-'}
               {passDurationDays != null && (
                 <span className="block text-xs font-semibold text-teal-700 mt-0.5">
                   {passDurationDays} day{passDurationDays !== 1 ? 's' : ''} total
-                  {user.shareBonusApplied ? ' · Share bonus included' : ''}
+                  {shareApplied ? ' · Share bonus included' : ''}
                 </span>
               )}
             </span>

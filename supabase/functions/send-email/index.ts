@@ -69,6 +69,33 @@ function formatMoney(amount: unknown, currency: unknown): string {
   return s ? `${c} ${s}` : `${c} —`;
 }
 
+/** First YYYY-MM-DD in a value (handles ISO timestamps from DB/clients). */
+function dateOnlyFromUnknown(v: unknown): string | null {
+  const s = String(v ?? '').trim();
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Inclusive calendar-day count between two date-only strings.
+ * Uses UTC calendar components (no Date parsing ambiguity). Matches app `inclusiveCalendarDaysBetween`.
+ */
+function inclusiveCalendarDaysBetweenDateOnly(from: string, until: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(until)) return null;
+  const y1 = Number(from.slice(0, 4));
+  const m1 = Number(from.slice(5, 7)) - 1;
+  const d1 = Number(from.slice(8, 10));
+  const y2 = Number(until.slice(0, 4));
+  const m2 = Number(until.slice(5, 7)) - 1;
+  const d2 = Number(until.slice(8, 10));
+  const a = Date.UTC(y1, m1, d1, 12);
+  const b = Date.UTC(y2, m2, d2, 12);
+  const ms = b - a;
+  if (!Number.isFinite(ms)) return null;
+  const daysBetween = Math.round(ms / (1000 * 60 * 60 * 24));
+  return Math.max(1, daysBetween + 1);
+}
+
 function shareBonusPromoText(passType: unknown): { headline: string; body: string } {
   const t = String(passType ?? '').toLowerCase().trim();
   // Keep messaging generic enough for all pass types, but slightly more specific when we can.
@@ -248,15 +275,27 @@ Deno.serve(async (req) => {
       const safeName = escapeHtml(user_name || '');
       const safeReceipt = escapeHtml(receipt_number || '—');
       const safePayment = escapeHtml(payment_method || '—');
-      const safeValidFrom = escapeHtml(valid_from || '—');
-      const safeValidUntil = escapeHtml(valid_until || '—');
       const money = escapeHtml(formatMoney(amount, currency));
       const promo = shareBonusPromoText(pass_type);
 
-      const durationNum = typeof duration_days === 'number' ? duration_days : Number(duration_days);
-      const durationLabel = Number.isFinite(durationNum) && durationNum > 0
-        ? `${Math.floor(durationNum)} day${durationNum === 1 ? '' : 's'}`
-        : '—';
+      // Duration must follow the *displayed* validity window (extended valid_until after share bonus),
+      // not `duration_days` from the client (often stale if the email was queued before bonus applied).
+      const fromKey = dateOnlyFromUnknown(valid_from);
+      const untilKey = dateOnlyFromUnknown(valid_until);
+      const displayFrom = fromKey ?? (valid_from != null && String(valid_from).trim() ? String(valid_from).trim() : '—');
+      const displayUntil = untilKey ?? (valid_until != null && String(valid_until).trim() ? String(valid_until).trim() : '—');
+      const safeValidFrom = escapeHtml(displayFrom);
+      const safeValidUntil = escapeHtml(displayUntil);
+
+      const computedInclusiveDays =
+        fromKey && untilKey ? inclusiveCalendarDaysBetweenDateOnly(fromKey, untilKey) : null;
+      const fallbackDurationNum = typeof duration_days === 'number' ? duration_days : Number(duration_days);
+      const durationLabel =
+        computedInclusiveDays != null && computedInclusiveDays > 0
+          ? `${computedInclusiveDays} day${computedInclusiveDays === 1 ? '' : 's'}`
+          : Number.isFinite(fallbackDurationNum) && fallbackDurationNum > 0
+            ? `${Math.floor(fallbackDurationNum)} day${fallbackDurationNum === 1 ? '' : 's'}`
+            : '—';
       const shareApplied = share_bonus_applied === true || share_bonus_applied === 'true';
 
       // Premium, mobile-friendly, email-client-safe HTML (tables + inline styles).
