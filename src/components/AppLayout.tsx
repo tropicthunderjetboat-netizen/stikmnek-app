@@ -1,6 +1,5 @@
 import React, { Suspense, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Store, ArrowRight } from 'lucide-react';
 
 // ── Eagerly-loaded components ──
 import Navbar from './Navbar';
@@ -29,70 +28,6 @@ const AdminPanel = React.lazy(() => import('./AdminPanel'));
 const PaymentCheckout = React.lazy(() => import('./PaymentCheckout'));
 const BusinessOwnerDashboard = React.lazy(() => import('./BusinessOwnerDashboard'));
 const HelpCenter = React.lazy(() => import('./HelpCenter'));
-
-const ListYourBusinessBanner: React.FC = () => {
-  const { language, user, setShowAuth, setAuthMode } = useAppContext();
-
-  // Don't show the banner to business users
-  if (user?.type === 'business') return null;
-
-  const handleClick = () => {
-    if (!user) {
-      setShowAuth(true);
-      setAuthMode('signup-business');
-      return;
-    }
-    const el = document.getElementById('list-business');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
-  return (
-    <div className="relative pt-16">
-      <div className="bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-3 sm:py-3.5">
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex w-9 h-9 rounded-lg bg-white/20 backdrop-blur-sm items-center justify-center flex-shrink-0">
-                <Store className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <p className="text-sm sm:text-base font-semibold leading-tight">
-                  {language === 'en'
-                    ? 'Own a business in Vanuatu?'
-                    : language === 'fr'
-                    ? 'Vous avez une entreprise au Vanuatu ?'
-                    : 'Yu gat wan bisnis long Vanuatu?'}
-                </p>
-                <p className="text-xs sm:text-sm text-white/80 hidden sm:block">
-                  {language === 'en'
-                    ? 'Reach thousands of tourists — list your business for free today!'
-                    : language === 'fr'
-                    ? 'Atteignez des milliers de touristes — inscrivez votre entreprise gratuitement !'
-                    : 'Rijim plante turis — listem bisnis blong yu fri tede!'}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleClick}
-              className="flex items-center gap-2 px-5 py-2.5 sm:px-6 sm:py-2.5 rounded-xl bg-white text-teal-700 font-bold text-sm sm:text-base hover:bg-teal-50 transition-all shadow-lg shadow-teal-900/20 hover:shadow-xl hover:-translate-y-0.5 flex-shrink-0"
-            >
-              <Store className="w-4 h-4 sm:hidden" />
-              <span className="hidden sm:inline">
-                {language === 'en' ? 'List Your Business' : language === 'fr' ? 'Inscrivez votre entreprise' : 'Listem Bisnis Blong Yu'}
-              </span>
-              <span className="sm:hidden">
-                {language === 'en' ? 'List Your Business' : language === 'fr' ? 'Inscrire' : 'Listem'}
-              </span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const AppLayout: React.FC = () => {
   const { currentView, user, userProfile, authLoading, setCurrentView } = useAppContext();
@@ -202,7 +137,6 @@ const AppLayout: React.FC = () => {
       default:
         return (
           <>
-            <ListYourBusinessBanner />
             <Hero />
             <HowItWorks />
             <CategoryShowcase />

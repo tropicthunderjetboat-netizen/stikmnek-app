@@ -13,7 +13,13 @@ export const translations: Record<string, Record<Language, string>> = {
   
   // Hero
   'hero.title': { en: 'Discover Vanuatu\'s Best Deals', fr: 'Découvrez les meilleures offres du Vanuatu', bi: 'Faenem Beswan Dils blong Vanuatu' },
-  'hero.subtitle': { en: 'Save up to 35% on dining, activities, tours & more with StikmNek passes', fr: 'Économisez jusqu\'à 35% sur la restauration, les activités, les visites et plus avec les pass StikmNek', bi: 'Sevem kasem 35% long kakae, aktiviti, tua mo moa wetem StikmNek pas' },
+  'hero.subtitle': {
+    en: 'Unlock exclusive discounts up to 35% on dining, tours, and activities. Join thousands of happy travelers and local businesses.',
+    fr: 'Profitez de réductions exclusives jusqu\'à 35 % sur la restauration, les visites et les activités. Rejoignez des milliers de voyageurs et d\'entreprises locales satisfaits.',
+    bi: 'Openem eksklusiv diskaon kasem 35% long kakae, tua, mo aktiviti. Joinem tausen blong hapi turis mo lokal bisnis.',
+  },
+  'hero.ctaTourist': { en: 'Sign Up & Get Deals', fr: 'Inscrivez-vous et profitez des offres', bi: 'Saen Ap & Karem Dils' },
+  'hero.ctaBusiness': { en: 'List Your Business (Free)', fr: 'Inscrivez votre entreprise (gratuit)', bi: 'Listem Bisnis Blong Yu (Fri)' },
   'hero.cta': { en: 'Get Your Pass', fr: 'Obtenez votre pass', bi: 'Karem Pas Blong Yu' },
   'hero.explore': { en: 'Explore Deals', fr: 'Explorer les offres', bi: 'Eksploarem Dils' },
   'hero.businesses': { en: 'Local Businesses', fr: 'Entreprises locales', bi: 'Lokal Bisnis' },

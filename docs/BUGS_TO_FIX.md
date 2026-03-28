@@ -45,11 +45,12 @@ This document lists bugs and gaps identified from the codebase and existing docs
 - **Impact:** Expired passes can still appear “active” in the DB; any backend or future client that relies on `active` may treat them as valid.
 - **Fix:** Add a scheduled job (e.g. pg_cron or Supabase scheduled function) that runs periodically: `UPDATE passes SET active = false WHERE expires_at < now()`.
 
-### 6. **ResetPassword may show “Invalid or expired link” before hash is processed**
+### 6. **ResetPassword may show “Invalid or expired link” before hash is processed** — RESOLVED
 
-- **Where:** `src/pages/ResetPassword.tsx` uses `useEffect` to call `supabase.auth.getSession()` once on mount to decide whether to show the “Set new password” form or “Invalid or expired link”.
-- **Risk:** If the Supabase client has not yet processed the recovery hash from the URL, `getSession()` can return no session and the user sees “Invalid or expired link” even with a valid link.
-- **Fix:** Prefer relying on auth state that is updated after URL hash is processed (e.g. `onAuthStateChange` or retrying `getSession()` after a short delay / after ensuring the client has run `getSession()` or equivalent that processes the hash). Optionally use Supabase’s recovery flow that explicitly exchanges the hash for a session before rendering.
+- **Where:** `src/pages/ResetPassword.tsx`.
+- **Resolution:** Session readiness uses **`supabase.auth.onAuthStateChange`** together with **polled `getSession()`** (every 200ms) instead of a single mount read or a short one-shot timer. Max wait is **12s** when the URL looks like a recovery link (`access_token`, `type=recovery`, `refresh_token`, or PKCE `code=` in the query), and **4s** otherwise—reducing false “Invalid or expired link” while `detectSessionInUrl` finishes.
+- **Deployment:** Root **`vercel.json`** rewrites client routes to **`/index.html`** so **`/reset-password`** is not a host-level 404 on Vercel.
+- **Supabase (project settings):** **Site URL** and **Redirect URLs** must include your production origin and **`…/reset-password`**; the reset email template should keep the standard confirmation URL behavior.
 
 ---
 
@@ -79,6 +80,7 @@ This document lists bugs and gaps identified from the codebase and existing docs
 
 - **Resubmit error surfacing:** `invokeWithRetry` in BusinessOwnerDashboard now preserves response body on non-2xx so the toast shows the real Edge Function error (e.g. column missing) instead of a generic message.
 - **Password reset redirect:** Forgot-password email link now redirects to `/reset-password`; `main.tsx` redirects recovery hash from other paths to `/reset-password`.
+- **Reset password UX (#6):** Resolved as described in §6 above (polling + auth listener + `vercel.json` SPA routing).
 - **PayPal return:** PayPalReturnHandler passes `passType` and `startDate` to `paypal-capture` and calls `refreshUserPass()` after success.
 - **create-checkout / paypal-capture:** Both Edge Functions exist and are documented in `PHASE2_PAYPAL_SETUP.md`; ensure they are deployed and secrets set.
 
@@ -91,5 +93,5 @@ This document lists bugs and gaps identified from the codebase and existing docs
 - [ ] Share bonus flow (extend-pass) updates the pass and UI reflects it.
 - [ ] Resubmit works after migration `20250311300000` is applied.
 - [ ] Expired passes are marked `active = false` by the backend job.
-- [ ] Password reset link shows “Set new password” when the link is valid (and hash is processed).
+- [x] Password reset link shows “Set new password” when the link is valid (and hash is processed). *(Verified: no host 404 on `/reset-password`; minimal false invalid state.)*
 - [ ] Admin/business emails send when SendGrid is configured; admin password reset email delivers when Auth email is configured.

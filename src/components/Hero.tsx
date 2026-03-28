@@ -5,7 +5,21 @@ import { businesses as localBusinesses } from '@/data/businesses';
 import { ArrowRight, MapPin, Star, Users } from 'lucide-react';
 
 const Hero: React.FC = () => {
-  const { language, setCurrentView, dbBusinesses } = useAppContext();
+  const { language, user, setShowAuth, setAuthMode, dbBusinesses } = useAppContext();
+
+  const scrollToListBusiness = () => {
+    if (!user) {
+      setShowAuth(true);
+      setAuthMode('signup-business');
+      return;
+    }
+    document.getElementById('list-business')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const openTouristSignup = () => {
+    setShowAuth(true);
+    setAuthMode('signup-tourist');
+  };
 
   // Use real business count from DB, fallback to local
   const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
@@ -22,7 +36,7 @@ const Hero: React.FC = () => {
   );
 
   return (
-    <section className="relative min-h-[600px] lg:min-h-[700px] flex items-center overflow-hidden">
+    <section className="relative min-h-[80vh] flex items-center overflow-hidden pt-16">
       {/* Background Image */}
       <div className="absolute inset-0">
         <img
@@ -39,7 +53,7 @@ const Hero: React.FC = () => {
       <div className="absolute top-20 right-10 w-72 h-72 bg-emerald-400/10 rounded-full blur-3xl" />
       <div className="absolute bottom-10 left-10 w-96 h-96 bg-teal-400/10 rounded-full blur-3xl" />
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-32 w-full">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 w-full flex flex-col justify-center">
         <div className="max-w-2xl">
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 text-white/90 text-sm mb-6">
@@ -58,17 +72,19 @@ const Hero: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row gap-4 mb-12">
             <button
-              onClick={() => setCurrentView('passes')}
-              className="group flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-lg hover:from-orange-600 hover:to-amber-600 transition-all shadow-xl shadow-orange-500/30 hover:shadow-orange-500/50 hover:-translate-y-0.5"
+              type="button"
+              onClick={openTouristSignup}
+              className="group flex items-center justify-center gap-2 px-8 py-4 sm:py-5 rounded-xl bg-orange-500 text-white font-bold text-lg hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/35 hover:shadow-orange-500/50 hover:-translate-y-0.5 sm:flex-1 sm:min-h-[3.5rem]"
             >
-              {t('hero.cta', language)}
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              {t('hero.ctaTourist', language)}
+              <ArrowRight className="w-5 h-5 shrink-0 group-hover:translate-x-1 transition-transform" />
             </button>
             <button
-              onClick={() => setCurrentView('deals')}
-              className="flex items-center justify-center gap-2 px-8 py-4 rounded-xl bg-white/15 backdrop-blur-sm border border-white/30 text-white font-semibold text-lg hover:bg-white/25 transition-all"
+              type="button"
+              onClick={scrollToListBusiness}
+              className="flex items-center justify-center gap-2 px-8 py-4 sm:py-5 rounded-xl border-[3px] border-white bg-transparent text-white font-bold text-lg hover:bg-white/10 transition-all sm:flex-1 sm:min-h-[3.5rem]"
             >
-              {t('hero.explore', language)}
+              {t('hero.ctaBusiness', language)}
             </button>
           </div>
 
