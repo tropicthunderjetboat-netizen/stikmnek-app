@@ -48,6 +48,159 @@ function compareDates(a: string | null, b: string | null): number {
   return a < b ? -1 : 1;
 }
 
+// ─── Party + pricing (mirrors src/lib/redemptionSavings.ts & pricingTiers.ts) ───
+
+type PartyCounts = { adults: number; children: number; infants: number };
+
+function partyFromProfileRow(row: {
+  num_adults?: number | null;
+  num_children?: number | null;
+  num_infants?: number | null;
+} | null | undefined): PartyCounts {
+  if (!row) return { adults: 1, children: 0, infants: 0 };
+  const aRaw = row.num_adults;
+  const cRaw = row.num_children;
+  const iRaw = row.num_infants;
+  if (aRaw == null && cRaw == null && iRaw == null) {
+    return { adults: 1, children: 0, infants: 0 };
+  }
+  return {
+    adults: Math.max(0, Math.floor(Number(aRaw ?? 0))),
+    children: Math.max(0, Math.floor(Number(cRaw ?? 0))),
+    infants: Math.max(0, Math.floor(Number(iRaw ?? 0))),
+  };
+}
+
+type PricingTierInput = {
+  label: string;
+  min_pax: number;
+  max_pax: number | null;
+  original_price_vt: number;
+  deal_price_vt: number;
+};
+
+function pricingTiersFromDb(value: unknown): PricingTierInput[] {
+  if (!value || !Array.isArray(value)) return [];
+  const out: PricingTierInput[] = [];
+  for (const row of value) {
+    if (!row || typeof row !== 'object') continue;
+    const o = row as Record<string, unknown>;
+    const min = Math.max(0, Math.floor(Number(o.min_pax ?? 0) || 0));
+    const maxRaw = o.max_pax;
+    const max =
+      maxRaw === null || maxRaw === undefined || maxRaw === ''
+        ? null
+        : Math.max(0, Math.floor(Number(maxRaw) || 0));
+    out.push({
+      label: String(o.label ?? '').trim(),
+      min_pax: min,
+      max_pax: max,
+      original_price_vt: Math.max(0, Number(o.original_price_vt) || 0),
+      deal_price_vt: Math.max(0, Number(o.deal_price_vt) || 0),
+    });
+  }
+  return out;
+}
+
+function computeTieredBookingTotals(
+  tiers: PricingTierInput[],
+  adults: number,
+  children: number,
+  infants: number,
+): { totalStandard: number; totalDeal: number } {
+  const a = Math.max(0, adults);
+  const ch = Math.max(0, children);
+  const inf = Math.max(0, infants);
+  const usable = tiers.filter((t) => t.original_price_vt > 0 && t.deal_price_vt >= 0);
+  if (usable.length === 0) return { totalStandard: 0, totalDeal: 0 };
+
+  if (usable.length === 1) {
+    const t = usable[0];
+    const pax = a + ch + inf;
+    return {
+      totalStandard: pax * t.original_price_vt,
+      totalDeal: pax * t.deal_price_vt,
+    };
+  }
+
+  const low = (s: string) => s.toLowerCase();
+  const pick = (pred: (label: string) => boolean, indexFallback: number): PricingTierInput => {
+    const found = usable.find((t) => pred(low(t.label)));
+    if (found) return found;
+    return usable[Math.min(indexFallback, usable.length - 1)] ?? usable[0];
+  };
+
+  const tAdult = pick((l) => /adult|13\+|adulte|senior|grown/.test(l), 0);
+  const tChild = pick((l) => /child|kid|enfant|pikinini|minor|2-12|5-12|6-12|7-12|school/.test(l), 1);
+  const tInfant = pick((l) => /infant|baby|b[eé]b[eé]|0-4|0–4|toddler|smol/.test(l), 2);
+
+  return {
+    totalStandard:
+      a * tAdult.original_price_vt + ch * tChild.original_price_vt + inf * tInfant.original_price_vt,
+    totalDeal: a * tAdult.deal_price_vt + ch * tChild.deal_price_vt + inf * tInfant.deal_price_vt,
+  };
+}
+
+function hasUsableTieredPricing(pricingTiers: unknown): boolean {
+  const tiers = pricingTiersFromDb(pricingTiers);
+  return tiers.some(
+    (t) =>
+      t.original_price_vt > 0 &&
+      t.deal_price_vt >= 0 &&
+      t.deal_price_vt < t.original_price_vt,
+  );
+}
+
+function computeRedemptionSavings(
+  biz: { pricing_tiers: unknown; original_price: unknown; deal_price: unknown },
+  party: PartyCounts,
+): {
+  savedAmount: number;
+  totalStandard: number;
+  totalDeal: number;
+  savingsLine: string;
+  isTiered: boolean;
+  unitSavings: number;
+} {
+  if (hasUsableTieredPricing(biz.pricing_tiers)) {
+    const tiers = pricingTiersFromDb(biz.pricing_tiers);
+    const { totalStandard, totalDeal } = computeTieredBookingTotals(
+      tiers,
+      party.adults,
+      party.children,
+      party.infants,
+    );
+    const ts = Math.round(totalStandard);
+    const td = Math.round(totalDeal);
+    const saved = Math.max(0, ts - td);
+    const savingsLine =
+      `Party: ${party.adults} adult(s)` +
+      (party.children ? `, ${party.children} child(ren)` : '') +
+      (party.infants ? `, ${party.infants} infant(s)` : '') +
+      ` — ${ts.toLocaleString()} VT standard → ${td.toLocaleString()} VT StikmNek (${saved.toLocaleString()} VT saved)`;
+    return { savedAmount: saved, totalStandard: ts, totalDeal: td, savingsLine, isTiered: true, unitSavings: 0 };
+  }
+
+  const o = Number(biz.original_price);
+  const d = Number(biz.deal_price);
+  const partySize = Math.max(1, party.adults + party.children);
+  if (!Number.isFinite(o) || !Number.isFinite(d) || o <= d) {
+    return { savedAmount: 0, totalStandard: 0, totalDeal: 0, savingsLine: '—', isTiered: false, unitSavings: 0 };
+  }
+  const unit = Math.round(o - d);
+  const saved = Math.max(0, unit * partySize);
+  const savingsLine =
+    `${unit.toLocaleString()} VT × ${partySize} ${partySize === 1 ? 'person' : 'people'} = ${saved.toLocaleString()} VT total saved`;
+  return {
+    savedAmount: saved,
+    totalStandard: Math.round(o * partySize),
+    totalDeal: Math.round(d * partySize),
+    savingsLine,
+    isTiered: false,
+    unitSavings: unit,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -143,12 +296,14 @@ Deno.serve(async (req) => {
       message = 'Pass has expired.';
     }
 
-    // Load tourist profile for display
+    // Load tourist profile (party size for savings math + display)
     const { data: profile } = await supabase
       .from('user_profiles')
-      .select('name, display_name, email')
+      .select('name, display_name, email, num_adults, num_children, num_infants')
       .eq('user_id', touristUserId)
       .maybeSingle();
+
+    const party = partyFromProfileRow(profile);
 
     const touristName =
       profile?.name ||
@@ -212,6 +367,11 @@ Deno.serve(async (req) => {
           action: 'validity_check',
           canRedeem,
           tourist: { name: touristName, email: touristEmail },
+          party: {
+            adults: party.adults,
+            children: party.children,
+            infants: party.infants,
+          },
           pass: {
             id: pass.id,
             type: pass.pass_type,
@@ -277,10 +437,28 @@ Deno.serve(async (req) => {
         }
       }
 
-      const savedAmount = Number(body?.savedAmount ?? 0) || 0;
       const discountLabelRaw = body?.discount ?? body?.discountLabel ?? '';
       const discount_label =
         typeof discountLabelRaw === 'string' ? discountLabelRaw.trim() : String(discountLabelRaw ?? '').trim();
+
+      const { data: bizRow, error: bizLoadErr } = await supabase
+        .from('businesses')
+        .select('name, pricing_tiers, original_price, deal_price, owner_id')
+        .eq('id', businessId)
+        .maybeSingle();
+
+      if (bizLoadErr || !bizRow) {
+        console.error('[verify-redemption] business load:', bizLoadErr);
+        return errorResponse('Business not found', 404);
+      }
+
+      if (scannerRole === 'business' && String((bizRow as { owner_id?: string }).owner_id ?? '') !== String(scannerUser.id)) {
+        return errorResponse('You are not authorized to redeem for this business', 403);
+      }
+
+      // Server-authoritative savings (ignore client savedAmount to prevent tampering)
+      const computed = computeRedemptionSavings(bizRow, party);
+      const savedAmount = computed.savedAmount;
 
       const insertRow: Record<string, unknown> = {
         user_id: touristUserId,
@@ -333,8 +511,15 @@ Deno.serve(async (req) => {
             discountApplied: appliedDiscount,
             savedAmount: Number(redemption.saved_amount) || 0,
             redeemedAt: redemption.redeemed_at,
-            originalPrice: body?.originalPrice ?? null,
-            dealPrice: body?.dealPrice ?? null,
+            originalPrice: computed.totalStandard,
+            dealPrice: computed.totalDeal,
+            savingsLine: computed.savingsLine,
+            isTieredPricing: computed.isTiered,
+            party: {
+              adults: party.adults,
+              children: party.children,
+              infants: party.infants,
+            },
           },
         },
         200

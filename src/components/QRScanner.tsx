@@ -1,6 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getPassDisplayTitle } from '@/data/pricing';
+import {
+  computeRedemptionSavingsForListing,
+  partyFromValidityApi,
+  type PartyCounts,
+} from '@/lib/redemptionSavings';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
@@ -40,6 +45,9 @@ interface RedemptionResult {
     redeemedAt: string;
     originalPrice?: number;
     dealPrice?: number;
+    savingsLine?: string;
+    isTieredPricing?: boolean;
+    party?: PartyCounts;
   };
   voucher?: VoucherInfo | null;
   passType?: string;
@@ -51,6 +59,8 @@ interface ValidityResult {
   action: 'validity_check';
   canRedeem: boolean;
   tourist: { name: string; email: string };
+  /** From tourist user_profiles — used for party-sized savings. */
+  party?: { adults: number; children: number; infants: number };
   pass: {
     id: string;
     type: string;
@@ -90,6 +100,8 @@ export type OwnerListingOffer = {
   discount: string | null;
   original_price: number | null;
   deal_price: number | null;
+  pricing_tiers?: unknown;
+  category?: string | null;
 };
 
 interface QRScannerProps {
@@ -105,13 +117,6 @@ function formatOfferDiscountLine(listing: OwnerListingOffer): string {
   if (disc && title) return `${disc} — ${title}`;
   if (disc) return disc;
   return title || 'Discount';
-}
-
-function savedAmountForListing(listing: OwnerListingOffer): number {
-  const o = Number(listing.original_price);
-  const d = Number(listing.deal_price);
-  if (!Number.isFinite(o) || !Number.isFinite(d)) return 0;
-  return Math.max(0, o - d);
 }
 
 // ═══ PASS TIER STYLING ═══
@@ -278,9 +283,13 @@ const QRScanner: React.FC<QRScannerProps> = ({
     return () => clearInterval(interval);
   }, [verifying, scanPurpose]);
 
-  const executeRedeemForListing = async (rawData: string, listing: OwnerListingOffer) => {
+  const executeRedeemForListing = async (
+    rawData: string,
+    listing: OwnerListingOffer,
+    party: PartyCounts,
+  ) => {
     const discountLine = formatOfferDiscountLine(listing);
-    const saved = savedAmountForListing(listing);
+    const preview = computeRedemptionSavingsForListing(listing, party);
     const { data, error } = await supabase.functions.invoke('verify-redemption', {
       body: {
         action: 'verify_and_redeem',
@@ -289,9 +298,9 @@ const QRScanner: React.FC<QRScannerProps> = ({
         businessName: listing.name,
         discount: discountLine,
         discountLabel: discountLine,
-        savedAmount: saved,
-        originalPrice: listing.original_price,
-        dealPrice: listing.deal_price,
+        savedAmount: preview.savedAmount,
+        originalPrice: preview.totalStandard,
+        dealPrice: preview.totalDeal,
         verifiedBy: user?.id,
       },
     });
@@ -329,6 +338,8 @@ const QRScanner: React.FC<QRScannerProps> = ({
       return;
     }
 
+    const party = partyFromValidityApi(checkData.party);
+
     // Use Edge Function (service role) so this works even when RLS or missing `active` column
     // breaks direct PostgREST queries — same pattern as dashboard get_all_owner_data.
     const { data: mbData, error: mbErr } = await supabase.functions.invoke('manage-business', {
@@ -359,6 +370,8 @@ const QRScanner: React.FC<QRScannerProps> = ({
         discount: b.discount != null ? String(b.discount) : null,
         original_price: b.original_price != null ? Number(b.original_price) : null,
         deal_price: b.deal_price != null ? Number(b.deal_price) : null,
+        pricing_tiers: b.pricing_tiers ?? null,
+        category: b.category != null ? String(b.category) : null,
       }))
       .filter((r) => r.id.length > 0)
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -371,7 +384,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
     }
 
     if (rows.length === 1) {
-      await executeRedeemForListing(rawData, rows[0]);
+      await executeRedeemForListing(rawData, rows[0], party);
       return;
     }
 
@@ -513,9 +526,10 @@ const QRScanner: React.FC<QRScannerProps> = ({
     }
     const listing = ownerListings.find((l) => l.id === selectedListingId);
     if (!listing) return;
+    const party = partyFromValidityApi(verifiedForOfferFlow?.party);
     setVerifying(true);
     try {
-      await executeRedeemForListing(raw, listing);
+      await executeRedeemForListing(raw, listing, party);
     } catch (e: any) {
       setResult({ success: false, error: e?.message || 'Redemption failed.' });
     } finally {
@@ -556,7 +570,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
             <div>
               <p className="text-xs font-bold text-gray-800">{label || 'Voucher Validity'}</p>
               <p className={`text-[10px] font-semibold ${config.textColor}`}>
-                {'businessName' in voucher && voucher.businessName ? voucher.businessName : businessName}
+                {'businessName' in voucher && voucher.businessName ? voucher.businessName : (preferredBusinessName ?? '')}
               </p>
             </div>
           </div>
@@ -782,7 +796,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
               {(r.originalPrice != null && r.dealPrice != null && r.originalPrice > 0) && (
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2"><CreditCard className="w-4 h-4 text-gray-400" /><span className="text-xs text-gray-500">Price</span></div>
+                  <div className="flex items-center gap-2"><CreditCard className="w-4 h-4 text-gray-400" /><span className="text-xs text-gray-500">Group total</span></div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-400 line-through">{r.originalPrice} VT</span>
                     <ArrowRight className="w-3 h-3 text-gray-300" />
@@ -820,8 +834,11 @@ const QRScanner: React.FC<QRScannerProps> = ({
               {/* Savings highlight */}
               {r.savedAmount > 0 && (
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200 text-center">
-                  <p className="text-xs font-semibold text-green-600 mb-1">Tourist Savings</p>
+                  <p className="text-xs font-semibold text-green-600 mb-1">Tourist savings (whole group)</p>
                   <p className="text-3xl font-extrabold text-green-700">{r.savedAmount} <span className="text-lg">VT</span></p>
+                  {r.savingsLine && (
+                    <p className="text-[11px] font-semibold text-green-800 mt-2 leading-snug px-1">{r.savingsLine}</p>
+                  )}
                   <div className="flex items-center justify-center gap-1.5 mt-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-green-500" />
                     <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Redemption Recorded in Database</span>
@@ -1340,12 +1357,25 @@ const QRScanner: React.FC<QRScannerProps> = ({
                 <p className="text-xs text-emerald-800">
                   {verifiedForOfferFlow.tourist?.name} · {getPassDisplayTitle(verifiedForOfferFlow.pass?.type || 'weekly', 'en')}
                 </p>
+                {(() => {
+                  const p = partyFromValidityApi(verifiedForOfferFlow.party);
+                  return (
+                    <p className="text-[11px] text-emerald-900 font-semibold mt-2 pt-2 border-t border-emerald-200/80">
+                      Group on profile: {p.adults} adult{p.adults !== 1 ? 's' : ''}
+                      {p.children > 0 ? `, ${p.children} child${p.children !== 1 ? 'ren' : ''}` : ''}
+                      {p.infants > 0 ? `, ${p.infants} infant${p.infants !== 1 ? 's' : ''}` : ''}
+                      <span className="block font-normal text-emerald-800/90 mt-0.5">Savings below use this party size (from tourist profile).</span>
+                    </p>
+                  );
+                })()}
               </div>
               <p className="text-sm font-bold text-gray-900">Which listing was this discount for?</p>
               <div className="space-y-2 max-h-[min(50vh,320px)] overflow-y-auto pr-1">
                 {ownerListings.map((listing) => {
                   const selected = selectedListingId === listing.id;
                   const line = formatOfferDiscountLine(listing);
+                  const party = partyFromValidityApi(verifiedForOfferFlow.party);
+                  const savings = computeRedemptionSavingsForListing(listing, party);
                   return (
                     <button
                       key={listing.id}
@@ -1359,9 +1389,12 @@ const QRScanner: React.FC<QRScannerProps> = ({
                     >
                       <p className="text-sm font-extrabold text-gray-900">{listing.name}</p>
                       <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{line}</p>
-                      {(listing.original_price != null && listing.deal_price != null) && (
+                      {savings.savedAmount > 0 && (
+                        <p className="text-[11px] font-bold text-teal-800 mt-2 leading-snug">{savings.savingsLine}</p>
+                      )}
+                      {savings.savedAmount <= 0 && (listing.original_price != null && listing.deal_price != null) && (
                         <p className="text-[10px] text-gray-500 mt-1">
-                          {Number(listing.original_price)} VT → {Number(listing.deal_price)} VT
+                          {Number(listing.original_price)} VT → {Number(listing.deal_price)} VT (per person — add tier or profile party for totals)
                         </p>
                       )}
                     </button>
