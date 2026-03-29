@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { businesses as localBusinesses, Business } from '@/data/businesses';
+import { businesses as localBusinesses, Business, publicListingBusinesses } from '@/data/businesses';
 
 import {
   MapPin, Star, X, Phone, Clock, ExternalLink, Navigation,
@@ -250,7 +250,10 @@ const MapView: React.FC = () => {
   const [showLayerPicker, setShowLayerPicker] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
-  const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
+  const allBusinesses = useMemo(
+    () => publicListingBusinesses(dbBusinesses, localBusinesses),
+    [dbBusinesses],
+  );
 
   // Filter businesses by radius and favorites
   const filteredBusinesses = useMemo(() => {

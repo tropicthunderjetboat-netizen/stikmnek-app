@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAppContext, ViewMode } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { businesses as localBusinesses, categories } from '@/data/businesses';
+import { businesses as localBusinesses, categories, publicListingBusinesses } from '@/data/businesses';
 import BusinessCard from './BusinessCard';
 import AdvancedSearch, { SortOption } from './AdvancedSearch';
 import { Search, SlidersHorizontal, LayoutGrid, List, Navigation, Loader2, Award } from 'lucide-react';
@@ -97,8 +97,10 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [whatsappFilter, setWhatsappFilter] = useState(false);
 
-  // Use DB businesses if loaded, otherwise fallback to local
-  const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
+  const allBusinesses = useMemo(
+    () => publicListingBusinesses(dbBusinesses, localBusinesses),
+    [dbBusinesses],
+  );
 
   const maxPrice = useMemo(() => Math.max(...allBusinesses.map(b => b.dealPrice || b.originalPrice), 50000), [allBusinesses]);
 

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { businesses as localBusinesses } from '@/data/businesses';
+import { businesses as localBusinesses, publicListingBusinesses } from '@/data/businesses';
 import { Star, TrendingUp, Award, Crown, Sparkles, ArrowRight, ChevronDown, ChevronUp, Flame, Eye, Info, Trophy, Medal } from 'lucide-react';
 import { formatVT } from '@/lib/utils';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
@@ -34,7 +34,10 @@ const FeaturedLeaderboard: React.FC = () => {
   const [showAll, setShowAll] = useState(false);
   const [showScoring, setShowScoring] = useState(false);
 
-  const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
+  const allBusinesses = useMemo(
+    () => publicListingBusinesses(dbBusinesses, localBusinesses),
+    [dbBusinesses],
+  );
 
   // Calculate leaderboard scores
   const leaderboard: ScoredBusiness[] = useMemo(() => {

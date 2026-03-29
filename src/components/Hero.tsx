@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { businesses as localBusinesses } from '@/data/businesses';
+import { businesses as localBusinesses, publicListingBusinesses } from '@/data/businesses';
 import { ArrowRight, MapPin, Star, Users } from 'lucide-react';
 
 const Hero: React.FC = () => {
@@ -9,20 +9,22 @@ const Hero: React.FC = () => {
 
   const scrollToListBusiness = () => {
     if (!user) {
-      setShowAuth(true);
       setAuthMode('signup-business');
+      setShowAuth(true);
       return;
     }
     document.getElementById('list-business')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const openTouristSignup = () => {
-    setShowAuth(true);
     setAuthMode('signup-tourist');
+    setShowAuth(true);
   };
 
-  // Use real business count from DB, fallback to local
-  const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
+  const allBusinesses = useMemo(
+    () => publicListingBusinesses(dbBusinesses, localBusinesses),
+    [dbBusinesses],
+  );
   const businessCount = allBusinesses.length;
 
   // Calculate average discount

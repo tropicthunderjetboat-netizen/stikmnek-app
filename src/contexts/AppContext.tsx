@@ -26,7 +26,8 @@ export type ViewMode =
   | 'payment-confirmation'
   | 'business-dashboard'
   | 'help'
-  | 'complete-profile';
+  | 'complete-profile'
+  | 'complete-business-profile';
 
 export type PassType = 'daily' | 'weekly' | 'monthly' | 'mega_group' | null;
 
@@ -203,6 +204,9 @@ interface AppContextType {
   refreshUserPass: () => Promise<void>;
   /** Reload pass redemptions from DB (e.g. after QR redemption). */
   refreshRedemptions: () => Promise<void>;
+  /** null = not loaded; business owners only — true if `businesses` has a row for this user. */
+  businessOwnerHasBusinessRow: boolean | null;
+  refreshBusinessOwnerRowStatus: () => Promise<void>;
   userLocation: GeoPosition | null;
   locationLoading: boolean;
   locationError: string | null;
@@ -234,6 +238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [dbBusinesses, setDbBusinesses] = useState<Business[]>([]);
   const [dbReviews, setDbReviews] = useState<DBReview[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [businessOwnerHasBusinessRow, setBusinessOwnerHasBusinessRow] = useState<boolean | null>(null);
 
   // Geolocation state
   const [userLocation, setUserLocation] = useState<GeoPosition | null>(null);
@@ -337,6 +342,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ownerId: b.owner_id || null,
           superStarCount: Number(b.super_star_count) || 0,
           pricingTiers: b.pricing_tiers ?? null,
+          active: b.active !== false,
         }));
         setDbBusinesses(mapped);
         setDataLoaded(true);
@@ -552,7 +558,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         profile = { ...profile, role: 'admin', user_type: 'admin' };
       }
     } else if (profile) {
-      finalRole = extractRole(profile);
+      let dbRole = extractRole(profile);
+      const metaType = metadata?.user_type;
+      // Sign-up race: SIGNED_IN can run before directProfileInsert() flips user_type to business.
+      if (metaType === 'business' && dbRole === 'tourist') {
+        dbRole = 'business';
+        profile = { ...profile, role: 'business', user_type: 'business' };
+        console.log('[resolveRole] Auth metadata business overrides transient tourist DB row');
+        supabase
+          .from('user_profiles')
+          .update({
+            user_type: 'business',
+            role: 'business',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', userId)
+          .then(() => console.log('[resolveRole] Synced business role to user_profiles'))
+          .catch((e) => console.warn('[resolveRole] Business role sync failed:', e?.message));
+      }
+      finalRole = dbRole;
       resolvedFromDb = true;
       console.log('[resolveRole] Using DB role:', finalRole);
     } else if (!dbQuerySucceeded && lastDbResolvedRoleRef.current) {
@@ -800,6 +824,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               setUserProfile(null);
               setFavorites([]);
               setRedemptions([]);
+              setBusinessOwnerHasBusinessRow(null);
               setAuthLoading(false);
               break;
             }
@@ -942,6 +967,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .channel('realtime-businesses')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'businesses' }, (payload) => {
         const b = payload.new as any;
+        if (b.active === false) return;
         const newBiz: Business = {
           id: b.id,
           name: b.name,
@@ -970,6 +996,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ownerId: b.owner_id || null,
           superStarCount: Number(b.super_star_count) || 0,
           pricingTiers: b.pricing_tiers ?? null,
+          active: true,
         };
         setDbBusinesses(prev => {
           if (prev.some(existing => existing.id === newBiz.id)) return prev;
@@ -1130,6 +1157,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCart(null);
     setCurrentView('home');
     setSidebarOpen(false);
+    setBusinessOwnerHasBusinessRow(null);
 
     try {
       await supabase.auth.signOut({ scope: 'local' });
@@ -1338,6 +1366,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [user?.id, loadRedemptions]);
 
+  const refreshBusinessOwnerRowStatus = useCallback(async () => {
+    const uid = user?.id;
+    const utype = user?.type;
+    if (!uid || utype !== 'business') {
+      setBusinessOwnerHasBusinessRow(null);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_id', uid)
+        .limit(1);
+      if (error) throw error;
+      setBusinessOwnerHasBusinessRow((data?.length ?? 0) > 0);
+    } catch (e) {
+      console.warn('[refreshBusinessOwnerRowStatus]', e);
+      setBusinessOwnerHasBusinessRow(false);
+    }
+  }, [user?.id, user?.type]);
+
+  useEffect(() => {
+    void refreshBusinessOwnerRowStatus();
+  }, [refreshBusinessOwnerRowStatus]);
+
   return (
     <AppContext.Provider
       value={{
@@ -1361,6 +1414,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         refreshUserPass,
         refreshRedemptions,
         refreshUserProfile,
+        businessOwnerHasBusinessRow,
+        refreshBusinessOwnerRowStatus,
         userLocation, locationLoading, locationError,
         requestUserLocation, getDistanceTo,
       }}

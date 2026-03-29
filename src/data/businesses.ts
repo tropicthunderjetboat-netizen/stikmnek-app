@@ -33,6 +33,15 @@ export interface Business {
   superStarCount?: number;
   /** Tiered pricing JSON from `pricing_tiers` (Tours / Activities). */
   pricingTiers?: unknown;
+  /** From DB `active`; false = hidden from public listings (e.g. onboarding stub). */
+  active?: boolean;
+}
+
+/** Tourist-facing lists: hide `active === false` DB rows; keep local fallback when DB empty or only stubs. */
+export function publicListingBusinesses(db: Business[], local: Business[]): Business[] {
+  if (db.length === 0) return local;
+  const pub = db.filter((b) => b.active !== false);
+  return pub.length > 0 ? pub : local;
 }
 
 

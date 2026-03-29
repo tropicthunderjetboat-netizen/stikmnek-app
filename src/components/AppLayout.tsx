@@ -21,6 +21,7 @@ import PayPalReturnHandler from './PayPalReturnHandler';
 import FloatingPassButton from './FloatingPassButton';
 import LoadingSkeleton from './LoadingSkeleton';
 import CompleteTouristProfile from './CompleteTouristProfile';
+import CompleteBusinessProfile from './CompleteBusinessProfile';
 
 // ── Lazy-loaded route components ──
 const Dashboard = React.lazy(() => import('./Dashboard'));
@@ -30,7 +31,14 @@ const BusinessOwnerDashboard = React.lazy(() => import('./BusinessOwnerDashboard
 const HelpCenter = React.lazy(() => import('./HelpCenter'));
 
 const AppLayout: React.FC = () => {
-  const { currentView, user, userProfile, authLoading, setCurrentView } = useAppContext();
+  const {
+    currentView,
+    user,
+    userProfile,
+    authLoading,
+    setCurrentView,
+    businessOwnerHasBusinessRow,
+  } = useAppContext();
   const prevViewRef = useRef(currentView);
 
   // ─── Role-based view access control ───
@@ -52,13 +60,19 @@ const AppLayout: React.FC = () => {
       return;
     }
 
+    // Business onboarding screen — do not bounce to dashboard until profile row exists
+    if (role === 'business' && currentView === 'business-dashboard' && businessOwnerHasBusinessRow === false) {
+      setCurrentView('complete-business-profile');
+      return;
+    }
+
     // Only admins can access admin panel
     if (currentView === 'admin' && role !== 'admin') {
       if (!userProfile) return;
       setCurrentView('home');
       return;
     }
-  }, [currentView, user, userProfile, authLoading, setCurrentView]);
+  }, [currentView, user, userProfile, authLoading, businessOwnerHasBusinessRow, setCurrentView]);
 
   // ─── Profile-First gating (Tourists) ───
   useEffect(() => {
@@ -77,6 +91,25 @@ const AppLayout: React.FC = () => {
       setCurrentView('complete-profile');
     }
   }, [user, userProfile, authLoading, currentView, setCurrentView]);
+
+  // ─── Profile-First gating (Business owners — businesses.owner_id row) ───
+  useEffect(() => {
+    if (!user || authLoading) return;
+    const role = userProfile?.role || user.type || 'tourist';
+    if (role !== 'business') return;
+    if (businessOwnerHasBusinessRow === null) return;
+
+    if (businessOwnerHasBusinessRow === false && currentView !== 'complete-business-profile') {
+      setCurrentView('complete-business-profile');
+    }
+  }, [
+    user,
+    userProfile,
+    authLoading,
+    businessOwnerHasBusinessRow,
+    currentView,
+    setCurrentView,
+  ]);
 
   // ─── Scroll to top on view change ───
   useEffect(() => {
@@ -101,6 +134,8 @@ const AppLayout: React.FC = () => {
     switch (currentView) {
       case 'complete-profile':
         return <CompleteTouristProfile />;
+      case 'complete-business-profile':
+        return <CompleteBusinessProfile />;
       case 'business-detail':
         return <BusinessDetail />;
       case 'deals':
@@ -150,13 +185,17 @@ const AppLayout: React.FC = () => {
     }
   };
 
-  const hideMainNav = currentView === 'business-dashboard' || currentView === 'complete-profile';
+  const hideMainNav =
+    currentView === 'business-dashboard' ||
+    currentView === 'complete-profile' ||
+    currentView === 'complete-business-profile';
   const hideFooter =
     currentView === 'admin' ||
     currentView === 'checkout' ||
     currentView === 'payment-confirmation' ||
     currentView === 'business-dashboard' ||
-    currentView === 'complete-profile';
+    currentView === 'complete-profile' ||
+    currentView === 'complete-business-profile';
 
   return (
     <div className="min-h-screen bg-white">

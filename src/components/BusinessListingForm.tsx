@@ -155,6 +155,41 @@ const BusinessListingForm: React.FC = () => {
     }
   }, [form.category]);
 
+  // Pre-fill from owner's first businesses row (onboarding stub or approved listing)
+  useEffect(() => {
+    if (!user?.id || user.type !== 'business') return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('name, category, email, phone, whatsapp_number, location')
+        .eq('owner_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled || error || !data) return;
+      const validCats = ['dining', 'activities', 'tours', 'shopping', 'spa', 'accommodation'];
+      const cat =
+        typeof data.category === 'string' && validCats.includes(data.category)
+          ? data.category
+          : 'dining';
+      setForm((prev) => ({
+        ...prev,
+        name: prev.name.trim() ? prev.name : (data.name as string) || prev.name,
+        category: prev.name.trim() ? prev.category : cat,
+        email: prev.email.trim() ? prev.email : (data.email as string) || prev.email,
+        phone: prev.phone.trim() ? prev.phone : (data.phone as string) || prev.phone,
+        whatsappNumber: prev.whatsappNumber.trim()
+          ? prev.whatsappNumber
+          : (data.whatsapp_number as string) || prev.whatsappNumber,
+        address: prev.address.trim() ? prev.address : (data.location as string) || prev.address,
+      }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.type]);
+
   // Auto-calculate end date
   const selectedDuration = DURATION_OPTIONS.find(d => d.value === form.listingDuration);
   const discountValidUntil = selectedDuration

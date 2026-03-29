@@ -1,12 +1,14 @@
 import React, { useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { businesses as localBusinesses, categories } from '@/data/businesses';
+import { businesses as localBusinesses, categories, publicListingBusinesses } from '@/data/businesses';
 
 const CategoryShowcase: React.FC = () => {
   const { language, setSelectedCategory, setCurrentView, dbBusinesses, dataLoaded } = useAppContext();
 
-  // Use DB businesses if loaded, otherwise fallback to local
-  const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
+  const allBusinesses = useMemo(
+    () => publicListingBusinesses(dbBusinesses, localBusinesses),
+    [dbBusinesses],
+  );
 
   // Compute real-time category counts
   const categoryCounts = useMemo(() => {
