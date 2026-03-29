@@ -59,18 +59,33 @@ COMMENT ON TABLE public.business_offerings IS
   'Discount / tour / deal line items owned by a row in public.businesses.';
 
 -- ─── RLS: read profile row when it has an active public listing ───
+-- Use SECURITY DEFINER helper so we do not subquery business_offerings under the
+-- invoker's RLS (owner_* policies on offerings reference businesses → recursion).
 DROP POLICY IF EXISTS "businesses_select_for_active_offerings" ON public.businesses;
+
+CREATE OR REPLACE FUNCTION public.business_has_active_public_offering(p_business_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.business_offerings o
+    WHERE o.business_id = p_business_id AND o.active IS TRUE
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.business_has_active_public_offering(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.business_has_active_public_offering(uuid) TO anon, authenticated;
+
 CREATE POLICY "businesses_select_for_active_offerings"
   ON public.businesses FOR SELECT
   TO anon, authenticated
-  USING (
-    EXISTS (
-      SELECT 1
-      FROM public.business_offerings o
-      WHERE o.business_id = businesses.id
-        AND o.active = true
-    )
-  );
+  USING (public.business_has_active_public_offering(id));
+
+COMMENT ON FUNCTION public.business_has_active_public_offering(uuid) IS
+  'RLS helper: true if profile has at least one active offering (bypasses offering↔business policy cycle).';
 
 COMMENT ON POLICY "businesses_select_for_active_offerings" ON public.businesses IS
   'Public/app can load master profile for embed joins when at least one active offering exists (stub profiles may have active = false).';
