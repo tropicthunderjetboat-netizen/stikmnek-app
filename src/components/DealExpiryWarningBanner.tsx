@@ -53,14 +53,33 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
       const sevenDaysFromNow = new Date(now);
       sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
-      // Per-deal dates live on business_offerings; join profile for owner filter.
+      // Per-deal dates on business_offerings; resolve profile ids first (avoid
+      // `.eq('businesses.owner_id', …)` — not reliable in PostgREST).
+      const { data: profiles, error: pe } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_id', userId);
+
+      if (pe) {
+        console.error('[DealExpiryWarning] businesses query:', pe);
+        setLoading(false);
+        return;
+      }
+
+      const profileIds = (profiles || []).map((p: { id: string }) => p.id).filter(Boolean);
+      if (profileIds.length === 0) {
+        setExpiringDeals([]);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('business_offerings')
         .select(`
           id, title, discount, original_price, deal_price, discount_valid_until, image,
           businesses!inner ( owner_id, category, name )
         `)
-        .eq('businesses.owner_id', userId)
+        .in('business_id', profileIds)
         .not('discount_valid_until', 'is', null)
         .lte('discount_valid_until', sevenDaysFromNow.toISOString().split('T')[0])
         .gte('discount_valid_until', now.toISOString().split('T')[0]);

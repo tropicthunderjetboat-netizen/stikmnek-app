@@ -362,17 +362,26 @@ const QRScanner: React.FC<QRScannerProps> = ({
       };
     };
 
-    const { data: offData, error: offErr } = await supabase
-      .from('business_offerings')
-      .select(
-        'id, title, discount, original_price, deal_price, pricing_tiers, active, businesses!inner(id, owner_id, category, name, active)',
-      )
-      .eq('businesses.owner_id', user.id);
+    let offData: OfferingJoin[] | null = null;
+    const { data: profileRows, error: profErr } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('owner_id', user.id);
+    const profileIds = (profileRows || []).map((p: { id: string }) => p.id).filter(Boolean);
+    if (!profErr && profileIds.length > 0) {
+      const { data, error: offErr } = await supabase
+        .from('business_offerings')
+        .select(
+          'id, title, discount, original_price, deal_price, pricing_tiers, active, businesses!inner(id, owner_id, category, name, active)',
+        )
+        .in('business_id', profileIds);
+      if (!offErr && data?.length) offData = data as OfferingJoin[];
+    }
 
     let rows: OwnerListingOffer[] = [];
-    if (!offErr && offData && (offData as OfferingJoin[]).length > 0) {
-      rows = (offData as OfferingJoin[])
-        .filter((o) => o.active !== false && o.businesses?.active !== false)
+    if (offData && offData.length > 0) {
+      rows = offData
+        .filter((o) => o.active !== false)
         .map((o) => ({
           id: String(o.id ?? ''),
           profileBusinessId: String(o.businesses?.id ?? ''),
