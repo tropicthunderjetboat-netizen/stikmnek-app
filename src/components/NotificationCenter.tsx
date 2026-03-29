@@ -98,7 +98,10 @@ const NotificationCenter: React.FC = () => {
     markAsRead(n.id);
     if (n.link_view) {
       if (n.link_business_id) {
-        const biz = dbBusinesses.find(b => b.id === n.link_business_id);
+        const bid = n.link_business_id;
+        const biz = dbBusinesses.find(
+          (b) => b.id === bid || b.profileBusinessId === bid,
+        );
         if (biz) setSelectedBusiness(biz);
       }
       setCurrentView(n.link_view as any);

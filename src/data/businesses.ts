@@ -40,7 +40,10 @@ export interface Business {
   superStarCount?: number;
   /** Tiered pricing JSON from `pricing_tiers` (Tours / Activities). */
   pricingTiers?: unknown;
-  /** From DB `active`; false = hidden from public listings (e.g. onboarding stub). */
+  /**
+   * Listing visibility: for rows from `business_offerings`, this follows the offering’s `active`.
+   * Master profile `businesses.active` may differ (e.g. stub false while deals are live).
+   */
   active?: boolean;
 }
 

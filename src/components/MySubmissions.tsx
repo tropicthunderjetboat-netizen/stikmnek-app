@@ -14,6 +14,7 @@ import {
   looksLikeRichDescriptionHtml,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
+import { mapJoinedOfferingToBusiness } from '@/lib/businessOfferingMap';
 
 export interface Submission {
   id: string;
@@ -33,6 +34,7 @@ export interface Submission {
   admin_notes: string | null;
   reviewed_at: string | null;
   created_at: string;
+  business_id?: string | null;
 }
 
 interface MySubmissionsProps {
@@ -83,9 +85,44 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
       if (!user?.id) return;
       const norm = (s: string) => s.trim().toLowerCase();
       const targetName = norm(submission.name);
+      const linkProfileId = submission.business_id ? String(submission.business_id) : '';
+
+      if (submission.status === 'approved' && linkProfileId) {
+        const { data: offRows, error } = await supabase
+          .from('business_offerings')
+          .select(`
+            id, title, description, description_fr, description_bi, discount, original_price, deal_price,
+            image, map_url, website, discount_valid_from, discount_valid_until, whatsapp_number,
+            pricing_tiers, tags, featured, active,
+            businesses!inner (
+              id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone,
+              email, contact_email, business_email, whatsapp_number, rating, review_count,
+              super_star_count, featured, active, map_url, website
+            )
+          `)
+          .eq('business_id', linkProfileId)
+          .order('created_at', { ascending: false });
+
+        if (!error && offRows && offRows.length > 0) {
+          const rows = offRows as Record<string, unknown>[];
+          const byTitle = rows.find(
+            (r) => norm(String((r.title as string) || '')) === targetName,
+          );
+          const chosen = byTitle || rows[0];
+          const b = chosen.businesses as Record<string, unknown> | undefined;
+          if (b && chosen) {
+            setSelectedBusiness(mapJoinedOfferingToBusiness(chosen, b, SUPABASE_URL));
+            setCurrentView('business-detail');
+            return;
+          }
+        }
+      }
 
       let biz: Business | undefined = dbBusinesses.find(
-        (b) => b.ownerId === user.id && norm(b.name) === targetName,
+        (b) =>
+          b.ownerId === user.id &&
+          (norm(b.name) === targetName ||
+            (linkProfileId && b.profileBusinessId === linkProfileId)),
       );
 
       if (!biz) {

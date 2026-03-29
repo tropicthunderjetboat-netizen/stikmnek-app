@@ -53,11 +53,14 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
       const sevenDaysFromNow = new Date(now);
       sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
 
-      // Query businesses owned by this user with discount_valid_until within 7 days
+      // Per-deal dates live on business_offerings; join profile for owner filter.
       const { data, error } = await supabase
-        .from('businesses')
-        .select('id, name, discount, original_price, deal_price, discount_valid_until, category, image')
-        .eq('owner_id', userId)
+        .from('business_offerings')
+        .select(`
+          id, title, discount, original_price, deal_price, discount_valid_until, image,
+          businesses!inner ( owner_id, category, name )
+        `)
+        .eq('businesses.owner_id', userId)
         .not('discount_valid_until', 'is', null)
         .lte('discount_valid_until', sevenDaysFromNow.toISOString().split('T')[0])
         .gte('discount_valid_until', now.toISOString().split('T')[0]);
@@ -69,20 +72,24 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
       }
 
       if (data && data.length > 0) {
-        const deals: ExpiringDeal[] = data.map((b: any) => {
-          const expiryDate = new Date(b.discount_valid_until + 'T23:59:59');
+        const deals: ExpiringDeal[] = data.map((row: Record<string, unknown>) => {
+          const b = row.businesses as Record<string, unknown> | undefined;
+          const expiryDate = new Date(String(row.discount_valid_until) + 'T23:59:59');
           const diffMs = expiryDate.getTime() - now.getTime();
           const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+          const title = String(row.title || '').trim();
+          const venue = String(b?.name || '').trim();
+          const displayName = title || venue || 'Listing';
 
           return {
-            id: b.id,
-            name: b.name,
-            discount: b.discount || '',
-            original_price: Number(b.original_price) || 0,
-            deal_price: Number(b.deal_price) || 0,
-            discount_valid_until: b.discount_valid_until,
-            category: b.category || '',
-            image: b.image || '',
+            id: String(row.id),
+            name: displayName,
+            discount: String(row.discount ?? ''),
+            original_price: Number(row.original_price) || 0,
+            deal_price: Number(row.deal_price) || 0,
+            discount_valid_until: String(row.discount_valid_until),
+            category: String(b?.category ?? ''),
+            image: String(row.image ?? ''),
             daysRemaining,
           };
         });

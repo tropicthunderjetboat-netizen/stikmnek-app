@@ -18,7 +18,6 @@ export function mapJoinedOfferingToBusiness(
   b: Record<string, unknown>,
   supabaseUrl: string,
 ): Business {
-  const bActive = b.active !== false;
   const oActive = o.active !== false;
   const cat = asCategory(b.category);
   const img = (o.image as string) || '';
@@ -53,7 +52,8 @@ export function mapJoinedOfferingToBusiness(
     ownerId: (b.owner_id as string) || null,
     superStarCount: Number(b.super_star_count) || 0,
     pricingTiers: o.pricing_tiers ?? null,
-    active: bActive && oActive,
+    /** Tourist discovery uses offering `active`; profile `active` is separate (stub / owner hide). */
+    active: oActive,
     profileName: String(b.name ?? '').trim() || undefined,
   };
 }

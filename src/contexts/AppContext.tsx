@@ -360,7 +360,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const mapped: Business[] = [];
         for (const row of offRows as Record<string, unknown>[]) {
           const b = row.businesses as Record<string, unknown> | null | undefined;
-          if (!b || b.active === false) continue;
+          if (!b) continue;
+          // Public deals are driven by the offering row. Master profile may stay
+          // `active: false` (onboarding stub) while offers are live.
           if (row.active === false) continue;
           mapped.push(mapJoinedOfferingToBusiness(row, b, SUPABASE_URL));
         }
