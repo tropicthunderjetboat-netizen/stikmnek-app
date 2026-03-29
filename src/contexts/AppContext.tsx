@@ -347,7 +347,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             whatsapp_number,
             rating,
             review_count,
-            super_star_count,
             featured,
             active,
             map_url,
