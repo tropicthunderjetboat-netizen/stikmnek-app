@@ -356,6 +356,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `)
         .order('featured', { ascending: false });
 
+      if (offErr) {
+        console.warn('[loadBusinesses] business_offerings:', offErr.message || offErr);
+      }
+
       if (!offErr && offRows && offRows.length > 0) {
         const mapped: Business[] = [];
         for (const row of offRows as Record<string, unknown>[]) {

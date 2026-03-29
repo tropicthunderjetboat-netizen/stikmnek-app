@@ -41,6 +41,18 @@ interface MySubmissionsProps {
   onNewStatusChange?: (count: number) => void;
 }
 
+/** PostgREST select for live listing (offer + profile); source of truth vs businesses stub. */
+const LIVE_OFFERING_SELECT = `
+  id, title, description, description_fr, description_bi, discount, original_price, deal_price,
+  image, map_url, website, discount_valid_from, discount_valid_until, whatsapp_number,
+  pricing_tiers, tags, featured, active,
+  businesses!inner (
+    id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone,
+    email, contact_email, business_email, whatsapp_number, rating, review_count,
+    super_star_count, featured, active, map_url, website
+  )
+`;
+
 /** Map DB row → app Business (matches AppContext loadBusinesses). */
 function mapDbRowToBusiness(row: Record<string, unknown>): Business {
   return {
@@ -87,28 +99,54 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
       const targetName = norm(submission.name);
       const linkProfileId = submission.business_id ? String(submission.business_id) : '';
 
-      if (submission.status === 'approved' && linkProfileId) {
-        const { data: offRows, error } = await supabase
-          .from('business_offerings')
-          .select(`
-            id, title, description, description_fr, description_bi, discount, original_price, deal_price,
-            image, map_url, website, discount_valid_from, discount_valid_until, whatsapp_number,
-            pricing_tiers, tags, featured, active,
-            businesses!inner (
-              id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone,
-              email, contact_email, business_email, whatsapp_number, rating, review_count,
-              super_star_count, featured, active, map_url, website
-            )
-          `)
-          .eq('business_id', linkProfileId)
-          .order('created_at', { ascending: false });
+      const pickOfferingRow = (rows: Record<string, unknown>[]) => {
+        const byTitle = rows.find(
+          (r) => norm(String((r.title as string) || '')) === targetName,
+        );
+        if (byTitle) return byTitle;
+        const byVenue = rows.find((r) => {
+          const prof = r.businesses as Record<string, unknown> | undefined;
+          return prof && norm(String(prof.name || '')) === targetName;
+        });
+        return byVenue || rows[0];
+      };
 
-        if (!error && offRows && offRows.length > 0) {
-          const rows = offRows as Record<string, unknown>[];
-          const byTitle = rows.find(
-            (r) => norm(String((r.title as string) || '')) === targetName,
+      // Approved live data lives on business_offerings (profile may be an empty stub).
+      if (submission.status === 'approved') {
+        let rows: Record<string, unknown>[] | null = null;
+        let lastError: unknown = null;
+
+        if (linkProfileId) {
+          const { data, error } = await supabase
+            .from('business_offerings')
+            .select(LIVE_OFFERING_SELECT)
+            .eq('business_id', linkProfileId)
+            .order('created_at', { ascending: false });
+          if (error) lastError = error;
+          else if (data?.length) rows = data as Record<string, unknown>[];
+        }
+
+        if ((!rows || rows.length === 0) && user.id) {
+          const { data, error } = await supabase
+            .from('business_offerings')
+            .select(LIVE_OFFERING_SELECT)
+            .eq('businesses.owner_id', user.id)
+            .order('created_at', { ascending: false });
+          if (error) lastError = error;
+          else if (data?.length) rows = data as Record<string, unknown>[];
+        }
+
+        if (lastError) {
+          console.error('[MySubmissions] business_offerings:', lastError);
+          toast.error(
+            language === 'en'
+              ? 'Could not load listing details. If this persists, check database access policies.'
+              : 'Impossible de charger les détails de l’annonce.',
           );
-          const chosen = byTitle || rows[0];
+        }
+
+        if (rows && rows.length > 0) {
+          const chosen = pickOfferingRow(rows);
           const b = chosen.businesses as Record<string, unknown> | undefined;
           if (b && chosen) {
             setSelectedBusiness(mapJoinedOfferingToBusiness(chosen, b, SUPABASE_URL));

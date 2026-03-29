@@ -21,6 +21,9 @@ $$;
 REVOKE ALL ON FUNCTION public.business_has_active_public_offering(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.business_has_active_public_offering(uuid) TO anon, authenticated;
 
+-- Ensure helper sees offerings regardless of invoker RLS (anon public reads).
+ALTER FUNCTION public.business_has_active_public_offering(uuid) SET row_security = off;
+
 CREATE POLICY "businesses_select_for_active_offerings"
   ON public.businesses FOR SELECT
   TO anon, authenticated

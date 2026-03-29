@@ -48,6 +48,7 @@ export function getBusinessImageUrl(
   const val = (imageOrPath || '').trim();
   if (!val) return '';
   if (val.startsWith('http://') || val.startsWith('https://')) return val;
+  // Allow storage paths with folders even without a file extension (e.g. UUID keys).
   if (!IMAGE_EXT.test(val) && !val.includes('/')) return '';
   const base = supabaseUrl.replace(/\/$/, '');
   const path = val.replace(/^\//, '');
