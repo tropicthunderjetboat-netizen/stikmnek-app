@@ -311,6 +311,71 @@ Deno.serve(async (req) => {
       return jsonResponse({ businesses: data || [] });
     }
 
+    // ─── GET_OWNER_OFFERINGS_LIVE ───
+    // Join offerings + profiles using service role (avoids client RLS / PostgREST issues).
+    if (action === 'get_owner_offerings_live') {
+      const userId = body.userId || authUser.id;
+      if (!userId) return errorResponse('Missing userId');
+      if (String(userId) !== String(authUser.id)) {
+        return errorResponse('Forbidden', 403);
+      }
+      const filterBusinessId =
+        body.businessId != null && String(body.businessId).trim() !== ''
+          ? String(body.businessId).trim()
+          : null;
+
+      const profileSelect =
+        'id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone, email, contact_email, business_email, whatsapp_number, rating, review_count, super_star_count, featured, active, map_url, website, tags';
+      const offeringSelect =
+        'id, business_id, title, description, description_fr, description_bi, discount, original_price, deal_price, image, map_url, website, discount_valid_from, discount_valid_until, whatsapp_number, pricing_tiers, tags, featured, active, created_at';
+
+      const { data: profiles, error: pErr } = await supabase
+        .from('businesses')
+        .select(profileSelect)
+        .eq('owner_id', userId);
+
+      if (pErr) {
+        console.error('[manage-business] get_owner_offerings_live profiles:', pErr);
+        return errorResponse(pErr.message, 500);
+      }
+
+      const plist = profiles || [];
+      const profileIds = plist.map((p: { id: string }) => p.id).filter(Boolean);
+      if (profileIds.length === 0) {
+        return jsonResponse({ success: true, items: [] });
+      }
+
+      if (filterBusinessId && !profileIds.includes(filterBusinessId)) {
+        return jsonResponse({ success: true, items: [] });
+      }
+
+      const offBase = supabase.from('business_offerings').select(offeringSelect);
+      const offFiltered = filterBusinessId
+        ? offBase.eq('business_id', filterBusinessId)
+        : offBase.in('business_id', profileIds);
+
+      const { data: offerings, error: oErr } = await offFiltered.order('created_at', {
+        ascending: false,
+      });
+      if (oErr) {
+        console.error('[manage-business] get_owner_offerings_live offerings:', oErr);
+        return errorResponse(oErr.message, 500);
+      }
+
+      const byBiz = new Map(plist.map((p: { id: string }) => [p.id, p]));
+      const items = (offerings || [])
+        .map((o: { business_id: string }) => {
+          const b = byBiz.get(o.business_id);
+          if (!b) return null;
+          return { offering: o, business: b };
+        })
+        .filter((x: unknown): x is { offering: Record<string, unknown>; business: Record<string, unknown> } =>
+          x != null
+        );
+
+      return jsonResponse({ success: true, items });
+    }
+
     // ─── ATTACH_PENDING_PHOTOS ───
     // Attach uploaded photo rows to an existing pending_businesses record.
     // Used after RPC insert_pending_business to guarantee business_photos rows are created server-side.

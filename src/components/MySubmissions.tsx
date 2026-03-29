@@ -101,8 +101,47 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
         return byTitle || rows[0];
       };
 
-      // Approved live data: business_offerings + separate businesses row (no embed).
+      // Approved live data: edge (service role) first, then direct PostgREST fallback.
       if (submission.status === 'approved') {
+        type LiveItem = {
+          offering: Record<string, unknown>;
+          business: Record<string, unknown>;
+        };
+        const { data: edgeData, error: edgeErr } = await supabase.functions.invoke(
+          'manage-business',
+          {
+            body: {
+              action: 'get_owner_offerings_live',
+              userId: user.id,
+              ...(linkProfileId ? { businessId: linkProfileId } : {}),
+            },
+          },
+        );
+        const edgePayload = edgeData as
+          | { success?: boolean; items?: LiveItem[]; error?: string }
+          | null
+          | undefined;
+        if (edgeErr) {
+          console.error('[MySubmissions] get_owner_offerings_live:', edgeErr, edgeData);
+        } else if (
+          edgePayload?.success &&
+          Array.isArray(edgePayload.items) &&
+          edgePayload.items.length > 0
+        ) {
+          const items = edgePayload.items.filter((x) => x?.offering && x?.business);
+          if (items.length > 0) {
+            const byTitle = items.find(
+              (x) => norm(String((x.offering.title as string) || '')) === targetName,
+            );
+            const pick = byTitle || items[0];
+            setSelectedBusiness(
+              mapJoinedOfferingToBusiness(pick.offering, pick.business, SUPABASE_URL),
+            );
+            setCurrentView('business-detail');
+            return;
+          }
+        }
+
         let offRows: Record<string, unknown>[] | null = null;
         let loadError: unknown = null;
 
