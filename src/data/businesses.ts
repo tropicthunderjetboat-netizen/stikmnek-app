@@ -2,6 +2,13 @@ export type Category = 'dining' | 'activities' | 'tours' | 'shopping' | 'spa' | 
 
 export interface Business {
   id: string;
+  /**
+   * Master `businesses` row when this listing row comes from `business_offerings`.
+   * Use for favorites, reviews, `business_photos`, and redemption APIs (still keyed by profile id).
+   */
+  profileBusinessId?: string;
+  /** Trading / venue name from profile (optional subtitle vs offer `title`). */
+  profileName?: string;
   name: string;
   category: Category;
   description: string;

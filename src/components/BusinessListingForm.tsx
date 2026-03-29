@@ -106,6 +106,32 @@ const BusinessListingForm: React.FC = () => {
     listingDuration: '1_month',
   });
 
+  /** When the owner has exactly one profile, link new pending rows to it (multi-offer workflow). */
+  const [ownerProfileBusinessId, setOwnerProfileBusinessId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setOwnerProfileBusinessId(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_id', user.id);
+      if (cancelled || error) return;
+      const rows = data || [];
+      if (rows.length === 1 && rows[0]?.id) {
+        setOwnerProfileBusinessId(String(rows[0].id));
+      } else {
+        setOwnerProfileBusinessId(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
 
   // Auto-calculate deal price and discount label when original price or discount % changes
@@ -359,6 +385,7 @@ const BusinessListingForm: React.FC = () => {
         p_discount_valid_until: discountValidUntil || null,
         p_whatsapp_number: form.whatsappNumber || null,
         p_pricing_tiers: tiersPayload,
+        p_business_id: ownerProfileBusinessId,
       });
 
       if (!rpcError && rpcId) {

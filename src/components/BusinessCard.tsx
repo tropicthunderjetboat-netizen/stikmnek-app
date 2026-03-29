@@ -7,6 +7,7 @@ import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { toast } from 'sonner';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 
 interface BusinessCardProps {
   business: Business;
@@ -32,11 +33,12 @@ const SuperStarBadge: React.FC<{ count: number }> = ({ count }) => {
 
 const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false }) => {
   const { language, favorites, toggleFavorite, setSelectedBusiness, setCurrentView, user, setShowAuth, setAuthMode, dbReviews } = useAppContext();
+  const profileId = profileBusinessIdFor(business);
 
   // Compute super star count: use DB field if available, otherwise count from reviews
   const superStarCount = (business.superStarCount && business.superStarCount > 0)
     ? business.superStarCount
-    : dbReviews.filter(r => r.business_id === business.id && r.has_super_star).length;
+    : dbReviews.filter(r => r.business_id === profileId && r.has_super_star).length;
 
   const hasWhatsApp = digitsForWaMe(getBusinessWhatsAppRaw(business)).length >= 5;
 
@@ -52,7 +54,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
       setAuthMode('signin');
       return;
     }
-    toggleFavorite(business.id);
+    toggleFavorite(profileId);
   };
 
   const handleWhatsApp = (e: React.MouseEvent) => {
@@ -95,7 +97,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
   };
 
 
-  const isFav = favorites.includes(business.id);
+  const isFav = favorites.includes(profileId);
   const desc = language === 'fr' ? business.descriptionFr : language === 'bi' ? business.descriptionBi : business.description;
   const savings = business.originalPrice - business.dealPrice;
 

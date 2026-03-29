@@ -60,6 +60,8 @@ interface PendingBusiness {
   discount_valid_from?: string;
   discount_valid_until?: string;
   pricing_tiers?: unknown;
+  /** When set, approval creates a `business_offerings` row on this profile only */
+  business_id?: string | null;
 }
 
 interface BusinessPhoto {
@@ -1236,8 +1238,13 @@ const AdminPanel: React.FC = () => {
                             </div>
                             <div>
                               <h4 className="text-lg font-bold text-gray-900">{biz.name}</h4>
-                              <div className="flex items-center gap-3 text-sm text-gray-500">
+                              <div className="flex items-center gap-3 text-sm text-gray-500 flex-wrap">
                                 <span className="px-2 py-0.5 rounded-md bg-gray-100 text-xs font-medium capitalize">{biz.category}</span>
+                                {biz.business_id ? (
+                                  <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 text-xs font-medium border border-teal-100">
+                                    New offer on existing profile
+                                  </span>
+                                ) : null}
                                 <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{new Date(biz.created_at).toLocaleDateString()}</span>
                               </div>
                             </div>

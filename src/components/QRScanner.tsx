@@ -96,6 +96,8 @@ interface ValidityResult {
 
 export type OwnerListingOffer = {
   id: string;
+  /** `public.businesses.id` — sent to verify-redemption as businessId */
+  profileBusinessId: string;
   name: string;
   discount: string | null;
   original_price: number | null;
@@ -106,8 +108,10 @@ export type OwnerListingOffer = {
 
 interface QRScannerProps {
   onClose: () => void;
-  /** If the owner had a listing selected in the dashboard, pre-select it in the offer picker. */
+  /** Profile `businesses.id` for validity check / redemption ownership (not offering id). */
   preferredBusinessId?: string | null;
+  /** Offering id from `business_offerings` when pre-selecting a specific deal in the picker. */
+  preferredOfferingId?: string | null;
   preferredBusinessName?: string | null;
 }
 
@@ -165,6 +169,7 @@ type RedeemSubStep = 'none' | 'pick_offer' | 'no_offers';
 const QRScanner: React.FC<QRScannerProps> = ({
   onClose,
   preferredBusinessId = null,
+  preferredOfferingId = null,
   preferredBusinessName = null,
 }) => {
   const { user } = useAppContext();
@@ -294,7 +299,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
       body: {
         action: 'verify_and_redeem',
         qrData: rawData,
-        businessId: listing.id,
+        businessId: listing.profileBusinessId,
         businessName: listing.name,
         discount: discountLine,
         discountLabel: discountLine,
@@ -340,41 +345,89 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
     const party = partyFromValidityApi(checkData.party);
 
-    // Use Edge Function (service role) so this works even when RLS or missing `active` column
-    // breaks direct PostgREST queries — same pattern as dashboard get_all_owner_data.
-    const { data: mbData, error: mbErr } = await supabase.functions.invoke('manage-business', {
-      body: { action: 'get_owner_businesses', userId: user.id },
-    });
+    type OfferingJoin = {
+      id?: string;
+      title?: string | null;
+      discount?: string | null;
+      original_price?: number | null;
+      deal_price?: number | null;
+      pricing_tiers?: unknown;
+      active?: boolean;
+      businesses?: {
+        id?: string;
+        owner_id?: string;
+        category?: string | null;
+        name?: string | null;
+        active?: boolean;
+      };
+    };
 
-    if (mbErr) {
-      console.error('[QRScanner] load owner listings (edge):', mbErr);
-      toast.error('Could not load your listings.');
-      setResult({ success: false, error: 'Could not load your active listings.' });
-      return;
+    const { data: offData, error: offErr } = await supabase
+      .from('business_offerings')
+      .select(
+        'id, title, discount, original_price, deal_price, pricing_tiers, active, businesses!inner(id, owner_id, category, name, active)',
+      )
+      .eq('businesses.owner_id', user.id);
+
+    let rows: OwnerListingOffer[] = [];
+    if (!offErr && offData && (offData as OfferingJoin[]).length > 0) {
+      rows = (offData as OfferingJoin[])
+        .filter((o) => o.active !== false && o.businesses?.active !== false)
+        .map((o) => ({
+          id: String(o.id ?? ''),
+          profileBusinessId: String(o.businesses?.id ?? ''),
+          name: String(
+            (o.title && String(o.title).trim()) || o.businesses?.name || 'Offer',
+          ),
+          discount: o.discount != null ? String(o.discount) : null,
+          original_price: o.original_price != null ? Number(o.original_price) : null,
+          deal_price: o.deal_price != null ? Number(o.deal_price) : null,
+          pricing_tiers: o.pricing_tiers ?? null,
+          category: o.businesses?.category != null ? String(o.businesses.category) : null,
+        }))
+        .filter((r) => r.id.length > 0 && r.profileBusinessId.length > 0)
+        .sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    const mbPayload = mbData as { businesses?: Record<string, unknown>[]; error?: string };
-    if (mbPayload?.error) {
-      console.error('[QRScanner] load owner listings:', mbPayload.error);
-      toast.error('Could not load your listings.');
-      setResult({ success: false, error: 'Could not load your active listings.' });
-      return;
-    }
+    if (rows.length === 0) {
+      const { data: mbData, error: mbErr } = await supabase.functions.invoke('manage-business', {
+        body: { action: 'get_owner_businesses', userId: user.id },
+      });
 
-    const rawList = mbPayload.businesses ?? [];
-    const rows: OwnerListingOffer[] = rawList
-      .filter((b) => b.active !== false)
-      .map((b) => ({
-        id: String(b.id ?? ''),
-        name: String(b.name ?? ''),
-        discount: b.discount != null ? String(b.discount) : null,
-        original_price: b.original_price != null ? Number(b.original_price) : null,
-        deal_price: b.deal_price != null ? Number(b.deal_price) : null,
-        pricing_tiers: b.pricing_tiers ?? null,
-        category: b.category != null ? String(b.category) : null,
-      }))
-      .filter((r) => r.id.length > 0)
-      .sort((a, b) => a.name.localeCompare(b.name));
+      if (mbErr) {
+        console.error('[QRScanner] load owner listings (edge):', mbErr);
+        toast.error('Could not load your listings.');
+        setResult({ success: false, error: 'Could not load your active listings.' });
+        return;
+      }
+
+      const mbPayload = mbData as { businesses?: Record<string, unknown>[]; error?: string };
+      if (mbPayload?.error) {
+        console.error('[QRScanner] load owner listings:', mbPayload.error);
+        toast.error('Could not load your listings.');
+        setResult({ success: false, error: 'Could not load your active listings.' });
+        return;
+      }
+
+      const rawList = mbPayload.businesses ?? [];
+      rows = rawList
+        .filter((b) => b.active !== false)
+        .map((b) => {
+          const id = String(b.id ?? '');
+          return {
+            id,
+            profileBusinessId: id,
+            name: String(b.name ?? ''),
+            discount: b.discount != null ? String(b.discount) : null,
+            original_price: b.original_price != null ? Number(b.original_price) : null,
+            deal_price: b.deal_price != null ? Number(b.deal_price) : null,
+            pricing_tiers: b.pricing_tiers ?? null,
+            category: b.category != null ? String(b.category) : null,
+          };
+        })
+        .filter((r) => r.id.length > 0)
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
 
     if (rows.length === 0) {
       setPendingRedeemQr(rawData);
@@ -390,10 +443,16 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
     setPendingRedeemQr(rawData);
     setOwnerListings(rows);
-    const preferred =
-      preferredBusinessId && rows.some((r) => r.id === preferredBusinessId)
-        ? preferredBusinessId
+    const preferredFromOffering =
+      preferredOfferingId && rows.some((r) => r.id === preferredOfferingId)
+        ? preferredOfferingId
         : null;
+    const singleOnProfile =
+      preferredBusinessId &&
+      rows.filter((r) => r.profileBusinessId === preferredBusinessId).length === 1
+        ? rows.find((r) => r.profileBusinessId === preferredBusinessId)!.id
+        : null;
+    const preferred = preferredFromOffering || singleOnProfile;
     setSelectedListingId(preferred);
     setRedeemSubStep('pick_offer');
     setVerifiedForOfferFlow(checkData);

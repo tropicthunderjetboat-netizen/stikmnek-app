@@ -20,6 +20,7 @@ import {
 } from '@/lib/pricingTiers';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { supabase } from '@/lib/supabase';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { toast } from 'sonner';
 import { Mail, Phone, Loader2 } from 'lucide-react';
 
@@ -317,7 +318,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
       const { data, error: invokeError } = await supabase.functions.invoke('send-email', {
         body: {
           action: 'send_booking_inquiry',
-          business_id: biz.id,
+          business_id: profileBusinessIdFor(biz),
           visit_date: visitDate,
           adults,
           children,

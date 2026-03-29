@@ -39,6 +39,7 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
+import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
 
 // ─── Retry helper for edge function calls (matches BusinessListingForm) ───
 async function invokeWithRetry(
@@ -131,6 +132,98 @@ interface UnifiedBusiness {
   _adminNotes?: string;
   _reviewedAt?: string;
   _createdAt?: string;
+  /** `public.businesses.id` when this row is a `business_offerings` listing */
+  _profileBusinessId?: string;
+}
+
+function mapOfferingRowToUnified(
+  o: Record<string, unknown>,
+  b: Record<string, unknown> | null | undefined,
+): UnifiedBusiness {
+  const profile = b || {};
+  const pid =
+    profile.id != null ? String(profile.id) : String(o.business_id ?? o.id ?? '');
+  return {
+    id: String(o.id),
+    _profileBusinessId: pid,
+    name: String(o.title || profile.name || 'Offer'),
+    category: String(profile.category || 'dining'),
+    description: String(o.description ?? ''),
+    descriptionFr: String((o.description_fr ?? o.description) ?? ''),
+    descriptionBi: String((o.description_bi ?? o.description) ?? ''),
+    image: String(o.image ?? ''),
+    rating: Number(profile.rating) || 0,
+    reviewCount: Number(profile.review_count) || 0,
+    discount: String(o.discount ?? ''),
+    originalPrice: Number(o.original_price) || 0,
+    dealPrice: Number(o.deal_price) || 0,
+    location: String(profile.location ?? ''),
+    lat: Number(profile.lat) || 0,
+    lng: Number(profile.lng) || 0,
+    hours: String(profile.hours ?? profile.opening_hours ?? ''),
+    phone: String(profile.phone ?? ''),
+    tags: Array.isArray(o.tags) ? (o.tags as string[]) : Array.isArray(profile.tags) ? (profile.tags as string[]) : [],
+    featured: Boolean(o.featured) || Boolean(profile.featured),
+    ownerId: (profile.owner_id as string) || null,
+    _source: 'approved',
+    _status: 'approved',
+    _createdAt: (o.created_at as string) || (profile.created_at as string),
+  };
+}
+
+function mapProfileRowToUnified(b: Record<string, unknown>): UnifiedBusiness {
+  return {
+    id: String(b.id),
+    _profileBusinessId: String(b.id),
+    name: String(b.name ?? ''),
+    category: String(b.category || 'dining'),
+    description: String(b.description ?? ''),
+    descriptionFr: String((b.description_fr ?? b.description) ?? ''),
+    descriptionBi: String((b.description_bi ?? b.description) ?? ''),
+    image: String((b.image as string) || (b.image_url as string) || ''),
+    rating: Number(b.rating) || 0,
+    reviewCount: Number(b.review_count) || 0,
+    discount: String((b.discount as string) || (b.deal as string) || ''),
+    originalPrice: Number(b.original_price) || 0,
+    dealPrice: Number(b.deal_price) || Number(b.discounted_price) || 0,
+    location: String(b.location ?? ''),
+    lat: Number(b.lat) || 0,
+    lng: Number(b.lng) || 0,
+    hours: String((b.hours as string) || (b.opening_hours as string) || ''),
+    phone: String(b.phone ?? ''),
+    tags: Array.isArray(b.tags) ? (b.tags as string[]) : [],
+    featured: Boolean(b.featured),
+    ownerId: (b.owner_id as string) || null,
+    _source: 'approved',
+    _status: 'approved',
+    _createdAt: b.created_at as string | undefined,
+  };
+}
+
+async function buildApprovedUnifiedFromProfiles(
+  approvedProfiles: Record<string, unknown>[],
+): Promise<UnifiedBusiness[]> {
+  const profileIds = approvedProfiles.map((p) => p.id).filter(Boolean).map(String);
+  type OfferingRow = { business_id?: unknown; businesses?: Record<string, unknown> };
+  let offeringRows: OfferingRow[] = [];
+  if (profileIds.length > 0) {
+    const { data } = await supabase
+      .from('business_offerings')
+      .select('*, businesses(*)')
+      .in('business_id', profileIds);
+    offeringRows = (data as OfferingRow[]) || [];
+  }
+  const seenProfiles = new Set(offeringRows.map((r) => String(r.business_id)));
+  const out: UnifiedBusiness[] = [];
+  for (const row of offeringRows) {
+    out.push(mapOfferingRowToUnified(row, row.businesses));
+  }
+  for (const b of approvedProfiles) {
+    if (!seenProfiles.has(String(b.id))) {
+      out.push(mapProfileRowToUnified(b));
+    }
+  }
+  return out;
 }
 
 type DashboardTab = 'overview' | 'submissions' | 'edit' | 'analytics' | 'reviews' | 'photos' | 'submit' | 'emails';
@@ -290,37 +383,8 @@ const BusinessOwnerDashboard: React.FC = () => {
         setAllSubmissions(submissions);
         setPendingBusinesses(submissions);
 
-        // Build unified business list
-        const unified: UnifiedBusiness[] = [];
-
-        // Add approved businesses
-        for (const b of approved) {
-          unified.push({
-            id: b.id,
-            name: b.name,
-            category: b.category,
-            description: b.description,
-            descriptionFr: b.description_fr || b.description,
-            descriptionBi: b.description_bi || b.description,
-            image: b.image || '',
-            rating: Number(b.rating) || 0,
-            reviewCount: b.review_count || 0,
-            discount: b.discount || '',
-            originalPrice: Number(b.original_price) || 0,
-            dealPrice: Number(b.deal_price) || 0,
-            location: b.location || '',
-            lat: Number(b.lat) || 0,
-            lng: Number(b.lng) || 0,
-            hours: b.hours || '',
-            phone: b.phone || '',
-            tags: b.tags || [],
-            featured: b.featured || false,
-            ownerId: b.owner_id || null,
-            _source: 'approved',
-            _status: 'approved',
-            _createdAt: b.created_at,
-          });
-        }
+        const approvedUnified = await buildApprovedUnifiedFromProfiles(approved);
+        const unified: UnifiedBusiness[] = [...approvedUnified];
 
         // Add pending submissions that aren't already approved
         // (When approved, the pending record stays but a new businesses record is created)
@@ -403,22 +467,8 @@ const BusinessOwnerDashboard: React.FC = () => {
       setAllSubmissions(submissions);
       setPendingBusinesses(submissions);
 
-      // Build unified list from separate calls
-      const unified: UnifiedBusiness[] = [];
-      for (const b of approved) {
-        unified.push({
-          id: b.id, name: b.name, category: b.category,
-          description: b.description, descriptionFr: b.description_fr || b.description,
-          descriptionBi: b.description_bi || b.description,
-          image: b.image || '', rating: Number(b.rating) || 0,
-          reviewCount: b.review_count || 0, discount: b.discount || '',
-          originalPrice: Number(b.original_price) || 0, dealPrice: Number(b.deal_price) || 0,
-          location: b.location || '', lat: Number(b.lat) || 0, lng: Number(b.lng) || 0,
-          hours: b.hours || '', phone: b.phone || '', tags: b.tags || [],
-          featured: b.featured || false, ownerId: b.owner_id || null,
-          _source: 'approved', _status: 'approved', _createdAt: b.created_at,
-        });
-      }
+      const approvedUnified = await buildApprovedUnifiedFromProfiles(approved);
+      const unified: UnifiedBusiness[] = [...approvedUnified];
       for (const s of submissions) {
         if (s.status === 'pending' || s.status === 'rejected') {
           unified.push({
@@ -460,21 +510,8 @@ const BusinessOwnerDashboard: React.FC = () => {
         setPendingBusinesses(directPending);
         setAllSubmissions(directPending);
 
-        const unified: UnifiedBusiness[] = [];
-        for (const b of approved) {
-          unified.push({
-            id: b.id, name: b.name, category: b.category,
-            description: b.description, descriptionFr: b.description_fr || b.description,
-            descriptionBi: b.description_bi || b.description,
-            image: b.image || b.image_url || '', rating: Number(b.rating) || 0,
-            reviewCount: b.review_count || 0, discount: b.discount || b.deal || '',
-            originalPrice: Number(b.original_price) || 0, dealPrice: Number(b.deal_price) || Number(b.discounted_price) || 0,
-            location: b.location || '', lat: Number(b.lat) || 0, lng: Number(b.lng) || 0,
-            hours: b.hours || b.opening_hours || '', phone: b.phone || '', tags: b.tags || [],
-            featured: b.featured || false, ownerId: b.owner_id || null,
-            _source: 'approved', _status: 'approved', _createdAt: b.created_at,
-          });
-        }
+        const approvedUnified = await buildApprovedUnifiedFromProfiles(approved);
+        const unified: UnifiedBusiness[] = [...approvedUnified];
         for (const s of directPending) {
           if (s.status === 'pending' || s.status === 'rejected') {
             unified.push({
@@ -584,7 +621,7 @@ const BusinessOwnerDashboard: React.FC = () => {
         console.log('[Dashboard] Realtime: business updated', payload.new);
         const updated = payload.new as any;
         setUnifiedBusinesses(prev => prev.map(b =>
-          b.id === updated.id ? {
+          effectiveProfileBusinessId(b) === updated.id ? {
             ...b,
             name: updated.name || b.name,
             description: updated.description || b.description,
@@ -615,6 +652,10 @@ const BusinessOwnerDashboard: React.FC = () => {
 
   const selectedBusiness = unifiedBusinesses.find(b => b.id === selectedBusinessId) || (hasAnyBusinesses ? unifiedBusinesses[0] : null);
   const selectedIsApproved = selectedBusiness?._source === 'approved';
+  const selectedProfileId = useMemo(() => {
+    if (!selectedBusiness || selectedBusiness._source !== 'approved') return '';
+    return effectiveProfileBusinessId(selectedBusiness);
+  }, [selectedBusiness]);
 
   useEffect(() => {
     if (unifiedBusinesses.length > 0 && !selectedBusinessId) {
@@ -652,11 +693,11 @@ const BusinessOwnerDashboard: React.FC = () => {
 
   // Load pending edits
   const loadPendingEdits = useCallback(async () => {
-    if (!selectedBusiness || !user || !selectedIsApproved) return;
+    if (!selectedBusiness || !user || !selectedIsApproved || !selectedProfileId) return;
     setLoadingEdits(true);
     try {
       const { data } = await supabase.functions.invoke('manage-business', {
-        body: { action: 'get_pending_edits', userId: user.id, businessId: selectedBusiness.id },
+        body: { action: 'get_pending_edits', userId: user.id, businessId: selectedProfileId },
       });
       if (data?.edits) setPendingEdits(data.edits);
     } catch (err) {
@@ -664,17 +705,17 @@ const BusinessOwnerDashboard: React.FC = () => {
     } finally {
       setLoadingEdits(false);
     }
-  }, [selectedBusiness, user, selectedIsApproved]);
+  }, [selectedBusiness, user, selectedIsApproved, selectedProfileId]);
 
   useEffect(() => { loadPendingEdits(); }, [loadPendingEdits]);
 
   const loadReviewResponses = useCallback(async () => {
-    if (!selectedBusiness?.id || !selectedIsApproved) return;
+    if (!selectedProfileId || !selectedIsApproved) return;
     try {
       const { data, error } = await supabase
         .from('review_responses')
         .select('id, review_id, response, created_at')
-        .eq('business_id', selectedBusiness.id)
+        .eq('business_id', selectedProfileId)
         .order('created_at', { ascending: false });
       if (error) throw error;
       const byReview = new Map<string, ReviewResponse>();
@@ -692,7 +733,7 @@ const BusinessOwnerDashboard: React.FC = () => {
     } catch (err) {
       console.error('Failed to load review responses:', err);
     }
-  }, [selectedBusiness?.id, selectedIsApproved]);
+  }, [selectedProfileId, selectedIsApproved]);
 
   useEffect(() => {
     void loadReviewResponses();
@@ -704,13 +745,13 @@ const BusinessOwnerDashboard: React.FC = () => {
   }, [activeTab, selectedBusiness, selectedIsApproved]);
 
   const loadGalleryPhotos = async () => {
-    if (!selectedBusiness) return;
+    if (!selectedBusiness || !selectedProfileId) return;
     setGalleryLoading(true);
     try {
       const { data, error } = await supabase
         .from('business_photos')
         .select('*')
-        .eq('business_id', selectedBusiness.id)
+        .eq('business_id', selectedProfileId)
         .order('is_main', { ascending: false })
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -723,11 +764,11 @@ const BusinessOwnerDashboard: React.FC = () => {
   };
 
   const handleSaveNewGalleryPhotos = async () => {
-    if (!selectedBusiness || !user || newGalleryPhotos.length === 0) return;
+    if (!selectedBusiness || !user || !selectedProfileId || newGalleryPhotos.length === 0) return;
     setSavingGallery(true);
     try {
       const photoRecords = newGalleryPhotos.map((photo, index) => ({
-        business_id: selectedBusiness.id, url: photo.url, file_path: photo.filePath,
+        business_id: selectedProfileId, url: photo.url, file_path: photo.filePath,
         uploaded_by: user.id, is_main: galleryPhotos.length === 0 && index === 0,
       }));
       const { error } = await supabase.from('business_photos').insert(photoRecords);
@@ -758,13 +799,13 @@ const BusinessOwnerDashboard: React.FC = () => {
   };
 
   const handleSetMainPhoto = async (photo: GalleryPhoto) => {
-    if (!selectedBusiness) return;
+    if (!selectedBusiness || !selectedProfileId) return;
     try {
-      await supabase.from('business_photos').update({ is_main: false }).eq('business_id', selectedBusiness.id);
+      await supabase.from('business_photos').update({ is_main: false }).eq('business_id', selectedProfileId);
       const { error } = await supabase.from('business_photos').update({ is_main: true }).eq('id', photo.id);
       if (error) throw error;
       await supabase.functions.invoke('manage-business', {
-        body: { action: 'update_business', userId: user?.id, businessId: selectedBusiness.id, updates: { image: photo.url } },
+        body: { action: 'update_business', userId: user?.id, businessId: selectedProfileId, updates: { image: photo.url } },
       });
       setGalleryPhotos(prev => prev.map(p => ({ ...p, is_main: p.id === photo.id })));
       toast.success('Main photo updated!');
@@ -773,7 +814,9 @@ const BusinessOwnerDashboard: React.FC = () => {
     }
   };
 
-  const businessReviews = dbReviews.filter(r => r.business_id === selectedBusiness?.id);
+  const businessReviews = dbReviews.filter(
+    r => selectedProfileId && r.business_id === selectedProfileId,
+  );
 
   const weeklyRedemptions = [
     { day: 'Mon', count: 12, revenue: 180 }, { day: 'Tue', count: 8, revenue: 120 },
@@ -786,7 +829,7 @@ const BusinessOwnerDashboard: React.FC = () => {
 
   // ═══ HANDLERS ═══
   const handleSubmitEditForReview = async () => {
-    if (!selectedBusiness || !user || !editHasChanges) {
+    if (!selectedBusiness || !user || !selectedProfileId || !editHasChanges) {
       if (!editHasChanges) toast.info('No changes detected.');
       return;
     }
@@ -801,7 +844,7 @@ const BusinessOwnerDashboard: React.FC = () => {
       if (editForm.original_price !== originalEditForm.original_price) changes.original_price = editForm.original_price;
 
       const { data, error } = await supabase.functions.invoke('manage-business', {
-        body: { action: 'submit_edit', userId: user.id, businessId: selectedBusiness.id, changes },
+        body: { action: 'submit_edit', userId: user.id, businessId: selectedProfileId, changes },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -815,10 +858,10 @@ const BusinessOwnerDashboard: React.FC = () => {
   };
 
   const handleToggleActive = async (active: boolean) => {
-    if (!selectedBusiness) return;
+    if (!selectedBusiness || !selectedProfileId) return;
     try {
       await supabase.functions.invoke('manage-business', {
-        body: { action: 'toggle_active', userId: user?.id, businessId: selectedBusiness.id, active },
+        body: { action: 'toggle_active', userId: user?.id, businessId: selectedProfileId, active },
       });
       toast.success(active ? 'Listing activated!' : 'Listing deactivated');
     } catch (err: any) {
@@ -827,13 +870,13 @@ const BusinessOwnerDashboard: React.FC = () => {
   };
 
   const handleRespondToReview = async (reviewId: string) => {
-    if (!selectedBusiness || !user || !responseText[reviewId]?.trim()) return;
+    if (!selectedBusiness || !user || !selectedProfileId || !responseText[reviewId]?.trim()) return;
     try {
       const { data, error } = await invokeWithRetry('manage-business', {
         action: 'respond_to_review',
         userId: user.id,
         reviewId,
-        businessId: selectedBusiness.id,
+        businessId: selectedProfileId,
         response: responseText[reviewId],
       });
       if (error) throw error instanceof Error ? error : new Error(String(error?.message || error));
@@ -966,6 +1009,12 @@ const BusinessOwnerDashboard: React.FC = () => {
         }
       }
 
+      const linkToProfile = unifiedBusinesses.find(
+        (b) => b._source === 'approved' && b.id === selectedBusinessId,
+      );
+      const pBusinessIdForSubmit =
+        linkToProfile != null ? effectiveProfileBusinessId(linkToProfile) : null;
+
       // Strategy 1: RPC insert (SECURITY DEFINER, bypasses RLS — most reliable)
       const { data: rpcId, error: rpcError } = await supabase.rpc('insert_pending_business', {
         p_owner_id: user?.id,
@@ -986,6 +1035,7 @@ const BusinessOwnerDashboard: React.FC = () => {
         p_discount_valid_until: discountValidUntil || null,
         p_whatsapp_number: submitForm.whatsappNumber || null,
         p_pricing_tiers: tiersPayload,
+        p_business_id: pBusinessIdForSubmit,
       });
 
       if (!rpcError && rpcId) {
@@ -1096,8 +1146,12 @@ const BusinessOwnerDashboard: React.FC = () => {
   };
 
 
-  const currentPendingEdit = pendingEdits.find(e => e.business_id === selectedBusiness?.id && e.status === 'pending');
-  const editHistory = pendingEdits.filter(e => e.business_id === selectedBusiness?.id);
+  const currentPendingEdit = pendingEdits.find(
+    e => selectedProfileId && e.business_id === selectedProfileId && e.status === 'pending',
+  );
+  const editHistory = pendingEdits.filter(
+    e => selectedProfileId && e.business_id === selectedProfileId,
+  );
 
   // ═══ ACCESS CHECK ═══
   // Use userProfile.role as the authoritative source (from DB), falling back to user.type
@@ -1713,7 +1767,14 @@ const BusinessOwnerDashboard: React.FC = () => {
       {showScanner && (
         <QRScanner
           onClose={() => setShowScanner(false)}
-          preferredBusinessId={selectedBusiness?.id ?? null}
+          preferredBusinessId={
+            selectedBusiness?._source === 'approved'
+              ? effectiveProfileBusinessId(selectedBusiness)
+              : null
+          }
+          preferredOfferingId={
+            selectedBusiness?._source === 'approved' ? selectedBusiness.id : null
+          }
           preferredBusinessName={selectedBusiness?.name ?? null}
         />
       )}

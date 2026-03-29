@@ -4,6 +4,7 @@ import { Language } from '@/data/translations';
 import { Business } from '@/data/businesses';
 import { supabase, directProfileInsert, SUPABASE_URL } from '@/lib/supabase';
 import { getBusinessImageUrl } from '@/lib/utils';
+import { mapJoinedOfferingToBusiness } from '@/lib/businessOfferingMap';
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
@@ -308,6 +309,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   const loadBusinesses = useCallback(async () => {
     try {
+      const { data: offRows, error: offErr } = await supabase
+        .from('business_offerings')
+        .select(`
+          id,
+          title,
+          description,
+          description_fr,
+          description_bi,
+          discount,
+          original_price,
+          deal_price,
+          image,
+          map_url,
+          website,
+          discount_valid_from,
+          discount_valid_until,
+          whatsapp_number,
+          pricing_tiers,
+          tags,
+          featured,
+          active,
+          businesses!inner (
+            id,
+            name,
+            category,
+            owner_id,
+            location,
+            lat,
+            lng,
+            hours,
+            opening_hours,
+            phone,
+            email,
+            contact_email,
+            business_email,
+            whatsapp_number,
+            rating,
+            review_count,
+            super_star_count,
+            featured,
+            active,
+            map_url,
+            website
+          )
+        `)
+        .order('featured', { ascending: false });
+
+      if (!offErr && offRows && offRows.length > 0) {
+        const mapped: Business[] = [];
+        for (const row of offRows as Record<string, unknown>[]) {
+          const b = row.businesses as Record<string, unknown> | null | undefined;
+          if (!b || b.active === false) continue;
+          if (row.active === false) continue;
+          mapped.push(mapJoinedOfferingToBusiness(row, b, SUPABASE_URL));
+        }
+        if (mapped.length > 0) {
+          setDbBusinesses(mapped);
+          setDataLoaded(true);
+          return;
+        }
+      }
+
       const { data, error } = await supabase
         .from('businesses')
         .select('*')
@@ -374,6 +437,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   /** Always call latest loadReviews from realtime (avoids stale useEffect closures) */
   const loadReviewsRef = useRef(loadReviews);
   loadReviewsRef.current = loadReviews;
+
+  const loadBusinessesRef = useRef(loadBusinesses);
+  loadBusinessesRef.current = loadBusinesses;
 
   const loadFavorites = useCallback(async (userId: string) => {
     try {
@@ -961,50 +1027,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Realtime subscriptions for businesses
+  // Realtime: refetch listings (business_offerings + profile join, or legacy businesses)
   useEffect(() => {
-    const channel = supabase
+    const debounced = () => {
+      void loadBusinessesRef.current?.();
+    };
+    const ch1 = supabase
       .channel('realtime-businesses')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'businesses' }, (payload) => {
-        const b = payload.new as any;
-        if (b.active === false) return;
-        const newBiz: Business = {
-          id: b.id,
-          name: b.name,
-          category: b.category,
-          description: b.description,
-          descriptionFr: b.description_fr || b.description,
-          descriptionBi: b.description_bi || b.description,
-          image: getBusinessImageUrl(b.image_url || b.image, SUPABASE_URL),
-          rating: Number(b.rating) || 0,
-          reviewCount: b.review_count || 0,
-          discount: b.deal || b.discount || '',
-          originalPrice: Number(b.original_price) || 0,
-          dealPrice: Number(b.discounted_price ?? b.deal_price) || 0,
-          location: b.location || '',
-          lat: Number(b.lat) || 0,
-          lng: Number(b.lng) || 0,
-          mapUrl: b.map_url || null,
-          map_url: b.map_url || null,
-          website: b.website || null,
-          hours: b.opening_hours || b.hours || '',
-          phone: b.phone || '',
-          contactEmail: b.email || b.contact_email || b.business_email || null,
-          whatsappNumber: b.whatsapp_number || null,
-          tags: b.tags || [],
-          featured: b.featured || false,
-          ownerId: b.owner_id || null,
-          superStarCount: Number(b.super_star_count) || 0,
-          pricingTiers: b.pricing_tiers ?? null,
-          active: true,
-        };
-        setDbBusinesses(prev => {
-          if (prev.some(existing => existing.id === newBiz.id)) return prev;
-          return [newBiz, ...prev];
-        });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'businesses' }, debounced)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const ch2 = supabase
+      .channel('realtime-business-offerings')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'business_offerings' }, debounced)
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(ch1);
+      void supabase.removeChannel(ch2);
+    };
   }, []);
 
   // Realtime: refetch redemptions when server inserts a row for this user (QR redemption, etc.)

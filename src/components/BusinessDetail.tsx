@@ -22,6 +22,7 @@ import {
   plainTextFromHtml,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
 
@@ -52,8 +53,9 @@ const BusinessDetail: React.FC = () => {
   if (!selectedBusiness) return null;
 
   const biz = selectedBusiness;
-  const isFav = favorites.includes(biz.id);
-  const reviews = useMemo(() => dbReviews.filter(r => r.business_id === biz.id), [dbReviews, biz.id]);
+  const profileId = profileBusinessIdFor(biz);
+  const isFav = favorites.includes(profileId);
+  const reviews = useMemo(() => dbReviews.filter(r => r.business_id === profileId), [dbReviews, profileId]);
 
   useEffect(() => {
     setDisplayCoverImage(biz.image || '');
@@ -111,13 +113,13 @@ const BusinessDetail: React.FC = () => {
   /** Refresh listing contact fields from DB so `whatsapp_number` is never stale in UI/modal. */
   useEffect(() => {
     if (!biz?.id) return;
-    const businessId = biz.id;
+    const listingId = biz.id;
     let cancelled = false;
     void (async () => {
       const { data, error } = await supabase
         .from('businesses')
         .select('whatsapp_number, phone, email, contact_email, map_url, website')
-        .eq('id', businessId)
+        .eq('id', profileId)
         .maybeSingle();
       if (cancelled || error || !data) return;
       const row = data as {
@@ -132,7 +134,7 @@ const BusinessDetail: React.FC = () => {
       const mapUrl = (row.map_url ?? '').trim();
       const site = (row.website ?? '').trim();
       setSelectedBusiness((current) => {
-        if (!current || current.id !== businessId) return current;
+        if (!current || current.id !== listingId) return current;
         return {
           ...current,
           whatsappNumber: wa || current.whatsappNumber || null,
@@ -152,7 +154,7 @@ const BusinessDetail: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [biz.id, setSelectedBusiness]);
+  }, [biz.id, profileId, setSelectedBusiness]);
 
   // Public moderation safety: only use approved photos for the primary cover when available.
   useEffect(() => {
@@ -162,7 +164,7 @@ const BusinessDetail: React.FC = () => {
       const { data, error } = await supabase
         .from('business_photos')
         .select('url, file_path')
-        .eq('business_id', biz.id)
+        .eq('business_id', profileId)
         .eq('status', 'approved')
         .order('is_main', { ascending: false })
         .order('created_at', { ascending: true })
@@ -179,7 +181,7 @@ const BusinessDetail: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [biz.id, biz.image]);
+  }, [biz.id, biz.image, profileId]);
 
   // Compute super star count: use DB field if available, otherwise count from reviews
   const superStarCount = (biz.superStarCount && biz.superStarCount > 0)
@@ -436,7 +438,7 @@ const BusinessDetail: React.FC = () => {
 
             {/* Photo Gallery */}
             <PhotoGallery
-              businessId={biz.id}
+              businessId={profileId}
               coverImage={displayCoverImage || biz.image}
               businessName={biz.name}
             />
@@ -483,7 +485,7 @@ const BusinessDetail: React.FC = () => {
               {showReviewForm && (
                 <div className="mb-6">
                   <ReviewForm
-                    businessId={biz.id}
+                    businessId={profileId}
                     businessName={biz.name}
                     compact
                     onSuccess={() => setShowReviewForm(false)}
@@ -633,7 +635,7 @@ const BusinessDetail: React.FC = () => {
               )}
 
               <div className="flex gap-2">
-                <button onClick={() => { if (!user) { setShowAuth(true); return; } toggleFavorite(biz.id); }}
+                <button onClick={() => { if (!user) { setShowAuth(true); return; } toggleFavorite(profileId); }}
                   className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors ${isFav ? 'border-red-200 bg-red-50 text-red-600' : 'border-gray-200 text-gray-600 hover:border-teal-300'}`}>
                   <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
                   {t('biz.save', language)}

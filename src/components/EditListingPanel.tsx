@@ -27,6 +27,7 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
+import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
 
 
 interface PendingEdit {
@@ -98,6 +99,9 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
   initialSection,
 }) => {
   const { user } = useAppContext();
+  const profileId = effectiveProfileBusinessId(
+    selectedBusiness as Business & { _profileBusinessId?: string },
+  );
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activeSection, setActiveSection] = useState<EditSection>(initialSection || 'basic');
@@ -174,7 +178,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
     setLoadingEdits(true);
     try {
       const { data } = await supabase.functions.invoke('manage-business', {
-        body: { action: 'get_pending_edits', userId: user.id, businessId: selectedBusiness.id },
+        body: { action: 'get_pending_edits', userId: user.id, businessId: profileId },
       });
       if (data?.edits) setPendingEdits(data.edits);
     } catch (err) {
@@ -200,8 +204,8 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
   }, [form, original]);
 
   const hasChanges = changedFields.length > 0;
-  const currentPendingEdit = pendingEdits.find(e => e.business_id === selectedBusiness?.id && e.status === 'pending');
-  const editHistory = pendingEdits.filter(e => e.business_id === selectedBusiness?.id);
+  const currentPendingEdit = pendingEdits.find(e => e.business_id === profileId && e.status === 'pending');
+  const editHistory = pendingEdits.filter(e => e.business_id === profileId);
 
   const isFieldChanged = (field: string) => changedFields.includes(field);
 
@@ -265,7 +269,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
       });
 
       const { data, error } = await supabase.functions.invoke('manage-business', {
-        body: { action: 'submit_edit', userId: user.id, businessId: selectedBusiness.id, changes },
+        body: { action: 'submit_edit', userId: user.id, businessId: profileId, changes },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -296,7 +300,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
     setDeleting(true);
     try {
       const { data, error } = await supabase.functions.invoke('manage-business', {
-        body: { action: 'delete_own_business', businessId: selectedBusiness.id },
+        body: { action: 'delete_own_business', businessId: profileId },
       });
       const res = data as { success?: boolean; error?: string } | null | undefined;
       if (error) {
