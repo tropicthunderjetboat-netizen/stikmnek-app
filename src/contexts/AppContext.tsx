@@ -198,6 +198,11 @@ interface AppContextType {
   dbBusinesses: Business[];
   dbReviews: DBReview[];
   submitReview: (businessId: string, rating: number, comment: string, isSuperStar?: boolean) => Promise<void>;
+  /**
+   * Owner + redemption preflight for Super Star *payment* (credits === 0).
+   * Call before opening the payment modal or charging the card — not after payment.
+   */
+  validateSuperStarPaymentPrerequisites: (businessId: string) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
   dataLoaded: boolean;
   refreshBusinesses: () => Promise<void>;
@@ -1309,14 +1314,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [user?.id]);
 
   // ═══════════════════════════════════════════════════════════
-  // SUBMIT REVIEW — Direct insert or RPC for Superstar
+  // REVIEW PREFLIGHT — owner + redemption (master businesses.id)
   // ═══════════════════════════════════════════════════════════
-  const submitReview = useCallback(async (businessId: string, rating: number, comment: string, isSuperStar = false) => {
-    if (!user) {
-      setShowAuth(true);
-      return;
-    }
-    try {
+  const preflightReviewSubmission = useCallback(
+    async (
+      businessId: string,
+      redemptionContext: 'leave_review' | 'superstar_purchase',
+    ): Promise<void> => {
+      if (!user) {
+        setShowAuth(true);
+        throw new Error('Not signed in');
+      }
+
       const { data: ownRow } = await supabase
         .from('businesses')
         .select('id')
@@ -1345,57 +1354,101 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (redemptionErr) throw redemptionErr;
       if (!redemptionRows?.length) {
         const msg =
-          language === 'en'
-            ? 'You must redeem a service from this business before leaving a review.'
-            : language === 'fr'
-              ? 'Vous devez utiliser une offre de cet établissement avant de laisser un avis.'
-              : 'Yu mas redeem wan sarvis long bisinis ia bifo yu save riviu.';
+          redemptionContext === 'superstar_purchase'
+            ? language === 'en'
+              ? 'You must redeem a service from this business before purchasing a Super Star review.'
+              : language === 'fr'
+                ? 'Vous devez utiliser une offre de cet établissement avant d’acheter un avis Super Star.'
+                : 'Yu mas redeem wan sarvis long bisinis ia bifo yu bae Super Star riviu.'
+            : language === 'en'
+              ? 'You must redeem a service from this business before leaving a review.'
+              : language === 'fr'
+                ? 'Vous devez utiliser une offre de cet établissement avant de laisser un avis.'
+                : 'Yu mas redeem wan sarvis long bisinis ia bifo yu save riviu.';
         toast.error(msg);
         throw new Error(msg);
       }
+    },
+    [user, language, setShowAuth],
+  );
 
-      if (isSuperStar || rating === 6) {
-        // Superstar: use RPC (atomic decrement credit + insert)
-        const { error } = await supabase.rpc('submit_superstar_review', {
-          p_business_id: businessId,
-          p_user_name: user.name,
-          p_comment: comment,
-        });
-        if (error) throw error;
-      } else {
-        // Standard 1-5: direct insert
-        const { error } = await supabase
-          .from('reviews')
-          .insert({
-            business_id: businessId,
-            user_id: user.id,
-            user_name: user.name,
-            rating,
-            comment,
-            has_super_star: false,
-            created_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-        if (error) throw error;
+  const validateSuperStarPaymentPrerequisites = useCallback(
+    async (businessId: string) => preflightReviewSubmission(businessId, 'superstar_purchase'),
+    [preflightReviewSubmission],
+  );
+
+  // ═══════════════════════════════════════════════════════════
+  // SUBMIT REVIEW — Direct insert or RPC for Superstar
+  // ═══════════════════════════════════════════════════════════
+  const submitReview = useCallback(
+    async (businessId: string, rating: number, comment: string, isSuperStar = false) => {
+      if (!user) {
+        setShowAuth(true);
+        return;
       }
+      try {
+        const wantsSuper = isSuperStar || rating === 6;
+        // Payment-specific copy is only used in validateSuperStarPaymentPrerequisites (before charging).
+        await preflightReviewSubmission(businessId, 'leave_review');
 
-      // Reload from DB instead of optimistic merge — avoids double cards when realtime
-      // fires with a slightly different payload shape than the client-built row.
-      await loadReviews();
+        if (wantsSuper) {
+          const { data: creditRow, error: creditErr } = await supabase
+            .from('user_profiles')
+            .select('superstar_credits')
+            .eq('user_id', user.id)
+            .maybeSingle();
 
-      // Refresh superstar credits after using one
-      if (isSuperStar || rating === 6) {
-        refreshUserProfile();
+          if (creditErr) throw creditErr;
+          const liveCredits = creditRow?.superstar_credits ?? 0;
+          if (liveCredits < 1) {
+            const msg =
+              language === 'en'
+                ? 'No Super Star credits available. Please purchase a Super Star first.'
+                : language === 'fr'
+                  ? 'Aucun crédit Super Star disponible. Veuillez d’abord acheter un Super Star.'
+                  : 'No gat Super Star kredit. Plis bae wan Super Star festaem.';
+            toast.error(msg);
+            throw new Error(msg);
+          }
+
+          const { error } = await supabase.rpc('submit_superstar_review', {
+            p_business_id: businessId,
+            p_user_name: user.name,
+            p_comment: comment,
+          });
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('reviews')
+            .insert({
+              business_id: businessId,
+              user_id: user.id,
+              user_name: user.name,
+              rating,
+              comment,
+              has_super_star: false,
+              created_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+          if (error) throw error;
+        }
+
+        await loadReviews();
+
+        if (wantsSuper) {
+          refreshUserProfile();
+        }
+
+        toast.success('Review submitted! Thank you.');
+      } catch (err: any) {
+        console.error('Submit review error:', err);
+        toast.error(err.message || 'Failed to submit review');
+        throw err;
       }
-
-      toast.success('Review submitted! Thank you.');
-    } catch (err: any) {
-      console.error('Submit review error:', err);
-      toast.error(err.message || 'Failed to submit review');
-      throw err;
-    }
-  }, [user, language, refreshUserProfile, loadReviews]);
+    },
+    [user, language, refreshUserProfile, loadReviews, preflightReviewSubmission, setShowAuth],
+  );
 
   const refreshBusinesses = useCallback(async () => {
     await loadBusinesses();
@@ -1456,7 +1509,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         searchQuery, setSearchQuery,
         selectedCategory, setSelectedCategory,
         redemptions,
-        dbBusinesses, dbReviews, submitReview, dataLoaded,
+        dbBusinesses, dbReviews, submitReview, validateSuperStarPaymentPrerequisites, dataLoaded,
         refreshBusinesses,
         refreshUserPass,
         refreshRedemptions,

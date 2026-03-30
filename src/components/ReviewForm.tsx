@@ -54,7 +54,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   onCancel,
   compact = false,
 }) => {
-  const { user, setShowAuth, setAuthMode, language, submitReview, refreshUserProfile } = useAppContext();
+  const { user, setShowAuth, setAuthMode, language, submitReview, refreshUserProfile, validateSuperStarPaymentPrerequisites } = useAppContext();
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
   const [comment, setComment] = useState('');
@@ -108,7 +108,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   const superstarCredits = user?.superstarCredits ?? 0;
   const hasSuperStarCredit = superstarCredits > 0 || superStarPurchased;
 
-  const handleSuperStarClick = () => {
+  const handleSuperStarClick = async () => {
     if (!user) { setShowAuth(true); setAuthMode('signin'); return; }
     // If already selected, deselect
     if (wantsSuperStar || superStarPurchased || rating === 6) {
@@ -117,13 +117,18 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       setRating(0);
       return;
     }
-    // Has credits: allow 6-star without purchase
+    // Has credits: allow 6-star without purchase (redemption still enforced at submitReview)
     if (superstarCredits > 0) {
       setWantsSuperStar(true);
       setRating(6);
       return;
     }
-    // No credits: open purchase modal
+    // No credits: require redemption before any payment UI / card charge
+    try {
+      await validateSuperStarPaymentPrerequisites(businessId);
+    } catch {
+      return;
+    }
     setShowSuperStarModal(true);
     setSsPaymentStep('form');
     setSsPaymentError(null);
@@ -152,6 +157,12 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   const handlePurchaseSuperStar = async () => {
     if (!user) return;
     if (!validateSuperStarCard()) return;
+
+    try {
+      await validateSuperStarPaymentPrerequisites(businessId);
+    } catch {
+      return;
+    }
 
     setSuperStarProcessing(true);
     setSsPaymentStep('processing');
