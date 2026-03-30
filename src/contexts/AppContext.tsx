@@ -1327,10 +1327,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (ownRow) {
         const msg =
           language === 'en'
-            ? 'You cannot review your own business.'
+            ? 'You cannot leave a review for your own business.'
             : language === 'fr'
-              ? 'Vous ne pouvez pas évaluer votre propre établissement.'
-              : 'Yu no save riviu bisinis blong yu yet.';
+              ? 'Vous ne pouvez pas laisser un avis sur votre propre établissement.'
+              : 'Yu no save riviu long bisinis blong yu yet.';
+        toast.error(msg);
+        throw new Error(msg);
+      }
+
+      const { data: redemptionRows, error: redemptionErr } = await supabase
+        .from('redemptions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('business_id', businessId)
+        .limit(1);
+
+      if (redemptionErr) throw redemptionErr;
+      if (!redemptionRows?.length) {
+        const msg =
+          language === 'en'
+            ? 'You must redeem a service from this business before leaving a review.'
+            : language === 'fr'
+              ? 'Vous devez utiliser une offre de cet établissement avant de laisser un avis.'
+              : 'Yu mas redeem wan sarvis long bisinis ia bifo yu save riviu.';
         toast.error(msg);
         throw new Error(msg);
       }
