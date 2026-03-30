@@ -3,6 +3,9 @@
  * manage-business Edge Function
  * Handles business listing submission, admin review, edits, and related operations.
  * Uses SUPABASE_SERVICE_ROLE_KEY to bypass RLS for secure database operations.
+ *
+ * Email (initial listing approval): requires SENDGRID_API_KEY (same as send-email / paypal-capture).
+ * Optional: SENDGRID_FROM_EMAIL (default stikmnek@gmail.com if unset), SENDGRID_FROM_NAME, APP_BASE_URL (default https://stikmnek.com).
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -65,6 +68,146 @@ async function purgeBusinessPhotosAndStorage(
   }
 
   return { error: null };
+}
+
+/** Public app URL for deep links in transactional emails (no trailing slash). */
+function getAppBaseUrl(): string {
+  const raw = (Deno.env.get('APP_BASE_URL') || 'https://stikmnek.com').trim();
+  return raw.replace(/\/+$/, '');
+}
+
+const LISTING_LIVE_BADGE_URL = 'https://stikmnek.com/images/stikmnek-badge.png';
+
+function escapeHtmlEmail(s: unknown): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Hashtag segment: strip spaces and non-alphanumeric (e.g. "My Amazing Business!" → "MyAmazingBusiness"). */
+function businessNameForHashtag(name: string): string {
+  const alnum = String(name ?? '').trim().replace(/[^a-zA-Z0-9]+/g, '');
+  return alnum || 'YourBusiness';
+}
+
+/** Owner inbox for listing-live email: `user_profiles.email` only (initial approval flow). */
+async function resolveOwnerNotificationEmail(
+  supabase: ReturnType<typeof createClient>,
+  ownerId: string,
+): Promise<string | null> {
+  const { data: prof, error: profErr } = await supabase
+    .from('user_profiles')
+    .select('email')
+    .eq('user_id', ownerId)
+    .maybeSingle();
+  if (profErr) {
+    console.warn('[manage-business] resolveOwnerNotificationEmail user_profiles:', profErr.message);
+  }
+  const em = prof?.email;
+  if (typeof em === 'string' && em.trim()) return em.trim();
+  return null;
+}
+
+/**
+ * SendGrid: congratulatory email when a brand-new business listing is first approved.
+ * Best-effort: logs on failure; does not throw (approval already persisted).
+ */
+async function sendInitialListingLiveEmail(params: {
+  toEmail: string;
+  businessName: string;
+  listingUrl: string;
+}): Promise<{ sent: boolean; skipped?: boolean; error?: string }> {
+  const apiKey = Deno.env.get('SENDGRID_API_KEY');
+  if (!apiKey) {
+    console.warn('[manage-business] SENDGRID_API_KEY not set — skipping listing-live email');
+    return { sent: false, skipped: true, error: 'SENDGRID_API_KEY not set' };
+  }
+
+  const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
+  const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
+  const subject = 'Congratulations! Your StikmNek Listing is Live!';
+
+  const nameEsc = escapeHtmlEmail(params.businessName);
+  const urlEsc = escapeHtmlEmail(params.listingUrl);
+  const hashtagName = businessNameForHashtag(params.businessName);
+
+  const socialBlockText =
+    `🎉 Exciting News! We're officially live on StikmNek! 🌴\n\n` +
+    `Find our amazing deals and discover the best of Vanuatu with us. Get ready to save on unique experiences!\n\n` +
+    `Check out our StikmNek page here: ${params.listingUrl}\n\n` +
+    `#StikmNek #VanuatuDeals #${hashtagName} #TravelVanuatu #SupportLocal`;
+
+  const html = `
+<div style="font-family: Arial, sans-serif; line-height: 1.55; color: #111; max-width: 560px;">
+  <p style="margin: 0 0 12px;">Hi ${nameEsc},</p>
+  <p style="margin: 0 0 12px;">Great news! Your listing on StikmNek is now live!</p>
+  <p style="margin: 0 0 12px;">You can view it here: <a href="${urlEsc}">${urlEsc}</a></p>
+  <p style="margin: 0 0 16px;">To celebrate, we&#39;ve prepared a special message for you to share with your audience on social media. Let your customers know they can now find you on StikmNek and start saving!</p>
+  <p style="margin: 0 0 8px;"><img src="${escapeHtmlEmail(LISTING_LIVE_BADGE_URL)}" alt="StikmNek" width="120" style="display:block;border:0;" /></p>
+  <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
+  <p style="margin: 0 0 8px;"><strong>SOCIAL MEDIA POST SUGGESTION</strong></p>
+  <p style="margin: 0 0 12px; white-space: pre-wrap;">${escapeHtmlEmail(socialBlockText)}</p>
+  <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
+  <p style="margin: 0 0 12px;">Thank you for joining the StikmNek family. We're thrilled to have you!</p>
+  <p style="margin: 0 0 4px;">Best regards,</p>
+  <p style="margin: 0;">The StikmNek Team</p>
+</div>
+`.trim();
+
+  const plainLines = [
+    `Hi ${params.businessName},`,
+    '',
+    'Great news! Your listing on StikmNek is now live!',
+    '',
+    `You can view it here: ${params.listingUrl}`,
+    '',
+    "To celebrate, we've prepared a special message for you to share with your audience on social media. Let your customers know they can now find you on StikmNek and start saving!",
+    '',
+    '--- SOCIAL MEDIA POST SUGGESTION ---',
+    '',
+    socialBlockText,
+    '',
+    '---',
+    '',
+    "Thank you for joining the StikmNek family. We're thrilled to have you!",
+    '',
+    'Best regards,',
+    'The StikmNek Team',
+  ];
+  const plain = plainLines.join('\n');
+
+  try {
+    const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: params.toEmail }] }],
+        from: { email: fromEmail, name: fromName },
+        subject,
+        content: [
+          { type: 'text/plain', value: plain },
+          { type: 'text/html', value: html },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('[manage-business] SendGrid listing-live email FAILED:', res.status, errText);
+      return { sent: false, error: `SendGrid error: ${res.status}` };
+    }
+    return { sent: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[manage-business] SendGrid listing-live email fetch error:', msg);
+    return { sent: false, error: msg };
+  }
 }
 
 Deno.serve(async (req) => {
@@ -517,6 +660,8 @@ Deno.serve(async (req) => {
           pendingRow.business_id != null && String(pendingRow.business_id).trim() !== ''
             ? String(pendingRow.business_id)
             : null;
+        /** First-time public listing only (pending had no `business_id`); skips re-approval / `review_edit` flows. */
+        const isInitialNewBusinessApproval = existingProfileId == null;
 
         const vDesc = String(pending.description ?? '');
         const tagArray = [String(pending.category || 'dining')];
@@ -709,6 +854,40 @@ Deno.serve(async (req) => {
             'Business approved but photos could not be updated. Please manually approve photos for this business. Error: ' + photoErr.message,
             500
           );
+        }
+
+        // ─── Listing live email (SendGrid): initial approval only — new `businesses` row, not linked re-review ───
+        if (isInitialNewBusinessApproval) {
+          const ownerEmail = await resolveOwnerNotificationEmail(supabase, String(pending.owner_id));
+          const listingUrl = `${getAppBaseUrl()}/business/${liveBusinessId}`;
+          const { data: liveNameRow } = await supabase
+            .from('businesses')
+            .select('name')
+            .eq('id', liveBusinessId)
+            .maybeSingle();
+          const displayName =
+            (liveNameRow?.name && String(liveNameRow.name).trim()) ||
+            (pending.name != null && String(pending.name).trim()) ||
+            'there';
+
+          if (ownerEmail) {
+            const sgResult = await sendInitialListingLiveEmail({
+              toEmail: ownerEmail,
+              businessName: displayName,
+              listingUrl,
+            });
+            if (!sgResult.sent) {
+              console.warn(
+                '[manage-business] Initial listing-live email:',
+                sgResult.skipped ? 'skipped (no API key)' : sgResult.error ?? 'unknown',
+              );
+            }
+          } else {
+            console.warn(
+              '[manage-business] Initial listing-live email skipped: no email for owner',
+              String(pending.owner_id),
+            );
+          }
         }
       }
 

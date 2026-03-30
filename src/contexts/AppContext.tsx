@@ -26,6 +26,9 @@ export type ViewMode =
   | 'payment-confirmation'
   | 'business-dashboard'
   | 'help'
+  | 'faq'
+  | 'business-guide'
+  | 'business-new'
   | 'complete-profile'
   | 'complete-business-profile';
 

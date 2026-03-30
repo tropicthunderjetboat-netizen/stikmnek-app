@@ -303,7 +303,7 @@ const HelpCenter: React.FC = () => {
               <div className="space-y-2.5 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-teal-500" />
-                  <span>support@stikm.nek</span>
+                  <span>stikmnek@gmail.com</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="w-4 h-4 text-teal-500" />

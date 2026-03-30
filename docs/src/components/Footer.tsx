@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { MapPin, Mail, Phone, Send, Shield, Globe, HelpCircle, Ticket, Book, FileText, Lock, Cookie, Database, RefreshCw } from 'lucide-react';
+import { MapPin, Mail, Phone, Send, Shield, Globe, HelpCircle, Book, FileText, Lock, Cookie, Database, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 // App version - bump this on every deploy so users can verify they have latest code
 const APP_VERSION = '3.0.0';
 
+const CONTACT_EMAIL = 'stikmnek@gmail.com';
 
 const Footer: React.FC = () => {
-  const { language, setCurrentView } = useAppContext();
+  const { language } = useAppContext();
   const [email, setEmail] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -139,11 +141,15 @@ const Footer: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-teal-500" />
-                hello@stikm.nek
+                <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-teal-400 transition-colors">
+                  {CONTACT_EMAIL}
+                </a>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-teal-500" />
-                +678 12345
+                <a href="tel:+67812345" className="hover:text-teal-400 transition-colors">
+                  +678 12345
+                </a>
               </div>
             </div>
           </div>
@@ -152,22 +158,26 @@ const Footer: React.FC = () => {
           <div>
             <h4 className="font-bold text-white mb-4">{t('footer.links', language)}</h4>
             <ul className="space-y-2.5">
-              {[
-                { label: t('nav.deals', language), view: 'deals' as const },
-                { label: t('nav.map', language), view: 'map' as const },
-                { label: t('nav.passes', language), view: 'passes' as const },
-                { label: language === 'en' ? 'Community' : language === 'fr' ? 'Communauté' : 'Komuniti', view: 'community' as const },
-                { label: t('footer.business', language), view: 'home' as const },
-              ].map((link, i) => (
-                <li key={i}>
-                  <button
-                    onClick={() => setCurrentView(link.view)}
-                    className="text-sm text-gray-400 hover:text-teal-400 transition-colors"
-                  >
-                    {link.label}
-                  </button>
-                </li>
-              ))}
+              <li>
+                <Link to="/deals" className="text-sm text-gray-400 hover:text-teal-400 transition-colors">
+                  {t('nav.deals', language)}
+                </Link>
+              </li>
+              <li>
+                <Link to="/map" className="text-sm text-gray-400 hover:text-teal-400 transition-colors">
+                  {t('nav.map', language)}
+                </Link>
+              </li>
+              <li>
+                <Link to="/passes" className="text-sm text-gray-400 hover:text-teal-400 transition-colors">
+                  {t('nav.passes', language)}
+                </Link>
+              </li>
+              <li>
+                <Link to="/business/new" className="text-sm text-gray-400 hover:text-teal-400 transition-colors">
+                  {t('footer.business', language)}
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -175,23 +185,50 @@ const Footer: React.FC = () => {
           <div>
             <h4 className="font-bold text-white mb-4">{t('footer.support', language)}</h4>
             <ul className="space-y-2.5">
-              {[
-                { label: language === 'en' ? 'Help Center' : language === 'fr' ? 'Centre d\'aide' : 'Help Senta', view: 'help' as const, icon: <Book className="w-3.5 h-3.5" /> },
-                { label: language === 'en' ? 'Support Tickets' : language === 'fr' ? 'Tickets de support' : 'Sapot Tikets', view: 'support' as const, icon: <Ticket className="w-3.5 h-3.5" /> },
-                { label: t('footer.faq', language), view: 'help' as const, icon: <HelpCircle className="w-3.5 h-3.5" /> },
-                { label: t('footer.contact', language), view: 'support' as const, icon: <Mail className="w-3.5 h-3.5" /> },
-                { label: language === 'en' ? 'Business Guide' : language === 'fr' ? 'Guide entreprise' : 'Bisnis Gaed', view: 'help' as const, icon: <FileText className="w-3.5 h-3.5" /> },
-              ].map((item, i) => (
-                <li key={i}>
-                  <button
-                    onClick={() => setCurrentView(item.view)}
-                    className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
-                  >
-                    <span className="text-gray-500">{item.icon}</span>
-                    {item.label}
-                  </button>
-                </li>
-              ))}
+              <li>
+                <Link
+                  to="/help"
+                  className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-gray-500">
+                    <Book className="w-3.5 h-3.5" />
+                  </span>
+                  {language === 'en' ? 'Help Center' : language === 'fr' ? 'Centre d\'aide' : 'Help Senta'}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/faq"
+                  className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-gray-500">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </span>
+                  {t('footer.faq', language)}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/business-guide"
+                  className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-gray-500">
+                    <FileText className="w-3.5 h-3.5" />
+                  </span>
+                  {language === 'en' ? 'Business Guide' : language === 'fr' ? 'Guide entreprise' : 'Bisnis Gaed'}
+                </Link>
+              </li>
+              <li>
+                <a
+                  href={`mailto:${CONTACT_EMAIL}`}
+                  className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-gray-500">
+                    <Mail className="w-3.5 h-3.5" />
+                  </span>
+                  {t('footer.contact', language)}
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -199,20 +236,61 @@ const Footer: React.FC = () => {
           <div>
             <h4 className="font-bold text-white mb-4">{t('footer.legal', language)}</h4>
             <ul className="space-y-2.5">
-              {[
-                { label: t('footer.privacy', language), icon: <Lock className="w-3.5 h-3.5" /> },
-                { label: t('footer.terms', language), icon: <FileText className="w-3.5 h-3.5" /> },
-                { label: t('footer.gdpr', language), icon: <Shield className="w-3.5 h-3.5" /> },
-                { label: language === 'en' ? 'Cookie Policy' : language === 'fr' ? 'Politique de cookies' : 'Kuki Polisi', icon: <Cookie className="w-3.5 h-3.5" /> },
-                { label: language === 'en' ? 'Data Protection' : language === 'fr' ? 'Protection des données' : 'Data Proteksen', icon: <Database className="w-3.5 h-3.5" /> },
-              ].map((item, i) => (
-                <li key={i}>
-                  <button className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2">
-                    <span className="text-gray-500">{item.icon}</span>
-                    {item.label}
-                  </button>
-                </li>
-              ))}
+              <li>
+                <Link
+                  to="/legal/privacy"
+                  className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-gray-500">
+                    <Lock className="w-3.5 h-3.5" />
+                  </span>
+                  {t('footer.privacy', language)}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/legal/terms"
+                  className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-gray-500">
+                    <FileText className="w-3.5 h-3.5" />
+                  </span>
+                  {t('footer.terms', language)}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/legal/gdpr"
+                  className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-gray-500">
+                    <Shield className="w-3.5 h-3.5" />
+                  </span>
+                  {t('footer.gdpr', language)}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/legal/cookies"
+                  className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-gray-500">
+                    <Cookie className="w-3.5 h-3.5" />
+                  </span>
+                  {language === 'en' ? 'Cookie Policy' : language === 'fr' ? 'Politique de cookies' : 'Kuki Polisi'}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/legal/data-protection"
+                  className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-gray-500">
+                    <Database className="w-3.5 h-3.5" />
+                  </span>
+                  {language === 'en' ? 'Data Protection' : language === 'fr' ? 'Protection des données' : 'Data Proteksen'}
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

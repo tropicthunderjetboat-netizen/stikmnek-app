@@ -1,5 +1,8 @@
 import React, { Suspense, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
+import type { ViewMode } from '@/contexts/AppContext';
+import LegalDocumentPage from './LegalDocumentPage';
 
 // ── Eagerly-loaded components ──
 import Navbar from './Navbar';
@@ -30,7 +33,25 @@ const PaymentCheckout = React.lazy(() => import('./PaymentCheckout'));
 const BusinessOwnerDashboard = React.lazy(() => import('./BusinessOwnerDashboard'));
 const HelpCenter = React.lazy(() => import('./HelpCenter'));
 
+/** URL path → in-app view (excludes /legal/* handled separately). */
+const PATH_TO_VIEW: Record<string, ViewMode> = {
+  '/': 'home',
+  '/deals': 'deals',
+  '/map': 'map',
+  '/passes': 'passes',
+  '/business/new': 'business-new',
+  '/help': 'help',
+  '/faq': 'faq',
+  '/business-guide': 'business-guide',
+};
+
+function legalSlugFromPath(pathname: string): string | null {
+  const m = pathname.match(/^\/legal\/([^/]+)\/?$/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
 const AppLayout: React.FC = () => {
+  const location = useLocation();
   const {
     currentView,
     user,
@@ -40,6 +61,15 @@ const AppLayout: React.FC = () => {
     businessOwnerHasBusinessRow,
   } = useAppContext();
   const prevViewRef = useRef(currentView);
+
+  useEffect(() => {
+    const p = location.pathname;
+    if (p.startsWith('/legal/')) return;
+    const next = PATH_TO_VIEW[p];
+    if (next !== undefined) {
+      setCurrentView(next);
+    }
+  }, [location.pathname, setCurrentView]);
 
   // ─── Role-based view access control ───
   useEffect(() => {
@@ -131,6 +161,15 @@ const AppLayout: React.FC = () => {
   }, []);
 
   const renderView = () => {
+    const legalSlug = legalSlugFromPath(location.pathname);
+    if (legalSlug) {
+      return (
+        <div className="pt-16 min-h-[40vh] bg-white">
+          <LegalDocumentPage slug={legalSlug} />
+        </div>
+      );
+    }
+
     switch (currentView) {
       case 'complete-profile':
         return <CompleteTouristProfile />;
@@ -167,7 +206,29 @@ const AppLayout: React.FC = () => {
       case 'business-dashboard':
         return <BusinessOwnerDashboard />;
       case 'help':
-        return <HelpCenter />;
+        return (
+          <div className="pt-16">
+            <HelpCenter />
+          </div>
+        );
+      case 'faq':
+        return (
+          <div className="pt-16">
+            <HelpCenter initialSection="tourist-faq" />
+          </div>
+        );
+      case 'business-guide':
+        return (
+          <div className="pt-16">
+            <HelpCenter initialSection="business-guide" />
+          </div>
+        );
+      case 'business-new':
+        return (
+          <div className="pt-16 max-w-4xl mx-auto px-4">
+            <BusinessListingForm />
+          </div>
+        );
       case 'home':
       default:
         return (

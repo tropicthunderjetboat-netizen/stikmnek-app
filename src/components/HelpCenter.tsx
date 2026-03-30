@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import {
   HelpCircle, Book, Store, Shield, Users, ChevronDown, ChevronRight,
@@ -9,17 +9,30 @@ import {
 
 type HelpSection = 'overview' | 'tourist-faq' | 'business-guide' | 'admin-manual' | 'quick-start' | 'troubleshooting';
 
+const SUPPORT_EMAIL = 'stikmnek@gmail.com';
+
 interface FAQItem {
   question: string;
   answer: string;
   icon?: React.ReactNode;
 }
 
-const HelpCenter: React.FC = () => {
+interface HelpCenterProps {
+  initialSection?: HelpSection;
+}
+
+const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
   const { language, setCurrentView, user } = useAppContext();
-  const [activeSection, setActiveSection] = useState<HelpSection>('overview');
+  const [activeSection, setActiveSection] = useState<HelpSection>(initialSection ?? 'overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialSection) {
+      setActiveSection(initialSection);
+      setExpandedFAQ(null);
+    }
+  }, [initialSection]);
 
   const sections: { key: HelpSection; label: string; icon: React.ReactNode; description: string }[] = [
     { key: 'overview', label: 'Getting Started', icon: <Zap className="w-5 h-5" />, description: 'Learn the basics of StikmNek' },
@@ -154,7 +167,7 @@ const HelpCenter: React.FC = () => {
       content: 'Keep the platform running smoothly.',
       steps: [
         'Check error logs regularly for recurring issues',
-        'Respond to support email (support@stikm.nek) promptly',
+        `Respond to support email (${SUPPORT_EMAIL}) promptly`,
         'Track email delivery rates and fix any failures',
       ],
     },
@@ -302,11 +315,15 @@ const HelpCenter: React.FC = () => {
               <div className="space-y-2.5 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
                   <Mail className="w-4 h-4 text-teal-500" />
-                  <span>support@stikm.nek</span>
+                  <a href={`mailto:${SUPPORT_EMAIL}`} className="text-teal-600 hover:underline">
+                    {SUPPORT_EMAIL}
+                  </a>
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="w-4 h-4 text-teal-500" />
-                  <span>+678 12345</span>
+                  <a href="tel:+67812345" className="text-teal-600 hover:underline">
+                    +678 12345
+                  </a>
                 </div>
                 <div className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4 text-teal-500" />
@@ -314,7 +331,7 @@ const HelpCenter: React.FC = () => {
                 </div>
               </div>
               <a
-                href="mailto:support@stikm.nek?subject=StikmNek%20support"
+                href={`mailto:${SUPPORT_EMAIL}?subject=StikmNek%20support`}
                 className="block w-full mt-4 py-2.5 rounded-xl bg-teal-50 text-teal-700 text-sm font-semibold hover:bg-teal-100 transition-colors text-center"
               >
                 Email support

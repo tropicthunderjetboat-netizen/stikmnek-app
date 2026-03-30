@@ -1025,7 +1025,7 @@ Enjoy your deals in Vanuatu!
         {/* Help Text */}
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-400">
-            Need help? Contact us at <a href="mailto:support@stikm.nek" className="text-teal-600 hover:underline">support@stikm.nek</a>
+            Need help? Contact us at <a href="mailto:stikmnek@gmail.com" className="text-teal-600 hover:underline">stikmnek@gmail.com</a>
           </p>
         </div>
       </div>

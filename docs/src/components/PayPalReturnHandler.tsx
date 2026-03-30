@@ -243,7 +243,7 @@ const PayPalReturnHandler: React.FC = () => {
               </button>
             </div>
             <p className="text-xs text-gray-400 mt-4">
-              If you were charged, please contact <a href="mailto:support@stikm.nek" className="text-teal-600 hover:underline">support@stikm.nek</a>
+              If you were charged, please contact <a href="mailto:stikmnek@gmail.com" className="text-teal-600 hover:underline">stikmnek@gmail.com</a>
             </p>
           </>
         )}
