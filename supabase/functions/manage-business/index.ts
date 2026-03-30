@@ -512,42 +512,181 @@ Deno.serve(async (req) => {
       if (updateErr) return errorResponse(updateErr.message, 500);
 
       if (decision === 'approved') {
-        const bizRecord = {
-          owner_id: pending.owner_id,
-          name: pending.name,
-          category: pending.category,
-          description: pending.description,
+        const pendingRow = pending as Record<string, unknown>;
+        const existingProfileId =
+          pendingRow.business_id != null && String(pendingRow.business_id).trim() !== ''
+            ? String(pendingRow.business_id)
+            : null;
+
+        const vDesc = String(pending.description ?? '');
+        const tagArray = [String(pending.category || 'dining')];
+
+        const offeringFields = {
+          title: (pending.name && String(pending.name).trim()) || 'Main offer',
+          description: vDesc,
+          description_fr: vDesc,
+          description_bi: vDesc,
           discount: pending.discount || '',
           original_price: Number(pending.original_price) || 0,
           deal_price: Number(pending.deal_price) || 0,
-          location: pending.location || '',
-          phone: pending.phone || '',
-          hours: pending.hours || '',
           image: pending.image || '',
-          map_url: pending.map_url || null,
-          website: pending.website || null,
-          discount_valid_from: pending.discount_valid_from || null,
-          discount_valid_until: pending.discount_valid_until || null,
-          whatsapp_number: pending.whatsapp_number || null,
+          map_url: pending.map_url ?? null,
+          website: pending.website ?? null,
+          discount_valid_from: pending.discount_valid_from ?? null,
+          discount_valid_until: pending.discount_valid_until ?? null,
+          whatsapp_number: pending.whatsapp_number ?? null,
           pricing_tiers: pending.pricing_tiers ?? null,
+          tags: tagArray,
+          active: true,
+          updated_at: new Date().toISOString(),
         };
 
-        const { data: newBiz, error: insertErr } = await supabase
-          .from('businesses')
-          .insert(bizRecord)
-          .select()
-          .single();
+        let liveBusinessId: string;
 
-        if (insertErr) {
-          console.error('[manage-business] Failed to create businesses record:', insertErr);
-          return errorResponse('Approved but failed to create business record: ' + insertErr.message, 500);
+        if (existingProfileId) {
+          const { data: prof, error: profErr } = await supabase
+            .from('businesses')
+            .select('id, owner_id')
+            .eq('id', existingProfileId)
+            .maybeSingle();
+
+          if (profErr || !prof) {
+            return errorResponse('Invalid business_id on pending row (profile not found)', 400);
+          }
+          if (String(prof.owner_id) !== String(pending.owner_id)) {
+            return errorResponse('Invalid business_id on pending row (owner mismatch)', 403);
+          }
+
+          const vEmail = (pending.email && String(pending.email).trim()) || null;
+          const profileUpdate: Record<string, unknown> = {
+            category: pending.category || 'dining',
+            description: vDesc,
+            description_fr: vDesc,
+            description_bi: vDesc,
+            image: pending.image || '',
+            discount: pending.discount || '',
+            original_price: Number(pending.original_price) || 0,
+            deal_price: Number(pending.deal_price) || 0,
+            location: pending.location || '',
+            phone: pending.phone || '',
+            hours: pending.hours || '',
+            map_url: pending.map_url ?? null,
+            website: pending.website ?? null,
+            discount_valid_from: pending.discount_valid_from ?? null,
+            discount_valid_until: pending.discount_valid_until ?? null,
+            whatsapp_number: pending.whatsapp_number ?? null,
+            pricing_tiers: pending.pricing_tiers ?? null,
+            tags: tagArray,
+            email: vEmail,
+            contact_email: vEmail,
+            business_email: vEmail,
+            active: true,
+            updated_at: new Date().toISOString(),
+          };
+          const trimmedName = pending.name != null ? String(pending.name).trim() : '';
+          if (trimmedName) profileUpdate.name = trimmedName;
+
+          const { error: profUpdErr } = await supabase
+            .from('businesses')
+            .update(profileUpdate)
+            .eq('id', existingProfileId);
+
+          if (profUpdErr) {
+            console.error('[manage-business] Failed to sync businesses row on re-approve:', profUpdErr);
+            return errorResponse(
+              'Approved but failed to update profile: ' + profUpdErr.message,
+              500,
+            );
+          }
+
+          const { data: primaryRows, error: offSelErr } = await supabase
+            .from('business_offerings')
+            .select('id')
+            .eq('business_id', existingProfileId)
+            .order('created_at', { ascending: true })
+            .limit(1);
+
+          if (offSelErr) {
+            console.error('[manage-business] offering lookup:', offSelErr);
+            return errorResponse(offSelErr.message, 500);
+          }
+
+          const primaryId = primaryRows?.[0]?.id as string | undefined;
+          if (primaryId) {
+            const { error: offUpdErr } = await supabase
+              .from('business_offerings')
+              .update(offeringFields)
+              .eq('id', primaryId);
+            if (offUpdErr) {
+              console.error('[manage-business] Failed to update business_offerings:', offUpdErr);
+              return errorResponse(
+                'Approved but failed to update live offering: ' + offUpdErr.message,
+                500,
+              );
+            }
+          } else {
+            const { error: offInsErr } = await supabase.from('business_offerings').insert({
+              business_id: existingProfileId,
+              ...offeringFields,
+              featured: false,
+            });
+            if (offInsErr) {
+              console.error('[manage-business] Failed to insert business_offerings:', offInsErr);
+              return errorResponse(
+                'Approved but failed to create live offering: ' + offInsErr.message,
+                500,
+              );
+            }
+          }
+
+          liveBusinessId = existingProfileId;
+        } else {
+          const bizRecord = {
+            owner_id: pending.owner_id,
+            name: pending.name,
+            category: pending.category,
+            description: pending.description,
+            discount: pending.discount || '',
+            original_price: Number(pending.original_price) || 0,
+            deal_price: Number(pending.deal_price) || 0,
+            location: pending.location || '',
+            phone: pending.phone || '',
+            hours: pending.hours || '',
+            image: pending.image || '',
+            map_url: pending.map_url || null,
+            website: pending.website || null,
+            discount_valid_from: pending.discount_valid_from || null,
+            discount_valid_until: pending.discount_valid_until || null,
+            whatsapp_number: pending.whatsapp_number || null,
+            pricing_tiers: pending.pricing_tiers ?? null,
+          };
+
+          const { data: newBiz, error: insertErr } = await supabase
+            .from('businesses')
+            .insert(bizRecord)
+            .select()
+            .single();
+
+          if (insertErr) {
+            console.error('[manage-business] Failed to create businesses record:', insertErr);
+            return errorResponse('Approved but failed to create business record: ' + insertErr.message, 500);
+          }
+
+          liveBusinessId = newBiz.id as string;
+
+          const { error: offInsErr } = await supabase.from('business_offerings').insert({
+            business_id: liveBusinessId,
+            ...offeringFields,
+            featured: false,
+          });
+          if (offInsErr) {
+            console.warn('[manage-business] businesses created but offering insert failed:', offInsErr);
+          }
         }
 
-        // Move gallery rows to the live business. Preserve admin rejections — only non-rejected
-        // rows become approved (matches review_pending_business RPC).
         const { error: rejErr } = await supabase
           .from('business_photos')
-          .update({ business_id: newBiz.id })
+          .update({ business_id: liveBusinessId })
           .eq('business_id', businessId)
           .eq('status', 'rejected');
 
@@ -561,7 +700,7 @@ Deno.serve(async (req) => {
 
         const { error: photoErr } = await supabase
           .from('business_photos')
-          .update({ business_id: newBiz.id, status: 'approved' })
+          .update({ business_id: liveBusinessId, status: 'approved' })
           .eq('business_id', businessId);
 
         if (photoErr) {
@@ -720,13 +859,75 @@ Deno.serve(async (req) => {
           location: 'location',
           tags: 'tags',
           whatsapp_number: 'whatsapp_number',
+          map_url: 'map_url',
+          website: 'website',
+          image: 'image',
+          pricing_tiers: 'pricing_tiers',
         };
         for (const [k, v] of Object.entries(changes)) {
           const col = colMap[k] || k;
           if (v !== undefined) updates[col] = v;
         }
         if (Object.keys(updates).length > 0) {
-          await supabase.from('businesses').update(updates).eq('id', edit.business_id);
+          const { error: bizUpdErr } = await supabase
+            .from('businesses')
+            .update(updates)
+            .eq('id', edit.business_id);
+          if (bizUpdErr) {
+            console.error('[manage-business] review_edit businesses update:', bizUpdErr);
+            return errorResponse(bizUpdErr.message, 500);
+          }
+        }
+
+        // Public deals read from business_offerings — mirror editable fields onto primary offering.
+        const offeringPatch: Record<string, unknown> = {};
+        if (changes.description !== undefined) {
+          offeringPatch.description = changes.description;
+          offeringPatch.description_fr = changes.description;
+          offeringPatch.description_bi = changes.description;
+        }
+        if (changes.discount !== undefined) offeringPatch.discount = changes.discount;
+        if (changes.original_price !== undefined) {
+          offeringPatch.original_price = Number(changes.original_price) || 0;
+        }
+        if (changes.deal_price !== undefined) {
+          offeringPatch.deal_price = Number(changes.deal_price) || 0;
+        }
+        if (changes.whatsapp_number !== undefined) {
+          offeringPatch.whatsapp_number = changes.whatsapp_number;
+        }
+        if (changes.tags !== undefined) offeringPatch.tags = changes.tags;
+        if (changes.map_url !== undefined) offeringPatch.map_url = changes.map_url;
+        if (changes.website !== undefined) offeringPatch.website = changes.website;
+        if (changes.image !== undefined) offeringPatch.image = changes.image;
+        if (changes.pricing_tiers !== undefined) {
+          offeringPatch.pricing_tiers = changes.pricing_tiers;
+        }
+
+        if (Object.keys(offeringPatch).length > 0) {
+          offeringPatch.active = true;
+          offeringPatch.updated_at = new Date().toISOString();
+          const { data: primaryRows, error: offSelErr } = await supabase
+            .from('business_offerings')
+            .select('id')
+            .eq('business_id', edit.business_id)
+            .order('created_at', { ascending: true })
+            .limit(1);
+          if (offSelErr) {
+            console.error('[manage-business] review_edit offering lookup:', offSelErr);
+            return errorResponse(offSelErr.message, 500);
+          }
+          const oid = primaryRows?.[0]?.id as string | undefined;
+          if (oid) {
+            const { error: offErr } = await supabase
+              .from('business_offerings')
+              .update(offeringPatch)
+              .eq('id', oid);
+            if (offErr) {
+              console.error('[manage-business] review_edit offering update:', offErr);
+              return errorResponse(offErr.message, 500);
+            }
+          }
         }
       }
 
