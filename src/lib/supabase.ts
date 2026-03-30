@@ -39,7 +39,7 @@ async function navigatorLockFallback<R>(
   if (typeof navigator !== 'undefined' && navigator.locks) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), Math.min(acquireTimeout, 4000));
+      const timeoutId = setTimeout(() => controller.abort(), Math.max(acquireTimeout, 4000));
 
       const result = await navigator.locks.request(
         name,
@@ -89,8 +89,8 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
     detectSessionInUrl: true,
     flowType: 'implicit',
     lock: navigatorLockFallback,
-    // Reduce lock acquire timeout for faster fail — avoids hanging on session restore
-    lockAcquireTimeout: 2000,
+    // Session storage lock: slightly higher timeout reduces Navigator lock fallback warnings when tabs compete
+    lockAcquireTimeout: 5000,
   },
 });
 

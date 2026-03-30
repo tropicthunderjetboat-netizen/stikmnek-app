@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { businesses as fallbackBusinesses } from '@/data/businesses';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { Star, Quote, MessageSquarePlus, X, ChevronDown, Sparkles } from 'lucide-react';
 import ReviewForm from '@/components/ReviewForm';
 
@@ -13,6 +14,11 @@ const ReviewsSection: React.FC = () => {
   const [showDropdown, setShowDropdown] = useState(false);
 
   const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : fallbackBusinesses;
+
+  const reviewableBusinesses = useMemo(() => {
+    if (!user?.id) return allBusinesses;
+    return allBusinesses.filter((b) => !b.ownerId || b.ownerId !== user.id);
+  }, [allBusinesses, user?.id]);
 
   // Use DB reviews if available, otherwise show placeholder
   const featured = dbReviews.length > 0
@@ -27,7 +33,9 @@ const ReviewsSection: React.FC = () => {
   // Map business_id to business name for display
   const businessNameMap = useMemo(() => {
     const map: Record<string, string> = {};
-    allBusinesses.forEach(b => { map[b.id] = b.name; });
+    allBusinesses.forEach((b) => {
+      map[profileBusinessIdFor(b)] = b.name;
+    });
     return map;
   }, [allBusinesses]);
 
@@ -163,11 +171,22 @@ const ReviewsSection: React.FC = () => {
                     </button>
                     {showDropdown && (
                       <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-60 overflow-y-auto z-20">
-                        {allBusinesses.map(biz => (
+                        {reviewableBusinesses.length === 0 && (
+                          <p className="px-4 py-3 text-sm text-gray-500">
+                            {language === 'en'
+                              ? 'No listings available to review (including your own).'
+                              : language === 'fr'
+                                ? 'Aucune annonce à évaluer (y compris la vôtre).'
+                                : 'No gat lista blong riviu.'}
+                          </p>
+                        )}
+                        {reviewableBusinesses.map((biz) => {
+                          const pid = profileBusinessIdFor(biz);
+                          return (
                           <button
                             key={biz.id}
                             type="button"
-                            onClick={() => { setSelectedBusinessId(biz.id); setShowDropdown(false); }}
+                            onClick={() => { setSelectedBusinessId(pid); setShowDropdown(false); }}
                             className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-teal-50 transition-colors border-b border-gray-50 last:border-0"
                           >
                             <img
@@ -180,7 +199,8 @@ const ReviewsSection: React.FC = () => {
                               <p className="text-xs text-gray-500 capitalize">{biz.category} &middot; {biz.location}</p>
                             </div>
                           </button>
-                        ))}
+                        );
+                        })}
                       </div>
                     )}
                   </div>
@@ -190,7 +210,7 @@ const ReviewsSection: React.FC = () => {
                   {/* Selected Business Display */}
                   <div className="flex items-center gap-3 p-3 bg-teal-50 rounded-xl border border-teal-100">
                     {(() => {
-                      const biz = allBusinesses.find(b => b.id === selectedBusinessId);
+                      const biz = allBusinesses.find((b) => profileBusinessIdFor(b) === selectedBusinessId);
                       return biz ? (
                         <>
                           <img src={biz.image} alt={biz.name} className="w-12 h-12 rounded-lg object-cover shrink-0" />

@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useAppContext, ViewMode } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { businesses as localBusinesses, categories, publicListingBusinesses } from '@/data/businesses';
+import { businesses as localBusinesses, categories, publicListingBusinesses, Business } from '@/data/businesses';
+import { pickRepresentativeOfferingsPerProfile, profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import BusinessCard from './BusinessCard';
 import AdvancedSearch, { SortOption } from './AdvancedSearch';
 import { Search, SlidersHorizontal, LayoutGrid, List, Navigation, Loader2, Award } from 'lucide-react';
@@ -23,15 +24,17 @@ const WhatsAppFilterIcon: React.FC<{ className?: string }> = ({ className }) => 
 
 // ─── Leaderboard scoring (same algorithm as FeaturedLeaderboard) ───
 function computeLeaderboardScore(
-  biz: typeof localBusinesses[0],
-  allBusinesses: typeof localBusinesses,
+  biz: Business,
+  allBusinesses: Business[],
   dbReviews: any[],
   redemptions: any[]
 ): number {
+  const profileId = profileBusinessIdFor(biz);
   const maxReviews = Math.max(...allBusinesses.map(b => b.reviewCount), 1);
   const maxSuperStars = Math.max(...allBusinesses.map(b => {
+    const pid = profileBusinessIdFor(b);
     const dbCount = b.superStarCount || 0;
-    const reviewCount = dbReviews.filter(r => r.business_id === b.id && r.has_super_star).length;
+    const reviewCount = dbReviews.filter(r => r.business_id === pid && r.has_super_star).length;
     return Math.max(dbCount, reviewCount);
   }), 1);
 
@@ -39,7 +42,7 @@ function computeLeaderboardScore(
   const reviewScore = Math.min(Math.log(biz.reviewCount + 1) / Math.log(maxReviews + 1), 1);
   const superStarCount = Math.max(
     biz.superStarCount || 0,
-    dbReviews.filter(r => r.business_id === biz.id && r.has_super_star).length
+    dbReviews.filter(r => r.business_id === profileId && r.has_super_star).length
   );
   const superStarScore = maxSuperStars > 0 ? Math.min(superStarCount / maxSuperStars, 1) : 0;
   const discountPct = biz.originalPrice > 0
@@ -47,11 +50,11 @@ function computeLeaderboardScore(
     : 0;
   const dealScore = Math.min(discountPct * 2, 1);
   const recentReviews = dbReviews.filter(r => {
-    if (r.business_id !== biz.id) return false;
+    if (r.business_id !== profileId) return false;
     const daysSince = (Date.now() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24);
     return daysSince <= 30;
   }).length;
-  const bizRedemptions = redemptions.filter(r => r.businessId === biz.id).length;
+  const bizRedemptions = redemptions.filter(r => r.businessId === profileId).length;
   const engagementRaw = (recentReviews * 2) + bizRedemptions;
   const engagementScore = Math.min(engagementRaw / 20, 1);
 
@@ -97,10 +100,11 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [whatsappFilter, setWhatsappFilter] = useState(false);
 
-  const allBusinesses = useMemo(
-    () => publicListingBusinesses(dbBusinesses, localBusinesses),
-    [dbBusinesses],
-  );
+  const allBusinesses = useMemo(() => {
+    const raw = publicListingBusinesses(dbBusinesses, localBusinesses);
+    if (dbBusinesses.length === 0) return raw;
+    return pickRepresentativeOfferingsPerProfile(raw);
+  }, [dbBusinesses]);
 
   const maxPrice = useMemo(() => Math.max(...allBusinesses.map(b => b.dealPrice || b.originalPrice), 50000), [allBusinesses]);
 

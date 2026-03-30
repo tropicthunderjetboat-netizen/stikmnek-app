@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import { Language } from '@/data/translations';
 import { Business } from '@/data/businesses';
 import { supabase, directProfileInsert, SUPABASE_URL } from '@/lib/supabase';
-import { getBusinessImageUrl } from '@/lib/utils';
 import { mapJoinedOfferingToBusiness } from '@/lib/businessOfferingMap';
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
@@ -359,7 +358,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('[loadBusinesses] business_offerings:', offErr.message || offErr);
       }
 
-      if (!offErr && offRows && offRows.length > 0) {
+      if (offErr) {
+        console.warn('[loadBusinesses] business_offerings:', offErr.message || offErr);
+        setDbBusinesses([]);
+        setDataLoaded(true);
+        return;
+      }
+
+      if (offRows && offRows.length > 0) {
         const mapped: Business[] = [];
         for (const row of offRows as Record<string, unknown>[]) {
           const b = row.businesses as Record<string, unknown> | null | undefined;
@@ -369,52 +375,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (row.active === false) continue;
           mapped.push(mapJoinedOfferingToBusiness(row, b, SUPABASE_URL));
         }
-        if (mapped.length > 0) {
-          setDbBusinesses(mapped);
-          setDataLoaded(true);
-          return;
-        }
-      }
-
-      const { data, error } = await supabase
-        .from('businesses')
-        .select('*')
-        .order('featured', { ascending: false });
-      if (error) throw error;
-      if (data) {
-        const mapped: Business[] = data.map((b: any) => ({
-          id: b.id,
-          name: b.name ?? '',
-          category: b.category ?? 'dining',
-          description: b.description ?? '',
-          descriptionFr: b.description_fr || b.description,
-          descriptionBi: b.description_bi || b.description,
-          image: getBusinessImageUrl(b.image_url || b.image, SUPABASE_URL),
-          rating: Number(b.rating) || 0,
-          reviewCount: b.review_count || 0,
-          discount: b.deal || b.discount || '',
-          originalPrice: Number(b.original_price) || 0,
-          dealPrice: Number(b.discounted_price ?? b.deal_price) || 0,
-          location: b.location || '',
-          lat: Number(b.lat) || 0,
-          lng: Number(b.lng) || 0,
-          mapUrl: b.map_url || null,
-          map_url: b.map_url || null,
-          website: b.website || null,
-          hours: b.opening_hours || b.hours || '',
-          phone: b.phone || b.business_phone || b.contact_phone || b.phone_number || '',
-          contactEmail: b.email || b.contact_email || b.business_email || null,
-          whatsappNumber: b.whatsapp_number || b.whatsapp || b.business_whatsapp || null,
-          tags: b.tags || [],
-          featured: b.featured || false,
-          ownerId: b.owner_id || null,
-          superStarCount: Number(b.super_star_count) || 0,
-          pricingTiers: b.pricing_tiers ?? null,
-          active: b.active !== false,
-        }));
         setDbBusinesses(mapped);
-        setDataLoaded(true);
+      } else {
+        setDbBusinesses([]);
       }
+      setDataLoaded(true);
     } catch (err) {
       console.error('Failed to load businesses:', err);
       setDataLoaded(true);
@@ -565,7 +530,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   //           4) Auth metadata  5) Default tourist (never hang)
   // DB fetch has 3s timeout. Admin DB update runs in background.
   // ═══════════════════════════════════════════════════════════
-  const ROLE_RESOLVE_TIMEOUT_MS = 3000;
+  /** Slightly generous for slow networks; pairs with handleAuthenticatedUser outer race. */
+  const ROLE_RESOLVE_TIMEOUT_MS = 8000;
 
   const resolveRole = useCallback(async (
     userId: string,
@@ -755,7 +721,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const result = await Promise.race([
           resolveRole(authUser.id, authUser.email || '', authUser.user_metadata),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('handleAuthenticatedUser: resolveRole timeout')), 5000)
+            setTimeout(() => reject(new Error('handleAuthenticatedUser: resolveRole timeout')), 10_000)
           ),
         ]);
         role = result.role;
@@ -782,7 +748,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               userType: fallbackType as 'tourist' | 'business' | 'admin',
             }),
             new Promise<{ success: boolean; profile?: any; error?: string }>((resolve) =>
-              setTimeout(() => resolve({ success: false, error: 'directProfileInsert timeout' }), 4000)
+              setTimeout(() => resolve({ success: false, error: 'directProfileInsert timeout' }), 8000)
             ),
           ]);
 
@@ -980,16 +946,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }, 1500);
 
-    // SAFETY NET: Force authLoading off after 6 seconds (fail-fast)
+    // SAFETY NET: Force authLoading off if role/profile work stalls (rare slow DB)
     const safetyTimer = setTimeout(() => {
       setAuthLoading(prev => {
         if (prev) {
-          console.warn('[Safety] authLoading still true after 6s — forcing false');
+          console.warn('[Safety] authLoading still true after 12s — forcing false');
           return false;
         }
         return prev;
       });
-    }, 6000);
+    }, 12_000);
 
     return () => {
       subscription.unsubscribe();
@@ -1351,6 +1317,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
+      const { data: ownRow } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('id', businessId)
+        .eq('owner_id', user.id)
+        .maybeSingle();
+
+      if (ownRow) {
+        const msg =
+          language === 'en'
+            ? 'You cannot review your own business.'
+            : language === 'fr'
+              ? 'Vous ne pouvez pas évaluer votre propre établissement.'
+              : 'Yu no save riviu bisinis blong yu yet.';
+        toast.error(msg);
+        throw new Error(msg);
+      }
+
       if (isSuperStar || rating === 6) {
         // Superstar: use RPC (atomic decrement credit + insert)
         const { error } = await supabase.rpc('submit_superstar_review', {
@@ -1392,7 +1376,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast.error(err.message || 'Failed to submit review');
       throw err;
     }
-  }, [user, refreshUserProfile, loadReviews]);
+  }, [user, language, refreshUserProfile, loadReviews]);
 
   const refreshBusinesses = useCallback(async () => {
     await loadBusinesses();

@@ -22,9 +22,18 @@ import {
   plainTextFromHtml,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
-import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import {
+  mapJoinedOfferingToBusiness,
+  OFFERING_LISTING_COLUMNS,
+  profileBusinessIdFor,
+} from '@/lib/businessOfferingMap';
+import type { Business } from '@/data/businesses';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
+
+/** Master profile fields required by `mapJoinedOfferingToBusiness` (listing detail lives on offerings). */
+const PROFILE_STUB_COLS =
+  'id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone, email, contact_email, business_email, whatsapp_number, rating, review_count, featured, active, map_url, website, tags';
 
 // WhatsApp SVG icon component
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
@@ -49,26 +58,86 @@ const BusinessDetail: React.FC = () => {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewResponsesById, setReviewResponsesById] = useState<Record<string, ReviewResponseRow>>({});
   const [displayCoverImage, setDisplayCoverImage] = useState('');
+  const [profileOfferings, setProfileOfferings] = useState<Business[]>([]);
+  const [offeringsFetchError, setOfferingsFetchError] = useState<string | null>(null);
+  const [offeringsLoaded, setOfferingsLoaded] = useState(false);
 
-  if (!selectedBusiness) return null;
+  const profileId = selectedBusiness ? profileBusinessIdFor(selectedBusiness) : '';
 
-  const biz = selectedBusiness;
-  const profileId = profileBusinessIdFor(biz);
-  const isFav = favorites.includes(profileId);
-  const reviews = useMemo(() => dbReviews.filter(r => r.business_id === profileId), [dbReviews, profileId]);
+  /** Load master profile stub + all active offerings; listing copy comes from `business_offerings`. */
+  useEffect(() => {
+    if (!selectedBusiness || !profileId) {
+      setProfileOfferings([]);
+      setOfferingsFetchError(null);
+      setOfferingsLoaded(false);
+      return;
+    }
+    let cancelled = false;
+    setOfferingsLoaded(false);
+    void (async () => {
+      const { data: prof, error: pErr } = await supabase
+        .from('businesses')
+        .select(PROFILE_STUB_COLS)
+        .eq('id', profileId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (pErr || !prof) {
+        setOfferingsFetchError(pErr?.message ?? 'Profile not found');
+        setProfileOfferings([]);
+        setOfferingsLoaded(true);
+        return;
+      }
+      const { data: offs, error: oErr } = await supabase
+        .from('business_offerings')
+        .select(OFFERING_LISTING_COLUMNS)
+        .eq('business_id', profileId)
+        .eq('active', true)
+        .order('featured', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (cancelled) return;
+      if (oErr) {
+        setOfferingsFetchError(oErr.message);
+        setProfileOfferings([]);
+        setOfferingsLoaded(true);
+        return;
+      }
+      const b = prof as Record<string, unknown>;
+      const mapped = ((offs || []) as Record<string, unknown>[]).map((row) =>
+        mapJoinedOfferingToBusiness(row, b, SUPABASE_URL),
+      );
+      setProfileOfferings(mapped);
+      setOfferingsFetchError(null);
+      setOfferingsLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
+
+  const effectiveBiz = useMemo((): Business | null => {
+    if (!selectedBusiness) return null;
+    if (profileOfferings.length === 0) return selectedBusiness;
+    const match = profileOfferings.find((o) => o.id === selectedBusiness.id);
+    return match ?? profileOfferings[0] ?? selectedBusiness;
+  }, [selectedBusiness, profileOfferings]);
 
   useEffect(() => {
-    setDisplayCoverImage(biz.image || '');
-  }, [biz.id, biz.image]);
+    setDisplayCoverImage(effectiveBiz?.image || '');
+  }, [effectiveBiz?.id, effectiveBiz?.image]);
+
+  const reviews = useMemo(
+    () => (profileId ? dbReviews.filter((r) => r.business_id === profileId) : []),
+    [dbReviews, profileId],
+  );
 
   useEffect(() => {
     if (reviews.length === 0) {
       setReviewResponsesById({});
       return;
     }
-    const ids = reviews.map(r => r.id);
+    const ids = reviews.map((r) => r.id);
     let cancelled = false;
-    (async () => {
+    void (async () => {
       const { data, error } = await supabase
         .from('review_responses')
         .select('review_id, response, created_at')
@@ -81,18 +150,37 @@ const BusinessDetail: React.FC = () => {
       });
       if (!cancelled) setReviewResponsesById(map);
     })();
-    return () => { cancelled = true; };
-  }, [biz.id, reviews]);
-  const desc = language === 'fr' ? biz.descriptionFr : language === 'bi' ? biz.descriptionBi : biz.description;
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveBiz?.id, reviews]);
+
+  const desc = useMemo(() => {
+    if (!effectiveBiz) return '';
+    return language === 'fr'
+      ? effectiveBiz.descriptionFr
+      : language === 'bi'
+        ? effectiveBiz.descriptionBi
+        : effectiveBiz.description;
+  }, [effectiveBiz, language]);
 
   const pricingTiers = useMemo(
-    () => pricingTiersFromDb(biz.pricingTiers ?? (biz as { pricing_tiers?: unknown }).pricing_tiers),
-    [biz.id, biz.pricingTiers],
+    () =>
+      pricingTiersFromDb(
+        effectiveBiz?.pricingTiers ?? (effectiveBiz as { pricing_tiers?: unknown })?.pricing_tiers,
+      ),
+    [effectiveBiz?.id, effectiveBiz?.pricingTiers],
   );
-  const showTieredTable = categoryUsesTieredPricing(biz.category) && pricingTiers.length > 0;
+  const showTieredTable =
+    effectiveBiz != null &&
+    categoryUsesTieredPricing(effectiveBiz.category) &&
+    pricingTiers.length > 0;
 
-  const mapCoords = useMemo(() => effectiveBusinessCoords(biz), [biz.lat, biz.lng, biz.mapUrl, biz.map_url]);
-  const savedMapUrlTrimmed = ((biz.mapUrl ?? biz.map_url) || '').trim();
+  const mapCoords = useMemo(
+    () => (effectiveBiz ? effectiveBusinessCoords(effectiveBiz) : null),
+    [effectiveBiz?.lat, effectiveBiz?.lng, effectiveBiz?.mapUrl, effectiveBiz?.map_url],
+  );
+  const savedMapUrlTrimmed = ((effectiveBiz?.mapUrl ?? effectiveBiz?.map_url) || '').trim();
   const googleMapsOpenHref = useMemo(() => {
     if (mapCoords) {
       return googleMapsExternalOpenUrl({
@@ -103,62 +191,14 @@ const BusinessDetail: React.FC = () => {
     }
     return savedMapUrlTrimmed;
   }, [mapCoords, savedMapUrlTrimmed]);
-  const websiteUrl = (biz.website || '').trim();
+  const websiteUrl = (effectiveBiz?.website || '').trim();
   const websiteHref = websiteUrl ? normalizeWebsiteForStorage(websiteUrl) : null;
 
-  /** Normalize WhatsApp from camelCase + DB snake_case; wa.me needs enough digits. */
-  const businessWhatsAppRaw = getBusinessWhatsAppRaw(biz);
+  const businessWhatsAppRaw = effectiveBiz ? getBusinessWhatsAppRaw(effectiveBiz) : '';
   const hasWhatsApp = digitsForWaMe(businessWhatsAppRaw).length >= 5;
 
-  /** Refresh listing contact fields from DB so `whatsapp_number` is never stale in UI/modal. */
   useEffect(() => {
-    if (!biz?.id) return;
-    const listingId = biz.id;
-    let cancelled = false;
-    void (async () => {
-      const { data, error } = await supabase
-        .from('businesses')
-        .select('whatsapp_number, phone, email, contact_email, map_url, website')
-        .eq('id', profileId)
-        .maybeSingle();
-      if (cancelled || error || !data) return;
-      const row = data as {
-        whatsapp_number?: string | null;
-        phone?: string | null;
-        email?: string | null;
-        contact_email?: string | null;
-        map_url?: string | null;
-        website?: string | null;
-      };
-      const wa = (row.whatsapp_number ?? '').trim();
-      const mapUrl = (row.map_url ?? '').trim();
-      const site = (row.website ?? '').trim();
-      setSelectedBusiness((current) => {
-        if (!current || current.id !== listingId) return current;
-        return {
-          ...current,
-          whatsappNumber: wa || current.whatsappNumber || null,
-          whatsapp_number: wa || current.whatsapp_number || null,
-          phone: (row.phone ?? '').trim() || current.phone,
-          contactEmail:
-            (row.contact_email ?? '').trim() ||
-            (row.email ?? '').trim() ||
-            current.contactEmail ||
-            null,
-          mapUrl: mapUrl || current.mapUrl || null,
-          map_url: mapUrl || current.map_url || null,
-          website: site || current.website || null,
-        };
-      });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [biz.id, profileId, setSelectedBusiness]);
-
-  // Public moderation safety: only use approved photos for the primary cover when available.
-  useEffect(() => {
-    if (!biz?.id) return;
+    if (!effectiveBiz?.id || !profileId) return;
     let cancelled = false;
     void (async () => {
       const { data, error } = await supabase
@@ -172,16 +212,23 @@ const BusinessDetail: React.FC = () => {
       if (cancelled || error) return;
       const first = data?.[0] as { url?: string; file_path?: string } | undefined;
       if (!first) {
-        setDisplayCoverImage(biz.image || '');
+        setDisplayCoverImage(effectiveBiz.image || '');
         return;
       }
-      const resolved = getPhotoDisplayUrl(first, SUPABASE_URL) || first.url || biz.image || '';
+      const resolved =
+        getPhotoDisplayUrl(first, SUPABASE_URL) || first.url || effectiveBiz.image || '';
       setDisplayCoverImage(resolved);
     })();
     return () => {
       cancelled = true;
     };
-  }, [biz.id, biz.image, profileId]);
+  }, [effectiveBiz?.id, effectiveBiz?.image, profileId]);
+
+  if (!selectedBusiness || !effectiveBiz) return null;
+
+  const biz = effectiveBiz;
+  const isListingOwner = Boolean(user?.id && biz.ownerId && user.id === biz.ownerId);
+  const isFav = favorites.includes(profileId);
 
   // Compute super star count: use DB field if available, otherwise count from reviews
   const superStarCount = (biz.superStarCount && biz.superStarCount > 0)
@@ -262,6 +309,50 @@ const BusinessDetail: React.FC = () => {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 pb-16">
+        {offeringsFetchError && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          >
+            {language === 'en'
+              ? 'Could not load live listing details.'
+              : language === 'fr'
+                ? 'Impossible de charger les détails de l’annonce.'
+                : 'No save lod listing detaels.'}{' '}
+            <span className="text-red-700">{offeringsFetchError}</span>
+          </div>
+        )}
+        {offeringsLoaded && !offeringsFetchError && profileOfferings.length === 0 && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            {language === 'en'
+              ? 'No active offers for this business yet.'
+              : language === 'fr'
+                ? 'Aucune offre active pour cet établissement pour le moment.'
+                : 'No gat aktiv ofa yet long bisnis ia.'}
+          </div>
+        )}
+        {profileOfferings.length > 1 && (
+          <div className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+            <label htmlFor="detail-offering-select" className="text-xs font-semibold text-gray-600 uppercase tracking-wide shrink-0">
+              {language === 'en' ? 'Deal' : language === 'fr' ? 'Offre' : 'Dil'}
+            </label>
+            <select
+              id="detail-offering-select"
+              value={biz.id}
+              onChange={(e) => {
+                const next = profileOfferings.find((o) => o.id === e.target.value);
+                if (next) setSelectedBusiness(next);
+              }}
+              className="w-full sm:max-w-md rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+            >
+              {profileOfferings.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="relative rounded-2xl overflow-hidden mb-6 shadow-lg">
           <img src={displayCoverImage || biz.image} alt={biz.name} className="w-full h-64 sm:h-80 object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -470,7 +561,7 @@ const BusinessDetail: React.FC = () => {
                     )}
                   </p>
                 </div>
-                {!showReviewForm && (
+                {!showReviewForm && !isListingOwner && (
                   <button
                     onClick={() => setShowReviewForm(true)}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-50 text-teal-700 text-sm font-semibold hover:bg-teal-100 transition-colors"
@@ -479,10 +570,19 @@ const BusinessDetail: React.FC = () => {
                     {t('review.write', language)}
                   </button>
                 )}
+                {isListingOwner && (
+                  <p className="text-xs text-gray-500 max-w-[14rem] text-right">
+                    {language === 'en'
+                      ? 'You cannot review your own listing.'
+                      : language === 'fr'
+                        ? 'Vous ne pouvez pas noter votre propre annonce.'
+                        : 'Yu no save riviu lista blong yu yet.'}
+                  </p>
+                )}
               </div>
 
               {/* Review Form */}
-              {showReviewForm && (
+              {showReviewForm && !isListingOwner && (
                 <div className="mb-6">
                   <ReviewForm
                     businessId={profileId}
@@ -563,7 +663,7 @@ const BusinessDetail: React.FC = () => {
                        language === 'fr' ? 'Pas encore d\'avis. Soyez le premier à partager votre expérience !' :
                        'No gat riviu yet. Yu faswan blong searem eksperiens blong yu!'}
                     </p>
-                    {!showReviewForm && (
+                    {!showReviewForm && !isListingOwner && (
                       <button
                         onClick={() => setShowReviewForm(true)}
                         className="mt-3 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors"

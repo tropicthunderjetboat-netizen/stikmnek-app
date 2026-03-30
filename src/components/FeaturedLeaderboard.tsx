@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as localBusinesses, publicListingBusinesses } from '@/data/businesses';
+import { pickRepresentativeOfferingsPerProfile, profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { Star, TrendingUp, Award, Crown, Sparkles, ArrowRight, ChevronDown, ChevronUp, Flame, Eye, Info, Trophy, Medal } from 'lucide-react';
 import { formatVT } from '@/lib/utils';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
@@ -34,22 +35,25 @@ const FeaturedLeaderboard: React.FC = () => {
   const [showAll, setShowAll] = useState(false);
   const [showScoring, setShowScoring] = useState(false);
 
-  const allBusinesses = useMemo(
-    () => publicListingBusinesses(dbBusinesses, localBusinesses),
-    [dbBusinesses],
-  );
+  const allBusinesses = useMemo(() => {
+    const raw = publicListingBusinesses(dbBusinesses, localBusinesses);
+    if (dbBusinesses.length === 0) return raw;
+    return pickRepresentativeOfferingsPerProfile(raw);
+  }, [dbBusinesses]);
 
   // Calculate leaderboard scores
   const leaderboard: ScoredBusiness[] = useMemo(() => {
     // Get max values for normalization
     const maxReviews = Math.max(...allBusinesses.map(b => b.reviewCount), 1);
     const maxSuperStars = Math.max(...allBusinesses.map(b => {
+      const pid = profileBusinessIdFor(b);
       const dbCount = b.superStarCount || 0;
-      const reviewCount = dbReviews.filter(r => r.business_id === b.id && r.has_super_star).length;
+      const reviewCount = dbReviews.filter(r => r.business_id === pid && r.has_super_star).length;
       return Math.max(dbCount, reviewCount);
     }), 1);
 
     const scored = allBusinesses.map(business => {
+      const profileId = profileBusinessIdFor(business);
       // 1. Rating score (0-1): normalized from 0-5 scale
       const ratingScore = Math.min(business.rating / 5, 1);
 
@@ -59,7 +63,7 @@ const FeaturedLeaderboard: React.FC = () => {
       // 3. Super Star score (0-1): premium engagement signal
       const superStarCount = Math.max(
         business.superStarCount || 0,
-        dbReviews.filter(r => r.business_id === business.id && r.has_super_star).length
+        dbReviews.filter(r => r.business_id === profileId && r.has_super_star).length
       );
       const superStarScore = maxSuperStars > 0 ? Math.min(superStarCount / maxSuperStars, 1) : 0;
 
@@ -71,11 +75,11 @@ const FeaturedLeaderboard: React.FC = () => {
 
       // 5. Engagement score (0-1): recent reviews + redemptions
       const recentReviews = dbReviews.filter(r => {
-        if (r.business_id !== business.id) return false;
+        if (r.business_id !== profileId) return false;
         const daysSince = (Date.now() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24);
         return daysSince <= 30;
       }).length;
-      const bizRedemptions = redemptions.filter(r => r.businessId === business.id).length;
+      const bizRedemptions = redemptions.filter(r => r.businessId === profileId).length;
       const engagementRaw = (recentReviews * 2) + bizRedemptions;
       const engagementScore = Math.min(engagementRaw / 20, 1);
 
@@ -216,7 +220,7 @@ const FeaturedLeaderboard: React.FC = () => {
               : 0;
             const superStarCount = Math.max(
               business.superStarCount || 0,
-              dbReviews.filter(r => r.business_id === business.id && r.has_super_star).length
+              dbReviews.filter(r => r.business_id === profileBusinessIdFor(business) && r.has_super_star).length
             );
 
             const isTopThree = rank <= 3;
