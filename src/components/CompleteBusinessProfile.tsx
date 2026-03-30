@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Store, Loader2 } from 'lucide-react';
+import { Store, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,6 +17,9 @@ const CompleteBusinessProfile: React.FC = () => {
     refreshUserProfile,
     refreshBusinesses,
     refreshBusinessOwnerRowStatus,
+    userProfileLoadError,
+    retryUserProfileFetch,
+    businessOnboardingResume,
   } = useAppContext();
 
   const [businessName, setBusinessName] = useState('');
@@ -158,20 +161,35 @@ const CompleteBusinessProfile: React.FC = () => {
 
   if (!user?.id) return null;
 
-  const copy = {
-    title:
-      language === 'en'
-        ? 'Set up your business'
-        : language === 'fr'
-          ? 'Configurez votre entreprise'
-          : 'Setapem bisnis blong yu',
-    subtitle:
-      language === 'en'
-        ? 'We use this so tourists can reach you and your listings stay consistent.'
-        : language === 'fr'
-          ? 'Pour que les touristes puissent vous contacter et que vos annonces restent cohérentes.'
-          : 'Blong turis i save kontakt yu mo listing i stret.',
-  };
+  const copy = businessOnboardingResume
+    ? {
+        title:
+          language === 'en'
+            ? 'Resume business profile setup'
+            : language === 'fr'
+              ? 'Reprendre la configuration'
+              : 'Go hed long setapem bisnis',
+        subtitle:
+          language === 'en'
+            ? 'Continue setting up — if you submitted a listing for approval, you still need a business profile row to use the dashboard.'
+            : language === 'fr'
+              ? 'Poursuivez la configuration — même avec une annonce en attente, ce profil est nécessaire pour le tableau de bord.'
+              : 'Go hed — sapos yu bin soema listing, yu mas komplitim profil ia blong yusum dashboard.',
+      }
+    : {
+        title:
+          language === 'en'
+            ? 'Set up your business'
+            : language === 'fr'
+              ? 'Configurez votre entreprise'
+              : 'Setapem bisnis blong yu',
+        subtitle:
+          language === 'en'
+            ? 'We use this so tourists can reach you and your listings stay consistent.'
+            : language === 'fr'
+              ? 'Pour que les touristes puissent vous contacter et que vos annonces restent cohérentes.'
+              : 'Blong turis i save kontakt yu mo listing i stret.',
+      };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-emerald-50/40 pt-20 pb-16">
@@ -184,6 +202,25 @@ const CompleteBusinessProfile: React.FC = () => {
             <h1 className="text-2xl font-extrabold">{copy.title}</h1>
             <p className="text-white/80 text-sm mt-1">{copy.subtitle}</p>
           </div>
+
+          {userProfileLoadError && (
+            <div
+              role="alert"
+              className="mx-6 sm:mx-8 mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+            >
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" aria-hidden />
+                <p>{userProfileLoadError}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void retryUserProfileFetch()}
+                className="shrink-0 px-4 py-2 rounded-lg bg-red-700 text-white font-semibold hover:bg-red-800"
+              >
+                {language === 'en' ? 'Try again' : language === 'fr' ? 'Réessayer' : 'Traem gen'}
+              </button>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-4">
             <div>

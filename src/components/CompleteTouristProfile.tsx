@@ -1,10 +1,19 @@
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import TouristProfileForm from '@/components/TouristProfileForm';
-import { Users, ArrowRight } from 'lucide-react';
+import { Users, ArrowRight, AlertCircle } from 'lucide-react';
 
 const CompleteTouristProfile: React.FC = () => {
-  const { user, userProfile, language, refreshUserProfile, setCurrentView } = useAppContext();
+  const {
+    user,
+    userProfile,
+    language,
+    refreshUserProfile,
+    setCurrentView,
+    userProfileLoadError,
+    retryUserProfileFetch,
+    touristOnboardingResume,
+  } = useAppContext();
 
   if (!user?.id) return null;
 
@@ -17,22 +26,53 @@ const CompleteTouristProfile: React.FC = () => {
               <Users className="w-6 h-6" />
             </div>
             <h1 className="text-2xl font-extrabold">
-              {language === 'en'
-                ? 'Complete your profile'
-                : language === 'fr'
-                  ? 'Complétez votre profil'
-                  : 'Komplitim profil blong yu'}
+              {touristOnboardingResume
+                ? language === 'en'
+                  ? 'Resume your profile'
+                  : language === 'fr'
+                    ? 'Reprendre votre profil'
+                    : 'Go bek long profil blong yu'
+                : language === 'en'
+                  ? 'Complete your profile'
+                  : language === 'fr'
+                    ? 'Complétez votre profil'
+                    : 'Komplitim profil blong yu'}
             </h1>
             <p className="text-white/80 text-sm mt-1">
-              {language === 'en'
-                ? 'We use this to recommend the right pass for your group and dates.'
-                : language === 'fr'
-                  ? 'Nous l’utilisons pour recommander le bon pass selon votre groupe et vos dates.'
-                  : 'Mifala i yusum blong rekomendem stret pas blong grup mo ol det.'}
+              {touristOnboardingResume
+                ? language === 'en'
+                  ? 'Pick up where you left off — your details are saved as you go.'
+                  : language === 'fr'
+                    ? 'Reprenez où vous en étiez — vos informations sont enregistrées au fil du remplissage.'
+                    : 'Go hed wea yu stap — ol samting i save lelebet.'
+                : language === 'en'
+                  ? 'We use this to recommend the right pass for your group and dates.'
+                  : language === 'fr'
+                    ? 'Nous l’utilisons pour recommander le bon pass selon votre groupe et vos dates.'
+                    : 'Mifala i yusum blong rekomendem stret pas blong grup mo ol det.'}
             </p>
           </div>
 
           <div className="p-6 sm:p-8">
+            {userProfileLoadError && (
+              <div
+                role="alert"
+                className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" aria-hidden />
+                  <p>{userProfileLoadError}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void retryUserProfileFetch()}
+                  className="shrink-0 px-4 py-2 rounded-lg bg-red-700 text-white font-semibold hover:bg-red-800"
+                >
+                  {language === 'en' ? 'Try again' : language === 'fr' ? 'Réessayer' : 'Traem gen'}
+                </button>
+              </div>
+            )}
+
             <TouristProfileForm
               userId={user.id}
               language={language}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -218,6 +218,27 @@ const PaymentCheckout: React.FC = () => {
   const expiryRef = useRef<HTMLInputElement>(null);
   const cvvRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Stable idempotency key for pass purchase retries (same cart pass type).
+   * Sent to process-card-payment as paymentTransactionId so duplicate inserts are avoided
+   * if the client retries after a network error or double-submit.
+   */
+  const passPurchaseIdempotencyKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    passPurchaseIdempotencyKeyRef.current = null;
+  }, [cart?.passType]);
+
+  function getOrCreatePassPurchaseIdempotencyKey(): string {
+    if (!passPurchaseIdempotencyKeyRef.current) {
+      passPurchaseIdempotencyKeyRef.current =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `stk-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+    }
+    return passPurchaseIdempotencyKeyRef.current;
+  }
+
   const selectedPass = cart ? PASSES[cart.passType] : null;
 
   /** When the user’s active pass already has the share bonus and matches the cart pass type, show boosted people/days (same rules as pricing / extend-pass). */
@@ -380,6 +401,7 @@ const PaymentCheckout: React.FC = () => {
           cardCvv,
           cardName: cardName.trim(),
           referralCode,
+          paymentTransactionId: getOrCreatePassPurchaseIdempotencyKey(),
         },
         // NO custom headers — let the SDK handle Authorization automatically
       });
@@ -456,7 +478,7 @@ const PaymentCheckout: React.FC = () => {
         // Navigate to confirmation after brief delay
         setTimeout(() => {
           setCart(null);
-          setCurrentView('payment-confirmation' as any);
+          setCurrentView('payment-confirmation');
         }, 2500);
       } else if (data.requires3DS) {
         setPaymentError('Your bank requires additional verification. Please try a different card or contact your bank.');
@@ -471,6 +493,7 @@ const PaymentCheckout: React.FC = () => {
       const errorMsg = err.message || 'Failed to process payment. Please try again.';
       setPaymentError(errorMsg);
       toast.error(errorMsg);
+      // Keep cart, startDate, and card fields — user can fix and retry without re-picking pass/dates.
       setStep('payment');
       setProcessing(false);
     }

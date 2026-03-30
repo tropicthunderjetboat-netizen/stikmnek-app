@@ -1,5 +1,27 @@
 export type Category = 'dining' | 'activities' | 'tours' | 'shopping' | 'spa' | 'accommodation';
 
+/** Raw `business_offerings` row shape when embedded from PostgREST (before mapping to `Business`). */
+export type EmbeddedBusinessOfferingRow = {
+  id?: string;
+  active?: boolean;
+  description?: string | null;
+  /** Alias some schemas use; DB column is usually `description`. */
+  description_html?: string | null;
+  description_fr?: string | null;
+  description_bi?: string | null;
+  deal_price?: number | null;
+  original_price?: number | null;
+  image?: string | null;
+  banner_url?: string | null;
+  pricing_tiers?: unknown;
+  tier_pricing?: unknown;
+  map_url?: string | null;
+  website?: string | null;
+  whatsapp_number?: string | null;
+  location_lat?: number | null;
+  location_long?: number | null;
+};
+
 export interface Business {
   id: string;
   /**
@@ -9,6 +31,11 @@ export interface Business {
   profileBusinessId?: string;
   /** Trading / venue name from profile (optional subtitle vs offer `title`). */
   profileName?: string;
+  /**
+   * Embedded offerings from `select('*, business_offerings(*)')` (optional).
+   * Cleared in most UI paths after mapping with `mapJoinedOfferingToBusiness`.
+   */
+  business_offerings?: EmbeddedBusinessOfferingRow[];
   name: string;
   category: Category;
   description: string;
@@ -45,6 +72,46 @@ export interface Business {
    * Master profile `businesses.active` may differ (e.g. stub false while deals are live).
    */
   active?: boolean;
+}
+
+/** First active (or first) embedded offering — safe vs missing `business_offerings`. */
+export function primaryEmbeddedOffering(
+  b: Pick<Business, 'business_offerings'> | null | undefined,
+): EmbeddedBusinessOfferingRow | null {
+  const arr = b?.business_offerings;
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+  const activeFirst = arr.find((o) => o && o.active !== false);
+  return activeFirst ?? arr[0] ?? null;
+}
+
+/** Rich HTML/text from embedded offering (`description_html` or `description`). */
+export function primaryOfferingDescriptionHtml(b: Business | null | undefined): string {
+  const o = primaryEmbeddedOffering(b);
+  if (!o) return '';
+  return String(o.description_html ?? o.description ?? '').trim();
+}
+
+/** Deal / list price with fallback to embedded offering (unmapped / partial rows). */
+export function effectiveListingDealPrice(b: Business): number {
+  const n = Number(b.dealPrice);
+  if (Number.isFinite(n) && n > 0) return n;
+  const o = primaryEmbeddedOffering(b);
+  const d = Number(o?.deal_price);
+  return Number.isFinite(d) ? d : 0;
+}
+
+export function effectiveListingOriginalPrice(b: Business): number {
+  const n = Number(b.originalPrice);
+  if (Number.isFinite(n) && n > 0) return n;
+  const o = primaryEmbeddedOffering(b);
+  const d = Number(o?.original_price);
+  return Number.isFinite(d) ? d : 0;
+}
+
+export function effectiveListingDescriptionPlain(b: Business): string {
+  const fromFlat = (b.description || '').trim();
+  if (fromFlat) return fromFlat;
+  return primaryOfferingDescriptionHtml(b);
 }
 
 /** Tourist-facing lists: hide `active === false` DB rows; keep local fallback when DB empty or only stubs. */

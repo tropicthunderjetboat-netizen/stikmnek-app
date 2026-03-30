@@ -28,6 +28,11 @@ import {
   profileBusinessIdFor,
 } from '@/lib/businessOfferingMap';
 import type { Business } from '@/data/businesses';
+import {
+  effectiveListingDealPrice,
+  primaryEmbeddedOffering,
+  primaryOfferingDescriptionHtml,
+} from '@/data/businesses';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
 
@@ -52,7 +57,7 @@ const BusinessDetail: React.FC = () => {
   const {
     language, selectedBusiness, setCurrentView, setSelectedBusiness,
     favorites, toggleFavorite, user, userProfile, setShowAuth, setAuthMode,
-    dbReviews,
+    dbReviews, checkReviewSubmissionAllowed,
   } = useAppContext();
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -157,30 +162,74 @@ const BusinessDetail: React.FC = () => {
 
   const desc = useMemo(() => {
     if (!effectiveBiz) return '';
-    return language === 'fr'
-      ? effectiveBiz.descriptionFr
-      : language === 'bi'
-        ? effectiveBiz.descriptionBi
-        : effectiveBiz.description;
-  }, [effectiveBiz, language]);
+    const o = primaryEmbeddedOffering(selectedBusiness as Business);
+    const fromEmbed = primaryOfferingDescriptionHtml(selectedBusiness as Business);
+    if (language === 'fr') {
+      return (
+        effectiveBiz.descriptionFr ||
+        String(o?.description_fr ?? o?.description_html ?? o?.description ?? '') ||
+        fromEmbed
+      );
+    }
+    if (language === 'bi') {
+      return (
+        effectiveBiz.descriptionBi ||
+        String(o?.description_bi ?? o?.description_html ?? o?.description ?? '') ||
+        fromEmbed
+      );
+    }
+    return (
+      effectiveBiz.description ||
+      String(o?.description_html ?? o?.description ?? '') ||
+      fromEmbed
+    );
+  }, [effectiveBiz, language, selectedBusiness]);
 
-  const pricingTiers = useMemo(
-    () =>
-      pricingTiersFromDb(
-        effectiveBiz?.pricingTiers ?? (effectiveBiz as { pricing_tiers?: unknown })?.pricing_tiers,
-      ),
-    [effectiveBiz?.id, effectiveBiz?.pricingTiers],
-  );
+  const pricingTiers = useMemo(() => {
+    const o = primaryEmbeddedOffering(selectedBusiness as Business);
+    const tiers =
+      effectiveBiz?.pricingTiers ??
+      (effectiveBiz as { pricing_tiers?: unknown })?.pricing_tiers ??
+      o?.pricing_tiers ??
+      o?.tier_pricing;
+    return pricingTiersFromDb(tiers);
+  }, [effectiveBiz?.id, effectiveBiz?.pricingTiers, selectedBusiness]);
   const showTieredTable =
     effectiveBiz != null &&
     categoryUsesTieredPricing(effectiveBiz.category) &&
     pricingTiers.length > 0;
 
-  const mapCoords = useMemo(
-    () => (effectiveBiz ? effectiveBusinessCoords(effectiveBiz) : null),
-    [effectiveBiz?.lat, effectiveBiz?.lng, effectiveBiz?.mapUrl, effectiveBiz?.map_url],
-  );
-  const savedMapUrlTrimmed = ((effectiveBiz?.mapUrl ?? effectiveBiz?.map_url) || '').trim();
+  const mapCoords = useMemo(() => {
+    if (!effectiveBiz) return null;
+    const o = primaryEmbeddedOffering(selectedBusiness as Business);
+    const lat =
+      Number(effectiveBiz.lat) ||
+      Number(o?.location_lat) ||
+      0;
+    const lng =
+      Number(effectiveBiz.lng) ||
+      Number(o?.location_long) ||
+      0;
+    const mapUrl = (effectiveBiz.mapUrl ?? effectiveBiz.map_url ?? o?.map_url ?? '') || '';
+    return effectiveBusinessCoords({
+      lat,
+      lng,
+      mapUrl: mapUrl || null,
+      map_url: mapUrl || null,
+    });
+  }, [
+    effectiveBiz?.lat,
+    effectiveBiz?.lng,
+    effectiveBiz?.mapUrl,
+    effectiveBiz?.map_url,
+    selectedBusiness,
+  ]);
+  const savedMapUrlTrimmed = (
+    (effectiveBiz?.mapUrl ??
+      effectiveBiz?.map_url ??
+      primaryEmbeddedOffering(selectedBusiness as Business)?.map_url) ||
+    ''
+  ).trim();
   const googleMapsOpenHref = useMemo(() => {
     if (mapCoords) {
       return googleMapsExternalOpenUrl({
@@ -191,7 +240,11 @@ const BusinessDetail: React.FC = () => {
     }
     return savedMapUrlTrimmed;
   }, [mapCoords, savedMapUrlTrimmed]);
-  const websiteUrl = (effectiveBiz?.website || '').trim();
+  const websiteUrl = (
+    effectiveBiz?.website ||
+    primaryEmbeddedOffering(selectedBusiness as Business)?.website ||
+    ''
+  ).trim();
   const websiteHref = websiteUrl ? normalizeWebsiteForStorage(websiteUrl) : null;
 
   const businessWhatsAppRaw = effectiveBiz ? getBusinessWhatsAppRaw(effectiveBiz) : '';
@@ -229,6 +282,18 @@ const BusinessDetail: React.FC = () => {
   const biz = effectiveBiz;
   const isListingOwner = Boolean(user?.id && biz.ownerId && user.id === biz.ownerId);
   const isFav = favorites.includes(profileId);
+
+  const openReviewFormIfAllowed = () => {
+    if (!profileId) return;
+    void (async () => {
+      const gate = await checkReviewSubmissionAllowed(profileId, 'leave_review');
+      if (!gate.allowed) {
+        toast.error(gate.message || '');
+        return;
+      }
+      setShowReviewForm(true);
+    })();
+  };
 
   // Compute super star count: use DB field if available, otherwise count from reviews
   const superStarCount = (biz.superStarCount && biz.superStarCount > 0)
@@ -273,7 +338,7 @@ const BusinessDetail: React.FC = () => {
       adults: 1,
       children: 0,
       infants: 0,
-      estimatedPriceWithDiscount: formatVT(biz.dealPrice),
+      estimatedPriceWithDiscount: formatVT(effectiveListingDealPrice(biz)),
       userName: user?.name?.trim() || 'Guest',
     });
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
@@ -563,7 +628,8 @@ const BusinessDetail: React.FC = () => {
                 </div>
                 {!showReviewForm && !isListingOwner && (
                   <button
-                    onClick={() => setShowReviewForm(true)}
+                    type="button"
+                    onClick={openReviewFormIfAllowed}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-50 text-teal-700 text-sm font-semibold hover:bg-teal-100 transition-colors"
                   >
                     <MessageSquarePlus className="w-4 h-4" />
@@ -665,7 +731,8 @@ const BusinessDetail: React.FC = () => {
                     </p>
                     {!showReviewForm && !isListingOwner && (
                       <button
-                        onClick={() => setShowReviewForm(true)}
+                        type="button"
+                        onClick={openReviewFormIfAllowed}
                         className="mt-3 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors"
                       >
                         {t('review.write', language)}

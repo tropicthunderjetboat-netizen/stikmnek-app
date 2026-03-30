@@ -38,6 +38,26 @@ function endOfDayDate(dateStr: string): string {
   return d.toISOString();
 }
 
+/** Start of calendar day in UTC as epoch ms (for YYYY-MM-DD already validated). */
+function utcStartOfCalendarDayMs(isoDateOnly: string): number {
+  return new Date(isoDateOnly + 'T00:00:00.000Z').getTime();
+}
+
+/** Today's calendar date start in UTC (midnight UTC for the current UTC date). */
+function utcTodayStartMs(): number {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+}
+
+/** Calendar span between valid_from and valid_until (matches addDays-based purchase flow). */
+function calendarDaysBetweenValidRange(validFrom: string, validUntil: string): number {
+  const a = new Date(validFrom + 'T00:00:00.000Z');
+  const b = new Date(validUntil + 'T00:00:00.000Z');
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 1;
+  const diff = Math.round((b.getTime() - a.getTime()) / 86400000);
+  return Math.max(1, diff);
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -145,6 +165,26 @@ Deno.serve(async (req) => {
         );
       }
 
+      // ─── Server-side: start date must not be before today's calendar date (UTC) ───
+      // Compare date-only fields at UTC midnight so behavior is stable regardless of
+      // Edge runtime region; YYYY-MM-DD is appended as Z to avoid local-TZ parsing quirks.
+      const startMs = utcStartOfCalendarDayMs(startDate);
+      if (Number.isNaN(startMs)) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Missing or invalid startDate (YYYY-MM-DD)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (startMs < utcTodayStartMs()) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Purchase start date cannot be in the past.',
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const passType = rawPassType;
       const baseDays = PASS_DAYS[passType] ?? 1;
       const baseMaxPeople = PASS_MAX_PEOPLE[passType] ?? 4;
@@ -173,7 +213,60 @@ Deno.serve(async (req) => {
       const expiresAt = endOfDayDate(validUntil);
       const receiptNumber = body?.receiptNumber ?? `STK-${Date.now().toString(36).toUpperCase()}`;
 
-      const passRow: Record<string, any> = {
+      // ─── Idempotency: payment_transaction_id / client idempotency key (stored in payment_session_id) ───
+      // Same key + same user → return existing pass (retries after gateway success or network loss).
+      const rawTxnId =
+        (typeof body?.paymentTransactionId === 'string' && body.paymentTransactionId.trim()) ||
+        (typeof body?.payment_transaction_id === 'string' && body.payment_transaction_id.trim()) ||
+        (typeof body?.idempotencyKey === 'string' && body.idempotencyKey.trim()) ||
+        '';
+      const paymentTxnId =
+        rawTxnId ||
+        (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `txn-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`);
+
+      if (rawTxnId) {
+        const { data: existingPass, error: existingErr } = await supabase
+          .from('passes')
+          .select(
+            'id, purchased_at, pass_type, valid_from, valid_until, expires_at, amount_paid, currency, share_bonus_applied, max_people',
+          )
+          .eq('user_id', authUser.id)
+          .eq('payment_session_id', rawTxnId)
+          .maybeSingle();
+
+        if (existingErr) {
+          console.error('process-card-payment: idempotent pass lookup:', existingErr);
+        } else if (existingPass) {
+          const ep = existingPass as Record<string, unknown>;
+          const vf = String(ep.valid_from ?? '') || validFrom;
+          const vu = String(ep.valid_until ?? '') || validUntil;
+          const exAt = String(ep.expires_at ?? '') || expiresAt;
+          const daysReplay = calendarDaysBetweenValidRange(vf, vu);
+          const rid = String(ep.id ?? '');
+          return new Response(
+            JSON.stringify({
+              success: true,
+              idempotentReplay: true,
+              receiptNumber: `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
+              passType: ep.pass_type ?? passType,
+              amount: Number(ep.amount_paid) || amount,
+              currency: (ep.currency as string) || 'AUD',
+              expiresAt: exAt,
+              validFrom: vf,
+              validUntil: vu,
+              days: daysReplay,
+              shareBonusApplied: Boolean(ep.share_bonus_applied),
+              sessionId: rid,
+              purchasedAt: (ep.purchased_at as string) ?? new Date().toISOString(),
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+      }
+
+      const passRow: Record<string, unknown> = {
         user_id: authUser.id,
         pass_type: passType,
         active: true,
@@ -185,7 +278,7 @@ Deno.serve(async (req) => {
         amount_paid: amount,
         currency: 'AUD',
         payment_provider: 'card-mock',
-        payment_session_id: null,
+        payment_session_id: paymentTxnId,
         purchased_at: new Date().toISOString(),
       };
 
@@ -196,10 +289,48 @@ Deno.serve(async (req) => {
         .single();
 
       if (insertErr) {
+        // Unique violation: concurrent insert with same idempotency key — return existing row.
+        if (insertErr.code === '23505' && rawTxnId) {
+          const { data: racedPass } = await supabase
+            .from('passes')
+            .select(
+              'id, purchased_at, pass_type, valid_from, valid_until, expires_at, amount_paid, currency, share_bonus_applied, max_people',
+            )
+            .eq('user_id', authUser.id)
+            .eq('payment_session_id', rawTxnId)
+            .maybeSingle();
+
+          if (racedPass) {
+            const ep = racedPass as Record<string, unknown>;
+            const vf = String(ep.valid_from ?? '') || validFrom;
+            const vu = String(ep.valid_until ?? '') || validUntil;
+            const exAt = String(ep.expires_at ?? '') || expiresAt;
+            const daysReplay = calendarDaysBetweenValidRange(vf, vu);
+            const rid = String(ep.id ?? '');
+            return new Response(
+              JSON.stringify({
+                success: true,
+                idempotentReplay: true,
+                receiptNumber: `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
+                passType: ep.pass_type ?? passType,
+                amount: Number(ep.amount_paid) || amount,
+                currency: (ep.currency as string) || 'AUD',
+                expiresAt: exAt,
+                validFrom: vf,
+                validUntil: vu,
+                days: daysReplay,
+                shareBonusApplied: Boolean(ep.share_bonus_applied),
+                sessionId: rid,
+                purchasedAt: (ep.purchased_at as string) ?? new Date().toISOString(),
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
+          }
+        }
         console.error('process-card-payment: insert passes error:', insertErr);
         return new Response(
           JSON.stringify({ success: false, error: 'Payment captured but failed to create pass: ' + insertErr.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
 
@@ -225,6 +356,7 @@ Deno.serve(async (req) => {
           shareBonusApplied: applyShareBonus,
           sessionId: insertedPass?.id ?? receiptNumber,
           purchasedAt: insertedPass?.purchased_at ?? new Date().toISOString(),
+          paymentTransactionId: paymentTxnId,
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useRef } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
-import { useAppContext } from '@/contexts/AppContext';
-import type { ViewMode } from '@/contexts/AppContext';
+import { useAppContext, isTouristProfileCompleteForGate, type ViewMode } from '@/contexts/AppContext';
 import LegalDocumentPage from './LegalDocumentPage';
 
 // ── Eagerly-loaded components ──
@@ -45,6 +45,20 @@ const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/business-guide': 'business-guide',
 };
 
+/**
+ * Tourists with an incomplete profile may still open these views (soft gate).
+ * All other views keep hard redirect to complete-profile until the gate passes.
+ * To expand browsing later, add view names here and optionally show a nav link to complete-profile.
+ */
+const TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
+  'deals',
+  'map',
+  'business-detail',
+  'help',
+  'faq',
+  'business-guide',
+];
+
 function legalSlugFromPath(pathname: string): string | null {
   const m = pathname.match(/^\/legal\/([^/]+)\/?$/);
   return m ? decodeURIComponent(m[1]) : null;
@@ -59,6 +73,9 @@ const AppLayout: React.FC = () => {
     authLoading,
     setCurrentView,
     businessOwnerHasBusinessRow,
+    userProfileLoadError,
+    retryUserProfileFetch,
+    language,
   } = useAppContext();
   const prevViewRef = useRef(currentView);
 
@@ -108,25 +125,25 @@ const AppLayout: React.FC = () => {
   useEffect(() => {
     if (!user || authLoading) return;
     if (user.type !== 'tourist') return;
+    if (userProfileLoadError) return;
     if (!userProfile) return; // wait for profile load
 
-    const profileDone =
-      userProfile.post_pass_profile_completed === true &&
-      Boolean(userProfile.name || userProfile.full_name || userProfile.display_name) &&
-      (userProfile.num_adults ?? 0) >= 1 &&
-      Boolean((userProfile as any).expected_arrival_date) &&
-      Boolean((userProfile as any).expected_departure_date);
+    const profileDone = isTouristProfileCompleteForGate(userProfile);
 
     if (!profileDone && currentView !== 'complete-profile') {
+      if (TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE.includes(currentView)) {
+        return;
+      }
       setCurrentView('complete-profile');
     }
-  }, [user, userProfile, authLoading, currentView, setCurrentView]);
+  }, [user, userProfile, authLoading, currentView, setCurrentView, userProfileLoadError]);
 
   // ─── Profile-First gating (Business owners — businesses.owner_id row) ───
   useEffect(() => {
     if (!user || authLoading) return;
     const role = userProfile?.role || user.type || 'tourist';
     if (role !== 'business') return;
+    if (userProfileLoadError) return;
     if (businessOwnerHasBusinessRow === null) return;
 
     if (businessOwnerHasBusinessRow === false && currentView !== 'complete-business-profile') {
@@ -139,6 +156,7 @@ const AppLayout: React.FC = () => {
     businessOwnerHasBusinessRow,
     currentView,
     setCurrentView,
+    userProfileLoadError,
   ]);
 
   // ─── Scroll to top on view change ───
@@ -258,6 +276,13 @@ const AppLayout: React.FC = () => {
     currentView === 'complete-profile' ||
     currentView === 'complete-business-profile';
 
+  const showTouristProfileNudge =
+    user?.type === 'tourist' &&
+    userProfile &&
+    !userProfileLoadError &&
+    !isTouristProfileCompleteForGate(userProfile) &&
+    TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE.includes(currentView);
+
   return (
     <div className="min-h-screen bg-white">
       {/* Skip Navigation Link - Accessibility */}
@@ -269,6 +294,47 @@ const AppLayout: React.FC = () => {
       </a>
 
       {!hideMainNav && <Navbar />}
+
+      {user && userProfileLoadError && (
+        <div
+          role="alert"
+          className={`${hideMainNav ? 'pt-4' : 'pt-20'} px-4 pb-2 bg-red-50 border-b border-red-200 text-red-900 text-sm`}
+        >
+          <div className="max-w-3xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" aria-hidden />
+              <p>{userProfileLoadError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void retryUserProfileFetch()}
+              className="shrink-0 px-4 py-2 rounded-lg bg-red-700 text-white text-sm font-semibold hover:bg-red-800 transition-colors"
+            >
+              {language === 'en' ? 'Try again' : language === 'fr' ? 'Réessayer' : 'Traem gen'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showTouristProfileNudge && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-950 text-sm px-4 py-2.5 text-center">
+          <span>
+            {language === 'en'
+              ? 'Finish your travel profile to unlock passes and the full app.'
+              : language === 'fr'
+                ? 'Terminez votre profil voyage pour débloquer les pass et toute l’application.'
+                : 'Finisem travel profil blong yu blong yusum fulap.'}{' '}
+          </span>
+          <button
+            type="button"
+            onClick={() => setCurrentView('complete-profile')}
+            className="font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-800"
+          >
+            {language === 'en' ? 'Continue setup' : language === 'fr' ? 'Poursuivre' : 'Go hed'}
+          </button>
+        </div>
+      )}
+
       <main id="main-content" role="main" aria-label="Main content">
         <Suspense fallback={<LoadingSkeleton />}>
           {renderView()}

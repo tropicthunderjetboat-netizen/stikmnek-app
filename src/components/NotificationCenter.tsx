@@ -1,17 +1,58 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAppContext } from '@/contexts/AppContext';
+import { useAppContext, type ViewMode } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { Bell, X, Check, CheckCheck, Ticket, Heart, Star, TrendingUp, Gift, Users, AlertCircle, Clock, ChevronRight } from 'lucide-react';
+
+/** Keeps runtime validation in sync with `ViewMode` in AppContext. */
+const VIEW_MODES = [
+  'home',
+  'deals',
+  'map',
+  'passes',
+  'dashboard',
+  'admin',
+  'business-detail',
+  'checkout',
+  'payment-confirmation',
+  'business-dashboard',
+  'help',
+  'faq',
+  'business-guide',
+  'business-new',
+  'complete-profile',
+  'complete-business-profile',
+] as const satisfies readonly ViewMode[];
+
+function isViewMode(value: unknown): value is ViewMode {
+  return typeof value === 'string' && (VIEW_MODES as readonly string[]).includes(value);
+}
 
 interface Notification {
   id: string;
   type: string;
   title: string;
   message: string;
-  link_view?: string;
+  link_view?: ViewMode;
   link_business_id?: string;
   is_read: boolean;
   created_at: string;
+}
+
+function notificationFromRow(row: Record<string, unknown>): Notification {
+  const linkRaw = row.link_view;
+  return {
+    id: String(row.id ?? ''),
+    type: String(row.type ?? ''),
+    title: String(row.title ?? ''),
+    message: String(row.message ?? ''),
+    link_view: isViewMode(linkRaw) ? linkRaw : undefined,
+    link_business_id:
+      row.link_business_id != null && row.link_business_id !== ''
+        ? String(row.link_business_id)
+        : undefined,
+    is_read: Boolean(row.is_read),
+    created_at: String(row.created_at ?? ''),
+  };
 }
 
 const NotificationCenter: React.FC = () => {
@@ -35,7 +76,7 @@ const NotificationCenter: React.FC = () => {
         .order('created_at', { ascending: false })
         .limit(20);
       if (error) throw error;
-      setNotifications(data || []);
+      setNotifications((data ?? []).map((row) => notificationFromRow(row as Record<string, unknown>)));
     } catch (err) {
       console.error('Failed to load notifications:', err);
       // Generate some sample notifications for demo
@@ -55,8 +96,8 @@ const NotificationCenter: React.FC = () => {
     const channel = supabase
       .channel('notifications-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
-        const n = payload.new as Notification;
-        setNotifications(prev => [n, ...prev]);
+        const n = notificationFromRow(payload.new as Record<string, unknown>);
+        setNotifications((prev) => [n, ...prev]);
       })
       .subscribe();
 
@@ -104,7 +145,7 @@ const NotificationCenter: React.FC = () => {
         );
         if (biz) setSelectedBusiness(biz);
       }
-      setCurrentView(n.link_view as any);
+      setCurrentView(n.link_view);
     }
     setOpen(false);
   };

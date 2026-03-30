@@ -1,8 +1,13 @@
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { Business } from '@/data/businesses';
-import { Star, Heart, MapPin, Clock, Share2, Sparkles, MessageCircle } from 'lucide-react';
+import {
+  Business,
+  effectiveListingDealPrice,
+  effectiveListingOriginalPrice,
+  primaryEmbeddedOffering,
+} from '@/data/businesses';
+import { Star, Heart, MapPin, Clock, Share2, Sparkles } from 'lucide-react';
 import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { toast } from 'sonner';
@@ -31,9 +36,20 @@ const SuperStarBadge: React.FC<{ count: number }> = ({ count }) => {
   );
 };
 
+/** Shared classes: ≥44px touch target, icon stays visually smaller via flex center */
+const iconActionBtn =
+  'inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2';
+
 const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false }) => {
   const { language, favorites, toggleFavorite, setSelectedBusiness, setCurrentView, user, setShowAuth, setAuthMode, dbReviews } = useAppContext();
   const profileId = profileBusinessIdFor(business);
+  const embed = primaryEmbeddedOffering(business);
+  const dealPrice = effectiveListingDealPrice(business);
+  const originalPrice = effectiveListingOriginalPrice(business);
+  const cardImage =
+    (business.image && business.image.trim()) ||
+    String(embed?.banner_url || embed?.image || '').trim() ||
+    '/placeholder.svg';
 
   // Compute super star count: use DB field if available, otherwise count from reviews
   const superStarCount = (business.superStarCount && business.superStarCount > 0)
@@ -41,6 +57,8 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
     : dbReviews.filter(r => r.business_id === profileId && r.has_super_star).length;
 
   const hasWhatsApp = digitsForWaMe(getBusinessWhatsAppRaw(business)).length >= 5;
+
+  const viewDetailsLabel = `View details for ${business.name}`;
 
   const handleViewDeal = () => {
     setSelectedBusiness(business);
@@ -67,7 +85,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
       adults: 1,
       children: 0,
       infants: 0,
-      estimatedPriceWithDiscount: formatVT(business.dealPrice),
+      estimatedPriceWithDiscount: formatVT(dealPrice),
       userName: user?.name?.trim() || 'Guest',
     });
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
@@ -98,69 +116,107 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
 
 
   const isFav = favorites.includes(profileId);
-  const desc = language === 'fr' ? business.descriptionFr : language === 'bi' ? business.descriptionBi : business.description;
-  const savings = business.originalPrice - business.dealPrice;
+  const desc =
+    language === 'fr'
+      ? (business.descriptionFr ||
+          String(embed?.description_fr ?? embed?.description_html ?? embed?.description ?? ''))
+      : language === 'bi'
+        ? (business.descriptionBi ||
+            String(embed?.description_bi ?? embed?.description_html ?? embed?.description ?? ''))
+        : (business.description ||
+            String(embed?.description_html ?? embed?.description ?? ''));
+  const savings = originalPrice - dealPrice;
+
+  const shareLabel = `Share ${business.name}`;
+  const favoriteLabel = isFav ? `Remove ${business.name} from favorites` : `Add ${business.name} to favorites`;
+  const whatsappLabel = `Chat on WhatsApp about ${business.name}`;
 
   if (listView) {
     return (
-      <div
-        className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg border border-gray-100 hover:border-teal-200 transition-all cursor-pointer"
-        onClick={handleViewDeal}
-      >
+      <article className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg border border-gray-100 hover:border-teal-200 transition-all">
         <div className="flex flex-col sm:flex-row">
-          <div className="relative w-full sm:w-56 h-40 sm:h-auto overflow-hidden flex-shrink-0">
-            <img src={business.image || '/placeholder.svg'} alt={business.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
-            <div className="absolute top-3 left-3 px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold shadow-lg">
+          <button
+            type="button"
+            onClick={handleViewDeal}
+            aria-label={viewDetailsLabel}
+            className="relative w-full sm:w-56 h-40 sm:min-h-[11rem] overflow-hidden flex-shrink-0 p-0 border-0 bg-transparent text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-inset sm:focus-visible:ring-offset-0"
+          >
+            <img src={cardImage} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
+            <div className="absolute top-3 left-3 px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold shadow-lg pointer-events-none">
               {business.discount}
             </div>
             {business.featured && (
-              <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded-md bg-teal-600/90 text-white text-[10px] font-semibold uppercase tracking-wider">
+              <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded-md bg-teal-600/90 text-white text-[10px] font-semibold uppercase tracking-wider pointer-events-none">
                 Featured
               </div>
             )}
-          </div>
+          </button>
           <div className="flex-1 p-5">
             <div className="flex items-start justify-between gap-3 mb-2">
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-bold text-gray-900 text-lg group-hover:text-teal-700 transition-colors">{business.name}</h3>
+                  <h3 className="font-bold text-gray-900 text-lg">
+                    <button
+                      type="button"
+                      onClick={handleViewDeal}
+                      className="text-left hover:text-teal-700 transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                    >
+                      {business.name}
+                    </button>
+                  </h3>
                   <SuperStarBadge count={superStarCount} />
                   {hasWhatsApp && (
                     <button
+                      type="button"
                       onClick={handleWhatsApp}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-green-600 text-[10px] font-bold hover:bg-green-100 transition-colors border border-green-200"
-                      title="Chat on WhatsApp"
+                      className="inline-flex min-h-11 items-center gap-1 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-green-600 text-xs font-bold hover:bg-green-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                      aria-label={whatsappLabel}
                     >
-                      <WhatsAppIcon className="w-3 h-3" />
+                      <WhatsAppIcon className="w-3.5 h-3.5 shrink-0" />
                       <span>WhatsApp</span>
                     </button>
                   )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
-                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{business.location}</span>
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{business.hours}</span>
-                  <span className="flex items-center gap-1"><Star className="w-3 h-3 text-amber-400 fill-amber-400" />{business.rating} ({business.reviewCount})</span>
+                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3 shrink-0" />{business.location}</span>
+                  <span className="flex items-center gap-1"><Clock className="w-3 h-3 shrink-0" />{business.hours}</span>
+                  <span className="flex items-center gap-1"><Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />{business.rating} ({business.reviewCount})</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-1 flex-shrink-0">
                 {hasWhatsApp && (
-                  <button onClick={handleWhatsApp} className="w-8 h-8 rounded-full flex items-center justify-center bg-green-50 text-green-600 hover:bg-green-100 transition-colors border border-green-200" title="Chat on WhatsApp">
-                    <WhatsAppIcon className="w-3.5 h-3.5" />
+                  <button
+                    type="button"
+                    onClick={handleWhatsApp}
+                    className={`${iconActionBtn} bg-green-50 text-green-600 hover:bg-green-100 border border-green-200`}
+                    aria-label={whatsappLabel}
+                  >
+                    <WhatsAppIcon className="w-4 h-4" />
                   </button>
                 )}
-                <button onClick={handleShare} className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600 transition-colors">
-                  <Share2 className="w-3.5 h-3.5" />
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  className={`${iconActionBtn} bg-gray-100 text-gray-500 hover:bg-blue-50 hover:text-blue-600`}
+                  aria-label={shareLabel}
+                >
+                  <Share2 className="w-4 h-4" />
                 </button>
-                <button onClick={handleFavorite} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isFav ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-500'}`}>
-                  <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-current' : ''}`} />
+                <button
+                  type="button"
+                  onClick={handleFavorite}
+                  className={`${iconActionBtn} ${isFav ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-gray-100 text-gray-500 hover:bg-red-50 hover:text-red-500'}`}
+                  aria-label={favoriteLabel}
+                >
+                  <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
                 </button>
               </div>
             </div>
             <p className="text-sm text-gray-500 mb-3 line-clamp-2">{plainTextFromHtml(desc || '')}</p>
-            <div className="flex items-center justify-between">
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl font-bold text-teal-700">{formatVT(business.dealPrice)}</span>
-                <span className="text-sm text-gray-400 line-through">{formatVT(business.originalPrice)}</span>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-xl font-bold text-teal-700">{formatVT(dealPrice)}</span>
+                <span className="text-sm text-gray-400 line-through">{formatVT(originalPrice)}</span>
                 {savings > 0 && (
                   <span className="px-2 py-0.5 rounded-md bg-green-50 text-green-700 text-xs font-bold">
                     Save {formatVT(savings)}
@@ -168,62 +224,71 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
                 )}
               </div>
               <button
-                onClick={(e) => { e.stopPropagation(); handleViewDeal(); }}
-                className="px-5 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors"
+                type="button"
+                onClick={handleViewDeal}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-teal-600 px-5 py-2 text-sm font-semibold text-white hover:bg-teal-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
               >
                 {t('biz.viewdeal', language)}
               </button>
             </div>
           </div>
         </div>
-      </div>
+      </article>
     );
   }
 
   return (
-    <div
-      className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-gray-100 hover:border-teal-200 transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-      onClick={handleViewDeal}
-    >
-      {/* Image */}
+    <article className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl border border-gray-100 hover:border-teal-200 transition-all duration-300 hover:-translate-y-1">
+      {/* Image — full-area primary control (keyboard + touch); actions sit above in z-order */}
       <div className="relative h-48 overflow-hidden">
+        <button
+          type="button"
+          onClick={handleViewDeal}
+          aria-label={viewDetailsLabel}
+          className="absolute inset-0 z-[1] h-full w-full cursor-pointer border-0 bg-transparent p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-0"
+        />
         <img
-          src={business.image || '/placeholder.svg'}
-          alt={business.name}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          src={cardImage}
+          alt=""
+          className="relative z-0 h-full w-full object-cover pointer-events-none group-hover:scale-110 transition-transform duration-500"
           onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-        
+        <div className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-t from-black/40 to-transparent" />
+
         {/* Discount Badge */}
-        <div className="absolute top-3 left-3 px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold shadow-lg">
+        <div className="pointer-events-none absolute top-3 left-3 z-[2] px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold shadow-lg">
           {business.discount}
         </div>
 
-        {/* Action Buttons */}
-        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+        {/* Action Buttons — always visible; ≥44px targets */}
+        <div className="absolute top-3 right-3 z-[3] flex items-center gap-1.5">
           {hasWhatsApp && (
             <button
+              type="button"
               onClick={handleWhatsApp}
-              className="w-9 h-9 rounded-full flex items-center justify-center bg-green-500 text-white hover:bg-green-600 transition-all shadow-lg"
-              title="Chat on WhatsApp"
+              className={`${iconActionBtn} bg-green-500 text-white shadow-lg hover:bg-green-600`}
+              aria-label={whatsappLabel}
             >
               <WhatsAppIcon className="w-4 h-4" />
             </button>
           )}
           <button
+            type="button"
             onClick={handleShare}
-            className="w-9 h-9 rounded-full flex items-center justify-center bg-white/90 text-gray-600 hover:bg-white hover:text-blue-600 transition-all shadow-lg opacity-0 group-hover:opacity-100"
+            className={`${iconActionBtn} bg-white/95 text-gray-600 shadow-lg hover:bg-white hover:text-blue-600 md:transition-shadow md:group-hover:shadow-xl`}
+            aria-label={shareLabel}
           >
             <Share2 className="w-4 h-4" />
           </button>
           <button
+            type="button"
             onClick={handleFavorite}
-            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-lg ${
+            className={`${iconActionBtn} shadow-lg ${
               isFav
-                ? 'bg-red-500 text-white'
-                : 'bg-white/90 text-gray-600 hover:bg-white hover:text-red-500'
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : 'bg-white/95 text-gray-600 hover:bg-white hover:text-red-500 md:transition-shadow md:group-hover:shadow-xl'
             }`}
+            aria-label={favoriteLabel}
           >
             <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
           </button>
@@ -231,14 +296,14 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
 
         {/* Featured Badge */}
         {business.featured && (
-          <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded-md bg-teal-600/90 text-white text-[10px] font-semibold uppercase tracking-wider">
+          <div className="pointer-events-none absolute bottom-3 left-3 z-[2] px-2 py-0.5 rounded-md bg-teal-600/90 text-white text-[10px] font-semibold uppercase tracking-wider">
             Featured
           </div>
         )}
 
         {/* Savings Badge */}
         {savings > 0 && (
-          <div className="absolute bottom-3 right-3 px-2 py-0.5 rounded-md bg-green-600/90 text-white text-[10px] font-semibold">
+          <div className="pointer-events-none absolute bottom-3 right-3 z-[2] px-2 py-0.5 rounded-md bg-green-600/90 text-white text-[10px] font-semibold">
             Save {formatVT(savings)}
           </div>
         )}
@@ -249,53 +314,60 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-bold text-gray-900 text-base leading-tight group-hover:text-teal-700 transition-colors">
-                {business.name}
+              <h3 className="font-bold text-gray-900 text-base leading-tight">
+                <button
+                  type="button"
+                  onClick={handleViewDeal}
+                  className="text-left hover:text-teal-700 transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                >
+                  {business.name}
+                </button>
               </h3>
               <SuperStarBadge count={superStarCount} />
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+            <Star className="w-4 h-4 text-amber-400 fill-amber-400" aria-hidden />
             <span className="text-sm font-semibold text-gray-800">{business.rating}</span>
           </div>
         </div>
 
         <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">{plainTextFromHtml(desc || '')}</p>
 
-        <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
-          <span className="flex items-center gap-1">
-            <MapPin className="w-3 h-3" />
-            {business.location}
+        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 mb-3">
+          <span className="flex min-w-0 items-center gap-1">
+            <MapPin className="w-3 h-3 shrink-0" />
+            <span className="truncate">{business.location}</span>
           </span>
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
+          <span className="flex items-center gap-1 shrink-0">
+            <Clock className="w-3 h-3 shrink-0" />
             {business.hours.split(' - ')[0]}
           </span>
           {hasWhatsApp && (
-            <span className="flex items-center gap-1 text-green-600">
+            <span className="flex items-center gap-1 text-green-600 shrink-0">
               <WhatsAppIcon className="w-3 h-3" />
               WhatsApp
             </span>
           )}
         </div>
 
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-          <div className="flex items-baseline gap-2">
-            <span className="text-lg font-bold text-teal-700">{formatVT(business.dealPrice)}</span>
-            <span className="text-sm text-gray-400 line-through">{formatVT(business.originalPrice)}</span>
+        <div className="flex items-center justify-between gap-3 pt-3 border-t border-gray-100 flex-wrap">
+          <div className="flex items-baseline gap-2 flex-wrap min-w-0">
+            <span className="text-lg font-bold text-teal-700">{formatVT(dealPrice)}</span>
+            <span className="text-sm text-gray-400 line-through">{formatVT(originalPrice)}</span>
             <span className="text-xs text-gray-400">{t('general.per_person', language)}</span>
           </div>
 
           <button
-            onClick={(e) => { e.stopPropagation(); handleViewDeal(); }}
-            className="px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 text-xs font-semibold hover:bg-teal-100 transition-colors"
+            type="button"
+            onClick={handleViewDeal}
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-teal-50 px-4 py-2 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
           >
             {t('biz.viewdeal', language)}
           </button>
         </div>
       </div>
-    </div>
+    </article>
   );
 };
 

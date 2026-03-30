@@ -1,7 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { useAppContext, ViewMode } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { businesses as localBusinesses, categories, publicListingBusinesses, Business } from '@/data/businesses';
+import {
+  businesses as localBusinesses,
+  categories,
+  publicListingBusinesses,
+  Business,
+  effectiveListingDealPrice,
+  effectiveListingOriginalPrice,
+  effectiveListingDescriptionPlain,
+} from '@/data/businesses';
 import { pickRepresentativeOfferingsPerProfile, profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import BusinessCard from './BusinessCard';
 import AdvancedSearch, { SortOption } from './AdvancedSearch';
@@ -45,8 +53,10 @@ function computeLeaderboardScore(
     dbReviews.filter(r => r.business_id === profileId && r.has_super_star).length
   );
   const superStarScore = maxSuperStars > 0 ? Math.min(superStarCount / maxSuperStars, 1) : 0;
-  const discountPct = biz.originalPrice > 0
-    ? (biz.originalPrice - biz.dealPrice) / biz.originalPrice
+  const oDeal = effectiveListingDealPrice(biz);
+  const oOrig = effectiveListingOriginalPrice(biz);
+  const discountPct = oOrig > 0
+    ? (oOrig - oDeal) / oOrig
     : 0;
   const dealScore = Math.min(discountPct * 2, 1);
   const recentReviews = dbReviews.filter(r => {
@@ -132,7 +142,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
 
         // Enhanced search: name, description, location, tags, category, whatsappNumber
         const nameMatch = fuzzyMatch(q, biz.name);
-        const descMatch = fuzzyMatch(q, plainTextFromHtml(biz.description || ''));
+        const descMatch = fuzzyMatch(q, plainTextFromHtml(effectiveListingDescriptionPlain(biz)));
         const locationMatch = fuzzyMatch(q, biz.location);
         const categoryMatch = (biz.category ?? '').toLowerCase().includes(q);
         const tagMatch = (biz.tags ?? []).some(tag => {
@@ -154,7 +164,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
         if (!nameMatch && !descMatch && !locationMatch && !categoryMatch && !tagMatch && !phoneticMatch && !whatsappMatch) return false;
       }
       // Price range filter
-      const price = biz.dealPrice || biz.originalPrice;
+      const price = effectiveListingDealPrice(biz) || effectiveListingOriginalPrice(biz);
       if (price < priceRange[0] || price > priceRange[1]) return false;
       // Rating filter
       if (biz.rating < minRating) return false;
@@ -171,16 +181,26 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
         });
         break;
       case 'price-low':
-        result.sort((a, b) => (a.dealPrice || a.originalPrice) - (b.dealPrice || b.originalPrice));
+        result.sort((a, b) =>
+          (effectiveListingDealPrice(a) || effectiveListingOriginalPrice(a)) -
+          (effectiveListingDealPrice(b) || effectiveListingOriginalPrice(b)),
+        );
         break;
       case 'price-high':
-        result.sort((a, b) => (b.dealPrice || b.originalPrice) - (a.dealPrice || a.originalPrice));
+        result.sort((a, b) =>
+          (effectiveListingDealPrice(b) || effectiveListingOriginalPrice(b)) -
+          (effectiveListingDealPrice(a) || effectiveListingOriginalPrice(a)),
+        );
         break;
       case 'rating':
         result.sort((a, b) => b.rating - a.rating);
         break;
       case 'savings':
-        result.sort((a, b) => (b.originalPrice - b.dealPrice) - (a.originalPrice - a.dealPrice));
+        result.sort(
+          (a, b) =>
+            effectiveListingOriginalPrice(b) - effectiveListingDealPrice(b) -
+            (effectiveListingOriginalPrice(a) - effectiveListingDealPrice(a)),
+        );
         break;
       case 'reviews':
         result.sort((a, b) => b.reviewCount - a.reviewCount);

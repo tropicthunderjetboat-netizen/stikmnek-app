@@ -69,8 +69,8 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
     const method = (p.preferred_contact_method || 'email') as PreferredContact;
     setPreferredContact(['email', 'whatsapp', 'phone'].includes(method) ? method : 'email');
     setResortName((p.resort_name || '').trim());
-    setExpectedArrivalDate((p as any).expected_arrival_date ? String((p as any).expected_arrival_date).slice(0, 10) : '');
-    setExpectedDepartureDate((p as any).expected_departure_date ? String((p as any).expected_departure_date).slice(0, 10) : '');
+    setExpectedArrivalDate(p.expected_arrival_date ? String(p.expected_arrival_date).slice(0, 10) : '');
+    setExpectedDepartureDate(p.expected_departure_date ? String(p.expected_departure_date).slice(0, 10) : '');
     setContactEmail((p.email || accountEmail || '').trim());
     setContactWhatsapp((p.whatsapp_number || '').trim() || (p.phone || '').trim());
     setContactPhone((p.phone || '').trim());

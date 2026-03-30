@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Language } from '@/data/translations';
 import { Business } from '@/data/businesses';
 import { supabase, directProfileInsert, SUPABASE_URL } from '@/lib/supabase';
-import { mapJoinedOfferingToBusiness } from '@/lib/businessOfferingMap';
+import { mapJoinedOfferingToBusiness, OFFERING_LISTING_COLUMNS } from '@/lib/businessOfferingMap';
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
@@ -164,6 +164,58 @@ export function dedupeReviewsList(list: DBReview[]): DBReview[] {
   return out;
 }
 
+/** ISO cutoff for `redemptions.redeemed_at` — last 30×24h from now (UTC). */
+function reviewRecentRedemptionCutoffIso(): string {
+  return new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+}
+
+/** Substring match for `RAISE EXCEPTION` text in `submit_superstar_review`. */
+const REVIEW_WINDOW_EXPIRED_RPC_SNIPPET = 'Review window expired';
+
+function translateReviewWindowExpiredMessage(language: Language): string {
+  if (language === 'fr') {
+    return 'Pour garder des avis pertinents, vous ne pouvez publier un avis que dans les 30 jours suivant votre visite.';
+  }
+  if (language === 'bi') {
+    return 'Blong riviu i stap fri, yu save postem riviu nomo insaed 30 dei from taem yu bin visit.';
+  }
+  return 'To keep reviews fresh, you can only post a review within 30 days of your visit.';
+}
+
+function translateMustRedeemFirstMessage(
+  language: Language,
+  redemptionContext: 'leave_review' | 'superstar_purchase',
+): string {
+  if (redemptionContext === 'superstar_purchase') {
+    if (language === 'en') {
+      return 'You must redeem a service from this business before purchasing a Super Star review.';
+    }
+    if (language === 'fr') {
+      return 'Vous devez utiliser une offre de cet établissement avant d’acheter un avis Super Star.';
+    }
+    return 'Yu mas redeem wan sarvis long bisinis ia bifo yu bae Super Star riviu.';
+  }
+  if (language === 'en') {
+    return 'You must redeem a service from this business before leaving a review.';
+  }
+  if (language === 'fr') {
+    return 'Vous devez utiliser une offre de cet établissement avant de laisser un avis.';
+  }
+  return 'Yu mas redeem wan sarvis long bisinis ia bifo yu save riviu.';
+}
+
+/** Tourist onboarding gate — same criteria as AppLayout profile-first redirect. */
+export function isTouristProfileCompleteForGate(p: UserProfile | null | undefined): boolean {
+  if (!p) return false;
+  return (
+    p.post_pass_profile_completed === true &&
+    Boolean(p.name || p.full_name || p.display_name) &&
+    (p.num_adults ?? 0) >= 1 &&
+    Boolean(p.expected_arrival_date) &&
+    Boolean(p.expected_departure_date)
+  );
+}
+
 interface AppContextType {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
@@ -206,6 +258,13 @@ interface AppContextType {
    * Call before opening the payment modal or charging the card — not after payment.
    */
   validateSuperStarPaymentPrerequisites: (businessId: string) => Promise<void>;
+  /**
+   * No toasts. Use before opening review UI: owner check + redemption within last 30 days.
+   */
+  checkReviewSubmissionAllowed: (
+    businessId: string,
+    redemptionContext?: 'leave_review' | 'superstar_purchase',
+  ) => Promise<{ allowed: boolean; message?: string }>;
   refreshUserProfile: () => Promise<void>;
   dataLoaded: boolean;
   refreshBusinesses: () => Promise<void>;
@@ -214,7 +273,17 @@ interface AppContextType {
   refreshRedemptions: () => Promise<void>;
   /** null = not loaded; business owners only — true if `businesses` has a row for this user. */
   businessOwnerHasBusinessRow: boolean | null;
+  /** True if this owner has a pending_businesses submission (awaiting review). */
+  businessOwnerHasPendingSubmission: boolean;
   refreshBusinessOwnerRowStatus: () => Promise<void>;
+  /** Set when user_profiles could not be loaded (network/Supabase); avoids gating loops on null profile. */
+  userProfileLoadError: string | null;
+  /** Clears error and refetches profile from Supabase (e.g. after a blip). */
+  retryUserProfileFetch: () => Promise<void>;
+  /** Tourist has started fields but gate not satisfied — show “resume” copy on complete-profile. */
+  touristOnboardingResume: boolean;
+  /** Business owner: pending submission or partial user_profiles business fields before businesses row. */
+  businessOnboardingResume: boolean;
   userLocation: GeoPosition | null;
   locationLoading: boolean;
   locationError: string | null;
@@ -247,6 +316,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [dbReviews, setDbReviews] = useState<DBReview[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [businessOwnerHasBusinessRow, setBusinessOwnerHasBusinessRow] = useState<boolean | null>(null);
+  const [businessOwnerHasPendingSubmission, setBusinessOwnerHasPendingSubmission] = useState(false);
+  const [userProfileLoadError, setUserProfileLoadError] = useState<string | null>(null);
 
   // Geolocation state
   const [userLocation, setUserLocation] = useState<GeoPosition | null>(null);
@@ -316,72 +387,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   const loadBusinesses = useCallback(async () => {
     try {
-      const { data: offRows, error: offErr } = await supabase
-        .from('business_offerings')
+      // Master profile + at least one active offering (!inner). Listing copy lives on
+      // `business_offerings`; `businesses` is the stub (location, hours, reviews, etc.).
+      const { data: profileRows, error: loadErr } = await supabase
+        .from('businesses')
         .select(`
           id,
-          title,
-          description,
-          description_fr,
-          description_bi,
-          discount,
-          original_price,
-          deal_price,
-          image,
-          map_url,
-          website,
-          discount_valid_from,
-          discount_valid_until,
+          name,
+          category,
+          owner_id,
+          location,
+          lat,
+          lng,
+          hours,
+          opening_hours,
+          phone,
+          email,
+          contact_email,
+          business_email,
           whatsapp_number,
-          pricing_tiers,
-          tags,
+          rating,
+          review_count,
           featured,
           active,
-          businesses!inner (
-            id,
-            name,
-            category,
-            owner_id,
-            location,
-            lat,
-            lng,
-            hours,
-            opening_hours,
-            phone,
-            email,
-            contact_email,
-            business_email,
-            whatsapp_number,
-            rating,
-            review_count,
-            featured,
-            active,
-            map_url,
-            website
+          map_url,
+          website,
+          tags,
+          super_star_count,
+          business_offerings!inner (
+            ${OFFERING_LISTING_COLUMNS}
           )
         `)
+        .eq('business_offerings.active', true)
         .order('featured', { ascending: false });
 
-      if (offErr) {
-        console.warn('[loadBusinesses] business_offerings:', offErr.message || offErr);
-      }
-
-      if (offErr) {
-        console.warn('[loadBusinesses] business_offerings:', offErr.message || offErr);
+      if (loadErr) {
+        console.warn('[loadBusinesses] businesses + business_offerings:', loadErr.message || loadErr);
         setDbBusinesses([]);
         setDataLoaded(true);
         return;
       }
 
-      if (offRows && offRows.length > 0) {
+      if (profileRows && profileRows.length > 0) {
         const mapped: Business[] = [];
-        for (const row of offRows as Record<string, unknown>[]) {
-          const b = row.businesses as Record<string, unknown> | null | undefined;
-          if (!b) continue;
-          // Public deals are driven by the offering row. Master profile may stay
-          // `active: false` (onboarding stub) while offers are live.
-          if (row.active === false) continue;
-          mapped.push(mapJoinedOfferingToBusiness(row, b, SUPABASE_URL));
+        for (const row of profileRows as Record<string, unknown>[]) {
+          const rawOff = row.business_offerings;
+          const offs = Array.isArray(rawOff) ? rawOff : [];
+          const { business_offerings: _drop, ...profile } = row;
+          for (const o of offs) {
+            const off = o as Record<string, unknown> & { active?: boolean };
+            if (off.active === false) continue;
+            mapped.push(mapJoinedOfferingToBusiness(off, profile, SUPABASE_URL));
+          }
         }
         setDbBusinesses(mapped);
       } else {
@@ -545,7 +602,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     userId: string,
     email: string,
     metadata?: Record<string, any>
-  ): Promise<{ role: 'tourist' | 'business' | 'admin'; profile: UserProfile | null; fromDb: boolean }> => {
+  ): Promise<{
+    role: 'tourist' | 'business' | 'admin';
+    profile: UserProfile | null;
+    fromDb: boolean;
+    /** False if the user_profiles query errored, timed out, or threw — profile may be unknown. */
+    profileRowFetchOk: boolean;
+  }> => {
     console.log('[resolveRole] START for userId:', userId, 'email:', email);
 
     // Step 1: Admin email check (synchronous, never blocks)
@@ -644,7 +707,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     console.log('[resolveRole] FINAL ROLE:', finalRole);
-    return { role: finalRole, profile, fromDb: resolvedFromDb };
+    return { role: finalRole, profile, fromDb: resolvedFromDb, profileRowFetchOk: dbQuerySucceeded };
   }, []);
 
 
@@ -725,6 +788,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Fail-fast: resolveRole has internal timeout; wrap in extra safety
       let role: 'tourist' | 'business' | 'admin';
       let profile: UserProfile | null;
+      let profileRowFetchOk = false;
       try {
         const result = await Promise.race([
           resolveRole(authUser.id, authUser.email || '', authUser.user_metadata),
@@ -734,10 +798,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ]);
         role = result.role;
         profile = result.profile;
+        profileRowFetchOk = result.profileRowFetchOk;
       } catch (resolveErr) {
         console.warn('[handleAuthenticatedUser] resolveRole failed — using default tourist:', (resolveErr as Error)?.message);
         role = ADMIN_EMAILS.includes((authUser.email || '').toLowerCase()) ? 'admin' : 'tourist';
         profile = null;
+        profileRowFetchOk = false;
       }
 
       // ─── FALLBACK: If no profile found, create one (with timeout, don't block) ───
@@ -774,6 +840,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
+      const profileReady = !!profile;
+      if (!profileReady && !profileRowFetchOk) {
+        setUserProfileLoadError(
+          'Failed to load your profile. Please check your connection and try again, or contact support if this continues.',
+        );
+      } else {
+        setUserProfileLoadError(null);
+      }
+
       const userObj = buildUser(authUser, role, profile);
 
       console.log('[handleAuthenticatedUser] Setting user state — role:', role, 'name:', userObj.name);
@@ -788,6 +863,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (err) {
       console.error('[handleAuthenticatedUser] CRITICAL ERROR:', err);
+      setUserProfileLoadError(
+        'Failed to load your profile. Please check your connection and try again, or contact support if this continues.',
+      );
       const meta = authUser.user_metadata || {};
       let fallbackRole: 'tourist' | 'business' | 'admin';
       
@@ -867,9 +945,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               authProcessingRef.current = false;
               setUser(null);
               setUserProfile(null);
+              setUserProfileLoadError(null);
               setFavorites([]);
               setRedemptions([]);
               setBusinessOwnerHasBusinessRow(null);
+              setBusinessOwnerHasPendingSubmission(false);
               setAuthLoading(false);
               break;
             }
@@ -1170,12 +1250,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     authProcessingRef.current = false;
     setUser(null);
     setUserProfile(null);
+    setUserProfileLoadError(null);
     setFavorites([]);
     setRedemptions([]);
     setCart(null);
     setCurrentView('home');
     setSidebarOpen(false);
     setBusinessOwnerHasBusinessRow(null);
+    setBusinessOwnerHasPendingSubmission(false);
 
     try {
       await supabase.auth.signOut({ scope: 'local' });
@@ -1303,6 +1385,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (error) throw error;
       if (profile) {
         setUserProfile(profile as UserProfile);
+        setUserProfileLoadError(null);
         setUser(prev => prev && prev.id === user.id
           ? {
             ...prev,
@@ -1310,23 +1393,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             shareBonusUnlocked: (profile as any).share_bonus_unlocked ?? false,
           }
           : prev);
+      } else {
+        setUserProfileLoadError(null);
       }
     } catch (err) {
       console.error('refreshUserProfile failed:', err);
+      setUserProfileLoadError('Failed to load your profile. Please try again in a moment.');
     }
   }, [user?.id]);
 
+  const retryUserProfileFetch = useCallback(async () => {
+    setUserProfileLoadError(null);
+    await refreshUserProfile();
+  }, [refreshUserProfile]);
+
   // ═══════════════════════════════════════════════════════════
-  // REVIEW PREFLIGHT — owner + redemption (master businesses.id)
+  // REVIEW PREFLIGHT — owner + redemption within last 30 days (businesses.id)
   // ═══════════════════════════════════════════════════════════
-  const preflightReviewSubmission = useCallback(
+  const evaluateReviewSubmissionPreflight = useCallback(
     async (
       businessId: string,
       redemptionContext: 'leave_review' | 'superstar_purchase',
-    ): Promise<void> => {
+    ): Promise<{ ok: true } | { ok: false; message: string }> => {
       if (!user) {
-        setShowAuth(true);
-        throw new Error('Not signed in');
+        return { ok: false, message: 'Not signed in' };
       }
 
       const { data: ownRow } = await supabase
@@ -1343,36 +1433,106 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             : language === 'fr'
               ? 'Vous ne pouvez pas laisser un avis sur votre propre établissement.'
               : 'Yu no save riviu long bisinis blong yu yet.';
-        toast.error(msg);
-        throw new Error(msg);
+        return { ok: false, message: msg };
       }
 
-      const { data: redemptionRows, error: redemptionErr } = await supabase
+      const cutoff = reviewRecentRedemptionCutoffIso();
+
+      const { data: recentRows, error: recentErr } = await supabase
+        .from('redemptions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('business_id', businessId)
+        .gte('redeemed_at', cutoff)
+        .limit(1);
+
+      if (recentErr) {
+        return {
+          ok: false,
+          message:
+            language === 'en'
+              ? 'Could not verify your visit history. Please try again.'
+              : language === 'fr'
+                ? 'Impossible de vérifier votre historique de visites. Réessayez.'
+                : 'Noka verifyem histori blong visit blong yu. Trai bakagen.',
+        };
+      }
+
+      if (recentRows?.length) {
+        return { ok: true };
+      }
+
+      const { data: anyRows, error: anyErr } = await supabase
         .from('redemptions')
         .select('id')
         .eq('user_id', user.id)
         .eq('business_id', businessId)
         .limit(1);
 
-      if (redemptionErr) throw redemptionErr;
-      if (!redemptionRows?.length) {
-        const msg =
-          redemptionContext === 'superstar_purchase'
-            ? language === 'en'
-              ? 'You must redeem a service from this business before purchasing a Super Star review.'
+      if (anyErr) {
+        return {
+          ok: false,
+          message:
+            language === 'en'
+              ? 'Could not verify your visit history. Please try again.'
               : language === 'fr'
-                ? 'Vous devez utiliser une offre de cet établissement avant d’acheter un avis Super Star.'
-                : 'Yu mas redeem wan sarvis long bisinis ia bifo yu bae Super Star riviu.'
-            : language === 'en'
-              ? 'You must redeem a service from this business before leaving a review.'
+                ? 'Impossible de vérifier votre historique de visites. Réessayez.'
+                : 'Noka verifyem histori blong visit blong yu. Trai bakagen.',
+        };
+      }
+
+      if (anyRows?.length) {
+        return { ok: false, message: translateReviewWindowExpiredMessage(language) };
+      }
+
+      return {
+        ok: false,
+        message: translateMustRedeemFirstMessage(language, redemptionContext),
+      };
+    },
+    [user, language],
+  );
+
+  const checkReviewSubmissionAllowed = useCallback(
+    async (
+      businessId: string,
+      redemptionContext: 'leave_review' | 'superstar_purchase' = 'leave_review',
+    ): Promise<{ allowed: boolean; message?: string }> => {
+      if (!user) {
+        return {
+          allowed: false,
+          message:
+            language === 'en'
+              ? 'Sign in to leave a review.'
               : language === 'fr'
-                ? 'Vous devez utiliser une offre de cet établissement avant de laisser un avis.'
-                : 'Yu mas redeem wan sarvis long bisinis ia bifo yu save riviu.';
-        toast.error(msg);
-        throw new Error(msg);
+                ? 'Connectez-vous pour laisser un avis.'
+                : 'Saen in blong riviu.',
+        };
+      }
+      const r = await evaluateReviewSubmissionPreflight(businessId, redemptionContext);
+      if (r.ok) return { allowed: true };
+      return { allowed: false, message: r.message };
+    },
+    [user, language, evaluateReviewSubmissionPreflight],
+  );
+
+  const preflightReviewSubmission = useCallback(
+    async (
+      businessId: string,
+      redemptionContext: 'leave_review' | 'superstar_purchase',
+    ): Promise<void> => {
+      if (!user) {
+        setShowAuth(true);
+        throw new Error('Not signed in');
+      }
+
+      const r = await evaluateReviewSubmissionPreflight(businessId, redemptionContext);
+      if (!r.ok) {
+        toast.error(r.message);
+        throw new Error(r.message);
       }
     },
-    [user, language, setShowAuth],
+    [user, setShowAuth, evaluateReviewSubmissionPreflight],
   );
 
   const validateSuperStarPaymentPrerequisites = useCallback(
@@ -1446,7 +1606,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toast.success('Review submitted! Thank you.');
       } catch (err: any) {
         console.error('Submit review error:', err);
-        toast.error(err.message || 'Failed to submit review');
+        let msg: string = err?.message || 'Failed to submit review';
+        if (typeof msg === 'string' && msg.includes(REVIEW_WINDOW_EXPIRED_RPC_SNIPPET)) {
+          msg = translateReviewWindowExpiredMessage(language);
+        }
+        toast.error(msg);
         throw err;
       }
     },
@@ -1474,25 +1638,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const utype = user?.type;
     if (!uid || utype !== 'business') {
       setBusinessOwnerHasBusinessRow(null);
+      setBusinessOwnerHasPendingSubmission(false);
       return;
     }
     try {
-      const { data, error } = await supabase
-        .from('businesses')
-        .select('id')
-        .eq('owner_id', uid)
-        .limit(1);
-      if (error) throw error;
-      setBusinessOwnerHasBusinessRow((data?.length ?? 0) > 0);
+      const [bizRes, pendRes] = await Promise.all([
+        supabase.from('businesses').select('id').eq('owner_id', uid).limit(1),
+        supabase
+          .from('pending_businesses')
+          .select('id')
+          .eq('owner_id', uid)
+          .eq('status', 'pending')
+          .limit(1),
+      ]);
+      if (bizRes.error) throw bizRes.error;
+      if (pendRes.error) throw pendRes.error;
+      setBusinessOwnerHasBusinessRow((bizRes.data?.length ?? 0) > 0);
+      setBusinessOwnerHasPendingSubmission((pendRes.data?.length ?? 0) > 0);
     } catch (e) {
       console.warn('[refreshBusinessOwnerRowStatus]', e);
       setBusinessOwnerHasBusinessRow(false);
+      setBusinessOwnerHasPendingSubmission(false);
     }
   }, [user?.id, user?.type]);
 
   useEffect(() => {
     void refreshBusinessOwnerRowStatus();
   }, [refreshBusinessOwnerRowStatus]);
+
+  const touristOnboardingResume = useMemo(() => {
+    if (!userProfile || user?.type !== 'tourist') return false;
+    if (isTouristProfileCompleteForGate(userProfile)) return false;
+    return Boolean(
+      userProfile.name ||
+        userProfile.full_name ||
+        userProfile.display_name ||
+        (userProfile.num_adults != null && userProfile.num_adults > 0) ||
+        userProfile.expected_arrival_date ||
+        userProfile.expected_departure_date ||
+        userProfile.num_children != null ||
+        userProfile.num_infants != null,
+    );
+  }, [userProfile, user?.type]);
+
+  const businessOnboardingResume = useMemo(() => {
+    if (!userProfile || user?.type !== 'business') return false;
+    if (businessOwnerHasBusinessRow === true) return false;
+    if (businessOwnerHasPendingSubmission) return true;
+    return Boolean(
+      (userProfile.business_name && userProfile.business_name.trim()) ||
+        (userProfile.business_location && userProfile.business_location.trim()) ||
+        (userProfile.business_phone && userProfile.business_phone.trim()) ||
+        (userProfile.business_email && userProfile.business_email.trim()) ||
+        (userProfile.whatsapp_number && userProfile.whatsapp_number.trim()),
+    );
+  }, [userProfile, user?.type, businessOwnerHasBusinessRow, businessOwnerHasPendingSubmission]);
 
   return (
     <AppContext.Provider
@@ -1512,13 +1712,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         searchQuery, setSearchQuery,
         selectedCategory, setSelectedCategory,
         redemptions,
-        dbBusinesses, dbReviews, submitReview, validateSuperStarPaymentPrerequisites, dataLoaded,
+        dbBusinesses, dbReviews, submitReview, validateSuperStarPaymentPrerequisites,
+        checkReviewSubmissionAllowed, dataLoaded,
         refreshBusinesses,
         refreshUserPass,
         refreshRedemptions,
         refreshUserProfile,
+        retryUserProfileFetch,
         businessOwnerHasBusinessRow,
+        businessOwnerHasPendingSubmission,
         refreshBusinessOwnerRowStatus,
+        userProfileLoadError,
+        touristOnboardingResume,
+        businessOnboardingResume,
         userLocation, locationLoading, locationError,
         requestUserLocation, getDistanceTo,
       }}

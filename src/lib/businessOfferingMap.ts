@@ -6,7 +6,7 @@ const CATEGORY_KEYS = new Set(categories.map((c) => c.key));
 
 /** PostgREST column list for `business_offerings` rows (no embed). */
 export const OFFERING_LISTING_COLUMNS =
-  'id, business_id, title, description, description_fr, description_bi, discount, original_price, deal_price, image, map_url, website, discount_valid_from, discount_valid_until, whatsapp_number, pricing_tiers, tags, featured, active, created_at';
+  'id, business_id, title, description, description_fr, description_bi, discount, original_price, deal_price, image, map_url, website, discount_valid_from, discount_valid_until, whatsapp_number, pricing_tiers, tags, featured, active, created_at, updated_at';
 
 function offeringPrimaryImage(o: Record<string, unknown>): string {
   const direct = String(o.image ?? '').trim();

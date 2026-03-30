@@ -10,6 +10,9 @@
  * - verify_and_redeem
  *   - Performs the same checks and, if eligible, inserts a row into public.redemptions.
  *   - Returns a RedemptionResult-like object with basic receipt info.
+ *
+ * Pass validity uses strict calendar dates (valid_from / valid_until) vs UTC "today";
+ * see the block comment before date checks — no in-session grace past the last valid day.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -38,6 +41,7 @@ function normalizeDate(dateStr: string | null | undefined): string | null {
   return d.toISOString().split('T')[0];
 }
 
+/** Current UTC calendar date (YYYY-MM-DD). Used with normalized pass dates for strict validity — see pass lookup comment block. */
 function getTodayDate(): string {
   return new Date().toISOString().split('T')[0];
 }
@@ -69,6 +73,17 @@ function partyFromProfileRow(row: {
     children: Math.max(0, Math.floor(Number(cRaw ?? 0))),
     infants: Math.max(0, Math.floor(Number(iRaw ?? 0))),
   };
+}
+
+function totalPartyPax(p: PartyCounts): number {
+  return p.adults + p.children + p.infants;
+}
+
+/** Enforce redemption only when > 0; null = treat as unlimited (legacy row or missing column). */
+function resolvePassMaxPeople(passRow: { max_people?: unknown }): number | null {
+  const m = passRow.max_people;
+  if (typeof m === 'number' && Number.isFinite(m) && m > 0) return Math.floor(m);
+  return null;
 }
 
 type PricingTierInput = {
@@ -260,7 +275,7 @@ Deno.serve(async (req) => {
 
     const { data: pass, error: passErr } = await supabase
       .from('passes')
-      .select('id, user_id, pass_type, active, valid_from, valid_until, expires_at, purchased_at')
+      .select('id, user_id, pass_type, active, valid_from, valid_until, expires_at, purchased_at, max_people')
       .eq('id', passId)
       .eq('user_id', touristUserId)
       .single();
@@ -269,6 +284,27 @@ Deno.serve(async (req) => {
       console.error('[verify-redemption] pass lookup error:', passErr);
       return errorResponse('Pass not found for this QR code', 404);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PASS VALIDITY — STRICT CALENDAR-DATE ENFORCEMENT (product policy)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Pass validity is determined ONLY by calendar dates (YYYY-MM-DD), not by clock
+    // time within a day or by "in-session" activity (e.g. a multi-hour visit).
+    //
+    // - valid_from / valid_until are normalized to ISO date strings and compared to
+    //   "today" from getTodayDate() — the current UTC calendar date. Keep purchase
+    //   and redemption using the same date convention to avoid off-by-one issues.
+    //
+    // - Expiration: redemption is blocked when today's date is STRICTLY AFTER
+    //   valid_until (passStatus = date_range_expired). The last valid calendar day is
+    //   still valid for the whole UTC date; the first moment of the NEXT calendar day
+    //   is out of range. There is NO grace period that extends validity past
+    //   valid_until for ongoing redemptions, meals, or bookings that cross midnight.
+    //
+    // - This strict boundary is intentional (predictable pass lifecycle). If UX copy
+    //   promises otherwise, align product/docs — do not add implicit grace here
+    //   without an explicit product change.
+    // ═══════════════════════════════════════════════════════════════════════════
 
     const validFrom = normalizeDate(pass.valid_from);
     const validUntil = normalizeDate(pass.valid_until);
@@ -304,6 +340,19 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const party = partyFromProfileRow(profile);
+    const totalPartySize = totalPartyPax(party);
+    const passMaxPeople = resolvePassMaxPeople(pass as { max_people?: unknown });
+
+    // ─── Party size vs pass capacity (max_people) — server-side enforcement ───
+    // Savings math uses adults+children (+ infants for tiers). The same headcount must
+    // not exceed the pass purchase limit (share bonus included in max_people at buy time).
+    if (canRedeem && passMaxPeople !== null && totalPartySize > passMaxPeople) {
+      passStatus = 'party_exceeds_pass_capacity';
+      canRedeem = false;
+      message =
+        `Party size (${totalPartySize}) exceeds this pass capacity (max ${passMaxPeople}). ` +
+        'The tourist should reduce group size in their profile or purchase a pass with a higher limit.';
+    }
 
     const touristName =
       profile?.name ||
@@ -382,6 +431,8 @@ Deno.serve(async (req) => {
             validUntil,
             expiresAt: pass.expires_at,
             purchasedAt: pass.purchased_at,
+            maxPeople: passMaxPeople,
+            totalPartySize,
           },
           voucher: null,
           redemptionHistory: {
@@ -404,6 +455,9 @@ Deno.serve(async (req) => {
           {
             success: false,
             error: message,
+            status: passStatus,
+            maxPeople: passMaxPeople,
+            totalPartySize,
           },
           200
         );

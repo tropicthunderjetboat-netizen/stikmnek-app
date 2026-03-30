@@ -90,12 +90,23 @@ function todayStr(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+function isValidListingImageUrl(url: string): boolean {
+  const u = url.trim();
+  return u.length > 0 && /^https?:\/\//i.test(u);
+}
+
 const BusinessListingForm: React.FC = () => {
   const { language, user, setShowAuth, setAuthMode } = useAppContext();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [pricingTiers, setPricingTiers] = useState<PricingTierInput[]>([]);
+  /** Inline validation for submit (images, description, pricing). */
+  const [fieldErrors, setFieldErrors] = useState<{
+    description?: string;
+    photos?: string;
+    pricing?: string;
+  }>({});
   const [form, setForm] = useState({
     name: '', category: 'dining', description: '', discount: '',
     originalPrice: '', discountPercent: '', dealPrice: '',
@@ -225,6 +236,7 @@ const BusinessListingForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFieldErrors({});
 
     // Require authentication
     if (!user) {
@@ -237,90 +249,128 @@ const BusinessListingForm: React.FC = () => {
       setShowAuth(true);
       return;
     }
-    // Validate required fields - discount is now optional
-    if (!form.name || !hasMeaningfulDescriptionContent(form.description)) {
+
+    if (!form.name?.trim()) {
       toast.error(
         language === 'en'
-          ? 'Please fill in all required fields (name and description)'
-          : 'Veuillez remplir tous les champs obligatoires (nom et description)'
+          ? 'Please enter your business name.'
+          : 'Veuillez indiquer le nom de l’entreprise.',
       );
+      return;
+    }
+
+    if (!hasMeaningfulDescriptionContent(form.description)) {
+      const msg =
+        language === 'en'
+          ? 'Please add a description with real detail (not only empty formatting).'
+          : 'Veuillez ajouter une description avec du contenu réel.';
+      setFieldErrors({ description: msg });
+      toast.error(msg);
       return;
     }
 
     const descPlainLen = plainTextFromHtml(form.description).length;
     if (descPlainLen > BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX) {
-      toast.error(
+      const msg =
         language === 'en'
           ? `Description must be ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} characters or fewer (plain text).`
-          : `La description doit comporter au plus ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} caractères (texte brut).`,
-      );
+          : `La description doit comporter au plus ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} caractères (texte brut).`;
+      setFieldErrors({ description: msg });
+      toast.error(msg);
       return;
     }
 
-    // If discount is provided, validate it
-    const hasDiscount = form.originalPrice && form.discountPercent;
-    if (hasDiscount) {
-      const pct = Number(form.discountPercent);
-      if (isNaN(pct) || pct <= 0 || pct >= 100) {
-        toast.error(
-          language === 'en'
-            ? 'Discount must be between 1% and 99%'
-            : 'La remise doit être entre 1% et 99%'
-        );
-        return;
-      }
-    }
-
-
-    // Validate prices only if provided
-    if (hasDiscount) {
-      const origPrice = Number(form.originalPrice);
-      const dlPrice = Number(form.dealPrice);
-      if (isNaN(origPrice) || origPrice <= 0 || isNaN(dlPrice) || dlPrice <= 0) {
-        toast.error(
-          language === 'en'
-            ? 'Please enter valid prices greater than 0'
-            : 'Veuillez entrer des prix valides supérieurs à 0'
-        );
-        return;
-      }
-
-      if (dlPrice >= origPrice) {
-        toast.error(
-          language === 'en'
-            ? 'Deal price should be less than the original price'
-            : 'Le prix promotionnel doit être inférieur au prix original'
-        );
-        return;
-      }
-    } else if (form.originalPrice) {
-      // Has price but no discount - that's fine, just validate the price
-      const origPrice = Number(form.originalPrice);
-      if (isNaN(origPrice) || origPrice <= 0) {
-        toast.error(
-          language === 'en'
-            ? 'Please enter a valid price greater than 0'
-            : 'Veuillez entrer un prix valide supérieur à 0'
-        );
-        return;
-      }
+    const mainImageUrl = photos.length > 0 ? String(photos[0].url || '').trim() : '';
+    if (!isValidListingImageUrl(mainImageUrl)) {
+      const msg =
+        language === 'en'
+          ? 'Add at least one photo and wait for upload to finish (a valid image URL is required).'
+          : 'Ajoutez au moins une photo et attendez la fin du téléchargement.';
+      setFieldErrors({ photos: msg });
+      toast.error(msg);
+      return;
     }
 
     let tiersPayload: unknown[] | null = null;
     if (categoryUsesTieredPricing(form.category)) {
       const { data, error: tierErr } = validatePricingTiersForSubmit(pricingTiers);
       if (tierErr) {
+        setFieldErrors({ pricing: tierErr });
         toast.error(tierErr);
         return;
       }
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        const msg =
+          language === 'en'
+            ? 'Add at least one complete pricing tier (label and valid standard / StikmNek prices).'
+            : 'Ajoutez au moins un palier de prix complet (libellé et prix valides).';
+        setFieldErrors({ pricing: msg });
+        toast.error(msg);
+        return;
+      }
       tiersPayload = data;
+    } else {
+      const origPrice = Number(form.originalPrice);
+      if (!Number.isFinite(origPrice) || origPrice <= 0) {
+        const msg =
+          language === 'en'
+            ? 'Enter your standard price in VT (must be greater than 0).'
+            : 'Indiquez votre prix standard en VT (supérieur à 0).';
+        setFieldErrors({ pricing: msg });
+        toast.error(msg);
+        return;
+      }
+
+      const hasDiscount = Boolean(form.discountPercent?.trim());
+      let dealNum: number;
+      if (hasDiscount) {
+        const pct = Number(form.discountPercent);
+        if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) {
+          const msg =
+            language === 'en'
+              ? 'Discount must be between 1% and 99%.'
+              : 'La remise doit être entre 1% et 99%.';
+          setFieldErrors({ pricing: msg });
+          toast.error(msg);
+          return;
+        }
+        dealNum = Number(form.dealPrice);
+        if (!Number.isFinite(dealNum) || dealNum <= 0) {
+          const msg =
+            language === 'en'
+              ? 'Enter a valid discounted price (or adjust discount %).'
+              : 'Entrez un prix promotionnel valide.';
+          setFieldErrors({ pricing: msg });
+          toast.error(msg);
+          return;
+        }
+        if (dealNum >= origPrice) {
+          const msg =
+            language === 'en'
+              ? 'With a discount set, the StikmNek price must be less than your standard price.'
+              : 'Avec une remise, le prix StikmNek doit être inférieur au prix standard.';
+          setFieldErrors({ pricing: msg });
+          toast.error(msg);
+          return;
+        }
+      } else {
+        dealNum = origPrice;
+      }
+
+      if (!Number.isFinite(dealNum) || dealNum <= 0 || dealNum > origPrice) {
+        const msg =
+          language === 'en'
+            ? 'Invalid pricing: listed price must be positive and not greater than your standard price.'
+            : 'Prix invalide : le prix affiché doit être positif et ne pas dépasser le prix standard.';
+        setFieldErrors({ pricing: msg });
+        toast.error(msg);
+        return;
+      }
     }
 
     setSubmitting(true);
 
     try {
-      // Use the first uploaded photo as the main image
-      const mainImageUrl = photos.length > 0 ? photos[0].url : '';
 
       // Prepare photo data to send to edge function (server-side insert bypasses RLS)
       const photoData = photos.map((photo, index) => ({
@@ -623,7 +673,10 @@ const BusinessListingForm: React.FC = () => {
             </label>
             <BusinessDescriptionEditor
               value={form.description}
-              onChange={(html) => setForm({ ...form, description: html })}
+              onChange={(html) => {
+                setFieldErrors((fe) => ({ ...fe, description: undefined }));
+                setForm({ ...form, description: html });
+              }}
               placeholder={
                 language === 'en'
                   ? 'Describe your business and what makes it special...'
@@ -642,9 +695,21 @@ const BusinessListingForm: React.FC = () => {
                 {language === 'en' ? ' (plain text)' : ' (texte brut)'}
               </span>
             </div>
+            {fieldErrors.description && (
+              <p className="text-sm text-red-600 mt-2 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                {fieldErrors.description}
+              </p>
+            )}
           </div>
           {/* ─── Pricing & Discount Section ─── */}
-          <div className="p-5 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
+          <div
+            className={`p-5 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border ${
+              fieldErrors.pricing && !categoryUsesTieredPricing(form.category)
+                ? 'border-red-300 ring-1 ring-red-200'
+                : 'border-teal-100'
+            }`}
+          >
             <div className="flex items-center gap-2 mb-1">
               <Tag className="w-4 h-4 text-teal-600" />
               <h3 className="text-sm font-bold text-teal-800">
@@ -678,7 +743,10 @@ const BusinessListingForm: React.FC = () => {
                     min="1"
                     step="1"
                     value={form.originalPrice}
-                    onChange={(e) => setForm({ ...form, originalPrice: e.target.value })}
+                    onChange={(e) => {
+                      setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                      setForm({ ...form, originalPrice: e.target.value });
+                    }}
                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
                     placeholder="5000"
                   />
@@ -702,7 +770,10 @@ const BusinessListingForm: React.FC = () => {
                     max="99"
                     step="1"
                     value={form.discountPercent}
-                    onChange={(e) => setForm({ ...form, discountPercent: e.target.value })}
+                    onChange={(e) => {
+                      setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                      setForm({ ...form, discountPercent: e.target.value });
+                    }}
                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
                     placeholder="20"
                   />
@@ -797,15 +868,38 @@ const BusinessListingForm: React.FC = () => {
                 </div>
               </div>
             )}
+            {fieldErrors.pricing && !categoryUsesTieredPricing(form.category) && (
+              <p className="text-sm text-red-600 mt-3 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                {fieldErrors.pricing}
+              </p>
+            )}
           </div>
 
           {categoryUsesTieredPricing(form.category) && (
-            <PricingTiersEditor
-              tiers={pricingTiers}
-              onChange={setPricingTiers}
-              language={language}
-              discountPercent={tierDiscountPercent}
-            />
+            <div
+              className={
+                fieldErrors.pricing
+                  ? 'rounded-xl border border-red-300 ring-1 ring-red-200 p-1'
+                  : ''
+              }
+            >
+              <PricingTiersEditor
+                tiers={pricingTiers}
+                onChange={(next) => {
+                  setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                  setPricingTiers(next);
+                }}
+                language={language}
+                discountPercent={tierDiscountPercent}
+              />
+              {fieldErrors.pricing && (
+                <p className="text-sm text-red-600 mt-2 px-1 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                  {fieldErrors.pricing}
+                </p>
+              )}
+            </div>
           )}
 
           {/* ─── Discount Validity Date Range ─── */}
@@ -1013,11 +1107,28 @@ const BusinessListingForm: React.FC = () => {
           {/* Photo Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              {language === 'en' ? 'Business Photos (Optional)' : 'Photos de l\'entreprise (Optionnel)'}
+              {language === 'en' ? 'Business Photos *' : 'Photos de l\'entreprise *'}
             </label>
-            <PhotoUploader photos={photos} onPhotosChange={setPhotos} maxPhotos={5} userId={user?.id || ''} />
-
-
+            <p className="text-xs text-gray-500 mb-2">
+              {language === 'en'
+                ? 'At least one photo is required. The first photo is used as the cover image.'
+                : 'Au moins une photo est requise. La première sert d’image de couverture.'}
+            </p>
+            <PhotoUploader
+              photos={photos}
+              onPhotosChange={(next) => {
+                setFieldErrors((fe) => ({ ...fe, photos: undefined }));
+                setPhotos(next);
+              }}
+              maxPhotos={5}
+              userId={user?.id || ''}
+            />
+            {fieldErrors.photos && (
+              <p className="text-sm text-red-600 mt-2 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                {fieldErrors.photos}
+              </p>
+            )}
           </div>
 
           {/* Submit */}

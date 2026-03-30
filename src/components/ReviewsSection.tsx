@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import { toast } from 'sonner';
 import { t } from '@/data/translations';
 import { businesses as fallbackBusinesses } from '@/data/businesses';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
@@ -8,7 +9,8 @@ import ReviewForm from '@/components/ReviewForm';
 
 
 const ReviewsSection: React.FC = () => {
-  const { language, dbReviews, dbBusinesses, user, setShowAuth, setAuthMode } = useAppContext();
+  const { language, dbReviews, dbBusinesses, user, setShowAuth, setAuthMode, checkReviewSubmissionAllowed } =
+    useAppContext();
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedBusinessId, setSelectedBusinessId] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -186,7 +188,17 @@ const ReviewsSection: React.FC = () => {
                           <button
                             key={biz.id}
                             type="button"
-                            onClick={() => { setSelectedBusinessId(pid); setShowDropdown(false); }}
+                            onClick={() => {
+                              void (async () => {
+                                const gate = await checkReviewSubmissionAllowed(pid, 'leave_review');
+                                if (!gate.allowed) {
+                                  toast.error(gate.message || '');
+                                  return;
+                                }
+                                setSelectedBusinessId(pid);
+                                setShowDropdown(false);
+                              })();
+                            }}
                             className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-teal-50 transition-colors border-b border-gray-50 last:border-0"
                           >
                             <img

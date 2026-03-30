@@ -28,6 +28,81 @@ function errorResponse(message: string, status = 400) {
   return jsonResponse({ success: false, error: message }, status);
 }
 
+type SupabaseServiceClient = ReturnType<typeof createClient>;
+
+function unauthorizedResponse(): Response {
+  return jsonResponse({ success: false, error: 'Unauthorized' }, 403);
+}
+
+const BEARER_PREFIX = /^Bearer\s+/i;
+
+/**
+ * Resolve the authenticated user from the JWT in the request.
+ * Never use `body.userId` for caller identity.
+ */
+async function getAuthUser(
+  supabase: SupabaseServiceClient,
+  req: Request,
+): Promise<{ user: { id: string; email?: string } } | { response: Response }> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.trim()) {
+    return { response: errorResponse('Missing Authorization header', 401) };
+  }
+  const token = authHeader.replace(BEARER_PREFIX, '').trim();
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) {
+    return { response: errorResponse('Invalid or expired session', 401) };
+  }
+  return { user };
+}
+
+async function isAdminUser(supabase: SupabaseServiceClient, userId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return data?.role === 'admin';
+}
+
+/** Returns a 403 Response if the user is not an admin; otherwise null. */
+async function assertAdmin(
+  supabase: SupabaseServiceClient,
+  userId: string,
+): Promise<Response | null> {
+  if (!(await isAdminUser(supabase, userId))) {
+    return unauthorizedResponse();
+  }
+  return null;
+}
+
+/** Returns a 403 Response if userId is not the business owner; otherwise null. */
+async function requireOwner(
+  supabase: SupabaseServiceClient,
+  businessId: string,
+  userId: string,
+): Promise<Response | null> {
+  const { data: biz, error } = await supabase
+    .from('businesses')
+    .select('owner_id')
+    .eq('id', businessId)
+    .maybeSingle();
+  if (error || !biz?.owner_id || String(biz.owner_id) !== String(userId)) {
+    return unauthorizedResponse();
+  }
+  return null;
+}
+
+/** Admin may act on any business; non-admins must own the business row. */
+async function assertAdminOrOwner(
+  supabase: SupabaseServiceClient,
+  businessId: string,
+  userId: string,
+): Promise<Response | null> {
+  if (await isAdminUser(supabase, userId)) return null;
+  return requireOwner(supabase, businessId, userId);
+}
+
 /**
  * Remove gallery rows + Storage objects for a business, then caller deletes `businesses` row.
  * `business_photos` may not have ON DELETE CASCADE in all deployments.
@@ -70,7 +145,7 @@ async function purgeBusinessPhotosAndStorage(
   return { error: null };
 }
 
-/** Public app URL for deep links in transactional emails (no trailing slash). */
+/** Public app URL for listing links (no trailing slash). Uses `APP_BASE_URL` secret (Deno env ≈ `process.env.APP_BASE_URL`). */
 function getAppBaseUrl(): string {
   const raw = (Deno.env.get('APP_BASE_URL') || 'https://stikmnek.com').trim();
   return raw.replace(/\/+$/, '');
@@ -126,34 +201,31 @@ async function sendInitialListingLiveEmail(params: {
     return { sent: false, skipped: true, error: 'SENDGRID_API_KEY not set' };
   }
 
-  const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
+  const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'stikmnek@gmail.com';
   const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
   const subject = 'Congratulations! Your StikmNek Listing is Live!';
 
   const nameEsc = escapeHtmlEmail(params.businessName);
   const urlEsc = escapeHtmlEmail(params.listingUrl);
   const hashtagName = businessNameForHashtag(params.businessName);
-
-  const socialBlockText =
-    `🎉 Exciting News! We're officially live on StikmNek! 🌴\n\n` +
-    `Find our amazing deals and discover the best of Vanuatu with us. Get ready to save on unique experiences!\n\n` +
-    `Check out our StikmNek page here: ${params.listingUrl}\n\n` +
+  const tagLine =
     `#StikmNek #VanuatuDeals #${hashtagName} #TravelVanuatu #SupportLocal`;
 
   const html = `
 <div style="font-family: Arial, sans-serif; line-height: 1.55; color: #111; max-width: 560px;">
-  <p style="margin: 0 0 12px;">Hi ${nameEsc},</p>
-  <p style="margin: 0 0 12px;">Great news! Your listing on StikmNek is now live!</p>
-  <p style="margin: 0 0 12px;">You can view it here: <a href="${urlEsc}">${urlEsc}</a></p>
-  <p style="margin: 0 0 16px;">To celebrate, we&#39;ve prepared a special message for you to share with your audience on social media. Let your customers know they can now find you on StikmNek and start saving!</p>
-  <p style="margin: 0 0 8px;"><img src="${escapeHtmlEmail(LISTING_LIVE_BADGE_URL)}" alt="StikmNek" width="120" style="display:block;border:0;" /></p>
-  <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
-  <p style="margin: 0 0 8px;"><strong>SOCIAL MEDIA POST SUGGESTION</strong></p>
-  <p style="margin: 0 0 12px; white-space: pre-wrap;">${escapeHtmlEmail(socialBlockText)}</p>
-  <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
-  <p style="margin: 0 0 12px;">Thank you for joining the StikmNek family. We're thrilled to have you!</p>
-  <p style="margin: 0 0 4px;">Best regards,</p>
-  <p style="margin: 0;">The StikmNek Team</p>
+  <p>Hi ${nameEsc},</p>
+  <p>Great news! Your listing on StikmNek is now live!</p>
+  <p>You can view it here: <a href="${urlEsc}">${urlEsc}</a></p>
+  <p>To celebrate, we&#39;ve prepared a special message for you to share with your audience on social media. Let your customers know they can now find you on StikmNek and start saving!</p>
+  <p><img src="${escapeHtmlEmail(LISTING_LIVE_BADGE_URL)}" alt="StikmNek" width="120" style="display:block;border:0;" /></p>
+  <hr>
+  <h3 style="margin: 16px 0 8px; font-size: 1.1rem;">🎉 Exciting News! We&#39;re officially live on StikmNek! 🌴</h3>
+  <p>Find our amazing deals and discover the best of Vanuatu with us. Get ready to save on unique experiences!</p>
+  <p>Check out our StikmNek page here: <a href="${urlEsc}">${urlEsc}</a></p>
+  <p>${escapeHtmlEmail(tagLine)}</p>
+  <hr>
+  <p>Thank you for joining the StikmNek family. We&#39;re thrilled to have you!</p>
+  <p>Best regards,<br>The StikmNek Team</p>
 </div>
 `.trim();
 
@@ -166,9 +238,17 @@ async function sendInitialListingLiveEmail(params: {
     '',
     "To celebrate, we've prepared a special message for you to share with your audience on social media. Let your customers know they can now find you on StikmNek and start saving!",
     '',
-    '--- SOCIAL MEDIA POST SUGGESTION ---',
+    `Badge: ${LISTING_LIVE_BADGE_URL}`,
     '',
-    socialBlockText,
+    '---',
+    '',
+    "🎉 Exciting News! We're officially live on StikmNek! 🌴",
+    '',
+    'Find our amazing deals and discover the best of Vanuatu with us. Get ready to save on unique experiences!',
+    '',
+    `Check out our StikmNek page here: ${params.listingUrl}`,
+    '',
+    tagLine,
     '',
     '---',
     '',
@@ -216,11 +296,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return errorResponse('Missing Authorization header', 401);
-    }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
@@ -237,12 +312,11 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !authUser) {
-      return errorResponse('Invalid or expired session', 401);
+    const authResult = await getAuthUser(supabase, req);
+    if ('response' in authResult) {
+      return authResult.response;
     }
+    const authUser = authResult.user;
 
     const body = await req.json().catch(() => ({}));
     const action = body?.action;
@@ -263,8 +337,7 @@ Deno.serve(async (req) => {
 
     // ─── SUBMIT_BUSINESS ───
     if (action === 'submit_business') {
-      const userId = body.userId || authUser.id;
-      if (!userId) return errorResponse('Missing userId');
+      const userId = authUser.id;
 
       const record = {
         owner_id: userId,
@@ -323,9 +396,9 @@ Deno.serve(async (req) => {
     // Owner edits a rejected submission and resubmits for approval
     if (action === 'resubmit_pending_business') {
       try {
-        const userId = body.userId || authUser.id;
+        const userId = authUser.id;
         const pendingId = body.pendingId;
-        if (!userId || !pendingId) return errorResponse('Missing userId or pendingId', 400);
+        if (!pendingId) return errorResponse('Missing pendingId', 400);
 
         const { data: existing, error: fetchErr } = await supabase
           .from('pending_businesses')
@@ -401,8 +474,7 @@ Deno.serve(async (req) => {
 
     // ─── GET_ALL_OWNER_DATA ───
     if (action === 'get_all_owner_data') {
-      const userId = body.userId || authUser.id;
-      if (!userId) return errorResponse('Missing userId');
+      const userId = authUser.id;
 
       const [approvedRes, pendingRes] = await Promise.all([
         supabase.from('businesses').select('*').eq('owner_id', userId),
@@ -418,8 +490,7 @@ Deno.serve(async (req) => {
 
     // ─── GET_OWNER_BUSINESSES ───
     if (action === 'get_owner_businesses') {
-      const userId = body.userId || authUser.id;
-      if (!userId) return errorResponse('Missing userId');
+      const userId = authUser.id;
 
       const { data, error } = await supabase
         .from('businesses')
@@ -432,10 +503,7 @@ Deno.serve(async (req) => {
 
     // ─── GET_PENDING ───
     if (action === 'get_pending') {
-      const userId = body.userId || authUser.id;
-      const isAdmin = body.isAdmin === true;
-
-      if (isAdmin) {
+      if (await isAdminUser(supabase, authUser.id)) {
         const { data, error } = await supabase
           .from('pending_businesses')
           .select('*')
@@ -444,11 +512,10 @@ Deno.serve(async (req) => {
         return jsonResponse({ businesses: data || [] });
       }
 
-      if (!userId) return errorResponse('Missing userId');
       const { data, error } = await supabase
         .from('pending_businesses')
         .select('*')
-        .eq('owner_id', userId)
+        .eq('owner_id', authUser.id)
         .order('created_at', { ascending: false });
       if (error) return errorResponse(error.message, 500);
       return jsonResponse({ businesses: data || [] });
@@ -457,11 +524,7 @@ Deno.serve(async (req) => {
     // ─── GET_OWNER_OFFERINGS_LIVE ───
     // Join offerings + profiles using service role (avoids client RLS / PostgREST issues).
     if (action === 'get_owner_offerings_live') {
-      const userId = body.userId || authUser.id;
-      if (!userId) return errorResponse('Missing userId');
-      if (String(userId) !== String(authUser.id)) {
-        return errorResponse('Forbidden', 403);
-      }
+      const userId = authUser.id;
       const filterBusinessId =
         body.businessId != null && String(body.businessId).trim() !== ''
           ? String(body.businessId).trim()
@@ -523,10 +586,10 @@ Deno.serve(async (req) => {
     // Attach uploaded photo rows to an existing pending_businesses record.
     // Used after RPC insert_pending_business to guarantee business_photos rows are created server-side.
     if (action === 'attach_pending_photos') {
-      const userId = body.userId || authUser.id;
+      const userId = authUser.id;
       const pendingId = body.pendingId;
       const photos = Array.isArray(body.photos) ? body.photos : [];
-      if (!userId || !pendingId) return errorResponse('Missing userId or pendingId', 400);
+      if (!pendingId) return errorResponse('Missing pendingId', 400);
       if (photos.length === 0) return jsonResponse({ success: true, inserted: 0 });
 
       const { data: pending, error: pendingErr } = await supabase
@@ -561,11 +624,10 @@ Deno.serve(async (req) => {
 
     // ─── GET_PENDING_EDITS ───
     if (action === 'get_pending_edits') {
-      const userId = body.userId || authUser.id;
+      const userId = authUser.id;
       const businessId = body.businessId;
-      const isAdmin = body.isAdmin === true;
 
-      if (isAdmin) {
+      if (await isAdminUser(supabase, userId)) {
         const { data, error } = await supabase
           .from('pending_edits')
           .select('*')
@@ -576,6 +638,8 @@ Deno.serve(async (req) => {
       }
 
       if (businessId) {
+        const denied = await requireOwner(supabase, String(businessId), userId);
+        if (denied) return denied;
         const { data, error } = await supabase
           .from('pending_edits')
           .select('*')
@@ -597,9 +661,17 @@ Deno.serve(async (req) => {
 
     // ─── ADMIN_CREATE_BUSINESS ───
     if (action === 'admin_create_business') {
-      const userId = body.userId || authUser.id;
+      const denied = await assertAdmin(supabase, authUser.id);
+      if (denied) return denied;
+
+      const targetOwnerId =
+        (typeof body.ownerId === 'string' && body.ownerId.trim() ? body.ownerId.trim() : null) ??
+        (typeof body.targetOwnerId === 'string' && body.targetOwnerId.trim() ? body.targetOwnerId.trim() : null) ??
+        (typeof body.userId === 'string' && body.userId.trim() ? body.userId.trim() : null) ??
+        authUser.id;
+
       const record = {
-        owner_id: userId,
+        owner_id: targetOwnerId,
         name: body.name || '',
         category: body.category || 'dining',
         description: body.description || '',
@@ -629,266 +701,277 @@ Deno.serve(async (req) => {
 
     // ─── REVIEW_BUSINESS ───
     if (action === 'review_business') {
-      const businessId = body.businessId; // This is the pending_business id
+      const denied = await assertAdmin(supabase, authUser.id);
+      if (denied) return denied;
+
+      const pendingId = body.businessId; // pending_businesses.id
       const decision = body.decision; // 'approved' | 'rejected'
       const adminNotes = body.adminNotes || '';
 
-      if (!businessId || !decision) return errorResponse('Missing businessId or decision');
+      if (!pendingId || !decision) return errorResponse('Missing businessId or decision');
 
       const { data: pending, error: fetchErr } = await supabase
         .from('pending_businesses')
         .select('*')
-        .eq('id', businessId)
+        .eq('id', pendingId)
         .single();
 
       if (fetchErr || !pending) return errorResponse('Pending business not found', 404);
 
-      const { error: updateErr } = await supabase
-        .from('pending_businesses')
-        .update({
-          status: decision,
-          admin_notes: adminNotes,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', businessId);
+      if (decision === 'rejected') {
+        const { error: updateErr } = await supabase
+          .from('pending_businesses')
+          .update({
+            status: 'rejected',
+            admin_notes: adminNotes,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', pendingId);
+        if (updateErr) return errorResponse(updateErr.message, 500);
+        return jsonResponse({ success: true });
+      }
 
-      if (updateErr) return errorResponse(updateErr.message, 500);
+      // ─── approved: master stub on `businesses`, rich listing on `business_offerings`, then remove pending row ───
+      const pendingRow = pending as Record<string, unknown>;
+      const existingProfileId =
+        pendingRow.business_id != null && String(pendingRow.business_id).trim() !== ''
+          ? String(pendingRow.business_id)
+          : null;
+      const isInitialNewBusinessApproval = existingProfileId == null;
 
-      if (decision === 'approved') {
-        const pendingRow = pending as Record<string, unknown>;
-        const existingProfileId =
-          pendingRow.business_id != null && String(pendingRow.business_id).trim() !== ''
-            ? String(pendingRow.business_id)
-            : null;
-        /** First-time public listing only (pending had no `business_id`); skips re-approval / `review_edit` flows. */
-        const isInitialNewBusinessApproval = existingProfileId == null;
+      const vDesc = String(pending.description ?? '');
+      const tagArray = [String(pending.category || 'dining')];
 
-        const vDesc = String(pending.description ?? '');
-        const tagArray = [String(pending.category || 'dining')];
+      const offeringFields = {
+        title: (pending.name && String(pending.name).trim()) || 'Main offer',
+        description: vDesc,
+        description_fr: vDesc,
+        description_bi: vDesc,
+        discount: pending.discount || '',
+        original_price: Number(pending.original_price) || 0,
+        deal_price: Number(pending.deal_price) || 0,
+        image: pending.image || '',
+        map_url: pending.map_url ?? null,
+        website: pending.website ?? null,
+        discount_valid_from: pending.discount_valid_from ?? null,
+        discount_valid_until: pending.discount_valid_until ?? null,
+        whatsapp_number: pending.whatsapp_number ?? null,
+        pricing_tiers: pending.pricing_tiers ?? null,
+        tags: tagArray,
+        active: true,
+        updated_at: new Date().toISOString(),
+      };
 
-        const offeringFields = {
-          title: (pending.name && String(pending.name).trim()) || 'Main offer',
-          description: vDesc,
-          description_fr: vDesc,
-          description_bi: vDesc,
-          discount: pending.discount || '',
-          original_price: Number(pending.original_price) || 0,
-          deal_price: Number(pending.deal_price) || 0,
-          image: pending.image || '',
+      const vEmail = (pending.email && String(pending.email).trim()) || null;
+
+      /** Master profile only: no duplicate listing copy (canonical fields live on business_offerings). */
+      const stubProfilePatch = (): Record<string, unknown> => {
+        const trimmedName = pending.name != null ? String(pending.name).trim() : '';
+        const base: Record<string, unknown> = {
+          category: pending.category || 'dining',
+          location: pending.location || '',
+          phone: pending.phone || '',
+          hours: pending.hours || '',
           map_url: pending.map_url ?? null,
           website: pending.website ?? null,
           discount_valid_from: pending.discount_valid_from ?? null,
           discount_valid_until: pending.discount_valid_until ?? null,
           whatsapp_number: pending.whatsapp_number ?? null,
-          pricing_tiers: pending.pricing_tiers ?? null,
           tags: tagArray,
+          email: vEmail,
+          contact_email: vEmail,
+          business_email: vEmail,
           active: true,
+          is_verified: true,
+          description: '',
+          description_fr: '',
+          description_bi: '',
+          image: '',
+          discount: '',
+          original_price: 0,
+          deal_price: 0,
+          pricing_tiers: null,
           updated_at: new Date().toISOString(),
         };
+        if (trimmedName) base.name = trimmedName;
+        return base;
+      };
 
-        let liveBusinessId: string;
+      let liveBusinessId: string;
 
-        if (existingProfileId) {
-          const { data: prof, error: profErr } = await supabase
-            .from('businesses')
-            .select('id, owner_id')
-            .eq('id', existingProfileId)
-            .maybeSingle();
+      if (existingProfileId) {
+        const { data: prof, error: profErr } = await supabase
+          .from('businesses')
+          .select('id, owner_id')
+          .eq('id', existingProfileId)
+          .maybeSingle();
 
-          if (profErr || !prof) {
-            return errorResponse('Invalid business_id on pending row (profile not found)', 400);
-          }
-          if (String(prof.owner_id) !== String(pending.owner_id)) {
-            return errorResponse('Invalid business_id on pending row (owner mismatch)', 403);
-          }
+        if (profErr || !prof) {
+          return errorResponse('Invalid business_id on pending row (profile not found)', 400);
+        }
+        if (String(prof.owner_id) !== String(pending.owner_id)) {
+          return errorResponse('Invalid business_id on pending row (owner mismatch)', 403);
+        }
 
-          const vEmail = (pending.email && String(pending.email).trim()) || null;
-          const profileUpdate: Record<string, unknown> = {
-            category: pending.category || 'dining',
-            description: vDesc,
-            description_fr: vDesc,
-            description_bi: vDesc,
-            image: pending.image || '',
-            discount: pending.discount || '',
-            original_price: Number(pending.original_price) || 0,
-            deal_price: Number(pending.deal_price) || 0,
-            location: pending.location || '',
-            phone: pending.phone || '',
-            hours: pending.hours || '',
-            map_url: pending.map_url ?? null,
-            website: pending.website ?? null,
-            discount_valid_from: pending.discount_valid_from ?? null,
-            discount_valid_until: pending.discount_valid_until ?? null,
-            whatsapp_number: pending.whatsapp_number ?? null,
-            pricing_tiers: pending.pricing_tiers ?? null,
-            tags: tagArray,
-            email: vEmail,
-            contact_email: vEmail,
-            business_email: vEmail,
-            active: true,
-            updated_at: new Date().toISOString(),
-          };
-          const trimmedName = pending.name != null ? String(pending.name).trim() : '';
-          if (trimmedName) profileUpdate.name = trimmedName;
+        const { error: profUpdErr } = await supabase
+          .from('businesses')
+          .update(stubProfilePatch())
+          .eq('id', existingProfileId);
 
-          const { error: profUpdErr } = await supabase
-            .from('businesses')
-            .update(profileUpdate)
-            .eq('id', existingProfileId);
+        if (profUpdErr) {
+          console.error('[manage-business] Failed to update businesses stub on re-approve:', profUpdErr);
+          return errorResponse(
+            'Approved but failed to update profile: ' + profUpdErr.message,
+            500,
+          );
+        }
 
-          if (profUpdErr) {
-            console.error('[manage-business] Failed to sync businesses row on re-approve:', profUpdErr);
+        const { data: primaryRows, error: offSelErr } = await supabase
+          .from('business_offerings')
+          .select('id')
+          .eq('business_id', existingProfileId)
+          .order('created_at', { ascending: true })
+          .limit(1);
+
+        if (offSelErr) {
+          console.error('[manage-business] offering lookup:', offSelErr);
+          return errorResponse(offSelErr.message, 500);
+        }
+
+        const primaryId = primaryRows?.[0]?.id as string | undefined;
+        if (primaryId) {
+          const { error: offUpdErr } = await supabase
+            .from('business_offerings')
+            .update(offeringFields)
+            .eq('id', primaryId);
+          if (offUpdErr) {
+            console.error('[manage-business] Failed to update business_offerings:', offUpdErr);
             return errorResponse(
-              'Approved but failed to update profile: ' + profUpdErr.message,
+              'Approved but failed to update live offering: ' + offUpdErr.message,
               500,
             );
           }
-
-          const { data: primaryRows, error: offSelErr } = await supabase
-            .from('business_offerings')
-            .select('id')
-            .eq('business_id', existingProfileId)
-            .order('created_at', { ascending: true })
-            .limit(1);
-
-          if (offSelErr) {
-            console.error('[manage-business] offering lookup:', offSelErr);
-            return errorResponse(offSelErr.message, 500);
-          }
-
-          const primaryId = primaryRows?.[0]?.id as string | undefined;
-          if (primaryId) {
-            const { error: offUpdErr } = await supabase
-              .from('business_offerings')
-              .update(offeringFields)
-              .eq('id', primaryId);
-            if (offUpdErr) {
-              console.error('[manage-business] Failed to update business_offerings:', offUpdErr);
-              return errorResponse(
-                'Approved but failed to update live offering: ' + offUpdErr.message,
-                500,
-              );
-            }
-          } else {
-            const { error: offInsErr } = await supabase.from('business_offerings').insert({
-              business_id: existingProfileId,
-              ...offeringFields,
-              featured: false,
-            });
-            if (offInsErr) {
-              console.error('[manage-business] Failed to insert business_offerings:', offInsErr);
-              return errorResponse(
-                'Approved but failed to create live offering: ' + offInsErr.message,
-                500,
-              );
-            }
-          }
-
-          liveBusinessId = existingProfileId;
         } else {
-          const bizRecord = {
-            owner_id: pending.owner_id,
-            name: pending.name,
-            category: pending.category,
-            description: pending.description,
-            discount: pending.discount || '',
-            original_price: Number(pending.original_price) || 0,
-            deal_price: Number(pending.deal_price) || 0,
-            location: pending.location || '',
-            phone: pending.phone || '',
-            hours: pending.hours || '',
-            image: pending.image || '',
-            map_url: pending.map_url || null,
-            website: pending.website || null,
-            discount_valid_from: pending.discount_valid_from || null,
-            discount_valid_until: pending.discount_valid_until || null,
-            whatsapp_number: pending.whatsapp_number || null,
-            pricing_tiers: pending.pricing_tiers ?? null,
-          };
-
-          const { data: newBiz, error: insertErr } = await supabase
-            .from('businesses')
-            .insert(bizRecord)
-            .select()
-            .single();
-
-          if (insertErr) {
-            console.error('[manage-business] Failed to create businesses record:', insertErr);
-            return errorResponse('Approved but failed to create business record: ' + insertErr.message, 500);
-          }
-
-          liveBusinessId = newBiz.id as string;
-
           const { error: offInsErr } = await supabase.from('business_offerings').insert({
-            business_id: liveBusinessId,
+            business_id: existingProfileId,
             ...offeringFields,
             featured: false,
           });
           if (offInsErr) {
-            console.warn('[manage-business] businesses created but offering insert failed:', offInsErr);
-          }
-        }
-
-        const { error: rejErr } = await supabase
-          .from('business_photos')
-          .update({ business_id: liveBusinessId })
-          .eq('business_id', businessId)
-          .eq('status', 'rejected');
-
-        if (rejErr) {
-          console.error('[manage-business] Photo update (rejected) failed after business approval:', rejErr);
-          return errorResponse(
-            'Business approved but rejected photos could not be relinked. Error: ' + rejErr.message,
-            500
-          );
-        }
-
-        const { error: photoErr } = await supabase
-          .from('business_photos')
-          .update({ business_id: liveBusinessId, status: 'approved' })
-          .eq('business_id', businessId);
-
-        if (photoErr) {
-          console.error('[manage-business] Photo update failed after business approval:', photoErr);
-          return errorResponse(
-            'Business approved but photos could not be updated. Please manually approve photos for this business. Error: ' + photoErr.message,
-            500
-          );
-        }
-
-        // ─── Listing live email (SendGrid): initial approval only — new `businesses` row, not linked re-review ───
-        if (isInitialNewBusinessApproval) {
-          const ownerEmail = await resolveOwnerNotificationEmail(supabase, String(pending.owner_id));
-          const listingUrl = `${getAppBaseUrl()}/business/${liveBusinessId}`;
-          const { data: liveNameRow } = await supabase
-            .from('businesses')
-            .select('name')
-            .eq('id', liveBusinessId)
-            .maybeSingle();
-          const displayName =
-            (liveNameRow?.name && String(liveNameRow.name).trim()) ||
-            (pending.name != null && String(pending.name).trim()) ||
-            'there';
-
-          if (ownerEmail) {
-            const sgResult = await sendInitialListingLiveEmail({
-              toEmail: ownerEmail,
-              businessName: displayName,
-              listingUrl,
-            });
-            if (!sgResult.sent) {
-              console.warn(
-                '[manage-business] Initial listing-live email:',
-                sgResult.skipped ? 'skipped (no API key)' : sgResult.error ?? 'unknown',
-              );
-            }
-          } else {
-            console.warn(
-              '[manage-business] Initial listing-live email skipped: no email for owner',
-              String(pending.owner_id),
+            console.error('[manage-business] Failed to insert business_offerings:', offInsErr);
+            return errorResponse(
+              'Approved but failed to create live offering: ' + offInsErr.message,
+              500,
             );
           }
         }
+
+        liveBusinessId = existingProfileId;
+      } else {
+        const bizStub = {
+          owner_id: pending.owner_id,
+          name: pending.name,
+          ...stubProfilePatch(),
+        };
+
+        const { data: newBiz, error: insertErr } = await supabase
+          .from('businesses')
+          .insert(bizStub)
+          .select()
+          .single();
+
+        if (insertErr) {
+          console.error('[manage-business] Failed to create businesses stub:', insertErr);
+          return errorResponse('Approved but failed to create business record: ' + insertErr.message, 500);
+        }
+
+        liveBusinessId = newBiz.id as string;
+
+        const { error: offInsErr } = await supabase.from('business_offerings').insert({
+          business_id: liveBusinessId,
+          ...offeringFields,
+          featured: false,
+        });
+        if (offInsErr) {
+          console.error('[manage-business] Offering insert failed after stub insert:', offInsErr);
+          return errorResponse(
+            'Approved but failed to create live offering: ' + offInsErr.message,
+            500,
+          );
+        }
+      }
+
+      const { error: rejErr } = await supabase
+        .from('business_photos')
+        .update({ business_id: liveBusinessId })
+        .eq('business_id', pendingId)
+        .eq('status', 'rejected');
+
+      if (rejErr) {
+        console.error('[manage-business] Photo update (rejected) failed after business approval:', rejErr);
+        return errorResponse(
+          'Business approved but rejected photos could not be relinked. Error: ' + rejErr.message,
+          500
+        );
+      }
+
+      const { error: photoErr } = await supabase
+        .from('business_photos')
+        .update({ business_id: liveBusinessId, status: 'approved' })
+        .eq('business_id', pendingId);
+
+      if (photoErr) {
+        console.error('[manage-business] Photo update failed after business approval:', photoErr);
+        return errorResponse(
+          'Business approved but photos could not be updated. Please manually approve photos for this business. Error: ' + photoErr.message,
+          500
+        );
+      }
+
+      if (isInitialNewBusinessApproval) {
+        const ownerEmail = await resolveOwnerNotificationEmail(supabase, String(pending.owner_id));
+        const listingUrl = `${getAppBaseUrl()}/business/${liveBusinessId}`;
+        const { data: liveNameRow } = await supabase
+          .from('businesses')
+          .select('name')
+          .eq('id', liveBusinessId)
+          .maybeSingle();
+        const displayName =
+          (liveNameRow?.name && String(liveNameRow.name).trim()) ||
+          (pending.name != null && String(pending.name).trim()) ||
+          'there';
+
+        if (ownerEmail) {
+          const sgResult = await sendInitialListingLiveEmail({
+            toEmail: ownerEmail,
+            businessName: displayName,
+            listingUrl,
+          });
+          if (!sgResult.sent) {
+            console.warn(
+              '[manage-business] Initial listing-live email:',
+              sgResult.skipped ? 'skipped (no API key)' : sgResult.error ?? 'unknown',
+            );
+          }
+        } else {
+          console.warn(
+            '[manage-business] Initial listing-live email skipped: user_profiles.email empty for owner',
+            String(pending.owner_id),
+          );
+        }
+      }
+
+      const { error: delPendingErr } = await supabase
+        .from('pending_businesses')
+        .delete()
+        .eq('id', pendingId);
+
+      if (delPendingErr) {
+        console.error('[manage-business] Failed to delete pending row after approval:', delPendingErr);
+        return errorResponse(
+          'Approved but could not remove pending submission: ' + delPendingErr.message,
+          500,
+        );
       }
 
       return jsonResponse({ success: true });
@@ -909,7 +992,7 @@ Deno.serve(async (req) => {
         return errorResponse('Business not found', 404);
       }
       if (!bizRow.owner_id || String(bizRow.owner_id) !== String(authUser.id)) {
-        return errorResponse('You can only delete your own listings', 403);
+        return unauthorizedResponse();
       }
 
       const purge = await purgeBusinessPhotosAndStorage(supabase, businessId);
@@ -937,14 +1020,8 @@ Deno.serve(async (req) => {
       const businessId = body.businessId;
       if (!businessId) return errorResponse('Missing businessId');
 
-      const { data: adminProfile } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('user_id', authUser.id)
-        .maybeSingle();
-      if (adminProfile?.role !== 'admin') {
-        return errorResponse('Admin access required', 403);
-      }
+      const denied = await assertAdmin(supabase, authUser.id);
+      if (denied) return denied;
 
       const purge = await purgeBusinessPhotosAndStorage(supabase, businessId);
       if (purge.error) {
@@ -958,12 +1035,28 @@ Deno.serve(async (req) => {
 
     // ─── SUBMIT_EDIT ───
     if (action === 'submit_edit') {
-      const userId = body.userId || authUser.id;
+      const userId = authUser.id;
       const businessId = body.businessId;
       const changes = body.changes || {};
 
-      if (!userId || !businessId || Object.keys(changes).length === 0) {
-        return errorResponse('Missing userId, businessId, or changes');
+      if (!businessId || Object.keys(changes).length === 0) {
+        return errorResponse('Missing businessId or changes');
+      }
+
+      const denied = await assertAdminOrOwner(supabase, String(businessId), userId);
+      if (denied) return denied;
+
+      let ownerIdForEdit = userId;
+      if (await isAdminUser(supabase, userId)) {
+        const { data: bizRow, error: bizErr } = await supabase
+          .from('businesses')
+          .select('owner_id')
+          .eq('id', businessId)
+          .maybeSingle();
+        if (bizErr || !bizRow?.owner_id) {
+          return errorResponse('Business not found', 404);
+        }
+        ownerIdForEdit = String(bizRow.owner_id);
       }
 
       // Check for existing pending edit
@@ -971,7 +1064,7 @@ Deno.serve(async (req) => {
         .from('pending_edits')
         .select('id, changes')
         .eq('business_id', businessId)
-        .eq('owner_id', userId)
+        .eq('owner_id', ownerIdForEdit)
         .eq('status', 'pending')
         .single();
 
@@ -989,7 +1082,7 @@ Deno.serve(async (req) => {
         .from('pending_edits')
         .insert({
           business_id: businessId,
-          owner_id: userId,
+          owner_id: ownerIdForEdit,
           changes,
           status: 'pending',
         });
@@ -1000,6 +1093,9 @@ Deno.serve(async (req) => {
 
     // ─── REVIEW_EDIT ───
     if (action === 'review_edit') {
+      const denied = await assertAdmin(supabase, authUser.id);
+      if (denied) return denied;
+
       const editId = body.editId;
       const decision = body.decision; // 'approved' | 'rejected'
       const adminNotes = body.adminNotes || '';
@@ -1122,6 +1218,9 @@ Deno.serve(async (req) => {
         return errorResponse('Missing businessId or updates');
       }
 
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id);
+      if (denied) return denied;
+
       const { error } = await supabase
         .from('businesses')
         .update(updates)
@@ -1137,6 +1236,9 @@ Deno.serve(async (req) => {
       const active = body.active;
 
       if (!businessId || active === undefined) return errorResponse('Missing businessId or active');
+
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id);
+      if (denied) return denied;
 
       const { error } = await supabase
         .from('businesses')
@@ -1166,7 +1268,7 @@ Deno.serve(async (req) => {
         return errorResponse('Business not found', 404);
       }
       if (String(business.owner_id) !== String(authUser.id)) {
-        return errorResponse('Only the business owner can respond to reviews', 403);
+        return unauthorizedResponse();
       }
 
       const { data: review, error: revErr } = await supabase
@@ -1201,12 +1303,8 @@ Deno.serve(async (req) => {
 
     // ─── GET_ALL_PHOTOS ─── (admin only)
     if (action === 'get_all_photos') {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('user_id', authUser.id)
-        .single();
-      if (profile?.role !== 'admin') return errorResponse('Admin access required', 403);
+      const denied = await assertAdmin(supabase, authUser.id);
+      if (denied) return denied;
 
       const { data, error } = await supabase
         .from('business_photos')
@@ -1222,12 +1320,8 @@ Deno.serve(async (req) => {
       const photoId = body.photoId;
       if (!photoId) return errorResponse('Missing photoId');
 
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('user_id', authUser.id)
-        .single();
-      if (profile?.role !== 'admin') return errorResponse('Admin access required', 403);
+      const denied = await assertAdmin(supabase, authUser.id);
+      if (denied) return denied;
 
       const status = action === 'approve_photo' ? 'approved' : 'rejected';
       const { error } = await supabase
@@ -1243,6 +1337,9 @@ Deno.serve(async (req) => {
     if (action === 'get_analytics') {
       const businessId = body.businessId;
       if (!businessId) return errorResponse('Missing businessId');
+
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id);
+      if (denied) return denied;
 
       const { data: reviews } = await supabase
         .from('reviews')
@@ -1269,15 +1366,8 @@ Deno.serve(async (req) => {
       const targetUserId = body.targetUserId || body.userId;
       if (!targetUserId) return errorResponse('Missing targetUserId');
 
-      // Verify caller is admin
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('user_id', authUser.id)
-        .single();
-      if (profile?.role !== 'admin') {
-        return errorResponse('Admin access required', 403);
-      }
+      const denied = await assertAdmin(supabase, authUser.id);
+      if (denied) return denied;
 
       // Prevent deleting self
       if (targetUserId === authUser.id) {

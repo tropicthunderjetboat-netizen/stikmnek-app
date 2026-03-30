@@ -14,7 +14,7 @@ import {
   Keyboard, RotateCcw, Zap, Shield, Eye, ShieldCheck,
   CalendarCheck, CalendarX, Timer, TrendingDown, History,
   BadgeCheck, Ban, Info, Sparkles, CreditCard, Hash,
-  ArrowRight, Crown, Award, Star, Receipt, CircleDot, Tag
+  ArrowRight, Crown, Award, Star, Receipt, CircleDot, Tag, Users
 } from 'lucide-react';
 
 
@@ -147,9 +147,75 @@ const getPassTierConfig = (passType: string) => {
   return { gradient: 'from-teal-400 via-emerald-500 to-teal-600', bg: 'bg-teal-50', border: 'border-teal-300', text: 'text-teal-800', badge: 'bg-gradient-to-r from-teal-500 to-emerald-500', icon: <Ticket className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
 };
 
+/** User-facing copy when verify-redemption rejects the QR (must match backend `Invalid QR payload*` strings). */
+const INVALID_QR_PAYLOAD_USER_MESSAGE =
+  "This isn't a StikmNek pass code. Please scan a valid StikmNek QR pass.";
+
+function isInvalidQrPayloadBackendMessage(msg: string | undefined | null): boolean {
+  if (!msg || typeof msg !== 'string') return false;
+  return msg.trim().startsWith('Invalid QR payload');
+}
+
+function resolveVerifyRedemptionBackendError(
+  data: unknown,
+  parsedFromError: { success?: boolean; error?: string } | null,
+): string | undefined {
+  const e = parsedFromError?.error;
+  if (typeof e === 'string' && e.length > 0) return e;
+  if (data && typeof data === 'object' && data !== null) {
+    const d = data as Record<string, unknown>;
+    if (typeof d.error === 'string' && d.error.length > 0) return d.error;
+  }
+  return undefined;
+}
+
+/** Parse JSON body from supabase.functions.invoke FunctionsHttpError (context Response or message). */
+async function extractFunctionsInvokeErrorBody(
+  error: unknown,
+): Promise<{ success?: boolean; error?: string } | null> {
+  const e = error as Record<string, unknown> | null;
+  if (!e) return null;
+  try {
+    if (e.context && typeof (e.context as Response).json === 'function') {
+      try {
+        return await (e.context as Response).json();
+      } catch {
+        /* body consumed */
+      }
+    }
+    if (e.context && typeof (e.context as Response).text === 'function') {
+      try {
+        const text = await (e.context as Response).text();
+        if (text) return JSON.parse(text) as { success?: boolean; error?: string };
+      } catch {
+        /* not JSON */
+      }
+    }
+    if (typeof e.message === 'string') {
+      try {
+        return JSON.parse(e.message) as { success?: boolean; error?: string };
+      } catch {
+        /* not JSON */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 // ═══ FAILURE REASON CONFIG ═══
 const getFailureConfig = (status: string) => {
   switch (status) {
+    case 'invalid_qr_payload':
+      return {
+        icon: <ScanLine className="w-7 h-7" />,
+        color: 'text-rose-500',
+        bg: 'bg-rose-50',
+        border: 'border-rose-200',
+        title: 'Not a StikmNek pass',
+        suggestion: 'Ask the tourist to open their StikmNek dashboard and show the pass QR from there.',
+      };
     case 'expired':
     case 'date_range_expired':
       return { icon: <CalendarX className="w-7 h-7" />, color: 'text-red-500', bg: 'bg-red-50', border: 'border-red-200', title: 'Pass Expired', suggestion: 'This tourist needs to purchase a new pass to receive discounts.' };
@@ -159,6 +225,8 @@ const getFailureConfig = (status: string) => {
       return { icon: <History className="w-7 h-7" />, color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-200', title: 'Already Redeemed Today', suggestion: 'Each pass allows one redemption per business per day. The tourist can return tomorrow.' };
     case 'inactive':
       return { icon: <Ban className="w-7 h-7" />, color: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-200', title: 'Pass Inactive', suggestion: 'This pass has been deactivated. The tourist should contact support.' };
+    case 'party_exceeds_pass_capacity':
+      return { icon: <Users className="w-7 h-7" />, color: 'text-red-500', bg: 'bg-red-50', border: 'border-red-200', title: 'Group too large for this pass', suggestion: 'Ask the tourist to lower adults/children/infants in their profile to match the pass limit, or upgrade their pass.' };
     default:
       return { icon: <XCircle className="w-7 h-7" />, color: 'text-red-500', bg: 'bg-red-50', border: 'border-red-200', title: 'Verification Failed', suggestion: 'Please try scanning again or ask the tourist to show their pass code.' };
   }
@@ -310,7 +378,15 @@ const QRScanner: React.FC<QRScannerProps> = ({
       },
     });
     if (error) {
-      setResult({ success: false, error: 'Failed to record redemption. Please try again.' });
+      const parsed = await extractFunctionsInvokeErrorBody(error);
+      const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
+      const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
+      if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
+      setResult({
+        success: false,
+        error: invalidQr ? INVALID_QR_PAYLOAD_USER_MESSAGE : 'Failed to record redemption. Please try again.',
+        status: invalidQr ? 'invalid_qr_payload' : undefined,
+      });
       setRedeemSubStep('none');
       setOwnerListings([]);
       setVerifiedForOfferFlow(null);
@@ -488,7 +564,14 @@ const QRScanner: React.FC<QRScannerProps> = ({
           },
         });
         if (error) {
-          setValidityResult({ success: false, error: 'Failed to check validity. Please try again.' } as any);
+          const parsed = await extractFunctionsInvokeErrorBody(error);
+          const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
+          const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
+          if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
+          setValidityResult({
+            success: false,
+            error: invalidQr ? INVALID_QR_PAYLOAD_USER_MESSAGE : 'Failed to check validity. Please try again.',
+          } as ValidityResult);
           return;
         }
         setValidityResult(data as ValidityResult);
@@ -505,7 +588,15 @@ const QRScanner: React.FC<QRScannerProps> = ({
           },
         });
         if (error) {
-          setResult({ success: false, error: 'Failed to verify pass. Please try again.' });
+          const parsed = await extractFunctionsInvokeErrorBody(error);
+          const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
+          const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
+          if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
+          setResult({
+            success: false,
+            error: invalidQr ? INVALID_QR_PAYLOAD_USER_MESSAGE : 'Failed to verify pass. Please try again.',
+            status: invalidQr ? 'invalid_qr_payload' : undefined,
+          });
           return;
         }
         const v = data as ValidityResult;

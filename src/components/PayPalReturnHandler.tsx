@@ -161,7 +161,7 @@ const PayPalReturnHandler: React.FC = () => {
 
         // Navigate to confirmation after brief success animation
         setTimeout(() => {
-          setCurrentView('payment-confirmation' as any);
+          setCurrentView('payment-confirmation');
           setStatus('idle');
         }, 1500);
       } else {
