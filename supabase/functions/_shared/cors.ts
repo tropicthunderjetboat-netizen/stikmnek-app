@@ -51,8 +51,14 @@ export function getSafeCorsHeaders(req: Request): Record<string, string> {
   const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
   const origin = req.headers.get('Origin') ?? '';
   const base: Record<string, string> = {
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    // NOTE: keep in sync with browser preflight `Access-Control-Request-Headers`.
+    // Supabase clients commonly send: authorization, apikey, content-type, x-client-info.
+    // We include a few extra safe headers to avoid brittle CORS failures.
+    'Access-Control-Allow-Headers':
+      'authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-supabase-client',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    // Avoid CDN caching one origin's CORS headers for another origin.
+    Vary: 'Origin',
   };
   if (allowed.length === 0) {
     base['Access-Control-Allow-Origin'] = '*';

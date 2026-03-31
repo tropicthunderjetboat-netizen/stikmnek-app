@@ -60,6 +60,17 @@ function compareDates(a: string | null, b: string | null): number {
   return a < b ? -1 : 1;
 }
 
+/** TEMP_DEBUG_QR_SCAN — log request shape without echoing full QR payload or secrets */
+function maskQrDataForLog(raw: string): string {
+  const t = raw.trim();
+  if (t.length <= 24) return `[len=${t.length}] ${t.slice(0, 4)}…`;
+  return `[len=${t.length}] ${t.slice(0, 8)}…${t.slice(-6)}`;
+}
+
+function logDiag(label: string, payload: Record<string, unknown>): void {
+  console.log(`[verify-redemption][TEMP_DEBUG_QR_SCAN] ${label}`, JSON.stringify(payload));
+}
+
 // ─── Party + pricing (mirrors src/lib/redemptionSavings.ts & pricingTiers.ts) ───
 
 type PartyCounts = { adults: number; children: number; infants: number };
@@ -227,6 +238,14 @@ function computeRedemptionSavings(
 const BEARER_PREFIX = /^Bearer\s+/i;
 
 Deno.serve(async (req) => {
+  let reqUrlPath = '';
+  try {
+    reqUrlPath = new URL(req.url).pathname;
+  } catch {
+    reqUrlPath = '(unparsed url)';
+  }
+  logDiag('request', { method: req.method, path: reqUrlPath });
+
   const corsHeaders = getSafeCorsHeaders(req);
   const jsonResponse = (data: object, status = 200) =>
     new Response(JSON.stringify(data), {
@@ -256,6 +275,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim();
     const serviceKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
+    const anonKey = (Deno.env.get('SUPABASE_ANON_KEY') ?? '').trim();
     if (!supabaseUrl || !serviceKey) {
       console.error(
         '[verify-redemption] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY — cannot read public.passes',
@@ -265,15 +285,31 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Use ANON key for validating caller JWT (auth context). If not available, fall back to service key
+    // (still works for auth calls, but keeping auth/DB clients separate reduces confusion).
+    const authClientKey = anonKey || serviceKey;
+    if (!anonKey) {
+      logDiag('warn', { message: 'SUPABASE_ANON_KEY missing; auth validation falling back to service role key' });
+    }
+
+    const authClient = createClient(supabaseUrl, authClientKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
     // Service role bypasses RLS; public.passes has RLS enabled (see database-setup.sql).
     const supabase = createClient(supabaseUrl, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
     const token = authHeader.replace(BEARER_PREFIX, '').trim();
-    const { data: { user: scannerUser }, error: authError } = await supabase.auth.getUser(token);
+    const { data: { user: scannerUser }, error: authError } = await authClient.auth.getUser(token);
+    logDiag('auth', {
+      scannerUserId: scannerUser?.id ?? null,
+      authOk: !!scannerUser && !authError,
+      authErrorMessage: authError?.message ?? null,
+    });
     if (authError || !scannerUser) {
-      return errorResponse('Invalid or expired session', 401, {
+      return errorResponse('Missing or invalid authentication token.', 401, {
         reason: 'auth_invalid',
         authError: authError?.message ?? null,
       });
@@ -287,6 +323,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const scannerRole = scannerProfile?.role as string | undefined;
+    logDiag('scanner_profile', {
+      scannerRole: scannerRole ?? null,
+      profileErr: profileErr?.message ?? null,
+    });
     if (profileErr || !scannerRole || !['business', 'admin'].includes(scannerRole)) {
       return errorResponse('Not authorized to verify passes', 403, {
         reason: 'scanner_role',
@@ -301,10 +341,18 @@ Deno.serve(async (req) => {
     const businessId = body?.businessId;
     const businessName = body?.businessName ?? '';
 
+    logDiag('body_summary', {
+      action,
+      qrDataMasked: typeof rawQr === 'string' ? maskQrDataForLog(rawQr) : null,
+      businessId: businessId ?? null,
+      hasBusinessName: typeof businessName === 'string' && businessName.length > 0,
+    });
+
     if (!action) return errorResponse('Missing action', 400);
     if (!rawQr || typeof rawQr !== 'string') return errorResponse('Missing qrData', 400);
 
     const passId = parsePassIdFromQrData(rawQr);
+    logDiag('parsed_pass_id', { passId, parseOk: !!passId });
     if (!passId) {
       return errorResponse(
         'Invalid QR payload — expected a pass UUID (use the StikmNek app QR or paste the pass code).',
@@ -321,8 +369,18 @@ Deno.serve(async (req) => {
       .eq('id', passId)
       .maybeSingle();
 
-    console.log('[verify-redemption] passId received:', passId);
-    console.log('[verify-redemption] passes DB result:', { pass, passErr });
+    logDiag('passes_lookup', {
+      passId,
+      lookupError: passErr
+        ? { code: passErr.code, message: passErr.message }
+        : null,
+      passFound: !!pass,
+      passUserId: pass?.user_id ?? null,
+      passActive: pass?.active ?? null,
+      validFrom: pass?.valid_from ?? null,
+      validUntil: pass?.valid_until ?? null,
+      maxPeople: pass?.max_people ?? null,
+    });
 
     if (passErr) {
       console.error('[verify-redemption] passes table lookup error:', passErr.code, passErr.message, passErr);
@@ -395,6 +453,14 @@ Deno.serve(async (req) => {
       message = 'Pass has expired.';
     }
 
+    logDiag('validity_after_dates', {
+      passStatus,
+      canRedeem,
+      todayUtc: todayStr,
+      validFrom,
+      validUntil,
+    });
+
     // Load tourist profile (party size for savings math + display)
     const { data: profile } = await supabase
       .from('user_profiles')
@@ -417,6 +483,16 @@ Deno.serve(async (req) => {
         'The tourist should reduce group size in their profile or purchase a pass with a higher limit.';
     }
 
+    logDiag('tourist_profile_party', {
+      touristUserId,
+      profileRowFound: !!profile,
+      party: { adults: party.adults, children: party.children, infants: party.infants },
+      totalPartySize,
+      passMaxPeople,
+      passStatus,
+      canRedeem,
+    });
+
     const touristName =
       profile?.name ||
       profile?.display_name ||
@@ -438,6 +514,13 @@ Deno.serve(async (req) => {
           .eq('id', businessId)
           .eq('owner_id', scannerUser.id)
           .maybeSingle();
+
+        logDiag('business_ownership_check', {
+          businessId,
+          scannerUserId: scannerUser.id,
+          owned: !!ownedBusiness,
+          bizErr: bizErr?.message ?? null,
+        });
 
         if (bizErr || !ownedBusiness) {
           return errorResponse('You are not authorized to scan for this business', 403, {
@@ -474,40 +557,50 @@ Deno.serve(async (req) => {
       lastRedemptions = (recent ?? []).map((r: any) => r.redeemed_at as string);
     }
 
+    logDiag('redemption_history_summary', {
+      businessId: businessId ?? null,
+      alreadyRedeemedToday,
+      totalRedemptionsAtBusiness,
+    });
+
     if (action === 'check_voucher_validity') {
-      return jsonResponse(
-        {
-          success: true,
-          action: 'validity_check',
-          canRedeem,
-          tourist: { name: touristName, email: touristEmail },
-          party: {
-            adults: party.adults,
-            children: party.children,
-            infants: party.infants,
-          },
-          pass: {
-            id: pass.id,
-            type: pass.pass_type,
-            status: passStatus,
-            message,
-            active: pass.active,
-            validFrom,
-            validUntil,
-            expiresAt: pass.expires_at,
-            purchasedAt: pass.purchased_at,
-            maxPeople: passMaxPeople,
-            totalPartySize,
-          },
-          voucher: null,
-          redemptionHistory: {
-            alreadyRedeemedToday,
-            totalRedemptionsAtBusiness,
-            lastRedemptions,
-          },
+      const out = {
+        success: true,
+        action: 'validity_check',
+        canRedeem,
+        tourist: { name: touristName, email: touristEmail },
+        party: {
+          adults: party.adults,
+          children: party.children,
+          infants: party.infants,
         },
-        200
-      );
+        pass: {
+          id: pass.id,
+          type: pass.pass_type,
+          status: passStatus,
+          message,
+          active: pass.active,
+          validFrom,
+          validUntil,
+          expiresAt: pass.expires_at,
+          purchasedAt: pass.purchased_at,
+          maxPeople: passMaxPeople,
+          totalPartySize,
+        },
+        voucher: null,
+        redemptionHistory: {
+          alreadyRedeemedToday,
+          totalRedemptionsAtBusiness,
+          lastRedemptions,
+        },
+      };
+      logDiag('response_check_voucher_validity', {
+        status: 200,
+        canRedeem,
+        passStatus,
+        passId: pass.id,
+      });
+      return jsonResponse(out, 200);
     }
 
     if (action === 'verify_and_redeem') {
@@ -516,6 +609,13 @@ Deno.serve(async (req) => {
       }
 
       if (!canRedeem) {
+        logDiag('response_verify_and_redeem_blocked', {
+          status: 200,
+          success: false,
+          passStatus,
+          canRedeem: false,
+          businessId,
+        });
         return jsonResponse(
           {
             success: false,
@@ -545,6 +645,7 @@ Deno.serve(async (req) => {
           .limit(1);
 
         if (dupToday && dupToday.length > 0) {
+          logDiag('response_verify_and_redeem_dup', { status: 'already_redeemed_today', businessId });
           return jsonResponse(
             {
               success: false,
@@ -626,6 +727,12 @@ Deno.serve(async (req) => {
         discount_label ||
         (typeof body?.discount === 'string' ? body.discount : '');
 
+      logDiag('response_verify_and_redeem_success', {
+        redemptionId: redemption.id,
+        passId: pass.id,
+        businessId,
+        savedAmount: Number(redemption.saved_amount) || 0,
+      });
       return jsonResponse(
         {
           success: true,
@@ -658,7 +765,8 @@ Deno.serve(async (req) => {
 
     return errorResponse('Unknown action: ' + action, 400);
   } catch (err: any) {
-    console.error('[verify-redemption] unexpected error:', err?.message ?? err, err?.stack ?? '');
+    console.error('[verify-redemption][TEMP_DEBUG_QR_SCAN] unexpected error:', err?.message ?? err);
+    console.error('[verify-redemption] stack:', err?.stack ?? '');
     return errorResponse(
       typeof err?.message === 'string' && err.message.length > 0
         ? `Verification failed: ${err.message}`
