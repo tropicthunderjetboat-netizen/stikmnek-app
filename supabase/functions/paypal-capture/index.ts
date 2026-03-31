@@ -8,10 +8,24 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+/**
+ * CORS: set CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
+ */
+function getSafeCorsHeaders(req: Request): Record<string, string> {
+  const raw = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim();
+  const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  const origin = req.headers.get('Origin') ?? '';
+  const base: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  };
+  if (allowed.length === 0) {
+    base['Access-Control-Allow-Origin'] = '*';
+    return base;
+  }
+  base['Access-Control-Allow-Origin'] = allowed.includes(origin) ? origin : allowed[0]!;
+  return base;
+}
 
 const PASS_DAYS: Record<string, number> = { daily: 1, weekly: 6, monthly: 6, mega_group: 7 };
 const PASS_MAX_PEOPLE: Record<string, number> = { daily: 4, weekly: 4, monthly: 7, mega_group: 20 };
@@ -22,17 +36,6 @@ const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = 
   monthly: { extraPeople: 1, extraDays: 1 },
   mega_group: { extraPeople: 0, extraDays: 5 },
 };
-
-function jsonResponse(data: object, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-
-function errorResponse(message: string, status = 400) {
-  return jsonResponse({ success: false, error: message }, status);
-}
 
 function passTypeToBrandDisplay(passType: string): string {
   const t = String(passType ?? '').toLowerCase().trim();
@@ -159,6 +162,14 @@ function endOfDayDate(dateStr: string): string {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getSafeCorsHeaders(req);
+  const jsonResponse = (data: object, status = 200) =>
+    new Response(JSON.stringify(data), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  const errorResponse = (message: string, status = 400) => jsonResponse({ success: false, error: message }, status);
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

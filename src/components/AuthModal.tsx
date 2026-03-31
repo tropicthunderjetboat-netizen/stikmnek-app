@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { supabase } from '@/lib/supabase';
+import { SITE_URL, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { X, Mail, Lock, User, Briefcase, Plane, Loader2, Shield, ArrowLeft, Store, MapPin, Globe } from 'lucide-react';
 
@@ -41,7 +41,7 @@ const AuthModal: React.FC = () => {
     setErrors({});
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${SITE_URL}/reset-password`,
       });
       if (error) throw error;
       setForgotPasswordSent(true);

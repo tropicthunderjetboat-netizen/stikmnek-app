@@ -17,6 +17,14 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1N
 // ═══════════════════════════════════════════════════════════════
 export const SUPABASE_URL = supabaseUrl;
 
+/**
+ * Canonical site URL for auth redirects (reset password, email links).
+ * Prefer env override; otherwise use current origin in browser; final fallback is production.
+ */
+export const SITE_URL =
+  (import.meta.env.VITE_SITE_URL && String(import.meta.env.VITE_SITE_URL).trim()) ||
+  (typeof window !== 'undefined' ? window.location.origin : 'https://www.stikmnek.com');
+
 export const ENDPOINTS = {
   auth:      `${supabaseUrl}/auth/v1`,
   rest:      `${supabaseUrl}/rest/v1`,

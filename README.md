@@ -120,7 +120,7 @@ npm install
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`.
+Production: `https://www.stikmnek.com`.
 
 ### Build for Production
 

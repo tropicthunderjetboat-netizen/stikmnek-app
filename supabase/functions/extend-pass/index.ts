@@ -8,10 +8,24 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+/**
+ * CORS: set CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
+ */
+function getSafeCorsHeaders(req: Request): Record<string, string> {
+  const raw = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim();
+  const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  const origin = req.headers.get('Origin') ?? '';
+  const base: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  };
+  if (allowed.length === 0) {
+    base['Access-Control-Allow-Origin'] = '*';
+    return base;
+  }
+  base['Access-Control-Allow-Origin'] = allowed.includes(origin) ? origin : allowed[0]!;
+  return base;
+}
 
 // Share bonus: extra people and extra days per pass type (matches src/data/pricing.ts)
 const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = {
@@ -20,20 +34,6 @@ const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = 
   monthly: { extraPeople: 1, extraDays: 1 },
   mega_group: { extraPeople: 0, extraDays: 5 },
 };
-
-function jsonResponse(data: object, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-
-function errorResponse(message: string, status = 400, extra?: Record<string, unknown>) {
-  return new Response(JSON.stringify({ success: false, error: message, ...extra }), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
 
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T00:00:00');
@@ -47,6 +47,18 @@ function endOfDayISO(dateStr: string): string {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getSafeCorsHeaders(req);
+  const jsonResponse = (data: object, status = 200) =>
+    new Response(JSON.stringify(data), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  const errorResponse = (message: string, status = 400, extra?: Record<string, unknown>) =>
+    new Response(JSON.stringify({ success: false, error: message, ...extra }), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

@@ -212,7 +212,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
                 </button>
               </div>
             </div>
-            <p className="text-sm text-gray-500 mb-3 line-clamp-2">{plainTextFromHtml(desc || '')}</p>
+            <p className="text-sm text-gray-500 mb-3 line-clamp-3 overflow-hidden">{plainTextFromHtml(desc || '')}</p>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="text-xl font-bold text-teal-700">{formatVT(dealPrice)}</span>
@@ -332,7 +332,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
           </div>
         </div>
 
-        <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">{plainTextFromHtml(desc || '')}</p>
+        <p className="text-sm text-gray-500 mb-3 line-clamp-3 overflow-hidden leading-relaxed">{plainTextFromHtml(desc || '')}</p>
 
         <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 mb-3">
           <span className="flex min-w-0 items-center gap-1">
