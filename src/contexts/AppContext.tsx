@@ -387,8 +387,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   const loadBusinesses = useCallback(async () => {
     try {
-      // Master profile + at least one active offering (!inner). Listing copy lives on
-      // `business_offerings`; `businesses` is the stub (location, hours, reviews, etc.).
+      // Master profile must be active; at least one active offering (!inner). Listing copy
+      // lives on `business_offerings`; `businesses` holds profile + reviews, etc.
       const { data: profileRows, error: loadErr } = await supabase
         .from('businesses')
         .select(`
@@ -418,11 +418,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ${OFFERING_LISTING_COLUMNS}
           )
         `)
+        .eq('active', true)
         .eq('business_offerings.active', true)
-        .order('featured', { ascending: false });
+        .order('featured', { ascending: false })
+        .order('name', { ascending: true });
 
       if (loadErr) {
-        console.warn('[loadBusinesses] businesses + business_offerings:', loadErr.message || loadErr);
+        console.warn('[loadBusinesses] businesses + business_offerings:', loadErr.message || loadErr, loadErr);
         setDbBusinesses([]);
         setDataLoaded(true);
         return;
@@ -432,12 +434,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const mapped: Business[] = [];
         for (const row of profileRows as Record<string, unknown>[]) {
           const rawOff = row.business_offerings;
-          const offs = Array.isArray(rawOff) ? rawOff : [];
+          // PostgREST returns a single object when one child matches, or an array when multiple.
+          const offs = Array.isArray(rawOff) ? rawOff : rawOff != null ? [rawOff] : [];
           const { business_offerings: _drop, ...profile } = row;
           for (const o of offs) {
             const off = o as Record<string, unknown> & { active?: boolean };
             if (off.active === false) continue;
-            mapped.push(mapJoinedOfferingToBusiness(off, profile, SUPABASE_URL));
+            const b = mapJoinedOfferingToBusiness(off, profile, SUPABASE_URL);
+            const profileActive = profile.active !== false;
+            mapped.push({
+              ...b,
+              active: profileActive && b.active !== false,
+            });
           }
         }
         setDbBusinesses(mapped);
