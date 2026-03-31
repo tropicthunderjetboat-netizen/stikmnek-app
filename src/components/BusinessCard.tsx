@@ -214,9 +214,14 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
             </div>
             <p
               className="text-sm text-gray-500 mb-3 overflow-hidden"
-              style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+              style={{ overflow: 'hidden' }}
             >
-              {plainTextFromHtml(desc || '')}
+              <div
+                className="stikmnek-clamp-3"
+                style={{ display: '-webkit-box', WebkitLineClamp: '3', WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}
+              >
+                {plainTextFromHtml(desc || '')}
+              </div>
             </p>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-baseline gap-2 flex-wrap">
@@ -339,9 +344,14 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
 
         <p
           className="text-sm text-gray-500 mb-3 overflow-hidden leading-relaxed"
-          style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+          style={{ overflow: 'hidden' }}
         >
-          {plainTextFromHtml(desc || '')}
+          <div
+            className="stikmnek-clamp-3"
+            style={{ display: '-webkit-box', WebkitLineClamp: '3', WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}
+          >
+            {plainTextFromHtml(desc || '')}
+          </div>
         </p>
 
         <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 mb-3">

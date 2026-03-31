@@ -126,6 +126,15 @@
   @apply font-sans font-semibold text-foreground;
 }
 
+/* Hard clamp utility for production (avoids Tailwind line-clamp plugin dependency). */
+.stikmnek-clamp-3 {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 3 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  word-break: break-word !important;
+}
+
 .markdown-preview ul,
 .markdown-preview ol {
   @apply my-4 ml-6;
