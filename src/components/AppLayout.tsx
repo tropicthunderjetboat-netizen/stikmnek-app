@@ -20,7 +20,6 @@ import AuthModal from './AuthModal';
 import BusinessDetail from './BusinessDetail';
 import CookieConsent from './CookieConsent';
 import PaymentConfirmation from './PaymentConfirmation';
-import PayPalReturnHandler from './checkout/PayPalReturnHandler';
 import FloatingPassButton from './FloatingPassButton';
 import LoadingSkeleton from './LoadingSkeleton';
 import CompleteTouristProfile from './CompleteTouristProfile';
@@ -344,7 +343,6 @@ const AppLayout: React.FC = () => {
       {!hideFooter && <Footer />}
       <AuthModal />
       <CookieConsent />
-      <PayPalReturnHandler />
       <FloatingPassButton />
     </div>
   );

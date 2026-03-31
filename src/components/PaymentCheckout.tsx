@@ -196,7 +196,6 @@ const CardBrandIcon: React.FC<{ brand: string; className?: string }> = ({ brand,
 const PaymentCheckout: React.FC = () => {
   const { user, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass } = useAppContext();
   const [processing, setProcessing] = useState(false);
-  const [paypalLoading, setPaypalLoading] = useState(false);
   const [step, setStep] = useState<'dates' | 'payment' | 'processing' | 'success'>('dates');
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -500,103 +499,6 @@ const PaymentCheckout: React.FC = () => {
     }
   };
 
-  /**
-   * PayPal Smart Checkout: create order, persist pending context, redirect to PayPal.
-   * Return URL must include paypal_return=true; cancel URL must include paypal_cancel=true
-   * (see checkout/PayPalReturnHandler.tsx).
-   */
-  const handlePayWithPayPal = async () => {
-    if (!cart || !selectedPass) return;
-    setPaypalLoading(true);
-    setPaymentError(null);
-    try {
-      const token = await ensureFreshSession();
-      if (!token) {
-        toast.error('Your session has expired. Please sign in again.');
-        setStep('payment');
-        setShowAuth(true);
-        setAuthMode('signin');
-        return;
-      }
-
-      const origin = window.location.origin;
-      const returnUrl = `${origin}/?paypal_return=true`;
-      const cancelUrl = `${origin}/?paypal_cancel=true`;
-
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: {
-          passType: cart.passType,
-          startDate,
-          returnUrl,
-          cancelUrl,
-        },
-      });
-
-      if (error) {
-        const status = getInvokeStatus(error);
-        const body = await getInvokeErrorBody(error);
-        const fromBody = typeof body?.error === 'string' ? body.error : null;
-        const serverError = fromBody ?? (data && typeof (data as { error?: string }).error === 'string'
-          ? (data as { error: string }).error
-          : null);
-        if (serverError) throw new Error(serverError);
-        const errMsg = error.message || 'PayPal checkout failed';
-        if (errMsg.includes('non-2xx')) {
-          if (status === 404) {
-            throw new Error('Payment server: "create-checkout" not found. Deploy the Edge Function in Supabase.');
-          }
-          throw new Error('PayPal checkout unavailable. Check your connection or try again.');
-        }
-        throw new Error(errMsg);
-      }
-
-      if (!data || !(data as { success?: boolean }).success) {
-        const msg = (data as { error?: string })?.error || 'PayPal did not confirm order creation';
-        throw new Error(msg);
-      }
-
-      const d = data as {
-        orderId: string;
-        approvalUrl: string;
-        amount?: number;
-        currency?: string;
-        passType?: string;
-        startDate?: string;
-      };
-
-      if (!d.approvalUrl || !d.orderId) {
-        throw new Error('PayPal did not return an approval URL');
-      }
-
-      const pending = {
-        orderId: d.orderId,
-        passType: cart.passType,
-        startDate,
-        amount: d.amount,
-        currency: d.currency ?? 'AUD',
-        createdAt: new Date().toISOString(),
-      };
-      localStorage.setItem('paypalPending', JSON.stringify(pending));
-      try {
-        localStorage.setItem(
-          'pendingPayment',
-          JSON.stringify({ source: 'paypal', orderId: d.orderId, passType: cart.passType, startDate }),
-        );
-      } catch {
-        /* ignore */
-      }
-
-      window.location.href = d.approvalUrl;
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Could not start PayPal checkout';
-      console.error('[PaymentCheckout] PayPal:', err);
-      toast.error(message);
-      setPaymentError(message);
-    } finally {
-      setPaypalLoading(false);
-    }
-  };
-
 
   const Icon = selectedPass.icon;
   const currentStepIndex = step === 'dates' ? 0 : step === 'payment' ? 1 : step === 'success' ? 2 : 2;
@@ -618,7 +520,7 @@ const PaymentCheckout: React.FC = () => {
           <div className="lg:col-span-3 space-y-6">
             <div>
               <h1 className="text-2xl font-extrabold text-gray-900">Checkout</h1>
-              <p className="text-gray-500 text-sm mt-1">Pay with card on this page, or use PayPal in a few clicks</p>
+              <p className="text-gray-500 text-sm mt-1">Complete your purchase securely with your credit or debit card</p>
             </div>
 
             {/* Step Indicator */}
@@ -985,7 +887,7 @@ const PaymentCheckout: React.FC = () => {
                 <button
                   type="button"
                   onClick={handlePayWithCard}
-                  disabled={processing || paypalLoading}
+                  disabled={processing}
                   className="w-full py-4 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-lg transition-all shadow-lg shadow-teal-200 hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                 >
                   {processing ? (
@@ -1001,36 +903,8 @@ const PaymentCheckout: React.FC = () => {
                   )}
                 </button>
 
-                <div className="relative py-2">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-gray-200" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase tracking-wide">
-                    <span className="bg-gray-50 px-3 text-gray-400 font-medium">Or</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => void handlePayWithPayPal()}
-                  disabled={processing || paypalLoading}
-                  className="w-full py-3.5 rounded-xl border-2 border-[#0070ba] bg-white text-[#003087] font-bold text-base transition-all hover:bg-[#0070ba]/5 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {paypalLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Connecting to PayPal...
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-[#003087] font-extrabold tracking-tight">PayPal</span>
-                      <span>Pay A${selectedPass.price}.00</span>
-                    </>
-                  )}
-                </button>
-
                 <p className="text-xs text-center text-gray-400">
-                  Card: stays on StikmNek. PayPal: secure redirect, then you return here to finish.
+                  Card is processed securely. You stay on StikmNek — no redirect.
                 </p>
               </div>
             )}
