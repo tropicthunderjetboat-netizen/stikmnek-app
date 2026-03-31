@@ -174,7 +174,7 @@ function normalizePassQrInput(raw: string): string {
 
 function resolveVerifyRedemptionBackendError(
   data: unknown,
-  parsedFromError: { success?: boolean; error?: string } | null,
+  parsedFromError: { success?: boolean; error?: string; errorCode?: number; reason?: string } | null,
 ): string | undefined {
   const e = parsedFromError?.error;
   if (typeof e === 'string' && e.length > 0) return e;
@@ -183,6 +183,20 @@ function resolveVerifyRedemptionBackendError(
     if (typeof d.error === 'string' && d.error.length > 0) return d.error;
   }
   return undefined;
+}
+
+/** Human-readable line for Edge Function failures (includes HTTP + errorCode from JSON when present). */
+function formatVerifyInvokeFailure(
+  backendMsg: string | undefined,
+  parsed: { errorCode?: number; reason?: string } | null,
+  httpStatus: number | null,
+): string {
+  const parts: string[] = [];
+  if (backendMsg) parts.push(backendMsg);
+  const code = parsed?.errorCode ?? (httpStatus ?? undefined);
+  if (code != null) parts.push(`HTTP ${code}`);
+  if (parsed?.reason) parts.push(`reason: ${parsed.reason}`);
+  return parts.length > 0 ? parts.join(' — ') : 'Edge Function request failed';
 }
 
 /** Parse JSON body from supabase.functions.invoke FunctionsHttpError (context Response or message). */
@@ -214,6 +228,17 @@ async function extractFunctionsInvokeErrorBody(
         /* not JSON */
       }
     }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function getFunctionsInvokeHttpStatus(error: unknown): number | null {
+  try {
+    const e = error as { context?: Response; status?: number };
+    if (e?.context && typeof e.context.status === 'number') return e.context.status;
+    if (typeof e.status === 'number') return e.status;
   } catch {
     /* ignore */
   }
@@ -396,11 +421,15 @@ const QRScanner: React.FC<QRScannerProps> = ({
     if (error) {
       const parsed = await extractFunctionsInvokeErrorBody(error);
       const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
+      const httpStatus = getFunctionsInvokeHttpStatus(error);
+      console.error('[verify-redemption] verify_and_redeem failed', { httpStatus, parsed, data });
       const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
       if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
       setResult({
         success: false,
-        error: invalidQr ? INVALID_QR_PAYLOAD_USER_MESSAGE : 'Failed to record redemption. Please try again.',
+        error: invalidQr
+          ? INVALID_QR_PAYLOAD_USER_MESSAGE
+          : formatVerifyInvokeFailure(backendMsg, parsed, httpStatus),
         status: invalidQr ? 'invalid_qr_payload' : undefined,
       });
       setRedeemSubStep('none');
@@ -583,11 +612,15 @@ const QRScanner: React.FC<QRScannerProps> = ({
         if (error) {
           const parsed = await extractFunctionsInvokeErrorBody(error);
           const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
+          const httpStatus = getFunctionsInvokeHttpStatus(error);
+          console.error('[verify-redemption] check_voucher_validity failed', { httpStatus, parsed, data });
           const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
           if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
           setValidityResult({
             success: false,
-            error: invalidQr ? INVALID_QR_PAYLOAD_USER_MESSAGE : 'Failed to check validity. Please try again.',
+            error: invalidQr
+              ? INVALID_QR_PAYLOAD_USER_MESSAGE
+              : formatVerifyInvokeFailure(backendMsg, parsed, httpStatus),
           } as ValidityResult);
           return;
         }
@@ -607,13 +640,15 @@ const QRScanner: React.FC<QRScannerProps> = ({
         if (error) {
           const parsed = await extractFunctionsInvokeErrorBody(error);
           const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
+          const httpStatus = getFunctionsInvokeHttpStatus(error);
+          console.error('[verify-redemption] redeem flow check failed', { httpStatus, parsed, data });
           const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
           if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
           setResult({
             success: false,
             error: invalidQr
               ? INVALID_QR_PAYLOAD_USER_MESSAGE
-              : (error as { message?: string }).message || 'Unknown Error',
+              : formatVerifyInvokeFailure(backendMsg, parsed, httpStatus),
             status: invalidQr ? 'invalid_qr_payload' : undefined,
           });
           return;
