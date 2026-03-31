@@ -8,24 +8,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-/**
- * CORS: CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
- */
-function getSafeCorsHeaders(req: Request): Record<string, string> {
-  const raw = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim();
-  const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
-  const origin = req.headers.get('Origin') ?? '';
-  const base: Record<string, string> = {
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  };
-  if (allowed.length === 0) {
-    base['Access-Control-Allow-Origin'] = '*';
-    return base;
-  }
-  base['Access-Control-Allow-Origin'] = allowed.includes(origin) ? origin : allowed[0]!;
-  return base;
-}
+import { getSafeCorsHeaders } from '../_shared/cors.ts';
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
@@ -37,8 +20,13 @@ function jsonResponse(req: Request, data: object, status = 200) {
   });
 }
 
-function errorResponse(req: Request, message: string, status = 400) {
-  return jsonResponse(req, { success: false, error: message }, status);
+function errorResponse(
+  req: Request,
+  message: string,
+  status = 400,
+  extra?: Record<string, unknown>,
+) {
+  return jsonResponse(req, { success: false, error: message, errorCode: status, ...extra }, status);
 }
 
 async function getAuthUser(
@@ -115,6 +103,11 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!supabaseUrl.trim() || !supabaseServiceKey.trim()) {
+      return errorResponse(req, 'Server configuration error', 500, {
+        reason: 'missing_supabase_secrets',
+      });
+    }
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -172,6 +165,8 @@ Deno.serve(async (req) => {
         return jsonResponse(req, {
           success: false,
           error: 'Card payments are temporarily unavailable. Please use PayPal.',
+          errorCode: 501,
+          reason: 'card_mock_disabled',
         }, 501);
       }
 
@@ -344,7 +339,10 @@ Deno.serve(async (req) => {
           }
         }
         console.error('process-card-payment: insert passes error:', insertErr);
-        return errorResponse(req, 'Payment captured but failed to create pass: ' + insertErr.message, 500);
+        return errorResponse(req, 'Payment captured but failed to create pass: ' + insertErr.message, 500, {
+          reason: 'pass_insert_failed',
+          postgresCode: insertErr.code ?? null,
+        });
       }
 
       if (applyShareBonus) {
@@ -376,6 +374,6 @@ Deno.serve(async (req) => {
   } catch (err) {
     console.error('process-card-payment error:', err);
     const msg = err instanceof Error ? err.message : String(err ?? 'Internal server error');
-    return errorResponse(req, msg || 'Internal server error', 500);
+    return errorResponse(req, msg || 'Internal server error', 500, { reason: 'unexpected' });
   }
 });

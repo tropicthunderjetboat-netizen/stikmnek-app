@@ -7,25 +7,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-/**
- * CORS: set CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
- */
-function getSafeCorsHeaders(req: Request): Record<string, string> {
-  const raw = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim();
-  const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
-  const origin = req.headers.get('Origin') ?? '';
-  const base: Record<string, string> = {
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  };
-  if (allowed.length === 0) {
-    base['Access-Control-Allow-Origin'] = '*';
-    return base;
-  }
-  base['Access-Control-Allow-Origin'] = allowed.includes(origin) ? origin : allowed[0]!;
-  return base;
-}
+import { getSafeCorsHeaders } from '../_shared/cors.ts';
 
 const PASS_PRICES_AUD: Record<string, number> = {
   daily: 15,
@@ -64,7 +46,8 @@ Deno.serve(async (req) => {
       status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  const errorResponse = (message: string, status = 400) => jsonResponse({ success: false, error: message }, status);
+  const errorResponse = (message: string, status = 400, extra?: Record<string, unknown>) =>
+    jsonResponse({ success: false, error: message, errorCode: status, ...extra }, status);
 
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -81,11 +64,17 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!supabaseUrl.trim() || !serviceKey.trim()) {
+      return errorResponse('Server configuration error', 500, { reason: 'missing_supabase_secrets' });
+    }
     const supabase = createClient(supabaseUrl, serviceKey);
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
-      return errorResponse('Invalid or expired session', 401);
+      return errorResponse('Invalid or expired session', 401, {
+        reason: 'auth_invalid',
+        authError: authError?.message ?? null,
+      });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -141,7 +130,10 @@ Deno.serve(async (req) => {
     if (!orderRes.ok) {
       const errText = await orderRes.text();
       console.error('[create-checkout] PayPal create order failed:', orderRes.status, errText);
-      return errorResponse('PayPal could not create order: ' + errText.slice(0, 200), 502);
+      return errorResponse('PayPal could not create order: ' + errText.slice(0, 200), 502, {
+        reason: 'paypal_create_order_failed',
+        paypalStatus: orderRes.status,
+      });
     }
 
     const orderData = await orderRes.json();
@@ -150,7 +142,7 @@ Deno.serve(async (req) => {
     const approvalUrl = approveLink?.href;
 
     if (!orderId || !approvalUrl) {
-      return errorResponse('PayPal did not return approval URL', 502);
+      return errorResponse('PayPal did not return approval URL', 502, { reason: 'paypal_missing_approval_link' });
     }
 
     return jsonResponse({
@@ -164,6 +156,8 @@ Deno.serve(async (req) => {
     });
   } catch (err: any) {
     console.error('[create-checkout]', err);
-    return errorResponse(err?.message ?? 'Create checkout failed', 500);
+    return errorResponse(err?.message ?? 'Create checkout failed', 500, {
+      reason: String(err?.message ?? '').includes('PAYPAL') ? 'paypal_config' : 'unexpected',
+    });
   }
 });
