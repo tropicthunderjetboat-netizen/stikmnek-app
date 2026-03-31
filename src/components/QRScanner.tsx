@@ -611,7 +611,9 @@ const QRScanner: React.FC<QRScannerProps> = ({
           if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
           setResult({
             success: false,
-            error: invalidQr ? INVALID_QR_PAYLOAD_USER_MESSAGE : 'Failed to verify pass. Please try again.',
+            error: invalidQr
+              ? INVALID_QR_PAYLOAD_USER_MESSAGE
+              : (error as { message?: string }).message || 'Unknown Error',
             status: invalidQr ? 'invalid_qr_payload' : undefined,
           });
           return;

@@ -319,6 +319,7 @@ Deno.serve(async (req) => {
       return errorResponse('Server configuration error', 500);
     }
 
+    // Service role bypasses RLS; public.passes has RLS enabled (see database-setup.sql).
     const supabase = createClient(supabaseUrl, serviceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -366,6 +367,9 @@ Deno.serve(async (req) => {
       .select('id, user_id, pass_type, active, valid_from, valid_until, expires_at, purchased_at, max_people')
       .eq('id', passId)
       .maybeSingle();
+
+    console.log('[verify-redemption] passId received:', passId);
+    console.log('[verify-redemption] passes DB result:', { pass, passErr });
 
     if (passErr) {
       console.error('[verify-redemption] passes table lookup error:', passErr.code, passErr.message, passErr);
