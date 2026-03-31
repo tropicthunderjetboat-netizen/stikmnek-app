@@ -16,6 +16,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getSafeCorsHeaders } from '../_shared/cors.ts';
 
 /** Pass QR encodes only the pass row UUID; legacy JSON payloads still accepted for migration. */
 const PASS_ID_UUID_RE =
@@ -38,71 +39,6 @@ function parsePassIdFromQrData(rawQr: string): string | null {
     /* not JSON */
   }
   return null;
-}
-
-/**
- * CORS: set CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
- */
-function originMatchesAllowList(origin: string, allowed: string[]): boolean {
-  const o = origin.trim();
-  if (!o) return false;
-  if (allowed.includes(o)) return true;
-  // Common drift: apex vs www when secret lists only one hostname
-  try {
-    const u = new URL(o);
-    const host = u.hostname.toLowerCase();
-    const noWww = host.startsWith('www.') ? host.slice(4) : host;
-    const withWww = host.startsWith('www.') ? host : `www.${host}`;
-    const altA = `${u.protocol}//${noWww}${u.port ? `:${u.port}` : ''}`;
-    const altB = `${u.protocol}//${withWww}${u.port ? `:${u.port}` : ''}`;
-    let altAOrigin = '';
-    let altBOrigin = '';
-    try {
-      altAOrigin = new URL(altA).origin;
-    } catch {
-      /* ignore */
-    }
-    try {
-      altBOrigin = new URL(altB).origin;
-    } catch {
-      /* ignore */
-    }
-    return allowed.some((a) => {
-      try {
-        const x = new URL(a);
-        return (
-          x.origin === u.origin ||
-          (altAOrigin && x.origin === altAOrigin) ||
-          (altBOrigin && x.origin === altBOrigin)
-        );
-      } catch {
-        return a === o;
-      }
-    });
-  } catch {
-    return false;
-  }
-}
-
-function getSafeCorsHeaders(req: Request): Record<string, string> {
-  const raw = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim();
-  const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
-  const origin = req.headers.get('Origin') ?? '';
-  const base: Record<string, string> = {
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  };
-  if (allowed.length === 0) {
-    base['Access-Control-Allow-Origin'] = '*';
-    return base;
-  }
-  // Echo request Origin when allowed so browsers accept credentialed invokes (www/apex tolerant).
-  if (origin && originMatchesAllowList(origin, allowed)) {
-    base['Access-Control-Allow-Origin'] = origin;
-  } else {
-    base['Access-Control-Allow-Origin'] = allowed[0]!;
-  }
-  return base;
 }
 
 function normalizeDate(dateStr: string | null | undefined): string | null {
@@ -298,7 +234,15 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   const errorResponse = (message: string, status = 400, extra?: Record<string, unknown>) =>
-    jsonResponse({ success: false, error: message, ...extra }, status);
+    jsonResponse(
+      {
+        success: false,
+        error: message,
+        errorCode: status,
+        ...extra,
+      },
+      status,
+    );
 
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -316,7 +260,9 @@ Deno.serve(async (req) => {
       console.error(
         '[verify-redemption] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY — cannot read public.passes',
       );
-      return errorResponse('Server configuration error', 500);
+      return errorResponse('Server configuration error', 500, {
+        reason: 'missing_supabase_secrets',
+      });
     }
 
     // Service role bypasses RLS; public.passes has RLS enabled (see database-setup.sql).
@@ -327,7 +273,10 @@ Deno.serve(async (req) => {
     const token = authHeader.replace(BEARER_PREFIX, '').trim();
     const { data: { user: scannerUser }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !scannerUser) {
-      return errorResponse('Invalid or expired session', 401);
+      return errorResponse('Invalid or expired session', 401, {
+        reason: 'auth_invalid',
+        authError: authError?.message ?? null,
+      });
     }
 
     // ─── AUTHZ: Ensure scanner is a business owner or admin ───
@@ -339,7 +288,11 @@ Deno.serve(async (req) => {
 
     const scannerRole = scannerProfile?.role as string | undefined;
     if (profileErr || !scannerRole || !['business', 'admin'].includes(scannerRole)) {
-      return errorResponse('Not authorized to verify passes', 403);
+      return errorResponse('Not authorized to verify passes', 403, {
+        reason: 'scanner_role',
+        role: scannerRole ?? null,
+        profileError: profileErr?.message ?? null,
+      });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -378,11 +331,19 @@ Deno.serve(async (req) => {
           ? 'Database access error — check Edge Function secrets (SUPABASE_SERVICE_ROLE_KEY)'
           : 'Pass lookup failed',
         500,
+        {
+          reason: 'passes_query_failed',
+          postgresCode: passErr.code ?? null,
+          postgresMessage: passErr.message ?? null,
+        },
       );
     }
     if (!pass) {
       console.error('[verify-redemption] no row in passes for id:', passId);
-      return errorResponse('Pass not found for this QR code', 404);
+      return errorResponse('Pass not found for this QR code', 404, {
+        reason: 'pass_not_found',
+        passId,
+      });
     }
 
     const touristUserId = pass.user_id as string;
@@ -479,7 +440,10 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (bizErr || !ownedBusiness) {
-          return errorResponse('You are not authorized to scan for this business', 403);
+          return errorResponse('You are not authorized to scan for this business', 403, {
+            reason: 'business_not_owned',
+            businessId,
+          });
         }
       }
 
@@ -604,11 +568,18 @@ Deno.serve(async (req) => {
 
       if (bizLoadErr || !bizRow) {
         console.error('[verify-redemption] business load:', bizLoadErr);
-        return errorResponse('Business not found', 404);
+        return errorResponse('Business not found', 404, {
+          reason: 'business_not_found',
+          businessId,
+          postgresCode: bizLoadErr?.code ?? null,
+        });
       }
 
       if (scannerRole === 'business' && String((bizRow as { owner_id?: string }).owner_id ?? '') !== String(scannerUser.id)) {
-        return errorResponse('You are not authorized to redeem for this business', 403);
+        return errorResponse('You are not authorized to redeem for this business', 403, {
+          reason: 'redeem_business_forbidden',
+          businessId,
+        });
       }
 
       // Server-authoritative savings (ignore client savedAmount to prevent tampering)
@@ -631,7 +602,11 @@ Deno.serve(async (req) => {
 
       if (redErr || !redemption) {
         console.error('[verify-redemption] insert redemption error:', redErr);
-        return errorResponse('Failed to record redemption', 500);
+        return errorResponse('Failed to record redemption', 500, {
+          reason: 'redemption_insert_failed',
+          postgresCode: redErr?.code ?? null,
+          postgresMessage: redErr?.message ?? null,
+        });
       }
 
       const { data: bizNameRow } = await supabase
@@ -689,6 +664,7 @@ Deno.serve(async (req) => {
         ? `Verification failed: ${err.message}`
         : 'Verification failed',
       500,
+      { reason: 'unexpected', name: err?.name ?? null },
     );
   }
 });
