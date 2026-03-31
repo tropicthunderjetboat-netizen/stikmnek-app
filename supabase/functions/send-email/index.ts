@@ -14,22 +14,52 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
  *   BOOKING_INQUIRY_BCC — comma-separated emails to BCC on every booking inquiry (e.g. ops inbox for debugging)
  *   PASS_CONFIRMATION_EMAIL_OVERRIDE — if set, send_pass_confirmation delivers to this address instead of the
  *     purchaser’s auth email (for one-off QA). Remove after testing.
+ * CORS: CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
  */
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+function getSafeCorsHeaders(req: Request): Record<string, string> {
+  const raw = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim();
+  const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  const origin = req.headers.get('Origin') ?? '';
+  const base: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+  if (allowed.length === 0) {
+    base['Access-Control-Allow-Origin'] = '*';
+    return base;
+  }
+  base['Access-Control-Allow-Origin'] = allowed.includes(origin) ? origin : allowed[0]!;
+  return base;
+}
 
-function jsonResponse(data: object, status = 200) {
+function jsonResponse(req: Request, data: object, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...getSafeCorsHeaders(req), 'Content-Type': 'application/json' },
   });
 }
 
-function errorResponse(message: string, status = 400) {
-  return jsonResponse({ success: false, error: message }, status);
+function errorResponse(req: Request, message: string, status = 400) {
+  return jsonResponse(req, { success: false, error: message }, status);
+}
+
+type SupabaseServiceClient = ReturnType<typeof createClient>;
+const BEARER_PREFIX = /^Bearer\s+/i;
+
+async function getAuthUser(
+  supabase: SupabaseServiceClient,
+  req: Request,
+): Promise<{ user: { id: string; email?: string } } | { response: Response }> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.trim()) {
+    return { response: errorResponse(req, 'Missing Authorization header', 401) };
+  }
+  const token = authHeader.replace(BEARER_PREFIX, '').trim();
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) {
+    return { response: errorResponse(req, 'Invalid or expired session', 401) };
+  }
+  return { user };
 }
 
 /** Mask email for logs (e.g. ab***@domain.com). */
@@ -133,15 +163,26 @@ function shareBonusPromoText(passType: unknown): { headline: string; body: strin
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: getSafeCorsHeaders(req) });
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      console.warn('[send-email] Rejected: Missing Authorization header (is Verify JWT OFF for this function?)');
-      return errorResponse('Missing Authorization header', 401);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!supabaseUrl || !serviceKey) {
+      console.error('[send-email] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+      return errorResponse(req, 'Server misconfiguration', 500);
     }
+
+    const supabase = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const authResult = await getAuthUser(supabase, req);
+    if ('response' in authResult) {
+      return authResult.response;
+    }
+    const authUser = authResult.user;
 
     const body = await req.json().catch(() => ({}));
     const action = body?.action;
@@ -149,13 +190,13 @@ Deno.serve(async (req) => {
     console.log('[send-email] Invoked with action:', action ?? '(missing)');
 
     if (!action) {
-      return errorResponse('Missing action');
+      return errorResponse(req, 'Missing action');
     }
 
     // ─── HEALTH ───
     if (action === 'health_check') {
       const hasKey = !!Deno.env.get('SENDGRID_API_KEY');
-      return jsonResponse({
+      return jsonResponse(req, {
         success: true,
         sendgrid_configured: hasKey,
         message: hasKey ? 'SendGrid configured' : 'SENDGRID_API_KEY not set - emails will not send',
@@ -167,7 +208,7 @@ Deno.serve(async (req) => {
       const apiKey = Deno.env.get('SENDGRID_API_KEY');
       if (!apiKey) {
         console.warn('[send-email] SENDGRID_API_KEY not set - skipping email');
-        return jsonResponse({
+        return jsonResponse(req, {
           success: false,
           error: 'Email not configured. Set SENDGRID_API_KEY in Supabase secrets.',
         });
@@ -175,15 +216,20 @@ Deno.serve(async (req) => {
 
       const { owner_email, business_name, decision, admin_notes } = body;
       if (!owner_email) {
-        return errorResponse('Missing owner_email');
+        return errorResponse(req, 'Missing owner_email');
       }
 
+      const safeBusinessName = escapeHtml(business_name);
+      const subjectName = String(business_name ?? '').replace(/[\r\n\x00]/g, ' ').trim().slice(0, 200);
       const subject = decision === 'approved'
-        ? `Your business "${business_name}" has been approved!`
-        : `Update on your business "${business_name}" listing`;
+        ? `Your business "${subjectName}" has been approved!`
+        : `Update on your business "${subjectName}" listing`;
+      const notesBlock = admin_notes
+        ? `<p><strong>Admin note:</strong> ${escapeHtml(admin_notes)}</p>`
+        : '';
       const html = decision === 'approved'
-        ? `<p>Congratulations! Your business listing "${business_name}" has been approved and is now live on StikmNek.</p>${admin_notes ? `<p><strong>Admin note:</strong> ${admin_notes}</p>` : ''}`
-        : `<p>Your business listing "${business_name}" was not approved at this time.</p>${admin_notes ? `<p><strong>Admin note:</strong> ${admin_notes}</p>` : ''}<p>Please contact support if you have questions.</p>`;
+        ? `<p>Congratulations! Your business listing "${safeBusinessName}" has been approved and is now live on StikmNek.</p>${notesBlock}`
+        : `<p>Your business listing "${safeBusinessName}" was not approved at this time.</p>${notesBlock}<p>Please contact support if you have questions.</p>`;
 
       const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
         method: 'POST',
@@ -212,12 +258,13 @@ Deno.serve(async (req) => {
         const logMsg = `[send-email] SendGrid send_business_decision FAILED status=${res.status} body=${errText}`;
         console.error(logMsg);
         return jsonResponse(
+          req,
           { success: false, error: `SendGrid error: ${res.status}`, details: errText },
-          500
+          500,
         );
       }
 
-      return jsonResponse({ success: true, sent: true });
+      return jsonResponse(req, { success: true, sent: true });
     }
 
     // ─── SEND_PASS_CONFIRMATION (receipt email after pass purchase) ───
@@ -234,7 +281,7 @@ Deno.serve(async (req) => {
       if (!apiKey) {
         const msg = 'Email not configured. Set SENDGRID_API_KEY in Supabase Edge Function secrets.';
         console.error('[send-email] send_pass_confirmation FAILED: ' + msg);
-        return jsonResponse({ success: false, error: msg }, 500);
+        return jsonResponse(req, { success: false, error: msg }, 500);
       }
 
       const {
@@ -255,7 +302,7 @@ Deno.serve(async (req) => {
 
       if (!user_email || typeof user_email !== 'string') {
         console.warn('[send-email] Missing or invalid user_email in body. Keys received:', Object.keys(body ?? {}));
-        return errorResponse('Missing user_email');
+        return errorResponse(req, 'Missing user_email');
       }
 
       const passLabel = passTypeToBrandDisplay(pass_type);
@@ -429,8 +476,9 @@ Deno.serve(async (req) => {
         const logMsg = `[send-email] SendGrid fetch threw: ${fetchMsg}`;
         console.error(logMsg);
         return jsonResponse(
+          req,
           { success: false, error: 'SendGrid request failed', details: fetchMsg },
-          500
+          500,
         );
       }
 
@@ -446,13 +494,14 @@ Deno.serve(async (req) => {
         const logMsg = `[send-email] SendGrid send_pass_confirmation FAILED status=${res.status} body=${errText}`;
         console.error(logMsg);
         return jsonResponse(
+          req,
           { success: false, error: `SendGrid error: ${res.status}`, details: errText },
-          500
+          500,
         );
       }
 
       console.log('[send-email] Pass confirmation sent to', toEmail);
-      return jsonResponse({ success: true, sent: true, deliveredTo: toEmail, override: Boolean(emailOverride) });
+      return jsonResponse(req, { success: true, sent: true, deliveredTo: toEmail, override: Boolean(emailOverride) });
     }
 
     // ─── SEND_BOOKING_INQUIRY (tourist → business owner via SendGrid) ───
@@ -462,30 +511,13 @@ Deno.serve(async (req) => {
       const apiKey = Deno.env.get('SENDGRID_API_KEY');
       console.log('[send-email] SENDGRID_API_KEY present:', !!apiKey);
       if (!apiKey) {
-        return jsonResponse({
+        return jsonResponse(req, {
           success: false,
           error: 'Email not configured. Set SENDGRID_API_KEY in Supabase secrets.',
         }, 500);
       }
 
-      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-      console.log('[send-email] SUPABASE_URL present:', !!supabaseUrl, '| SUPABASE_SERVICE_ROLE_KEY present:', !!serviceKey);
-      if (!supabaseUrl || !serviceKey) {
-        console.error('[send-email] send_booking_inquiry: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-        return errorResponse('Server misconfiguration', 500);
-      }
-
-      const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
-      const token = authHeader.replace(/^Bearer\s+/i, '');
-      const { data: { user: tourist }, error: touristErr } = await supabaseAdmin.auth.getUser(token);
-      if (touristErr || !tourist) {
-        console.error('[send-email] send_booking_inquiry: getUser failed', touristErr?.message);
-        return errorResponse('Invalid or expired session', 401);
-      }
-      console.log('[send-email] Tourist user id:', tourist.id);
+      console.log('[send-email] Tourist user id:', authUser.id);
 
       const {
         business_id,
@@ -504,24 +536,24 @@ Deno.serve(async (req) => {
       } = body;
 
       if (!business_id || typeof business_id !== 'string') {
-        return errorResponse('Missing business_id');
+        return errorResponse(req, 'Missing business_id');
       }
 
       const a = Number(adults);
       const c = Number(children);
       const inf = infants !== undefined && infants !== null ? Number(infants) : 0;
       if (!Number.isFinite(a) || a < 0 || !Number.isFinite(c) || c < 0 || a + c < 1) {
-        return errorResponse('Invalid adults/children');
+        return errorResponse(req, 'Invalid adults/children');
       }
       if (!Number.isFinite(inf) || inf < 0) {
-        return errorResponse('Invalid infants');
+        return errorResponse(req, 'Invalid infants');
       }
 
       const nowIso = new Date().toISOString();
-      const { data: passRows, error: passErr } = await supabaseAdmin
+      const { data: passRows, error: passErr } = await supabase
         .from('passes')
         .select('id')
-        .eq('user_id', tourist.id)
+        .eq('user_id', authUser.id)
         .eq('active', true)
         .gt('expires_at', nowIso)
         .order('purchased_at', { ascending: false })
@@ -529,15 +561,15 @@ Deno.serve(async (req) => {
 
       if (passErr) {
         console.error('[send-email] send_booking_inquiry pass check:', passErr);
-        return errorResponse('Could not verify pass', 500);
+        return errorResponse(req, 'Could not verify pass', 500);
       }
       if (!passRows?.length) {
         console.warn('[send-email] send_booking_inquiry: no active pass for user');
-        return errorResponse('Active pass required to send booking inquiries', 403);
+        return errorResponse(req, 'Active pass required to send booking inquiries', 403);
       }
       console.log('[send-email] Pass check OK, pass row count:', passRows.length);
 
-      const { data: biz, error: bizErr } = await supabaseAdmin
+      const { data: biz, error: bizErr } = await supabase
         .from('businesses')
         .select('*')
         .eq('id', business_id)
@@ -545,7 +577,7 @@ Deno.serve(async (req) => {
 
       if (bizErr || !biz) {
         console.error('[send-email] send_booking_inquiry: business fetch', bizErr?.message);
-        return errorResponse('Business not found', 404);
+        return errorResponse(req, 'Business not found', 404);
       }
 
       const row = biz as Record<string, unknown>;
@@ -563,7 +595,7 @@ Deno.serve(async (req) => {
       console.log('[send-email] Listing email from row:', !!ownerEmail, '| owner_id:', ownerId ?? '(none)');
 
       if (!ownerEmail && ownerId) {
-        const { data: prof, error: profErr } = await supabaseAdmin
+        const { data: prof, error: profErr } = await supabase
           .from('user_profiles')
           .select('email')
           .eq('user_id', ownerId)
@@ -578,7 +610,7 @@ Deno.serve(async (req) => {
 
       // Fallback: auth.users.email (profile row can be empty or out of sync)
       if (!ownerEmail && ownerId) {
-        const { data: authUserData, error: authUserErr } = await supabaseAdmin.auth.admin.getUserById(ownerId);
+        const { data: authUserData, error: authUserErr } = await supabase.auth.admin.getUserById(ownerId);
         if (authUserErr) {
           console.error('[send-email] send_booking_inquiry: auth.admin.getUserById', authUserErr.message);
         }
@@ -592,6 +624,7 @@ Deno.serve(async (req) => {
       if (!ownerEmail) {
         console.error('[send-email] send_booking_inquiry: no recipient resolved for business', bizNameLog);
         return errorResponse(
+          req,
           'No business email on file for this listing. Please use WhatsApp or phone.',
           400,
         );
@@ -681,6 +714,7 @@ Deno.serve(async (req) => {
         }
         console.error('[send-email] SendGrid send_booking_inquiry FAILED status=', sgStatus, 'body=', errText);
         return jsonResponse(
+          req,
           { success: false, error: `SendGrid error: ${sgStatus}`, details: errText },
           500,
         );
@@ -692,27 +726,27 @@ Deno.serve(async (req) => {
       }
       console.log('[send-email] send_booking_inquiry: completed OK (HTTP', sgStatus, ')');
 
-      return jsonResponse({ success: true, sent: true });
+      return jsonResponse(req, { success: true, sent: true });
     }
 
     // ─── STUB: other actions (get_preferences, get_email_logs, etc.) ───
     if (action === 'get_preferences') {
-      return jsonResponse({ preferences: { pass_purchase: true, business_approval: true, new_review: true, marketing: false, weekly_digest: true } });
+      return jsonResponse(req, { preferences: { pass_purchase: true, business_approval: true, new_review: true, marketing: false, weekly_digest: true } });
     }
     if (action === 'get_email_logs') {
-      return jsonResponse({ logs: [], total: 0 });
+      return jsonResponse(req, { logs: [], total: 0 });
     }
     if (action === 'get_email_stats') {
-      return jsonResponse({ stats: { sent: 0, failed: 0 } });
+      return jsonResponse(req, { stats: { sent: 0, failed: 0 } });
     }
     if (action === 'get_templates') {
-      return jsonResponse({ templates: [] });
+      return jsonResponse(req, { templates: [] });
     }
     if (action === 'update_preferences' || action === 'update_template') {
-      return jsonResponse({ success: true });
+      return jsonResponse(req, { success: true });
     }
 
-    return errorResponse('Unknown action: ' + action);
+    return errorResponse(req, 'Unknown action: ' + action);
   } catch (err: unknown) {
     const errMessage = err instanceof Error ? err.message : String(err ?? 'Unknown error');
     const logMsg = `[send-email] Caught error: ${errMessage}`;
@@ -721,8 +755,9 @@ Deno.serve(async (req) => {
       console.error('[send-email] Stack:', err.stack);
     }
     return jsonResponse(
+      req,
       { success: false, error: errMessage || 'Internal server error' },
-      500
+      500,
     );
   }
 });

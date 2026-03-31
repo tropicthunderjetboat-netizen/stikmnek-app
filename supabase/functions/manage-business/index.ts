@@ -6,32 +6,45 @@
  *
  * Email (initial listing approval): requires SENDGRID_API_KEY (same as send-email / paypal-capture).
  * Optional: SENDGRID_FROM_EMAIL (default stikmnek@gmail.com if unset), SENDGRID_FROM_NAME, APP_BASE_URL (default https://stikmnek.com).
+ * CORS: set CORS_ALLOWED_ORIGINS (comma-separated origins) in Edge Function secrets.
+ * If unset, Access-Control-Allow-Origin is *. If set, request Origin must match an entry (see getSafeCorsHeaders).
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+/** Comma-separated allowed origins. If env empty, allows *. If set, echoes matching Origin or first entry for non-browser clients. */
+function getSafeCorsHeaders(req: Request): Record<string, string> {
+  const raw = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim();
+  const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  const origin = req.headers.get('Origin') ?? '';
+  const base: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+  if (allowed.length === 0) {
+    base['Access-Control-Allow-Origin'] = '*';
+    return base;
+  }
+  base['Access-Control-Allow-Origin'] = allowed.includes(origin) ? origin : allowed[0]!;
+  return base;
+}
 
 const CATEGORIES = ['dining', 'accommodation', 'tours', 'activities', 'shopping', 'transport', 'services', 'other'];
 
-function jsonResponse(data: object, status = 200) {
+function jsonResponse(req: Request, data: object, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...getSafeCorsHeaders(req), 'Content-Type': 'application/json' },
   });
 }
 
-function errorResponse(message: string, status = 400) {
-  return jsonResponse({ success: false, error: message }, status);
+function errorResponse(req: Request, message: string, status = 400) {
+  return jsonResponse(req, { success: false, error: message }, status);
 }
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 
-function unauthorizedResponse(): Response {
-  return jsonResponse({ success: false, error: 'Unauthorized' }, 403);
+function unauthorizedResponse(req: Request): Response {
+  return jsonResponse(req, { success: false, error: 'Unauthorized' }, 403);
 }
 
 const BEARER_PREFIX = /^Bearer\s+/i;
@@ -46,12 +59,12 @@ async function getAuthUser(
 ): Promise<{ user: { id: string; email?: string } } | { response: Response }> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.trim()) {
-    return { response: errorResponse('Missing Authorization header', 401) };
+    return { response: errorResponse(req, 'Missing Authorization header', 401) };
   }
   const token = authHeader.replace(BEARER_PREFIX, '').trim();
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) {
-    return { response: errorResponse('Invalid or expired session', 401) };
+    return { response: errorResponse(req, 'Invalid or expired session', 401) };
   }
   return { user };
 }
@@ -69,9 +82,10 @@ async function isAdminUser(supabase: SupabaseServiceClient, userId: string): Pro
 async function assertAdmin(
   supabase: SupabaseServiceClient,
   userId: string,
+  req: Request,
 ): Promise<Response | null> {
   if (!(await isAdminUser(supabase, userId))) {
-    return unauthorizedResponse();
+    return unauthorizedResponse(req);
   }
   return null;
 }
@@ -81,6 +95,7 @@ async function requireOwner(
   supabase: SupabaseServiceClient,
   businessId: string,
   userId: string,
+  req: Request,
 ): Promise<Response | null> {
   const { data: biz, error } = await supabase
     .from('businesses')
@@ -88,7 +103,7 @@ async function requireOwner(
     .eq('id', businessId)
     .maybeSingle();
   if (error || !biz?.owner_id || String(biz.owner_id) !== String(userId)) {
-    return unauthorizedResponse();
+    return unauthorizedResponse(req);
   }
   return null;
 }
@@ -98,9 +113,10 @@ async function assertAdminOrOwner(
   supabase: SupabaseServiceClient,
   businessId: string,
   userId: string,
+  req: Request,
 ): Promise<Response | null> {
   if (await isAdminUser(supabase, userId)) return null;
-  return requireOwner(supabase, businessId, userId);
+  return requireOwner(supabase, businessId, userId, req);
 }
 
 /**
@@ -292,7 +308,7 @@ async function sendInitialListingLiveEmail(params: {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: getSafeCorsHeaders(req) });
   }
 
   try {
@@ -303,11 +319,11 @@ Deno.serve(async (req) => {
     // Do not enforce arbitrary length checks here; just ensure it exists.
     if (!supabaseServiceKey) {
       console.error('[manage-business] SUPABASE_SERVICE_ROLE_KEY is missing');
-      return errorResponse('Server configuration error: missing service role key', 500);
+      return errorResponse(req, 'Server configuration error: missing service role key', 500);
     }
     if (!supabaseUrl) {
       console.error('[manage-business] SUPABASE_URL is missing');
-      return errorResponse('Server configuration error: missing Supabase URL', 500);
+      return errorResponse(req, 'Server configuration error: missing Supabase URL', 500);
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -322,17 +338,17 @@ Deno.serve(async (req) => {
     const action = body?.action;
 
     if (!action) {
-      return errorResponse('Missing action');
+      return errorResponse(req, 'Missing action');
     }
 
     // ─── HEALTH ───
     if (action === 'health') {
-      return jsonResponse({ success: true });
+      return jsonResponse(req, { success: true });
     }
 
     // ─── LIST_CATEGORIES ───
     if (action === 'list_categories') {
-      return jsonResponse({ categories: CATEGORIES });
+      return jsonResponse(req, { categories: CATEGORIES });
     }
 
     // ─── SUBMIT_BUSINESS ───
@@ -369,7 +385,7 @@ Deno.serve(async (req) => {
 
       if (error) {
         console.error('[manage-business] submit_business insert error:', error);
-        return errorResponse(error.message || 'Failed to submit business', 500);
+        return errorResponse(req, error.message || 'Failed to submit business', 500);
       }
 
       // Insert photos if provided
@@ -386,7 +402,7 @@ Deno.serve(async (req) => {
         await supabase.from('business_photos').insert(photoRecords);
       }
 
-      return jsonResponse({
+      return jsonResponse(req, {
         success: true,
         business: { id: pending.id, ...pending },
       });
@@ -398,7 +414,7 @@ Deno.serve(async (req) => {
       try {
         const userId = authUser.id;
         const pendingId = body.pendingId;
-        if (!pendingId) return errorResponse('Missing pendingId', 400);
+        if (!pendingId) return errorResponse(req, 'Missing pendingId', 400);
 
         const { data: existing, error: fetchErr } = await supabase
           .from('pending_businesses')
@@ -407,8 +423,8 @@ Deno.serve(async (req) => {
           .eq('owner_id', userId)
           .single();
 
-        if (fetchErr || !existing) return errorResponse('Submission not found or access denied', 404);
-        if (existing.status !== 'rejected') return errorResponse('Only rejected submissions can be resubmitted', 400);
+        if (fetchErr || !existing) return errorResponse(req, 'Submission not found or access denied', 404);
+        if (existing.status !== 'rejected') return errorResponse(req, 'Only rejected submissions can be resubmitted', 400);
 
         const updates: Record<string, any> = {
           name: body.name ?? existing.name,
@@ -444,7 +460,7 @@ Deno.serve(async (req) => {
 
         if (updateErr) {
           console.error('[manage-business] resubmit update error:', updateErr);
-          return errorResponse('Resubmit failed: ' + updateErr.message, 500);
+          return errorResponse(req, 'Resubmit failed: ' + updateErr.message, 500);
         }
 
         const photos = (body.photos || []).filter((p: any) => p?.url);
@@ -461,14 +477,14 @@ Deno.serve(async (req) => {
           const { error: insertErr } = await supabase.from('business_photos').insert(photoRecords);
           if (insertErr) {
             console.error('[manage-business] resubmit photo insert error:', insertErr);
-            return errorResponse('Resubmit succeeded but photo save failed: ' + insertErr.message, 500);
+            return errorResponse(req, 'Resubmit succeeded but photo save failed: ' + insertErr.message, 500);
           }
         }
 
-        return jsonResponse({ success: true, business: updated });
+        return jsonResponse(req, { success: true, business: updated });
       } catch (err: any) {
         console.error('[manage-business] resubmit error:', err);
-        return errorResponse('Resubmit failed: ' + (err?.message || String(err)), 500);
+        return errorResponse(req, 'Resubmit failed: ' + (err?.message || String(err)), 500);
       }
     }
 
@@ -481,7 +497,7 @@ Deno.serve(async (req) => {
         supabase.from('pending_businesses').select('*').eq('owner_id', userId).order('created_at', { ascending: false }),
       ]);
 
-      return jsonResponse({
+      return jsonResponse(req, {
         success: true,
         approved_businesses: approvedRes.data || [],
         pending_submissions: pendingRes.data || [],
@@ -497,8 +513,8 @@ Deno.serve(async (req) => {
         .select('*')
         .eq('owner_id', userId);
 
-      if (error) return errorResponse(error.message, 500);
-      return jsonResponse({ businesses: data || [] });
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { businesses: data || [] });
     }
 
     // ─── GET_PENDING ───
@@ -508,8 +524,8 @@ Deno.serve(async (req) => {
           .from('pending_businesses')
           .select('*')
           .order('created_at', { ascending: false });
-        if (error) return errorResponse(error.message, 500);
-        return jsonResponse({ businesses: data || [] });
+        if (error) return errorResponse(req, error.message, 500);
+        return jsonResponse(req, { businesses: data || [] });
       }
 
       const { data, error } = await supabase
@@ -517,8 +533,8 @@ Deno.serve(async (req) => {
         .select('*')
         .eq('owner_id', authUser.id)
         .order('created_at', { ascending: false });
-      if (error) return errorResponse(error.message, 500);
-      return jsonResponse({ businesses: data || [] });
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { businesses: data || [] });
     }
 
     // ─── GET_OWNER_OFFERINGS_LIVE ───
@@ -542,17 +558,17 @@ Deno.serve(async (req) => {
 
       if (pErr) {
         console.error('[manage-business] get_owner_offerings_live profiles:', pErr);
-        return errorResponse(pErr.message, 500);
+        return errorResponse(req, pErr.message, 500);
       }
 
       const plist = profiles || [];
       const profileIds = plist.map((p: { id: string }) => p.id).filter(Boolean);
       if (profileIds.length === 0) {
-        return jsonResponse({ success: true, items: [] });
+        return jsonResponse(req, { success: true, items: [] });
       }
 
       if (filterBusinessId && !profileIds.includes(filterBusinessId)) {
-        return jsonResponse({ success: true, items: [] });
+        return jsonResponse(req, { success: true, items: [] });
       }
 
       const offBase = supabase.from('business_offerings').select(offeringSelect);
@@ -565,7 +581,7 @@ Deno.serve(async (req) => {
       });
       if (oErr) {
         console.error('[manage-business] get_owner_offerings_live offerings:', oErr);
-        return errorResponse(oErr.message, 500);
+        return errorResponse(req, oErr.message, 500);
       }
 
       const byBiz = new Map(plist.map((p: { id: string }) => [p.id, p]));
@@ -579,7 +595,7 @@ Deno.serve(async (req) => {
           x != null
         );
 
-      return jsonResponse({ success: true, items });
+      return jsonResponse(req, { success: true, items });
     }
 
     // ─── ATTACH_PENDING_PHOTOS ───
@@ -589,19 +605,19 @@ Deno.serve(async (req) => {
       const userId = authUser.id;
       const pendingId = body.pendingId;
       const photos = Array.isArray(body.photos) ? body.photos : [];
-      if (!pendingId) return errorResponse('Missing pendingId', 400);
-      if (photos.length === 0) return jsonResponse({ success: true, inserted: 0 });
+      if (!pendingId) return errorResponse(req, 'Missing pendingId', 400);
+      if (photos.length === 0) return jsonResponse(req, { success: true, inserted: 0 });
 
       const { data: pending, error: pendingErr } = await supabase
         .from('pending_businesses')
         .select('id, owner_id')
         .eq('id', pendingId)
         .single();
-      if (pendingErr || !pending) return errorResponse('Pending business not found', 404);
-      if (String(pending.owner_id) !== String(userId)) return errorResponse('Access denied', 403);
+      if (pendingErr || !pending) return errorResponse(req, 'Pending business not found', 404);
+      if (String(pending.owner_id) !== String(userId)) return errorResponse(req, 'Access denied', 403);
 
       const validPhotos = photos.filter((p: any) => !!p?.url);
-      if (validPhotos.length === 0) return jsonResponse({ success: true, inserted: 0 });
+      if (validPhotos.length === 0) return jsonResponse(req, { success: true, inserted: 0 });
 
       // Replace existing rows for this pending listing to avoid duplicates on retries.
       await supabase.from('business_photos').delete().eq('business_id', pendingId);
@@ -617,9 +633,9 @@ Deno.serve(async (req) => {
       const { error: insertErr } = await supabase.from('business_photos').insert(photoRecords);
       if (insertErr) {
         console.error('[manage-business] attach_pending_photos insert error:', insertErr);
-        return errorResponse('Failed to attach photos: ' + insertErr.message, 500);
+        return errorResponse(req, 'Failed to attach photos: ' + insertErr.message, 500);
       }
-      return jsonResponse({ success: true, inserted: photoRecords.length });
+      return jsonResponse(req, { success: true, inserted: photoRecords.length });
     }
 
     // ─── GET_PENDING_EDITS ───
@@ -633,12 +649,12 @@ Deno.serve(async (req) => {
           .select('*')
           .eq('status', 'pending')
           .order('submitted_at', { ascending: false });
-        if (error) return errorResponse(error.message, 500);
-        return jsonResponse({ edits: data || [] });
+        if (error) return errorResponse(req, error.message, 500);
+        return jsonResponse(req, { edits: data || [] });
       }
 
       if (businessId) {
-        const denied = await requireOwner(supabase, String(businessId), userId);
+        const denied = await requireOwner(supabase, String(businessId), userId, req);
         if (denied) return denied;
         const { data, error } = await supabase
           .from('pending_edits')
@@ -646,8 +662,8 @@ Deno.serve(async (req) => {
           .eq('business_id', businessId)
           .eq('owner_id', userId)
           .order('submitted_at', { ascending: false });
-        if (error) return errorResponse(error.message, 500);
-        return jsonResponse({ edits: data || [] });
+        if (error) return errorResponse(req, error.message, 500);
+        return jsonResponse(req, { edits: data || [] });
       }
 
       const { data, error } = await supabase
@@ -655,13 +671,13 @@ Deno.serve(async (req) => {
         .select('*')
         .eq('owner_id', userId)
         .order('submitted_at', { ascending: false });
-      if (error) return errorResponse(error.message, 500);
-      return jsonResponse({ edits: data || [] });
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { edits: data || [] });
     }
 
     // ─── ADMIN_CREATE_BUSINESS ───
     if (action === 'admin_create_business') {
-      const denied = await assertAdmin(supabase, authUser.id);
+      const denied = await assertAdmin(supabase, authUser.id, req);
       if (denied) return denied;
 
       const targetOwnerId =
@@ -695,20 +711,20 @@ Deno.serve(async (req) => {
         .select()
         .single();
 
-      if (error) return errorResponse(error.message, 500);
-      return jsonResponse({ business: data });
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { business: data });
     }
 
     // ─── REVIEW_BUSINESS ───
     if (action === 'review_business') {
-      const denied = await assertAdmin(supabase, authUser.id);
+      const denied = await assertAdmin(supabase, authUser.id, req);
       if (denied) return denied;
 
       const pendingId = body.businessId; // pending_businesses.id
       const decision = body.decision; // 'approved' | 'rejected'
       const adminNotes = body.adminNotes || '';
 
-      if (!pendingId || !decision) return errorResponse('Missing businessId or decision');
+      if (!pendingId || !decision) return errorResponse(req, 'Missing businessId or decision');
 
       const { data: pending, error: fetchErr } = await supabase
         .from('pending_businesses')
@@ -716,7 +732,7 @@ Deno.serve(async (req) => {
         .eq('id', pendingId)
         .single();
 
-      if (fetchErr || !pending) return errorResponse('Pending business not found', 404);
+      if (fetchErr || !pending) return errorResponse(req, 'Pending business not found', 404);
 
       if (decision === 'rejected') {
         const { error: updateErr } = await supabase
@@ -727,8 +743,8 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq('id', pendingId);
-        if (updateErr) return errorResponse(updateErr.message, 500);
-        return jsonResponse({ success: true });
+        if (updateErr) return errorResponse(req, updateErr.message, 500);
+        return jsonResponse(req, { success: true });
       }
 
       // ─── approved: master stub on `businesses`, rich listing on `business_offerings`, then remove pending row ───
@@ -807,10 +823,10 @@ Deno.serve(async (req) => {
           .maybeSingle();
 
         if (profErr || !prof) {
-          return errorResponse('Invalid business_id on pending row (profile not found)', 400);
+          return errorResponse(req, 'Invalid business_id on pending row (profile not found)', 400);
         }
         if (String(prof.owner_id) !== String(pending.owner_id)) {
-          return errorResponse('Invalid business_id on pending row (owner mismatch)', 403);
+          return errorResponse(req, 'Invalid business_id on pending row (owner mismatch)', 403);
         }
 
         const { error: profUpdErr } = await supabase
@@ -821,6 +837,7 @@ Deno.serve(async (req) => {
         if (profUpdErr) {
           console.error('[manage-business] Failed to update businesses stub on re-approve:', profUpdErr);
           return errorResponse(
+            req,
             'Approved but failed to update profile: ' + profUpdErr.message,
             500,
           );
@@ -835,7 +852,7 @@ Deno.serve(async (req) => {
 
         if (offSelErr) {
           console.error('[manage-business] offering lookup:', offSelErr);
-          return errorResponse(offSelErr.message, 500);
+          return errorResponse(req, offSelErr.message, 500);
         }
 
         const primaryId = primaryRows?.[0]?.id as string | undefined;
@@ -847,6 +864,7 @@ Deno.serve(async (req) => {
           if (offUpdErr) {
             console.error('[manage-business] Failed to update business_offerings:', offUpdErr);
             return errorResponse(
+              req,
               'Approved but failed to update live offering: ' + offUpdErr.message,
               500,
             );
@@ -860,6 +878,7 @@ Deno.serve(async (req) => {
           if (offInsErr) {
             console.error('[manage-business] Failed to insert business_offerings:', offInsErr);
             return errorResponse(
+              req,
               'Approved but failed to create live offering: ' + offInsErr.message,
               500,
             );
@@ -882,7 +901,7 @@ Deno.serve(async (req) => {
 
         if (insertErr) {
           console.error('[manage-business] Failed to create businesses stub:', insertErr);
-          return errorResponse('Approved but failed to create business record: ' + insertErr.message, 500);
+          return errorResponse(req, 'Approved but failed to create business record: ' + insertErr.message, 500);
         }
 
         liveBusinessId = newBiz.id as string;
@@ -895,6 +914,7 @@ Deno.serve(async (req) => {
         if (offInsErr) {
           console.error('[manage-business] Offering insert failed after stub insert:', offInsErr);
           return errorResponse(
+            req,
             'Approved but failed to create live offering: ' + offInsErr.message,
             500,
           );
@@ -910,8 +930,9 @@ Deno.serve(async (req) => {
       if (rejErr) {
         console.error('[manage-business] Photo update (rejected) failed after business approval:', rejErr);
         return errorResponse(
+          req,
           'Business approved but rejected photos could not be relinked. Error: ' + rejErr.message,
-          500
+          500,
         );
       }
 
@@ -923,8 +944,9 @@ Deno.serve(async (req) => {
       if (photoErr) {
         console.error('[manage-business] Photo update failed after business approval:', photoErr);
         return errorResponse(
+          req,
           'Business approved but photos could not be updated. Please manually approve photos for this business. Error: ' + photoErr.message,
-          500
+          500,
         );
       }
 
@@ -969,18 +991,19 @@ Deno.serve(async (req) => {
       if (delPendingErr) {
         console.error('[manage-business] Failed to delete pending row after approval:', delPendingErr);
         return errorResponse(
+          req,
           'Approved but could not remove pending submission: ' + delPendingErr.message,
           500,
         );
       }
 
-      return jsonResponse({ success: true });
+      return jsonResponse(req, { success: true });
     }
 
     // ─── DELETE_OWN_BUSINESS (owner only; photos + storage + row) ───
     if (action === 'delete_own_business') {
       const businessId = body.businessId;
-      if (!businessId) return errorResponse('Missing businessId');
+      if (!businessId) return errorResponse(req, 'Missing businessId');
 
       const { data: bizRow, error: fetchErr } = await supabase
         .from('businesses')
@@ -989,15 +1012,14 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (fetchErr || !bizRow) {
-        return errorResponse('Business not found', 404);
+        return errorResponse(req, 'Business not found', 404);
       }
-      if (!bizRow.owner_id || String(bizRow.owner_id) !== String(authUser.id)) {
-        return unauthorizedResponse();
-      }
+      const ownDenied = await requireOwner(supabase, String(businessId), authUser.id, req);
+      if (ownDenied) return ownDenied;
 
       const purge = await purgeBusinessPhotosAndStorage(supabase, businessId);
       if (purge.error) {
-        return errorResponse(purge.error, 500);
+        return errorResponse(req, purge.error, 500);
       }
 
       const { error: delErr } = await supabase
@@ -1008,29 +1030,29 @@ Deno.serve(async (req) => {
 
       if (delErr) {
         console.error('[manage-business] delete_own_business:', delErr);
-        return errorResponse(delErr.message || 'Failed to delete listing', 500);
+        return errorResponse(req, delErr.message || 'Failed to delete listing', 500);
       }
 
       console.log('[manage-business] delete_own_business OK:', businessId, bizRow.name);
-      return jsonResponse({ success: true, deletedName: bizRow.name });
+      return jsonResponse(req, { success: true, deletedName: bizRow.name });
     }
 
     // ─── ADMIN_DELETE_BUSINESS ───
     if (action === 'admin_delete_business') {
       const businessId = body.businessId;
-      if (!businessId) return errorResponse('Missing businessId');
+      if (!businessId) return errorResponse(req, 'Missing businessId');
 
-      const denied = await assertAdmin(supabase, authUser.id);
+      const denied = await assertAdmin(supabase, authUser.id, req);
       if (denied) return denied;
 
       const purge = await purgeBusinessPhotosAndStorage(supabase, businessId);
       if (purge.error) {
-        return errorResponse(purge.error, 500);
+        return errorResponse(req, purge.error, 500);
       }
 
       const { error } = await supabase.from('businesses').delete().eq('id', businessId);
-      if (error) return errorResponse(error.message, 500);
-      return jsonResponse({ success: true });
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { success: true });
     }
 
     // ─── SUBMIT_EDIT ───
@@ -1040,10 +1062,10 @@ Deno.serve(async (req) => {
       const changes = body.changes || {};
 
       if (!businessId || Object.keys(changes).length === 0) {
-        return errorResponse('Missing businessId or changes');
+        return errorResponse(req, 'Missing businessId or changes');
       }
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), userId);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), userId, req);
       if (denied) return denied;
 
       let ownerIdForEdit = userId;
@@ -1054,7 +1076,7 @@ Deno.serve(async (req) => {
           .eq('id', businessId)
           .maybeSingle();
         if (bizErr || !bizRow?.owner_id) {
-          return errorResponse('Business not found', 404);
+          return errorResponse(req, 'Business not found', 404);
         }
         ownerIdForEdit = String(bizRow.owner_id);
       }
@@ -1074,8 +1096,8 @@ Deno.serve(async (req) => {
           .from('pending_edits')
           .update({ changes: mergedChanges })
           .eq('id', existing.id);
-        if (error) return errorResponse(error.message, 500);
-        return jsonResponse({ success: true, updated: true });
+        if (error) return errorResponse(req, error.message, 500);
+        return jsonResponse(req, { success: true, updated: true });
       }
 
       const { error } = await supabase
@@ -1087,20 +1109,20 @@ Deno.serve(async (req) => {
           status: 'pending',
         });
 
-      if (error) return errorResponse(error.message, 500);
-      return jsonResponse({ success: true });
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { success: true });
     }
 
     // ─── REVIEW_EDIT ───
     if (action === 'review_edit') {
-      const denied = await assertAdmin(supabase, authUser.id);
+      const denied = await assertAdmin(supabase, authUser.id, req);
       if (denied) return denied;
 
       const editId = body.editId;
       const decision = body.decision; // 'approved' | 'rejected'
       const adminNotes = body.adminNotes || '';
 
-      if (!editId || !decision) return errorResponse('Missing editId or decision');
+      if (!editId || !decision) return errorResponse(req, 'Missing editId or decision');
 
       const { data: edit, error: fetchErr } = await supabase
         .from('pending_edits')
@@ -1108,7 +1130,7 @@ Deno.serve(async (req) => {
         .eq('id', editId)
         .single();
 
-      if (fetchErr || !edit) return errorResponse('Pending edit not found', 404);
+      if (fetchErr || !edit) return errorResponse(req, 'Pending edit not found', 404);
 
       const { error: updateErr } = await supabase
         .from('pending_edits')
@@ -1119,7 +1141,7 @@ Deno.serve(async (req) => {
         })
         .eq('id', editId);
 
-      if (updateErr) return errorResponse(updateErr.message, 500);
+      if (updateErr) return errorResponse(req, updateErr.message, 500);
 
       if (decision === 'approved' && edit.changes) {
         const updates: Record<string, any> = {};
@@ -1150,7 +1172,7 @@ Deno.serve(async (req) => {
             .eq('id', edit.business_id);
           if (bizUpdErr) {
             console.error('[manage-business] review_edit businesses update:', bizUpdErr);
-            return errorResponse(bizUpdErr.message, 500);
+            return errorResponse(req, bizUpdErr.message, 500);
           }
         }
 
@@ -1190,7 +1212,7 @@ Deno.serve(async (req) => {
             .limit(1);
           if (offSelErr) {
             console.error('[manage-business] review_edit offering lookup:', offSelErr);
-            return errorResponse(offSelErr.message, 500);
+            return errorResponse(req, offSelErr.message, 500);
           }
           const oid = primaryRows?.[0]?.id as string | undefined;
           if (oid) {
@@ -1200,13 +1222,13 @@ Deno.serve(async (req) => {
               .eq('id', oid);
             if (offErr) {
               console.error('[manage-business] review_edit offering update:', offErr);
-              return errorResponse(offErr.message, 500);
+              return errorResponse(req, offErr.message, 500);
             }
           }
         }
       }
 
-      return jsonResponse({ success: true });
+      return jsonResponse(req, { success: true });
     }
 
     // ─── UPDATE_BUSINESS ───
@@ -1215,10 +1237,10 @@ Deno.serve(async (req) => {
       const updates = body.updates || {};
 
       if (!businessId || Object.keys(updates).length === 0) {
-        return errorResponse('Missing businessId or updates');
+        return errorResponse(req, 'Missing businessId or updates');
       }
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id, req);
       if (denied) return denied;
 
       const { error } = await supabase
@@ -1226,8 +1248,8 @@ Deno.serve(async (req) => {
         .update(updates)
         .eq('id', businessId);
 
-      if (error) return errorResponse(error.message, 500);
-      return jsonResponse({ success: true });
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { success: true });
     }
 
     // ─── TOGGLE_ACTIVE ───
@@ -1235,9 +1257,9 @@ Deno.serve(async (req) => {
       const businessId = body.businessId;
       const active = body.active;
 
-      if (!businessId || active === undefined) return errorResponse('Missing businessId or active');
+      if (!businessId || active === undefined) return errorResponse(req, 'Missing businessId or active');
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id, req);
       if (denied) return denied;
 
       const { error } = await supabase
@@ -1245,8 +1267,8 @@ Deno.serve(async (req) => {
         .update({ active })
         .eq('id', businessId);
 
-      if (error) return errorResponse(error.message, 500);
-      return jsonResponse({ success: true });
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { success: true });
     }
 
     // ─── RESPOND_TO_REVIEW ───
@@ -1256,7 +1278,7 @@ Deno.serve(async (req) => {
       const response = (body.response || '').trim();
 
       if (!reviewId || !businessId || !response) {
-        return errorResponse('Missing reviewId, businessId, or response');
+        return errorResponse(req, 'Missing reviewId, businessId, or response');
       }
 
       const { data: business, error: bizErr } = await supabase
@@ -1265,11 +1287,10 @@ Deno.serve(async (req) => {
         .eq('id', businessId)
         .maybeSingle();
       if (bizErr || !business) {
-        return errorResponse('Business not found', 404);
+        return errorResponse(req, 'Business not found', 404);
       }
-      if (String(business.owner_id) !== String(authUser.id)) {
-        return unauthorizedResponse();
-      }
+      const reviewOwnerDenied = await requireOwner(supabase, String(businessId), authUser.id, req);
+      if (reviewOwnerDenied) return reviewOwnerDenied;
 
       const { data: review, error: revErr } = await supabase
         .from('reviews')
@@ -1277,10 +1298,10 @@ Deno.serve(async (req) => {
         .eq('id', reviewId)
         .maybeSingle();
       if (revErr || !review) {
-        return errorResponse('Review not found', 404);
+        return errorResponse(req, 'Review not found', 404);
       }
       if (String(review.business_id) !== String(businessId)) {
-        return errorResponse('Review does not belong to this business', 400);
+        return errorResponse(req, 'Review does not belong to this business', 400);
       }
 
       const row = {
@@ -1296,14 +1317,14 @@ Deno.serve(async (req) => {
 
       if (error) {
         console.error('[manage-business] respond_to_review upsert error:', error);
-        return errorResponse(error.message, 500);
+        return errorResponse(req, error.message, 500);
       }
-      return jsonResponse({ success: true });
+      return jsonResponse(req, { success: true });
     }
 
     // ─── GET_ALL_PHOTOS ─── (admin only)
     if (action === 'get_all_photos') {
-      const denied = await assertAdmin(supabase, authUser.id);
+      const denied = await assertAdmin(supabase, authUser.id, req);
       if (denied) return denied;
 
       const { data, error } = await supabase
@@ -1311,16 +1332,16 @@ Deno.serve(async (req) => {
         .select('*')
         .order('created_at', { ascending: true });
 
-      if (error) return errorResponse(error.message, 500);
-      return jsonResponse({ photos: data || [] });
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { photos: data || [] });
     }
 
     // ─── APPROVE_PHOTO / REJECT_PHOTO ─── (admin only)
     if (action === 'approve_photo' || action === 'reject_photo') {
       const photoId = body.photoId;
-      if (!photoId) return errorResponse('Missing photoId');
+      if (!photoId) return errorResponse(req, 'Missing photoId');
 
-      const denied = await assertAdmin(supabase, authUser.id);
+      const denied = await assertAdmin(supabase, authUser.id, req);
       if (denied) return denied;
 
       const status = action === 'approve_photo' ? 'approved' : 'rejected';
@@ -1329,16 +1350,16 @@ Deno.serve(async (req) => {
         .update({ status })
         .eq('id', photoId);
 
-      if (error) return errorResponse(error.message, 500);
-      return jsonResponse({ success: true });
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { success: true });
     }
 
     // ─── GET_ANALYTICS ───
     if (action === 'get_analytics') {
       const businessId = body.businessId;
-      if (!businessId) return errorResponse('Missing businessId');
+      if (!businessId) return errorResponse(req, 'Missing businessId');
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id, req);
       if (denied) return denied;
 
       const { data: reviews } = await supabase
@@ -1351,7 +1372,7 @@ Deno.serve(async (req) => {
         .select('id, created_at')
         .eq('business_id', businessId);
 
-      return jsonResponse({
+      return jsonResponse(req, {
         success: true,
         reviewCount: reviews?.length || 0,
         redemptionCount: redemptions?.length || 0,
@@ -1364,29 +1385,30 @@ Deno.serve(async (req) => {
     // ─── ADMIN_DELETE_USER ───
     if (action === 'admin_delete_user') {
       const targetUserId = body.targetUserId || body.userId;
-      if (!targetUserId) return errorResponse('Missing targetUserId');
+      if (!targetUserId) return errorResponse(req, 'Missing targetUserId');
 
-      const denied = await assertAdmin(supabase, authUser.id);
+      const denied = await assertAdmin(supabase, authUser.id, req);
       if (denied) return denied;
 
       // Prevent deleting self
       if (targetUserId === authUser.id) {
-        return errorResponse('Cannot delete your own account', 400);
+        return errorResponse(req, 'Cannot delete your own account', 400);
       }
 
       // Delete from auth.users via Admin API
       const { error: deleteErr } = await supabase.auth.admin.deleteUser(targetUserId);
       if (deleteErr) {
         console.error('[manage-business] admin_delete_user:', deleteErr);
-        return errorResponse(deleteErr.message || 'Failed to delete user', 500);
+        return errorResponse(req, deleteErr.message || 'Failed to delete user', 500);
       }
 
-      return jsonResponse({ success: true });
+      return jsonResponse(req, { success: true });
     }
 
-    return errorResponse('Unknown action: ' + action, 400);
+    return errorResponse(req, 'Unknown action: ' + action, 400);
   } catch (err) {
     console.error('[manage-business] error:', err);
-    return errorResponse((err as Error).message, 500);
+    const msg = err instanceof Error ? err.message : String(err ?? 'Internal server error');
+    return errorResponse(req, msg || 'Internal server error', 500);
   }
 });

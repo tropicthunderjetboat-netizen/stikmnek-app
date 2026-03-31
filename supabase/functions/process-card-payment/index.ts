@@ -9,10 +9,53 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+/**
+ * CORS: CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
+ */
+function getSafeCorsHeaders(req: Request): Record<string, string> {
+  const raw = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim();
+  const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  const origin = req.headers.get('Origin') ?? '';
+  const base: Record<string, string> = {
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+  if (allowed.length === 0) {
+    base['Access-Control-Allow-Origin'] = '*';
+    return base;
+  }
+  base['Access-Control-Allow-Origin'] = allowed.includes(origin) ? origin : allowed[0]!;
+  return base;
+}
+
+type SupabaseServiceClient = ReturnType<typeof createClient>;
+const BEARER_PREFIX = /^Bearer\s+/i;
+
+function jsonResponse(req: Request, data: object, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { ...getSafeCorsHeaders(req), 'Content-Type': 'application/json' },
+  });
+}
+
+function errorResponse(req: Request, message: string, status = 400) {
+  return jsonResponse(req, { success: false, error: message }, status);
+}
+
+async function getAuthUser(
+  supabase: SupabaseServiceClient,
+  req: Request,
+): Promise<{ user: { id: string; email?: string } } | { response: Response }> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.trim()) {
+    return { response: errorResponse(req, 'Missing Authorization header', 401) };
+  }
+  const token = authHeader.replace(BEARER_PREFIX, '').trim();
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) {
+    return { response: errorResponse(req, 'Invalid or expired session', 401) };
+  }
+  return { user };
+}
 
 const SUPERSTAR_PRICE_AUD = 5.0;
 
@@ -49,6 +92,12 @@ function utcTodayStartMs(): number {
   return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 }
 
+/** UTC midnight of the calendar day `days` after the UTC day containing `utcMidnightMs`. */
+function utcAddCalendarDays(utcMidnightMs: number, days: number): number {
+  const d = new Date(utcMidnightMs);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days, 0, 0, 0, 0);
+}
+
 /** Calendar span between valid_from and valid_until (matches addDays-based purchase flow). */
 function calendarDaysBetweenValidRange(validFrom: string, validUntil: string): number {
   const a = new Date(validFrom + 'T00:00:00.000Z');
@@ -60,40 +109,27 @@ function calendarDaysBetweenValidRange(validFrom: string, validUntil: string): n
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: getSafeCorsHeaders(req) });
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Missing Authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !authUser) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invalid or expired session' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const authResult = await getAuthUser(supabase, req);
+    if ('response' in authResult) {
+      return authResult.response;
     }
+    const authUser = authResult.user;
 
     const body = await req.json().catch(() => ({}));
     const action = body?.action ?? body?.Action;
 
     if (!action) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Missing action. Use action: purchase_pass for pass purchase.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return errorResponse(req, 'Missing action. Use action: purchase_pass for pass purchase.', 400);
     }
 
     if (action === 'purchase_superstar') {
@@ -108,21 +144,15 @@ Deno.serve(async (req) => {
 
       if (rpcError) {
         console.error('increment_superstar_credits error:', rpcError);
-        return new Response(
-          JSON.stringify({ success: false, error: 'Failed to add Super Star credit' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return errorResponse(req, 'Failed to add Super Star credit', 500);
       }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          superstar_credits: newCount ?? 1,
-          amount: amountToCharge,
-          currency: 'AUD',
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse(req, {
+        success: true,
+        superstar_credits: newCount ?? 1,
+        amount: amountToCharge,
+        currency: 'AUD',
+      });
     }
 
     if (action === 'purchase_pass') {
@@ -139,30 +169,21 @@ Deno.serve(async (req) => {
 
       const mockEnabled = (Deno.env.get('CARD_MOCK_ENABLED') ?? '').toLowerCase() === 'true';
       if (!mockEnabled) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Card payments are temporarily unavailable. Please use PayPal.',
-          }),
-          { status: 501, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return jsonResponse(req, {
+          success: false,
+          error: 'Card payments are temporarily unavailable. Please use PayPal.',
+        }, 501);
       }
 
       const rawPassType = (body?.passType ?? body?.pass_type ?? '').toLowerCase();
       const startDate = body?.startDate ?? body?.start_date;
 
       if (!rawPassType || !['daily', 'weekly', 'monthly', 'mega_group'].includes(rawPassType)) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Missing or invalid passType' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return errorResponse(req, 'Missing or invalid passType', 400);
       }
 
       if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Missing or invalid startDate (YYYY-MM-DD)' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return errorResponse(req, 'Missing or invalid startDate (YYYY-MM-DD)', 400);
       }
 
       // ─── Server-side: start date must not be before today's calendar date (UTC) ───
@@ -170,18 +191,19 @@ Deno.serve(async (req) => {
       // Edge runtime region; YYYY-MM-DD is appended as Z to avoid local-TZ parsing quirks.
       const startMs = utcStartOfCalendarDayMs(startDate);
       if (Number.isNaN(startMs)) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Missing or invalid startDate (YYYY-MM-DD)' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return errorResponse(req, 'Missing or invalid startDate (YYYY-MM-DD)', 400);
       }
-      if (startMs < utcTodayStartMs()) {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Purchase start date cannot be in the past.',
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      const todayStartMs = utcTodayStartMs();
+      if (startMs < todayStartMs) {
+        return errorResponse(req, 'Purchase start date cannot be in the past.', 400);
+      }
+      // Latest allowed first day of pass: today + 30 calendar days (UTC midnight boundaries).
+      const maxStartMs = utcAddCalendarDays(todayStartMs, 30);
+      if (startMs > maxStartMs) {
+        return errorResponse(
+          req,
+          'Purchase start date cannot be more than 30 days in the future (UTC).',
+          400,
         );
       }
 
@@ -245,24 +267,21 @@ Deno.serve(async (req) => {
           const exAt = String(ep.expires_at ?? '') || expiresAt;
           const daysReplay = calendarDaysBetweenValidRange(vf, vu);
           const rid = String(ep.id ?? '');
-          return new Response(
-            JSON.stringify({
-              success: true,
-              idempotentReplay: true,
-              receiptNumber: `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
-              passType: ep.pass_type ?? passType,
-              amount: Number(ep.amount_paid) || amount,
-              currency: (ep.currency as string) || 'AUD',
-              expiresAt: exAt,
-              validFrom: vf,
-              validUntil: vu,
-              days: daysReplay,
-              shareBonusApplied: Boolean(ep.share_bonus_applied),
-              sessionId: rid,
-              purchasedAt: (ep.purchased_at as string) ?? new Date().toISOString(),
-            }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-          );
+          return jsonResponse(req, {
+            success: true,
+            idempotentReplay: true,
+            receiptNumber: `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
+            passType: ep.pass_type ?? passType,
+            amount: Number(ep.amount_paid) || amount,
+            currency: (ep.currency as string) || 'AUD',
+            expiresAt: exAt,
+            validFrom: vf,
+            validUntil: vu,
+            days: daysReplay,
+            shareBonusApplied: Boolean(ep.share_bonus_applied),
+            sessionId: rid,
+            purchasedAt: (ep.purchased_at as string) ?? new Date().toISOString(),
+          });
         }
       }
 
@@ -307,31 +326,25 @@ Deno.serve(async (req) => {
             const exAt = String(ep.expires_at ?? '') || expiresAt;
             const daysReplay = calendarDaysBetweenValidRange(vf, vu);
             const rid = String(ep.id ?? '');
-            return new Response(
-              JSON.stringify({
-                success: true,
-                idempotentReplay: true,
-                receiptNumber: `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
-                passType: ep.pass_type ?? passType,
-                amount: Number(ep.amount_paid) || amount,
-                currency: (ep.currency as string) || 'AUD',
-                expiresAt: exAt,
-                validFrom: vf,
-                validUntil: vu,
-                days: daysReplay,
-                shareBonusApplied: Boolean(ep.share_bonus_applied),
-                sessionId: rid,
-                purchasedAt: (ep.purchased_at as string) ?? new Date().toISOString(),
-              }),
-              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-            );
+            return jsonResponse(req, {
+              success: true,
+              idempotentReplay: true,
+              receiptNumber: `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
+              passType: ep.pass_type ?? passType,
+              amount: Number(ep.amount_paid) || amount,
+              currency: (ep.currency as string) || 'AUD',
+              expiresAt: exAt,
+              validFrom: vf,
+              validUntil: vu,
+              days: daysReplay,
+              shareBonusApplied: Boolean(ep.share_bonus_applied),
+              sessionId: rid,
+              purchasedAt: (ep.purchased_at as string) ?? new Date().toISOString(),
+            });
           }
         }
         console.error('process-card-payment: insert passes error:', insertErr);
-        return new Response(
-          JSON.stringify({ success: false, error: 'Payment captured but failed to create pass: ' + insertErr.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        );
+        return errorResponse(req, 'Payment captured but failed to create pass: ' + insertErr.message, 500);
       }
 
       if (applyShareBonus) {
@@ -342,35 +355,27 @@ Deno.serve(async (req) => {
           .eq('user_id', authUser.id);
       }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          receiptNumber,
-          passType,
-          amount,
-          currency: 'AUD',
-          expiresAt,
-          validFrom,
-          validUntil,
-          days,
-          shareBonusApplied: applyShareBonus,
-          sessionId: insertedPass?.id ?? receiptNumber,
-          purchasedAt: insertedPass?.purchased_at ?? new Date().toISOString(),
-          paymentTransactionId: paymentTxnId,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse(req, {
+        success: true,
+        receiptNumber,
+        passType,
+        amount,
+        currency: 'AUD',
+        expiresAt,
+        validFrom,
+        validUntil,
+        days,
+        shareBonusApplied: applyShareBonus,
+        sessionId: insertedPass?.id ?? receiptNumber,
+        purchasedAt: insertedPass?.purchased_at ?? new Date().toISOString(),
+        paymentTransactionId: paymentTxnId,
+      });
     }
 
-    return new Response(
-      JSON.stringify({ success: false, error: `Unknown action: ${action}. Use action: purchase_pass for pass purchase.` }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return errorResponse(req, `Unknown action: ${action}. Use action: purchase_pass for pass purchase.`, 400);
   } catch (err) {
     console.error('process-card-payment error:', err);
-    return new Response(
-      JSON.stringify({ success: false, error: (err as Error).message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    const msg = err instanceof Error ? err.message : String(err ?? 'Internal server error');
+    return errorResponse(req, msg || 'Internal server error', 500);
   }
 });
