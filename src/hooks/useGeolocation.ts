@@ -1,17 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+/**
+ * Geolocation types and distance helpers (MapView, BusinessGrid, AppContext).
+ */
 
 export interface GeoPosition {
   lat: number;
   lng: number;
   accuracy: number;
   timestamp: number;
-}
-
-export interface GeolocationState {
-  position: GeoPosition | null;
-  loading: boolean;
-  error: string | null;
-  permissionState: 'prompt' | 'granted' | 'denied' | 'unsupported' | null;
 }
 
 /**
@@ -70,139 +65,4 @@ export function estimateDrivingTime(meters: number): string {
   const mins = minutes % 60;
   if (mins === 0) return `${hours}h drive`;
   return `${hours}h ${mins}m drive`;
-}
-
-/**
- * Custom hook for real GPS geolocation
- */
-export function useGeolocation(autoRequest = false) {
-  const [state, setState] = useState<GeolocationState>({
-    position: null,
-    loading: false,
-    error: null,
-    permissionState: null,
-  });
-  const watchIdRef = useRef<number | null>(null);
-
-  // Check permission state
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setState(prev => ({ ...prev, permissionState: 'unsupported' }));
-      return;
-    }
-    if (navigator.permissions) {
-      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
-        setState(prev => ({ ...prev, permissionState: result.state as any }));
-        result.onchange = () => {
-          setState(prev => ({ ...prev, permissionState: result.state as any }));
-        };
-      }).catch(() => {
-        // permissions API not supported, leave as null
-      });
-    }
-  }, []);
-
-  // Auto-request if permission already granted
-  useEffect(() => {
-    if (autoRequest && state.permissionState === 'granted') {
-      requestLocation();
-    }
-  }, [autoRequest, state.permissionState]);
-
-  const requestLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      setState(prev => ({
-        ...prev,
-        error: 'Geolocation is not supported by your browser',
-        permissionState: 'unsupported',
-      }));
-      return;
-    }
-
-    setState(prev => ({ ...prev, loading: true, error: null }));
-
-    // Get initial position
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setState(prev => ({
-          ...prev,
-          position: {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-            timestamp: pos.timestamp,
-          },
-          loading: false,
-          error: null,
-          permissionState: 'granted',
-        }));
-      },
-      (err) => {
-        let errorMsg = 'Unable to get your location';
-        if (err.code === 1) errorMsg = 'Location permission denied';
-        if (err.code === 2) errorMsg = 'Location unavailable';
-        if (err.code === 3) errorMsg = 'Location request timed out';
-        setState(prev => ({
-          ...prev,
-          loading: false,
-          error: errorMsg,
-          permissionState: err.code === 1 ? 'denied' : prev.permissionState,
-        }));
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
-      }
-    );
-
-    // Start watching for updates
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-    }
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        setState(prev => ({
-          ...prev,
-          position: {
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
-            timestamp: pos.timestamp,
-          },
-          loading: false,
-          error: null,
-          permissionState: 'granted',
-        }));
-      },
-      () => {
-        // Silently ignore watch errors if we already have a position
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 30000,
-      }
-    );
-  }, []);
-
-  // Cleanup watch on unmount
-  useEffect(() => {
-    return () => {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-    };
-  }, []);
-
-  const getDistanceTo = useCallback((lat: number, lng: number): number | null => {
-    if (!state.position) return null;
-    return haversineDistance(state.position.lat, state.position.lng, lat, lng);
-  }, [state.position]);
-
-  return {
-    ...state,
-    requestLocation,
-    getDistanceTo,
-  };
 }
