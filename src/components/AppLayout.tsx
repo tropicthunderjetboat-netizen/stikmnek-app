@@ -1,7 +1,8 @@
 import React, { Suspense, useEffect, useRef } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
-import { useAppContext, isTouristProfileCompleteForGate, type ViewMode } from '@/contexts/AppContext';
+import { useAppContext, isTouristProfileCompleteForGate } from '@/contexts/AppContext';
+import { isViewMode, type ViewMode } from '@/utils/viewModes';
 import LegalDocumentPage from './LegalDocumentPage';
 
 // ── Eagerly-loaded components ──
@@ -82,7 +83,7 @@ const AppLayout: React.FC = () => {
     const p = location.pathname;
     if (p.startsWith('/legal/')) return;
     const next = PATH_TO_VIEW[p];
-    if (next !== undefined) {
+    if (next !== undefined && isViewMode(next)) {
       setCurrentView(next);
     }
   }, [location.pathname, setCurrentView]);

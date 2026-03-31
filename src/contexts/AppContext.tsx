@@ -7,6 +7,9 @@ import { mapJoinedOfferingToBusiness, OFFERING_LISTING_COLUMNS } from '@/lib/bus
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
+import type { ViewMode } from '@/utils/viewModes';
+
+export type { ViewMode };
 
 /** PostgREST embed: null | single object | array — normalize to object rows only. */
 function normalizeEmbeddedOfferings(raw: unknown): Record<string, unknown>[] {
@@ -24,24 +27,6 @@ function normalizeEmbeddedOfferings(raw: unknown): Record<string, unknown>[] {
 // ADMIN EMAILS: These always get 'admin' role regardless of DB
 // ═══════════════════════════════════════════════════════════════
 const ADMIN_EMAILS = ['admin@stikmnek.com', 'testadmin@example.com', 'stikmnek@gmail.com'];
-
-export type ViewMode =
-  | 'home'
-  | 'deals'
-  | 'map'
-  | 'passes'
-  | 'dashboard'
-  | 'admin'
-  | 'business-detail'
-  | 'checkout'
-  | 'payment-confirmation'
-  | 'business-dashboard'
-  | 'help'
-  | 'faq'
-  | 'business-guide'
-  | 'business-new'
-  | 'complete-profile'
-  | 'complete-business-profile';
 
 export type PassType = 'daily' | 'weekly' | 'monthly' | 'mega_group' | null;
 
@@ -433,24 +418,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .order('featured', { ascending: false })
         .order('name', { ascending: true });
 
-      console.log(`${DBG} Supabase returned profileRows.length =`, profileRows?.length ?? 0, {
-        error: loadErr ? String(loadErr.message || loadErr) : null,
-      });
-      if (profileRows?.length) {
-        const sample = (profileRows as Record<string, unknown>[]).slice(0, 5).map((r) => ({
-          id: r.id,
-          name: r.name,
-          category: r.category,
-          active: r.active,
-          rawOfferingsType: r.business_offerings == null
-            ? 'null'
-            : Array.isArray(r.business_offerings)
-              ? `array(${r.business_offerings.length})`
-              : 'object',
-        }));
-        console.log(`${DBG} Sample rows (up to 5):`, sample);
-      }
-
       if (loadErr) {
         console.warn(`${DBG} fetch error:`, loadErr.message || loadErr, loadErr);
         setDbBusinesses([]);
@@ -463,17 +430,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         for (const row of profileRows as Record<string, unknown>[]) {
           const profileName = String(row.name ?? '(no name)');
           const profileId = String(row.id ?? '');
-          const rawCat = row.category;
-          if (rawCat == null || String(rawCat).trim() === '') {
-            console.log(`${DBG} category note: profile "${profileName}" (${profileId}) has blank/null category — UI maps unknown to a default (e.g. dining); not excluded by fetch.`);
-          }
 
           const rawOff = row.business_offerings;
           const offs = normalizeEmbeddedOfferings(rawOff);
           const { business_offerings: _drop, ...profile } = row;
 
           if (offs.length === 0) {
-            console.log(`${DBG} Skipping business:`, profileName, `id=${profileId}`, 'Reason: no embedded offerings (empty/null after normalize). raw type:', rawOff === null ? 'null' : Array.isArray(rawOff) ? 'array' : typeof rawOff);
             continue;
           }
 
@@ -481,7 +443,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           for (const o of offs) {
             const off = o as Record<string, unknown> & { active?: boolean; id?: unknown };
             if (off.active === false) {
-              console.log(`${DBG} Skipping offering:`, profileName, `offeringId=${String(off.id ?? '')}`, 'Reason: active is false');
               continue;
             }
             try {
@@ -496,14 +457,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               console.warn(`${DBG} Skipping business:`, profileName, `id=${profileId}`, 'Reason: mapJoinedOfferingToBusiness threw:', mapErr);
             }
           }
-          if (pushedForProfile === 0 && offs.length > 0) {
-            console.log(`${DBG} Skipping business:`, profileName, `id=${profileId}`, `Reason: had ${offs.length} offering(s) but none were active or all failed to map`);
-          }
         }
-        console.log(`${DBG} Mapped ${mapped.length} listing row(s) for Deals grid.`);
         setDbBusinesses(mapped);
       } else {
-        console.log(`${DBG} No profile rows returned (length 0).`);
         setDbBusinesses([]);
       }
       setDataLoaded(true);
@@ -671,13 +627,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     /** False if the user_profiles query errored, timed out, or threw — profile may be unknown. */
     profileRowFetchOk: boolean;
   }> => {
-    console.log('[resolveRole] START for userId:', userId, 'email:', email);
-
     // Step 1: Admin email check (synchronous, never blocks)
     const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
-    if (isAdmin) {
-      console.log('[resolveRole] ADMIN EMAIL MATCH — role = admin');
-    }
 
     // Step 2: Fetch profile with timeout — fail-fast
     let profile: UserProfile | null = null;
@@ -700,10 +651,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else if (data) {
         profile = data as UserProfile;
         dbQuerySucceeded = true;
-        console.log('[resolveRole] DB profile FOUND — user_type:', profile.user_type, 'role:', profile.role, 'name:', profile.name);
       } else {
         dbQuerySucceeded = true;
-        console.log('[resolveRole] No profile in DB for this user');
       }
     } catch (err) {
       console.warn('[resolveRole] Exception or timeout:', (err as Error)?.message);
@@ -718,12 +667,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       resolvedFromDb = true;
       // Defer admin DB update to background — don't block auth flow
       if (profile && extractRole(profile) !== 'admin') {
-        console.log('[resolveRole] Scheduling admin DB update (background)');
         supabase
           .from('user_profiles')
           .update({ role: 'admin', user_type: 'admin', updated_at: new Date().toISOString() })
           .eq('user_id', userId)
-          .then(() => console.log('[resolveRole] Admin profile updated'))
+          .then(() => {})
           .catch((e) => console.warn('[resolveRole] Admin update failed:', e?.message));
         profile = { ...profile, role: 'admin', user_type: 'admin' };
       }
@@ -734,7 +682,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (metaType === 'business' && dbRole === 'tourist') {
         dbRole = 'business';
         profile = { ...profile, role: 'business', user_type: 'business' };
-        console.log('[resolveRole] Auth metadata business overrides transient tourist DB row');
         supabase
           .from('user_profiles')
           .update({
@@ -743,21 +690,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             updated_at: new Date().toISOString(),
           })
           .eq('user_id', userId)
-          .then(() => console.log('[resolveRole] Synced business role to user_profiles'))
+          .then(() => {})
           .catch((e) => console.warn('[resolveRole] Business role sync failed:', e?.message));
       }
       finalRole = dbRole;
       resolvedFromDb = true;
-      console.log('[resolveRole] Using DB role:', finalRole);
     } else if (!dbQuerySucceeded && lastDbResolvedRoleRef.current) {
       finalRole = lastDbResolvedRoleRef.current;
-      console.log('[resolveRole] DB query FAILED — preserving last known role:', finalRole);
     } else if (metadata?.user_type && ['tourist', 'business', 'admin'].includes(metadata.user_type)) {
       finalRole = metadata.user_type as 'tourist' | 'business' | 'admin';
-      console.log('[resolveRole] No DB profile — using metadata user_type:', finalRole);
     } else {
       finalRole = 'tourist';
-      console.log('[resolveRole] Fail-fast: defaulting to tourist');
     }
 
     if (resolvedFromDb) {
@@ -768,7 +711,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setUserProfile(profile);
     }
 
-    console.log('[resolveRole] FINAL ROLE:', finalRole);
     return { role: finalRole, profile, fromDb: resolvedFromDb, profileRowFetchOk: dbQuerySucceeded };
   }, []);
 
@@ -812,7 +754,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Redirect user to the correct view based on role
   const redirectForRole = useCallback((role: 'tourist' | 'business' | 'admin') => {
-    console.log('[redirectForRole] Redirecting for role:', role);
     if (role === 'admin') {
       toast.success('Welcome back, Admin!');
       setCurrentView('admin');
@@ -837,7 +778,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     shouldRedirect: boolean
   ) => {
     if (authProcessingRef.current && !shouldRedirect) {
-      console.log('[handleAuthenticatedUser] SKIPPING — another call is in progress');
       setAuthLoading(false);
       return;
     }
@@ -845,8 +785,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     authProcessingRef.current = true;
 
     try {
-      console.log('[handleAuthenticatedUser] Processing user:', authUser.email, 'shouldRedirect:', shouldRedirect);
-
       // Fail-fast: resolveRole has internal timeout; wrap in extra safety
       let role: 'tourist' | 'business' | 'admin';
       let profile: UserProfile | null;
@@ -870,7 +808,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // ─── FALLBACK: If no profile found, create one (with timeout, don't block) ───
       if (!profile) {
-        console.log('[handleAuthenticatedUser] No profile found — creating via direct DB insert');
         const meta = authUser.user_metadata || {};
         const fallbackName = meta.name || meta.full_name || authUser.email?.split('@')[0] || 'User';
         const fallbackType = meta.user_type || 'tourist';
@@ -893,7 +830,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             role = extractRole(profile);
             setUserProfile(profile);
             lastDbResolvedRoleRef.current = role;
-            console.log('[handleAuthenticatedUser] Profile created — role:', role);
           } else {
             console.warn('[handleAuthenticatedUser] Direct DB insert failed or timed out:', directResult.error);
           }
@@ -913,7 +849,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const userObj = buildUser(authUser, role, profile);
 
-      console.log('[handleAuthenticatedUser] Setting user state — role:', role, 'name:', userObj.name);
       setUser(userObj);
       setShowAuth(false);
 
@@ -980,7 +915,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user && !sessionProcessedRef.current) {
-          console.log('[Init] Proactive getSession — restoring:', session.user.email);
           sessionProcessedRef.current = true;
           await handleAuthenticatedUser(session.user, false);
           return;
@@ -1001,7 +935,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
           switch (event) {
             case 'SIGNED_OUT': {
-              console.log('[onAuthStateChange] SIGNED_OUT — clearing all state');
               lastDbResolvedRoleRef.current = null;
               signInCooldownRef.current = 0;
               authProcessingRef.current = false;
@@ -1022,7 +955,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setAuthLoading(false);
                 break;
               }
-              console.log('[onAuthStateChange] SIGNED_IN for:', session.user.email);
               await handleAuthenticatedUser(session.user, true);
               break;
             }
@@ -1034,27 +966,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
               const msSinceSignIn = Date.now() - signInCooldownRef.current;
               if (signInCooldownRef.current > 0 && msSinceSignIn < 8000) {
-                console.log(`[onAuthStateChange] TOKEN_REFRESHED SKIPPED — within ${msSinceSignIn}ms of SIGNED_IN cooldown`);
                 setAuthLoading(false);
                 break;
               }
-              console.log('[onAuthStateChange] TOKEN_REFRESHED for:', session.user.email);
               await handleAuthenticatedUser(session.user, false);
               break;
             }
 
             case 'INITIAL_SESSION': {
               if (sessionProcessedRef.current) {
-                console.log('[onAuthStateChange] INITIAL_SESSION — already processed by proactive getSession');
                 setAuthLoading(false);
                 break;
               }
               if (session?.user) {
-                console.log('[onAuthStateChange] INITIAL_SESSION — restoring:', session.user.email);
                 sessionProcessedRef.current = true;
                 await handleAuthenticatedUser(session.user, false);
               } else {
-                console.log('[onAuthStateChange] INITIAL_SESSION — no session');
                 sessionProcessedRef.current = true;
                 setAuthLoading(false);
               }
@@ -1062,7 +989,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
 
             default: {
-              console.log('[onAuthStateChange] Unhandled event:', event);
               break;
             }
           }
@@ -1076,15 +1002,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // FALLBACK: If proactive getSession and INITIAL_SESSION both miss, retry at 1.5s
     const fallbackTimer = setTimeout(async () => {
       if (!sessionProcessedRef.current) {
-        console.log('[Init] Session not yet processed — retrying getSession');
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
-            console.log('[Init] Found existing session for:', session.user.email);
             sessionProcessedRef.current = true;
             await handleAuthenticatedUser(session.user, false);
           } else {
-            console.log('[Init] No existing session');
             sessionProcessedRef.current = true;
             setAuthLoading(false);
           }
@@ -1199,7 +1122,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // SIGN IN — Simple. Call Supabase. onAuthStateChange handles the rest.
   // ═══════════════════════════════════════════════════════════
   const signIn = useCallback(async (email: string, password: string) => {
-    console.log('[signIn] Attempting sign in for:', email);
     setAuthLoading(true);
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -1210,8 +1132,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast.error(error.message || 'Sign in failed');
       throw error;
     }
-
-    console.log('[signIn] signInWithPassword succeeded — onAuthStateChange will handle the rest');
   }, []);
 
 
@@ -1226,7 +1146,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // NO edge functions. NO layers. Two steps.
   // ═══════════════════════════════════════════════════════════
   const signUp = useCallback(async (name: string, email: string, password: string, type: 'tourist' | 'business') => {
-    console.log('[signUp] START — email:', email, 'type:', type);
     setAuthLoading(true);
 
     // ─── Step 1: Create the auth user ───
@@ -1255,16 +1174,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error('No user returned from sign up');
     }
 
-    console.log('[signUp] Auth user created:', authUser.id, 'hasSession:', hasSession);
-
     // ─── Step 2: Ensure profile has all columns populated ───
     const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
     const effectiveType = isAdmin ? 'admin' : type;
 
     if (hasSession) {
       // We have a session (JWT), so we can write to the DB via RLS
-      console.log('[signUp] Inserting/updating profile — userType:', effectiveType);
-
       const result = await directProfileInsert({
         userId: authUser.id,
         name: name,
@@ -1273,7 +1188,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
 
       if (result.success) {
-        console.log('[signUp] Profile ready — name:', result.profile?.name, 'user_type:', result.profile?.user_type);
         if (result.profile) {
           setUserProfile(result.profile as UserProfile);
         }
@@ -1286,7 +1200,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // onAuthStateChange SIGNED_IN will fire and set user state
     } else {
       // No session — email confirmation is required
-      console.log('[signUp] No session — email confirmation required');
       setAuthLoading(false);
       toast.success('Account created! Please check your email to confirm your account.');
       setShowAuth(false);
@@ -1306,7 +1219,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // SIGN OUT
   // ═══════════════════════════════════════════════════════════
   const signOut = useCallback(async () => {
-    console.log('[signOut] Signing out...');
     lastDbResolvedRoleRef.current = null;
     signInCooldownRef.current = 0;
     authProcessingRef.current = false;

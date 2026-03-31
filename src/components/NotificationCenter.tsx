@@ -1,31 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAppContext, type ViewMode } from '@/contexts/AppContext';
+import { useAppContext } from '@/contexts/AppContext';
+import { isViewMode, type ViewMode } from '@/utils/viewModes';
 import { supabase } from '@/lib/supabase';
 import { Bell, X, Check, CheckCheck, Ticket, Heart, Star, TrendingUp, Gift, Users, AlertCircle, Clock, ChevronRight } from 'lucide-react';
-
-/** Keeps runtime validation in sync with `ViewMode` in AppContext. */
-const VIEW_MODES = [
-  'home',
-  'deals',
-  'map',
-  'passes',
-  'dashboard',
-  'admin',
-  'business-detail',
-  'checkout',
-  'payment-confirmation',
-  'business-dashboard',
-  'help',
-  'faq',
-  'business-guide',
-  'business-new',
-  'complete-profile',
-  'complete-business-profile',
-] as const satisfies readonly ViewMode[];
-
-function isViewMode(value: unknown): value is ViewMode {
-  return typeof value === 'string' && (VIEW_MODES as readonly string[]).includes(value);
-}
 
 interface Notification {
   id: string;

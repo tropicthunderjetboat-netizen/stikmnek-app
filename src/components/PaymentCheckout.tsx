@@ -61,10 +61,8 @@ const PASSES = {
  * We only call this to FORCE a refresh before the invoke.
  */
 async function ensureFreshSession(): Promise<string | null> {
-  console.log('[PaymentCheckout] ensureFreshSession: checking current session...');
-  
   const { data: { session } } = await supabase.auth.getSession();
-  
+
   if (!session?.access_token) {
     console.error('[PaymentCheckout] ensureFreshSession: NO session found');
     return null;
@@ -73,11 +71,9 @@ async function ensureFreshSession(): Promise<string | null> {
   const expiresAt = session.expires_at;
   const now = Math.floor(Date.now() / 1000);
   const secondsLeft = expiresAt ? expiresAt - now : 0;
-  console.log('[PaymentCheckout] ensureFreshSession: token expires in', secondsLeft, 'seconds');
 
   // If token expires in less than 120 seconds, refresh it
   if (secondsLeft < 120) {
-    console.log('[PaymentCheckout] ensureFreshSession: refreshing session (< 120s left)...');
     const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
     if (error) {
       console.error('[PaymentCheckout] ensureFreshSession: refresh FAILED:', error.message);
@@ -87,12 +83,9 @@ async function ensureFreshSession(): Promise<string | null> {
       console.error('[PaymentCheckout] ensureFreshSession: refresh returned no token');
       return null;
     }
-    const newExpiry = refreshed.expires_at ? refreshed.expires_at - Math.floor(Date.now() / 1000) : 0;
-    console.log('[PaymentCheckout] ensureFreshSession: refreshed OK, new token expires in', newExpiry, 's');
     return refreshed.access_token;
   }
 
-  console.log('[PaymentCheckout] ensureFreshSession: current token is fresh enough');
   return session.access_token;
 }
 
@@ -365,7 +358,6 @@ const PaymentCheckout: React.FC = () => {
 
     try {
       // Step 1: Ensure the SDK has a fresh, valid session token
-      console.log('[PaymentCheckout] Step 1: Ensuring fresh session...');
       const token = await ensureFreshSession();
       if (!token) {
         console.error('[PaymentCheckout] No valid session — prompting sign in');
@@ -376,7 +368,6 @@ const PaymentCheckout: React.FC = () => {
         setAuthMode('signin');
         return;
       }
-      console.log('[PaymentCheckout] Session OK — token length:', token.length);
 
       // Step 2: Get stored referral code if any
       let referralCode: string | null = null;
@@ -388,8 +379,6 @@ const PaymentCheckout: React.FC = () => {
       // IMPORTANT: Do NOT pass custom Authorization header.
       // The Supabase SDK automatically includes the session JWT.
       // Passing a custom header can cause conflicts with the relay's JWT validation.
-      console.log('[PaymentCheckout] Step 3: Invoking process-card-payment...');
-      console.log('[PaymentCheckout] passType:', cart.passType, 'startDate:', startDate);
 
       const { data, error } = await supabase.functions.invoke('process-card-payment', {
         body: {
@@ -405,8 +394,6 @@ const PaymentCheckout: React.FC = () => {
         },
         // NO custom headers — let the SDK handle Authorization automatically
       });
-
-      console.log('[PaymentCheckout] invoke returned — data:', JSON.stringify(data)?.substring(0, 200), 'error:', error?.message);
 
       // Step 4: Handle the response
       // The SDK returns { data, error }. On non-2xx, error is set and data is often null;
@@ -437,7 +424,6 @@ const PaymentCheckout: React.FC = () => {
 
       if (data.success) {
         // Payment successful!
-        console.log('[PaymentCheckout] Payment SUCCESS — receipt:', data.receiptNumber);
         setPaymentResult(data);
         setStep('success');
 
