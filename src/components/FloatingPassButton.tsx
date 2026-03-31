@@ -51,16 +51,8 @@ const FloatingPassButton: React.FC = () => {
   const colors = passColors[user.pass] || passColors.weekly;
   const passTitle = getPassDisplayTitle(user.pass, language);
 
-  // Generate QR code data
-  const qrPayload = JSON.stringify({
-    type: 'stikm_nek_pass',
-    userId: user.id,
-    passId: user.passId,
-    passType: user.pass,
-    validFrom: user.passValidFrom,
-    validUntil: user.passValidUntil,
-    name: user.name,
-  });
+  /** QR encodes only the pass UUID — verify-redemption loads holder name + validity from DB. */
+  const qrPayload = user.passId;
 
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrPayload)}&color=0d9488&bgcolor=ffffff&margin=8`;
 

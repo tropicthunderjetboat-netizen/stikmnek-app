@@ -153,7 +153,23 @@ const INVALID_QR_PAYLOAD_USER_MESSAGE =
 
 function isInvalidQrPayloadBackendMessage(msg: string | undefined | null): boolean {
   if (!msg || typeof msg !== 'string') return false;
-  return msg.trim().startsWith('Invalid QR payload');
+  const m = msg.trim();
+  return m.startsWith('Invalid QR payload') || m.startsWith('Invalid pass code');
+}
+
+/** Normalize scanned/pasted data: plain UUID, or legacy JSON with passId. */
+function normalizePassQrInput(raw: string): string {
+  const t = raw.trim();
+  const uuidRe =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRe.test(t)) return t;
+  try {
+    const j = JSON.parse(t) as { passId?: unknown };
+    if (j && typeof j.passId === 'string') return String(j.passId).trim();
+  } catch {
+    /* ignore */
+  }
+  return t;
 }
 
 function resolveVerifyRedemptionBackendError(
@@ -545,7 +561,8 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
   // Handle scanned QR data
   const handleQRData = async (rawData: string) => {
-    lastScannedDataRef.current = rawData;
+    const normalizedQr = normalizePassQrInput(rawData);
+    lastScannedDataRef.current = normalizedQr;
     setVerifying(true);
     setVerifyStep(0);
     setShowSuccessAnimation(false);
@@ -559,7 +576,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
         const { data, error } = await supabase.functions.invoke('verify-redemption', {
           body: {
             action: 'check_voucher_validity',
-            qrData: rawData,
+            qrData: normalizedQr,
             ...(preferredBusinessId ? { businessId: preferredBusinessId, businessName: preferredBusinessName ?? '' } : {}),
           },
         });
@@ -584,7 +601,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
         const { data, error } = await supabase.functions.invoke('verify-redemption', {
           body: {
             action: 'check_voucher_validity',
-            qrData: rawData,
+            qrData: normalizedQr,
           },
         });
         if (error) {
@@ -609,7 +626,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
           });
           return;
         }
-        await proceedAfterPassValidForRedeem(rawData, v);
+        await proceedAfterPassValidForRedeem(normalizedQr, v);
       }
     } catch (err: any) {
       if (scanPurpose === 'check') {
@@ -1482,7 +1499,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                 <textarea
                   value={manualCode}
                   onChange={(e) => setManualCode(e.target.value)}
-                  placeholder='Paste the pass code here (e.g. {"type":"stikm_nek_pass",...})'
+                  placeholder="Paste your pass code (UUID from Copy pass code)"
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none h-32 font-mono text-xs"
                   autoFocus
                 />

@@ -83,20 +83,11 @@ const QRCodeDisplay: React.FC = () => {
           user.passPeopleCount ??
           (shareApplied ? getShareBonusTotalPeople(user.pass) : getBasePeople(user.pass)));
 
-  // Generate the QR code data payload (includes maxPeople for scanner to validate capacity)
+  /** QR encodes only the pass UUID — verify-redemption loads user + validity from DB. */
   const qrPayload = useMemo(() => {
-    if (!user || !user.pass || !user.passId || effectiveMaxPeople == null) return null;
-    return JSON.stringify({
-      type: 'stikm_nek_pass',
-      userId: user.id,
-      passId: user.passId,
-      passType: user.pass,
-      validFrom,
-      validUntil,
-      name: user.name,
-      maxPeople: effectiveMaxPeople,
-    });
-  }, [user, effectiveMaxPeople, validFrom, validUntil]);
+    if (!user || !user.pass || !user.passId) return null;
+    return user.passId;
+  }, [user?.pass, user?.passId]);
 
   // Generate QR code URL using qrserver.com API
   const qrCodeUrl = useMemo(() => {

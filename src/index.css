@@ -129,9 +129,9 @@
 /* Hard clamp utility for production (avoids Tailwind line-clamp plugin dependency). */
 .stikmnek-clamp-3 {
   display: -webkit-box !important;
+  overflow: hidden !important;
   -webkit-line-clamp: 3 !important;
   -webkit-box-orient: vertical !important;
-  overflow: hidden !important;
   word-break: break-word !important;
 }
 

@@ -17,6 +17,24 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+/** Pass QR encodes only the pass row UUID; legacy JSON payloads still accepted for migration. */
+const PASS_ID_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function parsePassIdFromQrData(rawQr: string): string | null {
+  const t = rawQr.trim();
+  if (PASS_ID_UUID_RE.test(t)) return t;
+  try {
+    const j = JSON.parse(t) as { passId?: unknown };
+    if (j && typeof j.passId === 'string' && PASS_ID_UUID_RE.test(j.passId.trim())) {
+      return j.passId.trim();
+    }
+  } catch {
+    /* not JSON */
+  }
+  return null;
+}
+
 /**
  * CORS: set CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
  */
@@ -270,32 +288,28 @@ Deno.serve(async (req) => {
     if (!action) return errorResponse('Missing action', 400);
     if (!rawQr || typeof rawQr !== 'string') return errorResponse('Missing qrData', 400);
 
-    let qr: any;
-    try {
-      qr = JSON.parse(rawQr);
-    } catch {
-      return errorResponse('Invalid QR payload (not JSON)', 400);
+    const passId = parsePassIdFromQrData(rawQr);
+    if (!passId) {
+      return errorResponse(
+        'Invalid QR payload — expected a pass UUID (use the StikmNek app QR or paste the pass code).',
+        400,
+      );
     }
 
-    if (!qr || qr.type !== 'stikm_nek_pass' || !qr.passId || !qr.userId) {
-      return errorResponse('Invalid QR payload (unexpected structure)', 400);
-    }
-
-    const passId = qr.passId as string;
-    const touristUserId = qr.userId as string;
     const today = getTodayDate();
 
     const { data: pass, error: passErr } = await supabase
       .from('passes')
       .select('id, user_id, pass_type, active, valid_from, valid_until, expires_at, purchased_at, max_people')
       .eq('id', passId)
-      .eq('user_id', touristUserId)
-      .single();
+      .maybeSingle();
 
     if (passErr || !pass) {
       console.error('[verify-redemption] pass lookup error:', passErr);
       return errorResponse('Pass not found for this QR code', 404);
     }
+
+    const touristUserId = pass.user_id as string;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // PASS VALIDITY — STRICT CALENDAR-DATE ENFORCEMENT (product policy)
@@ -369,10 +383,9 @@ Deno.serve(async (req) => {
     const touristName =
       profile?.name ||
       profile?.display_name ||
-      qr.name ||
-      scannerUser.email?.split('@')[0] ||
+      (profile?.email ? profile.email.split('@')[0] : null) ||
       'Tourist';
-    const touristEmail = profile?.email || scannerUser.email || '';
+    const touristEmail = profile?.email || '';
 
     // Redemption history (per business & pass)
     let alreadyRedeemedToday = false;
