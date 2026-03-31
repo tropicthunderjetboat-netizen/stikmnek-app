@@ -10,6 +10,36 @@
 
 import { supabase } from '@/lib/supabase';
 
+const isDev = import.meta.env.DEV;
+
+/**
+ * Wraps Edge Function invokes so failures log a clear console warning and never throw.
+ */
+async function guardedInvoke(
+  fnName: string,
+  body: Record<string, unknown>,
+  context: string,
+): Promise<{ data: unknown; error: { message?: string } | null }> {
+  try {
+    const { data, error } = await supabase.functions.invoke(fnName, { body });
+    if (error) {
+      console.warn(
+        `[Diagnostics] ${context} — ${fnName}:`,
+        error.message || JSON.stringify(error),
+        isDev ? '(development build)' : '',
+      );
+    }
+    return { data, error };
+  } catch (e) {
+    console.warn(
+      `[Diagnostics] ${context} — ${fnName} threw:`,
+      e instanceof Error ? e.message : e,
+      isDev ? '(development build)' : '',
+    );
+    return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
+  }
+}
+
 export interface DiagnosticResult {
   test: string;
   status: 'pass' | 'fail' | 'warn' | 'info';
@@ -286,14 +316,16 @@ export async function traceSignUp(
       results.push({ test: 'Step 2: Calling create-user-profile edge function', status: 'info', message: `Invoking with userId: ${authUser.id.substring(0, 8)}...`, timestamp: ts() });
 
       const startTime = performance.now();
-      const { data: fnResult, error: fnError } = await supabase.functions.invoke('create-user-profile', {
-        body: {
+      const { data: fnResult, error: fnError } = await guardedInvoke(
+        'create-user-profile',
+        {
           display_name: testName,
           role: testType,
           email: testEmail,
           user_id: authUser.id,
         },
-      });
+        'traceSignUp Step 2',
+      );
       const latency = Math.round(performance.now() - startTime);
 
       if (fnError) {
@@ -425,9 +457,11 @@ export async function diagnoseEdgeFunctions(): Promise<DiagnosticResult[]> {
   for (const fn of functions) {
     try {
       const startTime = performance.now();
-      const { data, error } = await supabase.functions.invoke(fn.name, {
-        body: fn.body,
-      });
+      const { data, error } = await guardedInvoke(
+        fn.name,
+        fn.body as Record<string, unknown>,
+        'diagnoseEdgeFunctions',
+      );
       const latency = Math.round(performance.now() - startTime);
 
       if (error) {
@@ -475,9 +509,11 @@ export async function diagnoseSentry(): Promise<DiagnosticResult[]> {
 
   // Health check
   try {
-    const { data, error } = await supabase.functions.invoke('sentry-relay', {
-      body: { action: 'health' },
-    });
+    const { data, error } = await guardedInvoke(
+      'sentry-relay',
+      { action: 'health' },
+      'diagnoseSentry health',
+    );
 
     if (error) {
       results.push({
@@ -524,15 +560,17 @@ export async function diagnoseSentry(): Promise<DiagnosticResult[]> {
 
   // Send a test message
   try {
-    const { data, error } = await supabase.functions.invoke('sentry-relay', {
-      body: {
+    const { data, error } = await guardedInvoke(
+      'sentry-relay',
+      {
         action: 'capture_message',
         message: 'DIAGNOSTIC TEST — If you see this in Sentry, the relay is working',
         level: 'info',
         tags: { source: 'stikmnek-diagnostic', test: 'true' },
         extra: { diagnosticTimestamp: ts(), userAgent: navigator.userAgent },
       },
-    });
+      'diagnoseSentry test message',
+    );
 
     results.push({
       test: 'Sentry Test Message',

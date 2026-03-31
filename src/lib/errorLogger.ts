@@ -5,6 +5,10 @@
  *
  * PERFORMANCE: init() defers heavy work (PerformanceObserver, Sentry health check)
  * to avoid blocking the main thread during page load.
+ *
+ * Sentry relay: all Edge Function invokes are wrapped — failures log a console warning
+ * and never throw. In development, relay can be skipped via VITE_SENTRY_RELAY_IN_DEV
+ * (default false) to reduce noise; set VITE_SENTRY_RELAY_IN_DEV=true to test the relay locally.
  */
 
 import { supabase } from '@/lib/supabase';
@@ -19,6 +23,10 @@ interface ErrorLogEntry {
   metadata?: Record<string, any>;
   severity: 'warning' | 'error' | 'critical';
 }
+
+const isDev = import.meta.env.DEV;
+/** When false (default in dev), outbound sentry-relay calls are skipped except health check soft-fail. */
+const sentryRelayInDev = import.meta.env.VITE_SENTRY_RELAY_IN_DEV === 'true';
 
 class ErrorLogger {
   private userId: string | null = null;
@@ -37,23 +45,14 @@ class ErrorLogger {
     if (this.initialized) return;
     this.initialized = true;
 
-    // Save the original console.error so we can still write real errors to the
-    // browser console without triggering our own interceptor.
     this.originalConsoleError = console.error.bind(console);
 
-    // Replace console.error with an interceptor that forwards genuine errors
-    // to the logging pipeline.
     const self = this;
     console.error = function (...args: any[]) {
-      // Always call the original console.error first so the message appears
-      // in the browser DevTools as expected.
       self.originalConsoleError?.(...args);
 
-      // ── Guards ──────────────────────────────────────────────────────
-      // 1. Re-entrancy: skip if we are already inside the logger.
       if (self.isProcessing) return;
 
-      // 2. Build a string representation of the arguments.
       let msg: string;
       try {
         msg = args
@@ -68,10 +67,9 @@ class ErrorLogger {
           )
           .join(' ');
       } catch {
-        return; // If we can't even stringify the args, bail out.
+        return;
       }
 
-      // 3. Skip internal logger / boundary messages (already captured directly).
       if (
         msg.includes('[ErrorLogger]') ||
         msg.includes('[ErrorBoundary]')
@@ -79,16 +77,11 @@ class ErrorLogger {
         return;
       }
 
-
-      // 4. Skip synthetic / framework-generated stack-trace-only errors.
-      //    React, Sentry, and some deployment platforms emit console.error
-      //    calls with _synthetic: true or purely for stack-trace capture.
       const hasSynthetic = args.some(
         (a) => typeof a === 'object' && a !== null && a._synthetic === true
       );
       if (hasSynthetic) return;
 
-      // 5. Skip React internal warnings (double-render, strict-mode, etc.)
       if (
         msg.includes('Warning:') ||
         msg.includes('React does not recognize') ||
@@ -98,7 +91,6 @@ class ErrorLogger {
         return;
       }
 
-      // ── Forward to logging pipeline ─────────────────────────────────
       try {
         self.isProcessing = true;
         self.log({
@@ -115,7 +107,6 @@ class ErrorLogger {
       }
     };
 
-    // Global error handler
     window.addEventListener('error', (event) => {
       this.log({
         error_type: 'runtime',
@@ -129,7 +120,6 @@ class ErrorLogger {
       });
     });
 
-    // Unhandled promise rejection handler
     window.addEventListener('unhandledrejection', (event) => {
       const message =
         event.reason?.message ||
@@ -145,24 +135,17 @@ class ErrorLogger {
       });
     });
 
-    // Defer heavy work to avoid blocking the main thread during page load.
     this.deferHeavyInit();
 
-    // Log initialization as an *info* message — NOT console.error — so it
-    // does not appear as a red error in the browser console or get picked up
-    // by error-monitoring overlays.
     if (import.meta.env.DEV) {
       console.info(
-        '[ErrorLogger] Initialized with Sentry relay + console.error interception'
+        '[ErrorLogger] Initialized (Sentry relay: ' +
+          (sentryRelayInDev ? 'enabled in dev' : 'skipped in dev unless VITE_SENTRY_RELAY_IN_DEV=true') +
+          ')'
       );
     }
   }
 
-  /**
-   * Defers PerformanceObserver setup and Sentry connection verification
-   * to after the browser is idle, preventing the ~100ms+ synchronous block
-   * that was contributing to long tasks during page load.
-   */
   private deferHeavyInit() {
     const setup = () => {
       this.initPerformanceObserver();
@@ -205,6 +188,39 @@ class ErrorLogger {
 
   setUserId(userId: string | null) {
     this.userId = userId;
+  }
+
+  /**
+   * Invokes sentry-relay; never throws. Logs console.warn on failure or in dev when skipped.
+   */
+  private async invokeSentryRelay(
+    body: Record<string, unknown>,
+    context: string
+  ): Promise<void> {
+    if (isDev && !sentryRelayInDev) {
+      console.warn(
+        `[ErrorLogger] ${context} — Sentry relay skipped in development (set VITE_SENTRY_RELAY_IN_DEV=true to enable)`
+      );
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('sentry-relay', { body });
+      if (error) {
+        console.warn(
+          `[ErrorLogger] ${context} — sentry-relay invoke failed:`,
+          error.message || String(error)
+        );
+        return;
+      }
+      if (data && typeof data === 'object' && 'success' in data && (data as { success?: boolean }).success === false) {
+        console.warn(`[ErrorLogger] ${context} — sentry-relay returned success=false`, data);
+      }
+    } catch (e) {
+      console.warn(
+        `[ErrorLogger] ${context} — sentry-relay threw:`,
+        e instanceof Error ? e.message : e
+      );
+    }
   }
 
   log(entry: ErrorLogEntry) {
@@ -286,18 +302,17 @@ class ErrorLogger {
     extra?: Record<string, any>
   ) {
     if (!this.sentryEnabled) return;
-    supabase.functions
-      .invoke('sentry-relay', {
-        body: {
-          action: 'capture_message',
-          message,
-          level,
-          tags: { source: 'stikmnek-frontend' },
-          extra,
-          user_id: this.userId,
-        },
-      })
-      .catch(() => {});
+    void this.invokeSentryRelay(
+      {
+        action: 'capture_message',
+        message,
+        level,
+        tags: { source: 'stikmnek-frontend' },
+        extra,
+        user_id: this.userId,
+      },
+      'captureMessage'
+    );
   }
 
   private storeLocally(entry: ErrorLogEntry) {
@@ -340,46 +355,58 @@ class ErrorLogger {
 
   private async flushToSentry() {
     if (!this.sentryEnabled || this.sentryBuffer.length === 0) return;
+    if (isDev && !sentryRelayInDev) {
+      this.sentryBuffer = [];
+      return;
+    }
     const entries = [...this.sentryBuffer];
     this.sentryBuffer = [];
     for (const entry of entries) {
-      supabase.functions
-        .invoke('sentry-relay', {
-          body: {
-            action: 'capture_error',
-            error_message: entry.error_message,
-            error_stack: entry.error_stack,
+      await this.invokeSentryRelay(
+        {
+          action: 'capture_error',
+          error_message: entry.error_message,
+          error_stack: entry.error_stack,
+          error_type: entry.error_type,
+          severity: entry.severity,
+          component: entry.component,
+          page_url: entry.page_url,
+          user_agent: entry.user_agent,
+          metadata: entry.metadata,
+          user_id: this.userId,
+          tags: {
             error_type: entry.error_type,
             severity: entry.severity,
-            component: entry.component,
-            page_url: entry.page_url,
-            user_agent: entry.user_agent,
-            metadata: entry.metadata,
-            user_id: this.userId,
-            tags: {
-              error_type: entry.error_type,
-              severity: entry.severity,
-            },
           },
-        })
-        .catch(() => {});
+        },
+        'flushToSentry'
+      );
     }
   }
 
   private async verifySentryConnection() {
-    try {
-      const { data, error } = await supabase.functions.invoke(
-        'sentry-relay',
-        { body: { action: 'health' } }
+    if (isDev && !sentryRelayInDev) {
+      this.sentryEnabled = false;
+      console.warn(
+        '[ErrorLogger] Sentry relay health check skipped in development (set VITE_SENTRY_RELAY_IN_DEV=true to verify)'
       );
+      return;
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('sentry-relay', {
+        body: { action: 'health' },
+      });
       if (error || !data?.success) {
         this.sentryEnabled = false;
-        console.warn('[ErrorLogger] Sentry relay health check failed:', error?.message || 'No success response');
+        console.warn(
+          '[ErrorLogger] Sentry relay health check failed:',
+          error?.message || 'No success response',
+          data ?? ''
+        );
       } else {
-        this.sentryEnabled = data.sentry_configured;
+        this.sentryEnabled = Boolean((data as { sentry_configured?: boolean }).sentry_configured);
         if (this.sentryEnabled) {
           console.info('[ErrorLogger] Sentry relay is ACTIVE and configured');
-          // Send a confirmation message to Sentry
           this.captureMessage(
             'StikmNek app initialized — Sentry relay confirmed active',
             'info',
@@ -390,15 +417,19 @@ class ErrorLogger {
             }
           );
         } else {
-          console.warn('[ErrorLogger] Sentry relay is reachable but Sentry DSN is not configured');
+          console.warn(
+            '[ErrorLogger] Sentry relay is reachable but Sentry DSN is not configured in Edge Function secrets'
+          );
         }
       }
-    } catch (_e) {
+    } catch (e) {
       this.sentryEnabled = false;
-      console.warn('[ErrorLogger] Sentry relay unreachable:', (_e as any)?.message);
+      console.warn(
+        '[ErrorLogger] Sentry relay unreachable:',
+        e instanceof Error ? e.message : e
+      );
     }
   }
-
 
   getLocalErrors(): any[] {
     try {
