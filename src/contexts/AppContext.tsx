@@ -8,6 +8,17 @@ import { mapJoinedOfferingToBusiness, OFFERING_LISTING_COLUMNS } from '@/lib/bus
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
 
+/** PostgREST embed: null | single object | array — normalize to object rows only. */
+function normalizeEmbeddedOfferings(raw: unknown): Record<string, unknown>[] {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) {
+    return raw.filter((x): x is Record<string, unknown> => x != null && typeof x === 'object' && !Array.isArray(x));
+  }
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    return [raw as Record<string, unknown>];
+  }
+  return [];
+}
 
 // ═══════════════════════════════════════════════════════════════
 // ADMIN EMAILS: These always get 'admin' role regardless of DB
@@ -386,9 +397,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // DATA LOADING
   // ═══════════════════════════════════════════════════════════
   const loadBusinesses = useCallback(async () => {
+    const DBG = '[loadBusinesses]';
     try {
-      // Master profile must be active; at least one active offering (!inner). Listing copy
-      // lives on `business_offerings`; `businesses` holds profile + reviews, etc.
+      // Left-embed `business_offerings` (no !inner) so we can see profiles even when the join
+      // or RLS would exclude rows with !inner — filter to active offerings in the loop below.
       const { data: profileRows, error: loadErr } = await supabase
         .from('businesses')
         .select(`
@@ -413,18 +425,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           map_url,
           website,
           tags,
-          super_star_count,
-          business_offerings!inner (
+          business_offerings (
             ${OFFERING_LISTING_COLUMNS}
           )
         `)
         .eq('active', true)
-        .eq('business_offerings.active', true)
         .order('featured', { ascending: false })
         .order('name', { ascending: true });
 
+      console.log(`${DBG} Supabase returned profileRows.length =`, profileRows?.length ?? 0, {
+        error: loadErr ? String(loadErr.message || loadErr) : null,
+      });
+      if (profileRows?.length) {
+        const sample = (profileRows as Record<string, unknown>[]).slice(0, 5).map((r) => ({
+          id: r.id,
+          name: r.name,
+          category: r.category,
+          active: r.active,
+          rawOfferingsType: r.business_offerings == null
+            ? 'null'
+            : Array.isArray(r.business_offerings)
+              ? `array(${r.business_offerings.length})`
+              : 'object',
+        }));
+        console.log(`${DBG} Sample rows (up to 5):`, sample);
+      }
+
       if (loadErr) {
-        console.warn('[loadBusinesses] businesses + business_offerings:', loadErr.message || loadErr, loadErr);
+        console.warn(`${DBG} fetch error:`, loadErr.message || loadErr, loadErr);
         setDbBusinesses([]);
         setDataLoaded(true);
         return;
@@ -433,28 +461,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (profileRows && profileRows.length > 0) {
         const mapped: Business[] = [];
         for (const row of profileRows as Record<string, unknown>[]) {
+          const profileName = String(row.name ?? '(no name)');
+          const profileId = String(row.id ?? '');
+          const rawCat = row.category;
+          if (rawCat == null || String(rawCat).trim() === '') {
+            console.log(`${DBG} category note: profile "${profileName}" (${profileId}) has blank/null category — UI maps unknown to a default (e.g. dining); not excluded by fetch.`);
+          }
+
           const rawOff = row.business_offerings;
-          // PostgREST returns a single object when one child matches, or an array when multiple.
-          const offs = Array.isArray(rawOff) ? rawOff : rawOff != null ? [rawOff] : [];
+          const offs = normalizeEmbeddedOfferings(rawOff);
           const { business_offerings: _drop, ...profile } = row;
+
+          if (offs.length === 0) {
+            console.log(`${DBG} Skipping business:`, profileName, `id=${profileId}`, 'Reason: no embedded offerings (empty/null after normalize). raw type:', rawOff === null ? 'null' : Array.isArray(rawOff) ? 'array' : typeof rawOff);
+            continue;
+          }
+
+          let pushedForProfile = 0;
           for (const o of offs) {
-            const off = o as Record<string, unknown> & { active?: boolean };
-            if (off.active === false) continue;
-            const b = mapJoinedOfferingToBusiness(off, profile, SUPABASE_URL);
-            const profileActive = profile.active !== false;
-            mapped.push({
-              ...b,
-              active: profileActive && b.active !== false,
-            });
+            const off = o as Record<string, unknown> & { active?: boolean; id?: unknown };
+            if (off.active === false) {
+              console.log(`${DBG} Skipping offering:`, profileName, `offeringId=${String(off.id ?? '')}`, 'Reason: active is false');
+              continue;
+            }
+            try {
+              const b = mapJoinedOfferingToBusiness(off, profile, SUPABASE_URL);
+              const profileActive = profile.active !== false;
+              mapped.push({
+                ...b,
+                active: profileActive && b.active !== false,
+              });
+              pushedForProfile += 1;
+            } catch (mapErr) {
+              console.warn(`${DBG} Skipping business:`, profileName, `id=${profileId}`, 'Reason: mapJoinedOfferingToBusiness threw:', mapErr);
+            }
+          }
+          if (pushedForProfile === 0 && offs.length > 0) {
+            console.log(`${DBG} Skipping business:`, profileName, `id=${profileId}`, `Reason: had ${offs.length} offering(s) but none were active or all failed to map`);
           }
         }
+        console.log(`${DBG} Mapped ${mapped.length} listing row(s) for Deals grid.`);
         setDbBusinesses(mapped);
       } else {
+        console.log(`${DBG} No profile rows returned (length 0).`);
         setDbBusinesses([]);
       }
       setDataLoaded(true);
     } catch (err) {
-      console.error('Failed to load businesses:', err);
+      console.error('[loadBusinesses] Failed to load businesses:', err);
       setDataLoaded(true);
     }
   }, []);
