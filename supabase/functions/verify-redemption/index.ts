@@ -22,8 +22,13 @@ const PASS_ID_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function parsePassIdFromQrData(rawQr: string): string | null {
-  const t = rawQr.trim();
+  const t = rawQr.trim().replace(/^\uFEFF/, '');
   if (PASS_ID_UUID_RE.test(t)) return t;
+  // Some scanners prefix/suffix whitespace or non-UUID noise — extract first UUID substring.
+  const embedded = t.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+  );
+  if (embedded && PASS_ID_UUID_RE.test(embedded[0])) return embedded[0];
   try {
     const j = JSON.parse(t) as { passId?: unknown };
     if (j && typeof j.passId === 'string' && PASS_ID_UUID_RE.test(j.passId.trim())) {
@@ -38,6 +43,47 @@ function parsePassIdFromQrData(rawQr: string): string | null {
 /**
  * CORS: set CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
  */
+function originMatchesAllowList(origin: string, allowed: string[]): boolean {
+  const o = origin.trim();
+  if (!o) return false;
+  if (allowed.includes(o)) return true;
+  // Common drift: apex vs www when secret lists only one hostname
+  try {
+    const u = new URL(o);
+    const host = u.hostname.toLowerCase();
+    const noWww = host.startsWith('www.') ? host.slice(4) : host;
+    const withWww = host.startsWith('www.') ? host : `www.${host}`;
+    const altA = `${u.protocol}//${noWww}${u.port ? `:${u.port}` : ''}`;
+    const altB = `${u.protocol}//${withWww}${u.port ? `:${u.port}` : ''}`;
+    let altAOrigin = '';
+    let altBOrigin = '';
+    try {
+      altAOrigin = new URL(altA).origin;
+    } catch {
+      /* ignore */
+    }
+    try {
+      altBOrigin = new URL(altB).origin;
+    } catch {
+      /* ignore */
+    }
+    return allowed.some((a) => {
+      try {
+        const x = new URL(a);
+        return (
+          x.origin === u.origin ||
+          (altAOrigin && x.origin === altAOrigin) ||
+          (altBOrigin && x.origin === altBOrigin)
+        );
+      } catch {
+        return a === o;
+      }
+    });
+  } catch {
+    return false;
+  }
+}
+
 function getSafeCorsHeaders(req: Request): Record<string, string> {
   const raw = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim();
   const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
@@ -50,7 +96,12 @@ function getSafeCorsHeaders(req: Request): Record<string, string> {
     base['Access-Control-Allow-Origin'] = '*';
     return base;
   }
-  base['Access-Control-Allow-Origin'] = allowed.includes(origin) ? origin : allowed[0]!;
+  // Echo request Origin when allowed so browsers accept credentialed invokes (www/apex tolerant).
+  if (origin && originMatchesAllowList(origin, allowed)) {
+    base['Access-Control-Allow-Origin'] = origin;
+  } else {
+    base['Access-Control-Allow-Origin'] = allowed[0]!;
+  }
   return base;
 }
 
@@ -237,6 +288,8 @@ function computeRedemptionSavings(
   };
 }
 
+const BEARER_PREFIX = /^Bearer\s+/i;
+
 Deno.serve(async (req) => {
   const corsHeaders = getSafeCorsHeaders(req);
   const jsonResponse = (data: object, status = 200) =>
@@ -257,11 +310,20 @@ Deno.serve(async (req) => {
       return errorResponse('Missing Authorization header', 401);
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim();
+    const serviceKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
+    if (!supabaseUrl || !serviceKey) {
+      console.error(
+        '[verify-redemption] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY — cannot read public.passes',
+      );
+      return errorResponse('Server configuration error', 500);
+    }
 
-    const token = authHeader.replace('Bearer ', '');
+    const supabase = createClient(supabaseUrl, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const token = authHeader.replace(BEARER_PREFIX, '').trim();
     const { data: { user: scannerUser }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !scannerUser) {
       return errorResponse('Invalid or expired session', 401);
@@ -298,14 +360,24 @@ Deno.serve(async (req) => {
 
     const today = getTodayDate();
 
+    // Source of truth: public.passes.id (UUID) from QR — service role reads bypass RLS.
     const { data: pass, error: passErr } = await supabase
       .from('passes')
       .select('id, user_id, pass_type, active, valid_from, valid_until, expires_at, purchased_at, max_people')
       .eq('id', passId)
       .maybeSingle();
 
-    if (passErr || !pass) {
-      console.error('[verify-redemption] pass lookup error:', passErr);
+    if (passErr) {
+      console.error('[verify-redemption] passes table lookup error:', passErr.code, passErr.message, passErr);
+      return errorResponse(
+        passErr.message?.includes('JWT') || passErr.message?.includes('permission')
+          ? 'Database access error — check Edge Function secrets (SUPABASE_SERVICE_ROLE_KEY)'
+          : 'Pass lookup failed',
+        500,
+      );
+    }
+    if (!pass) {
+      console.error('[verify-redemption] no row in passes for id:', passId);
       return errorResponse('Pass not found for this QR code', 404);
     }
 
@@ -607,8 +679,13 @@ Deno.serve(async (req) => {
 
     return errorResponse('Unknown action: ' + action, 400);
   } catch (err: any) {
-    console.error('[verify-redemption] unexpected error:', err);
-    return errorResponse(err?.message ?? 'Verification failed', 500);
+    console.error('[verify-redemption] unexpected error:', err?.message ?? err, err?.stack ?? '');
+    return errorResponse(
+      typeof err?.message === 'string' && err.message.length > 0
+        ? `Verification failed: ${err.message}`
+        : 'Verification failed',
+      500,
+    );
   }
 });
 
