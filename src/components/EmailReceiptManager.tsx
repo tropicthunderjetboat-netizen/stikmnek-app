@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   Mail, Send, Eye, EyeOff, CheckCircle, XCircle, AlertTriangle,
@@ -88,6 +88,7 @@ const EmailReceiptManager: React.FC<Props> = ({ onBack }) => {
     setLoadingLogs(true);
     try {
       const { data } = await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_email_logs', template_filter: 'payment_receipt', limit: 10 },
       });
       if (data?.logs) {
@@ -109,6 +110,7 @@ const EmailReceiptManager: React.FC<Props> = ({ onBack }) => {
     setLoadingPreview(true);
     try {
       const { data } = await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'preview_template', template_key: 'payment_receipt', variables: vars },
       });
       if (data?.html) {
@@ -134,6 +136,7 @@ const EmailReceiptManager: React.FC<Props> = ({ onBack }) => {
     setSendResult(null);
     try {
       const { data } = await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: {
           action: 'send_test_receipt',
           recipient_email: recipientEmail,
@@ -160,6 +163,7 @@ const EmailReceiptManager: React.FC<Props> = ({ onBack }) => {
   const handleResend = async (logId: string) => {
     try {
       const { data } = await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'resend_email', email_log_id: logId },
       });
       if (data?.success) {

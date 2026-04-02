@@ -102,6 +102,15 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
   },
 });
 
+export async function getEdgeAuthHeaders(): Promise<Record<string, string>> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    console.warn('[getEdgeAuthHeaders] getSession error:', error.message);
+  }
+  const token = data?.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 
 // ═══════════════════════════════════════════════════════════════
 // CONNECTION VERIFICATION

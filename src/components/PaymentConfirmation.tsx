@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabase } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import {
   CheckCircle, Download, Printer, ArrowRight, Receipt,
   Calendar, CreditCard, Hash, Clock, Shield, Zap, Star, Crown, Copy, Check, Mail, Loader2,
@@ -735,6 +735,7 @@ const PaymentConfirmation: React.FC = () => {
       const durationDays =
         inclusiveCalendarDaysBetween(p.validFrom, p.validUntil) ?? p.days ?? 0;
       const { data, error } = await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: {
           action: 'send_pass_confirmation',
           user_id: user.id,

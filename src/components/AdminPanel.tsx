@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as hardcodedBusinesses, Business } from '@/data/businesses';
 
-import { supabase, SUPABASE_URL } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   BarChart3, Users, TrendingUp, DollarSign, Store, Eye, Download,
@@ -765,6 +765,7 @@ const AdminPanel: React.FC = () => {
         if (biz?.email) {
           try {
             await supabase.functions.invoke('send-email', {
+              headers: await getEdgeAuthHeaders(),
               body: {
                 action: 'send_business_decision',
                 owner_id: biz.owner_id || '',
@@ -814,6 +815,7 @@ const AdminPanel: React.FC = () => {
       if (biz?.email) {
         try {
           await supabase.functions.invoke('send-email', {
+            headers: await getEdgeAuthHeaders(),
             body: {
               action: 'send_business_decision',
               owner_id: biz.owner_id || '',

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabase } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   Mail, Bell, BellOff, Send, Eye, CheckCircle, XCircle,
@@ -86,6 +86,7 @@ const EmailNotificationCenter: React.FC<Props> = ({ mode }) => {
   const loadPreferences = useCallback(async () => {
     try {
       const { data } = await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_preferences' },
       });
       if (data?.preferences) {
@@ -116,7 +117,7 @@ const EmailNotificationCenter: React.FC<Props> = ({ mode }) => {
       if (templateFilter !== 'all') {
         body.template_filter = templateFilter;
       }
-      const { data } = await supabase.functions.invoke('send-email', { body });
+      const { data } = await supabase.functions.invoke('send-email', { headers: await getEdgeAuthHeaders(), body });
       if (data?.logs) {
         setEmailLogs(data.logs);
         setTotalLogs(data.total || data.logs.length);
@@ -132,6 +133,7 @@ const EmailNotificationCenter: React.FC<Props> = ({ mode }) => {
   const loadStats = useCallback(async () => {
     try {
       const { data } = await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_email_stats' },
       });
       if (data?.stats) {
@@ -146,6 +148,7 @@ const EmailNotificationCenter: React.FC<Props> = ({ mode }) => {
   const loadTemplates = useCallback(async () => {
     try {
       const { data } = await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_templates' },
       });
       if (data?.templates) {
@@ -176,6 +179,7 @@ const EmailNotificationCenter: React.FC<Props> = ({ mode }) => {
     setPreferences(newPrefs);
     try {
       await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'update_preferences', preferences: newPrefs },
       });
       toast.success('Email preferences updated');
@@ -189,6 +193,7 @@ const EmailNotificationCenter: React.FC<Props> = ({ mode }) => {
   const toggleTemplate = async (templateKey: string, active: boolean) => {
     try {
       await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'update_template', template_key: templateKey, active },
       });
       setTemplates(prev => prev.map(t =>
@@ -229,6 +234,7 @@ const EmailNotificationCenter: React.FC<Props> = ({ mode }) => {
       };
 
       const { data } = await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'preview_template', template_key: templateKey, variables: sampleVars },
       });
       if (data?.html) {
@@ -274,6 +280,7 @@ const EmailNotificationCenter: React.FC<Props> = ({ mode }) => {
       };
 
       const { data } = await supabase.functions.invoke('send-email', {
+        headers: await getEdgeAuthHeaders(),
         body: {
           action: 'send_template_email',
           template_key: templateKey,
