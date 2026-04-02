@@ -32,6 +32,18 @@ function errorResponse(req: Request, message: string, status = 400, extra?: Reco
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
 
+function safeDecodeJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const json = atob(parts[1] ?? '');
+    const payload = JSON.parse(json);
+    return (payload && typeof payload === 'object') ? payload as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
 async function getAuthUser(
   authClient: SupabaseServiceClient,
   req: Request,
@@ -41,8 +53,21 @@ async function getAuthUser(
     return { response: errorResponse(req, 'Missing Authorization header', 401, { reason: 'missing_authorization' }) };
   }
   const token = authHeader.replace(BEARER_PREFIX, '').trim();
+  const tokenPayload = safeDecodeJwtPayload(token);
+  if (tokenPayload) {
+    console.log('[send-email] Auth header token payload (masked):', {
+      iss: tokenPayload.iss,
+      aud: tokenPayload.aud,
+      role: tokenPayload.role,
+      sub: tokenPayload.sub,
+      exp: tokenPayload.exp,
+    });
+  } else {
+    console.warn('[send-email] Auth header token is not a 3-part JWT (unexpected)');
+  }
   const { data: { user }, error } = await authClient.auth.getUser(token);
   if (error || !user) {
+    console.error('[send-email] auth.getUser failed:', error?.message ?? '(no error message)');
     return {
       response: errorResponse(req, 'Invalid or expired session', 401, {
         reason: 'auth_invalid',
@@ -172,6 +197,13 @@ Deno.serve(async (req) => {
       console.error('[send-email] Missing anon key for JWT validation (set APP_SUPABASE_ANON_KEY)');
       return errorResponse(req, 'Server misconfiguration', 500, { reason: 'missing_supabase_anon_key' });
     }
+    const anonPayload = safeDecodeJwtPayload(anonKey);
+    console.log('[send-email] JWT validation key (masked payload):', anonPayload ? {
+      ref: anonPayload.ref,
+      role: anonPayload.role,
+      iss: anonPayload.iss,
+      exp: anonPayload.exp,
+    } : '(could not decode)');
 
     const authClient = createClient(supabaseUrl, anonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
