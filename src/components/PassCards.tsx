@@ -2,13 +2,17 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { Check, Zap, Crown, Star, CreditCard, Lock, ShieldCheck, Users, Baby, Calendar, Share2, Gift, Sparkles, Loader2, PartyPopper } from 'lucide-react';
+import { Check, Zap, Crown, Star, CreditCard, Lock, ShieldCheck, Users, Baby, Calendar, Share2, Gift, Sparkles, Loader2, PartyPopper, AlertTriangle } from 'lucide-react';
 
 import { usePassConfig, PassConfig } from '@/hooks/usePassConfig';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { PASS_PRODUCTS } from '@/data/pricing';
-import { getPassTripGuidance } from '@/lib/passRecommendation';
+import {
+  getPassTripGuidance,
+  recommendedPassForPartySize,
+  buildPassStayMismatchMessage,
+} from '@/lib/passRecommendation';
 
 const getIconComponent = (icon: PassConfig['icon'], className = 'w-6 h-6') => {
   switch (icon) {
@@ -387,12 +391,19 @@ const PassCards: React.FC = () => {
       refreshUserProfile();
     }
   }, [user?.id, userProfile, refreshUserProfile]);
+  const uiLang: 'en' | 'fr' | 'bi' = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+
   const tripGuidance = useMemo(() => {
     if (!userProfile) return null;
     const products = Object.values(PASS_PRODUCTS);
-    const lang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
-    return getPassTripGuidance(userProfile, products, { language: lang });
-  }, [userProfile, language]);
+    return getPassTripGuidance(userProfile, products, { language: uiLang });
+  }, [userProfile, uiLang]);
+
+  /** Adults + children only (infants excluded), when profile exists. */
+  const recommendedPassType = useMemo(() => {
+    if (!userProfile) return null;
+    return recommendedPassForPartySize(userProfile.num_adults, userProfile.num_children);
+  }, [userProfile]);
   const [sharedPasses, setSharedPasses] = useState<Set<string>>(
     () => {
       try {
@@ -803,6 +814,20 @@ const PassCards: React.FC = () => {
               const hasBonusDays = bonus.extraDays > 0;
               const hasBonusPeople = bonus.extraPeople > 0 || bonus.extraKids > 0;
               const hasBonus = hasBonusDays || hasBonusPeople;
+              const isRecommended = recommendedPassType != null && pass.type === recommendedPassType;
+              const arrival = String(userProfile?.expected_arrival_date ?? '').slice(0, 10);
+              const departure = String(userProfile?.expected_departure_date ?? '').slice(0, 10);
+              const stayMismatchMsg =
+                arrival && departure
+                  ? buildPassStayMismatchMessage(
+                      arrival,
+                      departure,
+                      pass.baseDays,
+                      pass.fullDays,
+                      pass.shareBonus.extraDays,
+                      uiLang,
+                    )
+                  : null;
               // Calculate group display
               const groupLabel = pass.totalPeople
                 ? (language === 'en' ? `${pass.totalPeople} people` : language === 'fr' ? `${pass.totalPeople} personnes` : `${pass.totalPeople} man`)
@@ -834,19 +859,20 @@ const PassCards: React.FC = () => {
                   className={`relative bg-white rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-2 ${
                     shared ? 'animate-card-glow' : ''
                   } ${
-                    pass.popular
-                      ? `ring-2 ring-teal-500 shadow-xl ${shadow}`
+                    isRecommended
+                      ? `ring-2 ring-indigo-500 shadow-xl shadow-indigo-200/40 ${shadow}`
                       : 'border border-gray-200 shadow-sm hover:shadow-lg'
                   }`}
                 >
-                  {/* Popular Badge */}
-                  {pass.popular && (
-                    <div className={`absolute top-0 left-0 right-0 bg-gradient-to-r ${color} text-white text-center py-1.5 text-xs font-bold uppercase tracking-wider`}>
-                      {t('pass.popular', language)}
+                  {isRecommended && (
+                    <div className="absolute top-3 right-3 z-10">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-600 text-white text-[11px] font-extrabold shadow-lg">
+                        {language === 'en' ? 'Recommended' : language === 'fr' ? 'Recommandé' : 'Rekomendem'}
+                      </span>
                     </div>
                   )}
 
-                  <div className={`p-8 ${pass.popular ? 'pt-12' : ''}`}>
+                  <div className="p-8">
                     {/* Icon */}
                     <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${color} flex items-center justify-center text-white mb-5 shadow-lg ${shadow}`}>
                       {getIconComponent(pass.icon)}
@@ -875,6 +901,13 @@ const PassCards: React.FC = () => {
                         {shared && hasBonusDays && <Sparkles className="w-3 h-3 text-emerald-500" />}
                       </div>
                     </div>
+
+                    {stayMismatchMsg && (
+                      <div className="mb-4 flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50/90 p-3.5 text-left">
+                        <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" aria-hidden />
+                        <p className="text-xs sm:text-sm text-amber-950 font-medium leading-relaxed">{stayMismatchMsg}</p>
+                      </div>
+                    )}
 
                     <div className="flex items-baseline gap-1 mb-3">
                       <span className="text-4xl font-extrabold text-gray-900">${pass.price}</span>
@@ -993,7 +1026,7 @@ const PassCards: React.FC = () => {
                       className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                         user?.pass === pass.type
                           ? 'bg-green-50 text-green-700 border border-green-200 cursor-default'
-                          : pass.popular
+                          : isRecommended
                             ? `bg-gradient-to-r ${color} text-white hover:opacity-90 shadow-lg ${shadow}`
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}

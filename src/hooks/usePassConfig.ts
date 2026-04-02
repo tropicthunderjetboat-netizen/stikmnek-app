@@ -178,7 +178,7 @@ const DEFAULT_PASSES: PassConfig[] = [
       { id: 'f4', text: 'Map navigation', textFr: 'Navigation carte', textBi: 'Map navigesen' },
       { id: 'f7', text: 'Share app: +2 people AND free 7th day!', textFr: 'Partagez: +2 personnes ET 7e jour gratuit !', textBi: 'Serem: +2 man mo fri 7th dei!' },
     ],
-    popular: true,
+    popular: false,
     active: true,
     description: 'Best value for group adventures over 6 days',
     descriptionFr: 'Meilleur rapport qualité-prix pour les aventures de groupe sur 6 jours',
@@ -288,6 +288,7 @@ function loadFromStorage(): PassConfig[] {
             ...defaultPass,
             ...p,
             type: migratedType,
+            popular: false,
             adults: p.adults ?? defaultPass?.adults ?? 4,
             kids: p.kids ?? defaultPass?.kids ?? 0,
             totalPeople: p.totalPeople !== undefined ? p.totalPeople : (defaultPass?.totalPeople ?? 4),
@@ -395,14 +396,6 @@ export function usePassConfig() {
     });
   }, []);
 
-  const setPopular = useCallback((passId: string) => {
-    setPasses(prev => {
-      const next = prev.map(p => ({ ...p, popular: p.id === passId }));
-      saveToStorage(next);
-      return next;
-    });
-  }, []);
-
   const resetToDefaults = useCallback(() => {
     setPasses(DEFAULT_PASSES);
     saveToStorage(DEFAULT_PASSES);
@@ -420,7 +413,6 @@ export function usePassConfig() {
     updateShareBonus,
     addFeature,
     removeFeature,
-    setPopular,
     resetToDefaults,
   };
 }

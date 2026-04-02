@@ -42,7 +42,6 @@ export const translations: Record<string, Record<Language, string>> = {
   'pass.extended_group_adventure': { en: 'Extended Group Adventure Pass', fr: 'Pass Aventure Groupe Étendu', bi: 'Grup Advenija Pas' },
   'pass.ultimate_crew_experience': { en: 'Ultimate Crew Experience Pass', fr: 'Pass Expérience Ultime Équipe', bi: 'Ultimet Kru Eksperiens Pas' },
   'pass.mega_group_experience': { en: 'Mega Group Experience Pass', fr: 'Pass Expérience Méga Groupe', bi: 'Mega Grup Eksperiens Pas' },
-  'pass.popular': { en: 'Most Popular', fr: 'Le plus populaire', bi: 'Mos Populer' },
   'pass.buy': { en: 'Buy Now', fr: 'Acheter', bi: 'Baem Nao' },
   'pass.feature1': { en: 'Access all deals', fr: 'Accès à toutes les offres', bi: 'Akses olgeta dils' },
   'pass.feature2': { en: 'QR code coupons', fr: 'Coupons QR code', bi: 'QR kod kupons' },

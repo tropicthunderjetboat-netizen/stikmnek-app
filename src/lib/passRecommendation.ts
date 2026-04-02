@@ -3,7 +3,7 @@
  * (Filename is legacy; there is no pass “recommendation” here.)
  */
 import type { UserProfile } from '@/contexts/AppContext';
-import type { PassProductConfig } from '@/data/pricing';
+import type { PassProductConfig, PassProductId } from '@/data/pricing';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 
 /**
@@ -189,4 +189,128 @@ export function getPassTripGuidance(
     totalPeople,
     totalDays,
   };
+}
+
+// ─── Party-size “Recommended” badge (adults + children only; infants excluded) ───
+
+function clampPartyCount(n: unknown): number {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 0;
+  return Math.max(0, Math.floor(x));
+}
+
+/**
+ * Smallest pass tier we steer groups toward by headcount (adults + children).
+ * Infants are not counted toward party size here.
+ */
+export function recommendedPassForPartySize(adults: unknown, children: unknown): PassProductId {
+  const a = clampPartyCount(adults);
+  const c = clampPartyCount(children);
+  const n = Math.max(1, a + c);
+  if (n <= 4) return 'family_explorer';
+  if (n <= 6) return 'extended_group_adventure';
+  if (n <= 8) return 'ultimate_crew_experience';
+  return 'mega_group_experience';
+}
+
+function addCalendarDaysIso(isoDate: string, deltaDays: number): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const t = Date.UTC(y, m - 1, d, 12, 0, 0, 0);
+  const next = new Date(t + deltaDays * 86400000);
+  return next.toISOString().slice(0, 10);
+}
+
+function formatIsoDateShort(iso: string, language: 'en' | 'fr' | 'bi'): string {
+  const d = new Date(iso + 'T12:00:00.000Z');
+  if (Number.isNaN(d.getTime())) return iso;
+  const loc = language === 'fr' ? 'fr-FR' : 'en-AU';
+  return d.toLocaleDateString(loc, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/**
+ * When the tourist’s stay is longer than this pass’s base discount days, explain expiry vs Share Bonus.
+ * Uses arrival as an illustrative “first discount day” so we can show example end dates.
+ */
+export function buildPassStayMismatchMessage(
+  arrival: string,
+  departure: string,
+  passBaseDays: number,
+  passFullDays: number,
+  shareExtraDays: number,
+  language: 'en' | 'fr' | 'bi',
+): string | null {
+  const a = String(arrival).slice(0, 10);
+  const dep = String(departure).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(dep)) return null;
+
+  const tripDays = inclusiveCalendarDaysBetween(a, dep);
+  if (tripDays == null || tripDays <= passBaseDays) return null;
+
+  const baseDays = Math.max(1, passBaseDays);
+  const fullDays = Math.max(baseDays, passFullDays);
+  const endBaseIso = addCalendarDaysIso(a, baseDays - 1);
+  const endShareIso = addCalendarDaysIso(a, fullDays - 1);
+  if (!endBaseIso || !endShareIso) return null;
+
+  const arrivalFmt = formatIsoDateShort(a, language);
+  const endBaseFmt = formatIsoDateShort(endBaseIso, language);
+  const endShareFmt = formatIsoDateShort(endShareIso, language);
+  const exceedsShareWindow = tripDays > fullDays;
+
+  if (language === 'fr') {
+    const parts: string[] = [
+      `Votre séjour compte ${tripDays} jour${tripDays > 1 ? 's' : ''}, alors que ce pass inclut ${baseDays} jour${baseDays > 1 ? 's' : ''} de réductions avant le bonus de partage — pas toute la durée sur place.`,
+      `Si vous commencez à utiliser les réductions le ${arrivalFmt}, la période « incluse » se termine le ${endBaseFmt}. Après cette date, le pass n’est plus valable pour les offres, même si vous êtes encore au Vanuatu. Vous choisissez quels jours utiliser ; beaucoup de voyageurs prennent des jours sans activités.`,
+    ];
+    if (shareExtraDays > 0) {
+      parts.push(
+        `Avec le bonus de partage (après achat, en partageant l’app), ce pass monte à ${fullDays} jour${fullDays > 1 ? 's' : ''} de réductions, jusqu’au ${endShareFmt}.`,
+      );
+    } else {
+      parts.push(
+        `Le bonus de partage sur ce pass ajoute surtout de la capacité (personnes), pas de jours supplémentaires.`,
+      );
+    }
+    if (exceedsShareWindow) {
+      parts.push(
+        `Votre séjour dépasse même cette durée étendue : un seul pass ne couvrira pas chaque jour en réductions.`,
+      );
+    }
+    return parts.join(' ');
+  }
+
+  if (language === 'bi') {
+    const parts: string[] = [
+      `Trip blong yu i gat ${tripDays} dei, be pas ia i gat ${baseDays} dei blong diskount bifo bonus afta serem — no long evri dei long aelan.`,
+      `Sapos yu stat yusum diskount long ${arrivalFmt}, taem « insaed » i finis long ${endBaseFmt}. Afta det, pas i finis blong ol dils, maski yu stap yet long Vanuatu. Yu save josem wanwan dei we yu laik; fulap taem ol man i tek rest dei.`,
+    ];
+    if (shareExtraDays > 0) {
+      parts.push(
+        `Wetem bonus afta serem (afta bai, serem app), pas i kasem ${fullDays} dei blong diskount, kasem ${endShareFmt}.`,
+      );
+    } else {
+      parts.push(`Bonus afta serem long pas ia i adem moa pipol, no moa dei.`);
+    }
+    if (exceedsShareWindow) {
+      parts.push(`Trip blong yu i lonmoa tu long hem : wan pas bambae no kavrem evri dei long diskount.`);
+    }
+    return parts.join(' ');
+  }
+
+  const parts: string[] = [
+    `Your travel dates span ${tripDays} days, but this pass includes ${baseDays} discount day${baseDays > 1 ? 's' : ''} before Share Bonus—not your whole time on island.`,
+    `If you start using discounts on ${arrivalFmt}, the included period ends ${endBaseFmt}. After that, the pass is expired for deals, even if you’re still in Vanuatu. You choose which days to use; many guests take rest days and skip redemptions.`,
+  ];
+  if (shareExtraDays > 0) {
+    parts.push(
+      `With Share Bonus (after purchase, share the app), this pass reaches ${fullDays} discount day${fullDays > 1 ? 's' : ''}, through ${endShareFmt}.`,
+    );
+  } else {
+    parts.push(`Share Bonus on this pass adds capacity (people), not extra discount days.`);
+  }
+  if (exceedsShareWindow) {
+    parts.push(`Your stay is still longer than that—even with Share Bonus, one pass won’t cover every day with discounts.`);
+  }
+  return parts.join(' ');
 }

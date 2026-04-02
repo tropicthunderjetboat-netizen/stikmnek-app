@@ -4,7 +4,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { toast } from 'sonner';
 import {
   Zap, Star, Crown, Check, CreditCard, DollarSign, Trash2,
-  Plus, Eye, EyeOff, Award, ChevronDown,
+  Plus, Eye, EyeOff, ChevronDown,
   RotateCcw, Save, Palette, Globe, Hash, Sparkles, Users, Baby,
   ArrowUp, ArrowDown, Settings2, ToggleLeft, ToggleRight, Calendar,
   Share2, Gift
@@ -40,7 +40,7 @@ const PassEditor: React.FC = () => {
   const { language } = useAppContext();
   const {
     passes, updatePass, updatePassFeature, updateShareBonus, addFeature,
-    removeFeature, setPopular, resetToDefaults,
+    removeFeature, resetToDefaults,
   } = usePassConfig();
 
   const [expandedPass, setExpandedPass] = useState<string | null>(null);
@@ -142,18 +142,9 @@ const PassEditor: React.FC = () => {
               return (
                 <div
                   key={pass.id}
-                  className={`relative bg-white rounded-xl overflow-hidden transition-all duration-300 ${
-                    pass.popular
-                      ? `ring-2 ring-teal-500 shadow-lg`
-                      : 'border border-gray-200 shadow-sm'
-                  }`}
+                  className="relative bg-white rounded-xl overflow-hidden transition-all duration-300 border border-gray-200 shadow-sm"
                 >
-                  {pass.popular && (
-                    <div className={`bg-gradient-to-r from-${pass.colorFrom} to-${pass.colorTo} text-white text-center py-1 text-[10px] font-bold uppercase tracking-wider`}>
-                      Most Popular
-                    </div>
-                  )}
-                  <div className={`p-5 ${pass.popular ? '' : 'pt-5'}`}>
+                  <div className="p-5">
                     <div className={`w-10 h-10 rounded-xl bg-gradient-to-br from-${pass.colorFrom} to-${pass.colorTo} flex items-center justify-center text-white mb-3 shadow-md`}>
                       {getIconComponent(pass.icon, 'w-5 h-5')}
                     </div>
@@ -196,11 +187,7 @@ const PassEditor: React.FC = () => {
                         <li className="text-[10px] text-gray-400 pl-6">+{pass.features.length - 4} more features</li>
                       )}
                     </ul>
-                    <div className={`w-full py-2 rounded-lg text-xs font-bold text-center ${
-                      pass.popular
-                        ? `bg-gradient-to-r from-${pass.colorFrom} to-${pass.colorTo} text-white`
-                        : 'bg-gray-100 text-gray-600'
-                    }`}>
+                    <div className="w-full py-2 rounded-lg text-xs font-bold text-center bg-gray-100 text-gray-600">
                       Buy Now
                     </div>
                   </div>
@@ -271,11 +258,6 @@ const PassEditor: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h4 className="text-sm font-bold text-gray-900">{pass.name}</h4>
-                    {pass.popular && (
-                      <span className="px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 text-[10px] font-bold uppercase">
-                        Popular
-                      </span>
-                    )}
                     {!pass.active && (
                       <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-[10px] font-bold uppercase">
                         Inactive
@@ -297,15 +279,6 @@ const PassEditor: React.FC = () => {
                     title={pass.active ? 'Deactivate pass' : 'Activate pass'}
                   >
                     {pass.active ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
-                  </button>
-                  <button
-                    onClick={() => setPopular(pass.id)}
-                    className={`p-2 rounded-lg transition-colors ${
-                      pass.popular ? 'text-amber-500 hover:bg-amber-50' : 'text-gray-300 hover:bg-gray-100'
-                    }`}
-                    title="Set as most popular"
-                  >
-                    <Award className="w-5 h-5" />
                   </button>
                 </div>
 
