@@ -311,6 +311,11 @@ async function buildVerifyRedemptionInvokeHeaders(): Promise<Record<string, stri
   return { Authorization: `Bearer ${token}` };
 }
 
+/** TEMP_DEBUG_QR_SCAN: same auth header for manage-business invokes. */
+async function buildManageBusinessInvokeHeaders(): Promise<Record<string, string>> {
+  return await buildVerifyRedemptionInvokeHeaders();
+}
+
 // ═══ FAILURE REASON CONFIG ═══
 const getFailureConfig = (status: string) => {
   switch (status) {
@@ -604,8 +609,10 @@ const QRScanner: React.FC<QRScannerProps> = ({
     }
 
     if (rows.length === 0) {
+      const headers = await buildManageBusinessInvokeHeaders();
       const { data: mbData, error: mbErr } = await supabase.functions.invoke('manage-business', {
         body: { action: 'get_owner_businesses', userId: user.id },
+        headers,
       });
 
       if (mbErr) {

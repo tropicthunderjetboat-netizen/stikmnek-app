@@ -96,13 +96,15 @@ export function computeRedemptionSavingsForListing(
   }
 
   const o = Number(listing.original_price);
-  const d = Number(listing.deal_price);
+  // If a listing has no discount configured yet, `deal_price` is often null/undefined.
+  // Treat that as "no discount" (deal == original) rather than "free".
+  const d = listing.deal_price == null ? o : Number(listing.deal_price);
   const partySize = Math.max(1, party.adults + party.children);
   if (!Number.isFinite(o) || !Number.isFinite(d) || o <= d) {
     return {
       savedAmount: 0,
-      totalStandard: 0,
-      totalDeal: 0,
+      totalStandard: Number.isFinite(o) ? Math.round(o * partySize) : 0,
+      totalDeal: Number.isFinite(d) ? Math.round(d * partySize) : 0,
       isTiered: false,
       unitSavings: 0,
       partyBillingCount: partySize,

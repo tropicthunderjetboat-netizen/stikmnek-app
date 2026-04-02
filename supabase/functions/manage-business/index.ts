@@ -11,22 +11,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-/** Comma-separated allowed origins. If env empty, allows *. If set, echoes matching Origin or first entry for non-browser clients. */
-function getSafeCorsHeaders(req: Request): Record<string, string> {
-  const raw = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim();
-  const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
-  const origin = req.headers.get('Origin') ?? '';
-  const base: Record<string, string> = {
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  };
-  if (allowed.length === 0) {
-    base['Access-Control-Allow-Origin'] = '*';
-    return base;
-  }
-  base['Access-Control-Allow-Origin'] = allowed.includes(origin) ? origin : allowed[0]!;
-  return base;
-}
+import { getSafeCorsHeaders } from '../_shared/cors.ts';
 
 const CATEGORIES = ['dining', 'accommodation', 'tours', 'activities', 'shopping', 'transport', 'services', 'other'];
 
@@ -37,8 +22,8 @@ function jsonResponse(req: Request, data: object, status = 200) {
   });
 }
 
-function errorResponse(req: Request, message: string, status = 400) {
-  return jsonResponse(req, { success: false, error: message }, status);
+function errorResponse(req: Request, message: string, status = 400, extra?: Record<string, unknown>) {
+  return jsonResponse(req, { success: false, error: message, errorCode: status, ...extra }, status);
 }
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
@@ -54,17 +39,22 @@ const BEARER_PREFIX = /^Bearer\s+/i;
  * Never use `body.userId` for caller identity.
  */
 async function getAuthUser(
-  supabase: SupabaseServiceClient,
+  authClient: SupabaseServiceClient,
   req: Request,
 ): Promise<{ user: { id: string; email?: string } } | { response: Response }> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.trim()) {
-    return { response: errorResponse(req, 'Missing Authorization header', 401) };
+    return { response: errorResponse(req, 'Missing Authorization header', 401, { reason: 'missing_authorization' }) };
   }
   const token = authHeader.replace(BEARER_PREFIX, '').trim();
-  const { data: { user }, error } = await supabase.auth.getUser(token);
+  const { data: { user }, error } = await authClient.auth.getUser(token);
   if (error || !user) {
-    return { response: errorResponse(req, 'Invalid or expired session', 401) };
+    return {
+      response: errorResponse(req, 'Invalid or expired session', 401, {
+        reason: 'auth_invalid',
+        authError: error?.message ?? null,
+      }),
+    };
   }
   return { user };
 }
@@ -314,6 +304,10 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabaseAnonKey =
+      (Deno.env.get('APP_SUPABASE_ANON_KEY') ?? '').trim() ||
+      (Deno.env.get('SUPABASE_ANON_KEY') ?? '').trim() ||
+      (Deno.env.get('SUPABASE_ANON_KEY_PUBLIC') ?? '').trim();
 
     // SUPABASE_SERVICE_ROLE_KEY is a reserved secret in Supabase and is auto-injected at runtime.
     // Do not enforce arbitrary length checks here; just ensure it exists.
@@ -325,10 +319,19 @@ Deno.serve(async (req) => {
       console.error('[manage-business] SUPABASE_URL is missing');
       return errorResponse(req, 'Server configuration error: missing Supabase URL', 500);
     }
+    if (!supabaseAnonKey) {
+      console.error('[manage-business] Missing anon key for JWT validation (set APP_SUPABASE_ANON_KEY)');
+      return errorResponse(req, 'Server configuration error', 500, { reason: 'missing_supabase_anon_key' });
+    }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
 
-    const authResult = await getAuthUser(supabase, req);
+    const authResult = await getAuthUser(authClient, req);
     if ('response' in authResult) {
       return authResult.response;
     }
