@@ -8,8 +8,11 @@ import { mapJoinedOfferingToBusiness, OFFERING_LISTING_COLUMNS } from '@/lib/bus
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
 import type { ViewMode } from '@/utils/viewModes';
+import type { PassProductId } from '@/data/pricing';
+import { PASS_PRODUCTS, passProductIdFromDb } from '@/data/pricing';
 
 export type { ViewMode };
+export type { PassProductId };
 
 /** PostgREST embed: null | single object | array — normalize to object rows only. */
 function normalizeEmbeddedOfferings(raw: unknown): Record<string, unknown>[] {
@@ -28,7 +31,8 @@ function normalizeEmbeddedOfferings(raw: unknown): Record<string, unknown>[] {
 // ═══════════════════════════════════════════════════════════════
 const ADMIN_EMAILS = ['admin@stikmnek.com', 'testadmin@example.com', 'stikmnek@gmail.com'];
 
-export type PassType = 'daily' | 'weekly' | 'monthly' | 'mega_group' | null;
+/** Active pass on the user; null if none. Canonical product id (not legacy DB strings). */
+export type PassType = PassProductId | null;
 
 // ═══════════════════════════════════════════════════════════════
 // UserProfile — matches the ACTUAL user_profiles table columns
@@ -99,7 +103,7 @@ export interface User {
 }
 
 export interface CartItem {
-  passType: 'daily' | 'weekly' | 'monthly' | 'mega_group';
+  passType: PassProductId;
   price: number;
 }
 
@@ -232,7 +236,7 @@ interface AppContextType {
   toggleFavorite: (id: string) => void;
   cart: CartItem | null;
   setCart: (item: CartItem | null) => void;
-  purchasePass: (passType: 'daily' | 'weekly' | 'monthly' | 'mega_group') => void;
+  purchasePass: (passType: PassProductId) => void;
   selectedBusiness: Business | null;
   setSelectedBusiness: React.Dispatch<React.SetStateAction<Business | null>>;
   showAuth: boolean;
@@ -327,6 +331,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const lastDbResolvedRoleRef = useRef<'tourist' | 'business' | 'admin' | null>(null);
   const signInCooldownRef = useRef<number>(0);
   const authProcessingRef = useRef<boolean>(false);
+  /** Delays the red profile banner so transient timeouts / double auth events do not flash a false error. */
+  const profileBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ═══════════════════════════════════════════════════════════
   // GEOLOCATION
@@ -533,7 +539,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (!prev || prev.id !== userId) return prev;
             return {
               ...prev,
-              pass: pass.pass_type as PassType,
+              pass: passProductIdFromDb(String(pass.pass_type)),
               passId: pass.id,
               passExpiry: expiry.toISOString().split('T')[0],
               passValidFrom: validFrom,
@@ -801,26 +807,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     authProcessingRef.current = true;
 
+    if (profileBannerTimerRef.current) {
+      clearTimeout(profileBannerTimerRef.current);
+      profileBannerTimerRef.current = null;
+    }
+
     try {
-      // Fail-fast: resolveRole has internal timeout; wrap in extra safety
+      // Fail-fast: resolveRole has internal timeout; wrap in extra safety.
+      // Retry a few times — navigator auth lock / slow PostgREST often recovers within ~1s.
       let role: 'tourist' | 'business' | 'admin';
       let profile: UserProfile | null;
       let profileRowFetchOk = false;
-      try {
-        const result = await Promise.race([
-          resolveRole(authUser.id, authUser.email || '', authUser.user_metadata),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('handleAuthenticatedUser: resolveRole timeout')), 10_000)
-          ),
-        ]);
-        role = result.role;
-        profile = result.profile;
-        profileRowFetchOk = result.profileRowFetchOk;
-      } catch (resolveErr) {
-        console.warn('[handleAuthenticatedUser] resolveRole failed — using default tourist:', (resolveErr as Error)?.message);
-        role = ADMIN_EMAILS.includes((authUser.email || '').toLowerCase()) ? 'admin' : 'tourist';
-        profile = null;
-        profileRowFetchOk = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, 450 * attempt));
+        }
+        try {
+          const result = await Promise.race([
+            resolveRole(authUser.id, authUser.email || '', authUser.user_metadata),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('handleAuthenticatedUser: resolveRole timeout')), 12_000)
+            ),
+          ]);
+          role = result.role;
+          profile = result.profile;
+          profileRowFetchOk = result.profileRowFetchOk;
+          break;
+        } catch (resolveErr) {
+          console.warn(
+            `[handleAuthenticatedUser] resolveRole attempt ${attempt + 1}/3:`,
+            (resolveErr as Error)?.message,
+          );
+          if (attempt === 2) {
+            role = ADMIN_EMAILS.includes((authUser.email || '').toLowerCase()) ? 'admin' : 'tourist';
+            profile = null;
+            profileRowFetchOk = false;
+          }
+        }
       }
 
       // ─── FALLBACK: If no profile found, create one (with timeout, don't block) ───
@@ -856,11 +879,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const profileReady = !!profile;
+      const profileBannerMessage =
+        'Failed to load your profile. Please check your connection and try again, or contact support if this continues.';
       if (!profileReady && !profileRowFetchOk) {
-        setUserProfileLoadError(
-          'Failed to load your profile. Please check your connection and try again, or contact support if this continues.',
-        );
+        if (profileBannerTimerRef.current) {
+          clearTimeout(profileBannerTimerRef.current);
+          profileBannerTimerRef.current = null;
+        }
+        profileBannerTimerRef.current = setTimeout(() => {
+          profileBannerTimerRef.current = null;
+          setUserProfileLoadError(profileBannerMessage);
+        }, 1600);
       } else {
+        if (profileBannerTimerRef.current) {
+          clearTimeout(profileBannerTimerRef.current);
+          profileBannerTimerRef.current = null;
+        }
         setUserProfileLoadError(null);
       }
 
@@ -877,9 +911,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (err) {
       console.error('[handleAuthenticatedUser] CRITICAL ERROR:', err);
-      setUserProfileLoadError(
-        'Failed to load your profile. Please check your connection and try again, or contact support if this continues.',
-      );
+      if (profileBannerTimerRef.current) {
+        clearTimeout(profileBannerTimerRef.current);
+        profileBannerTimerRef.current = null;
+      }
+      // Fallback still signs the user in from JWT metadata — do not show the profile banner
+      // (it reads like a failed login even though the session is valid).
+      setUserProfileLoadError(null);
       const meta = authUser.user_metadata || {};
       let fallbackRole: 'tourist' | 'business' | 'admin';
       
@@ -952,6 +990,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
           switch (event) {
             case 'SIGNED_OUT': {
+              if (profileBannerTimerRef.current) {
+                clearTimeout(profileBannerTimerRef.current);
+                profileBannerTimerRef.current = null;
+              }
               lastDbResolvedRoleRef.current = null;
               signInCooldownRef.current = 0;
               authProcessingRef.current = false;
@@ -1051,6 +1093,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subscription.unsubscribe();
       clearTimeout(fallbackTimer);
       clearTimeout(safetyTimer);
+      if (profileBannerTimerRef.current) {
+        clearTimeout(profileBannerTimerRef.current);
+        profileBannerTimerRef.current = null;
+      }
     };
   }, [loadBusinesses, loadReviews, handleAuthenticatedUser]);
 
@@ -1350,7 +1396,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   // PURCHASE PASS
   // ═══════════════════════════════════════════════════════════
-  const purchasePass = useCallback(async (passType: 'daily' | 'weekly' | 'monthly' | 'mega_group') => {
+  const purchasePass = useCallback(async (passType: PassProductId) => {
     if (!user) {
       setShowAuth(true);
       setAuthMode('signup-tourist');
@@ -1360,8 +1406,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast.info('You already have this pass active!');
       return;
     }
-    const prices = { daily: 15, weekly: 45, monthly: 99, mega_group: 199 };
-    setCart({ passType, price: prices[passType] });
+    const price = PASS_PRODUCTS[passType]?.priceAUD ?? 0;
+    setCart({ passType, price });
     setCurrentView('checkout');
   }, [user, setCurrentView]);
 
@@ -1388,8 +1434,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUserProfileLoadError(null);
       }
     } catch (err) {
-      console.error('refreshUserProfile failed:', err);
-      setUserProfileLoadError('Failed to load your profile. Please try again in a moment.');
+      // Do not set the global profile banner here: PassCards / payment flows call refresh often;
+      // transient PostgREST errors would flash a false "failed login" banner before the next success.
+      console.warn('refreshUserProfile failed:', err);
     }
   }, [user?.id]);
 

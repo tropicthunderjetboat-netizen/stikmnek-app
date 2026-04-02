@@ -8,8 +8,9 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
+import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
 
-const PASS_PRICES_AUD: Record<string, number> = {
+const PASS_PRICES_AUD: Record<DbPassType, number> = {
   daily: 15,
   weekly: 45,
   monthly: 99,
@@ -78,16 +79,17 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const passType = body?.passType ?? body?.pass_type;
+    const rawPassType = String(body?.passType ?? body?.pass_type ?? '').trim();
+    const passTypeDb = normalizePassTypeToDb(rawPassType);
     const startDate = body?.startDate ?? body?.start_date;
     const returnUrl = body?.returnUrl ?? body?.return_url;
     const cancelUrl = body?.cancelUrl ?? body?.cancel_url;
 
-    if (!passType || !startDate) {
+    if (!passTypeDb || !startDate) {
       return errorResponse('Missing passType or startDate', 400);
     }
 
-    const amount = PASS_PRICES_AUD[passType];
+    const amount = PASS_PRICES_AUD[passTypeDb];
     if (amount == null) {
       return errorResponse('Invalid passType', 400);
     }
@@ -97,16 +99,17 @@ Deno.serve(async (req) => {
     const base = sandbox ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
     const accessToken = await getPayPalAccessToken(sandbox);
 
+    const semanticId = semanticPassIdFromDb(passTypeDb);
     const orderPayload = {
       intent: 'CAPTURE',
       purchase_units: [
         {
-          reference_id: `pass_${passType}_${startDate}`,
+          reference_id: `pass_${passTypeDb}_${startDate}`,
           amount: {
             currency_code: 'AUD',
             value: amount.toFixed(2),
           },
-          description: `StikmNek ${passType} pass — valid from ${startDate}`,
+          description: `StikmNek ${semanticId} pass — valid from ${startDate}`,
         },
       ],
       application_context: {
@@ -151,7 +154,7 @@ Deno.serve(async (req) => {
       approvalUrl,
       amount,
       currency: 'AUD',
-      passType,
+      passType: semanticId,
       startDate,
     });
   } catch (err: any) {

@@ -9,6 +9,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
+import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
@@ -89,10 +90,10 @@ async function getAuthUser(
 const SUPERSTAR_PRICE_AUD = 5.0;
 
 // Pass configuration (keep in sync with pricing.ts and paypal-capture)
-const PASS_DAYS: Record<string, number> = { daily: 1, weekly: 6, monthly: 6, mega_group: 7 };
-const PASS_MAX_PEOPLE: Record<string, number> = { daily: 4, weekly: 4, monthly: 7, mega_group: 20 };
-const PASS_PRICES_AUD: Record<string, number> = { daily: 15, weekly: 45, monthly: 99, mega_group: 199 };
-const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = {
+const PASS_DAYS: Record<DbPassType, number> = { daily: 1, weekly: 6, monthly: 6, mega_group: 7 };
+const PASS_MAX_PEOPLE: Record<DbPassType, number> = { daily: 4, weekly: 4, monthly: 7, mega_group: 20 };
+const PASS_PRICES_AUD: Record<DbPassType, number> = { daily: 15, weekly: 45, monthly: 99, mega_group: 199 };
+const SHARE_BONUS: Record<DbPassType, { extraPeople: number; extraDays: number }> = {
   daily: { extraPeople: 2, extraDays: 0 },
   weekly: { extraPeople: 2, extraDays: 1 },
   monthly: { extraPeople: 1, extraDays: 1 },
@@ -258,10 +259,11 @@ Deno.serve(async (req) => {
         }, 501);
       }
 
-      const rawPassType = (body?.passType ?? body?.pass_type ?? '').toLowerCase();
+      const rawPassType = String(body?.passType ?? body?.pass_type ?? '').trim();
       const startDate = body?.startDate ?? body?.start_date;
 
-      if (!rawPassType || !['daily', 'weekly', 'monthly', 'mega_group'].includes(rawPassType)) {
+      const passTypeDb = normalizePassTypeToDb(rawPassType);
+      if (!passTypeDb) {
         return errorResponse(req, 'Missing or invalid passType', 400);
       }
 
@@ -269,7 +271,7 @@ Deno.serve(async (req) => {
         return errorResponse(req, 'Missing or invalid startDate (YYYY-MM-DD)', 400);
       }
 
-      dbg('purchase_pass_input_ok', { passType: rawPassType, startDate });
+      dbg('purchase_pass_input_ok', { passTypeDb, passTypeClient: rawPassType, startDate });
 
       // ─── Server-side: start date must not be before today's calendar date (UTC) ───
       // Compare date-only fields at UTC midnight so behavior is stable regardless of
@@ -292,7 +294,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      const passType = rawPassType;
+      const passType = passTypeDb;
       const baseDays = PASS_DAYS[passType] ?? 1;
       const baseMaxPeople = PASS_MAX_PEOPLE[passType] ?? 4;
       const amount = PASS_PRICES_AUD[passType] ?? 0;
@@ -362,7 +364,7 @@ Deno.serve(async (req) => {
             success: true,
             idempotentReplay: true,
             receiptNumber: `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
-            passType: ep.pass_type ?? passType,
+            passType: semanticPassIdFromDb(normalizePassTypeToDb(String(ep.pass_type ?? '')) ?? passType),
             amount: Number(ep.amount_paid) || amount,
             currency: (ep.currency as string) || 'AUD',
             expiresAt: exAt,
@@ -378,7 +380,7 @@ Deno.serve(async (req) => {
 
       const passRow: Record<string, unknown> = {
         user_id: authUser.id,
-        pass_type: passType,
+        pass_type: passTypeDb,
         active: true,
         valid_from: validFrom,
         valid_until: validUntil,
@@ -424,7 +426,7 @@ Deno.serve(async (req) => {
               success: true,
               idempotentReplay: true,
               receiptNumber: `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
-              passType: ep.pass_type ?? passType,
+              passType: semanticPassIdFromDb(normalizePassTypeToDb(String(ep.pass_type ?? '')) ?? passType),
               amount: Number(ep.amount_paid) || amount,
               currency: (ep.currency as string) || 'AUD',
               expiresAt: exAt,
@@ -459,7 +461,7 @@ Deno.serve(async (req) => {
       return jsonResponse(req, {
         success: true,
         receiptNumber,
-        passType,
+        passType: semanticPassIdFromDb(passType),
         amount,
         currency: 'AUD',
         expiresAt,

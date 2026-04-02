@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { getBasePeople, getShareBonusTotalPeople, getPassDisplayTitle } from '@/data/pricing';
+import { getBasePeople, getShareBonusTotalPeople, getPassDisplayTitle, type PassProductId } from '@/data/pricing';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { supabase } from '@/lib/supabase';
 import { QrCode, Calendar, Shield, Ticket, Copy, Check } from 'lucide-react';
@@ -114,24 +114,24 @@ const QRCodeDisplay: React.FC = () => {
     return null;
   }
 
-  const passColors: Record<string, string> = {
-    daily: 'from-sky-500 to-blue-600',
-    weekly: 'from-teal-500 to-emerald-600',
-    monthly: 'from-orange-500 to-amber-600',
-    mega_group: 'from-fuchsia-600 to-purple-700',
+  const passColors: Record<PassProductId, string> = {
+    family_explorer: 'from-sky-500 to-blue-600',
+    extended_group_adventure: 'from-teal-500 to-emerald-600',
+    ultimate_crew_experience: 'from-orange-500 to-amber-600',
+    mega_group_experience: 'from-fuchsia-600 to-purple-700',
   };
 
-  const passBgColors: Record<string, string> = {
-    daily: 'bg-sky-50 border-sky-200',
-    weekly: 'bg-teal-50 border-teal-200',
-    monthly: 'bg-orange-50 border-orange-200',
-    mega_group: 'bg-fuchsia-50 border-fuchsia-200',
+  const passBgColors: Record<PassProductId, string> = {
+    family_explorer: 'bg-sky-50 border-sky-200',
+    extended_group_adventure: 'bg-teal-50 border-teal-200',
+    ultimate_crew_experience: 'bg-orange-50 border-orange-200',
+    mega_group_experience: 'bg-fuchsia-50 border-fuchsia-200',
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Header */}
-      <div className={`bg-gradient-to-r ${passColors[user.pass] || passColors.weekly} p-5 text-white`}>
+      <div className={`bg-gradient-to-r ${passColors[user.pass] || passColors.extended_group_adventure} p-5 text-white`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
@@ -152,7 +152,7 @@ const QRCodeDisplay: React.FC = () => {
 
       {/* QR Code */}
       <div className="p-6 flex flex-col items-center">
-        <div className={`p-4 rounded-2xl border-2 ${passBgColors[user.pass] || passBgColors.weekly} mb-4`}>
+        <div className={`p-4 rounded-2xl border-2 ${passBgColors[user.pass] || passBgColors.extended_group_adventure} mb-4`}>
           {qrCodeUrl ? (
             <img
               src={qrCodeUrl}

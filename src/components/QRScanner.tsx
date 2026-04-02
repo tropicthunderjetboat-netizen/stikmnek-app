@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { getPassDisplayTitle } from '@/data/pricing';
+import { getPassDisplayTitle, passProductIdFromDb } from '@/data/pricing';
 import {
   computeRedemptionSavingsForListing,
   partyFromValidityApi,
@@ -129,16 +129,20 @@ function formatOfferDiscountLine(listing: OwnerListingOffer): string {
 
 // ═══ PASS TIER STYLING ═══
 const getPassTierConfig = (passType: string) => {
+  const pid = passProductIdFromDb(passType);
+  if (pid === 'family_explorer') {
+    return { gradient: 'from-sky-500 to-blue-600', bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-800', badge: 'bg-gradient-to-r from-sky-500 to-blue-600', icon: <Zap className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
+  }
+  if (pid === 'extended_group_adventure') {
+    return { gradient: 'from-teal-500 to-emerald-600', bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-800', badge: 'bg-gradient-to-r from-teal-500 to-emerald-600', icon: <Star className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
+  }
+  if (pid === 'ultimate_crew_experience') {
+    return { gradient: 'from-orange-500 to-amber-600', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', badge: 'bg-gradient-to-r from-orange-500 to-amber-600', icon: <Crown className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
+  }
+  if (pid === 'mega_group_experience') {
+    return { gradient: 'from-fuchsia-600 to-purple-700', bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-900', badge: 'bg-gradient-to-r from-fuchsia-600 to-purple-700', icon: <Crown className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
+  }
   const type = (passType || '').toLowerCase();
-  if (type === 'daily') {
-    return { gradient: 'from-sky-500 to-blue-600', bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-800', badge: 'bg-gradient-to-r from-sky-500 to-blue-600', icon: <Zap className="w-4 h-4" />, label: getPassDisplayTitle('daily', 'en') };
-  }
-  if (type === 'weekly') {
-    return { gradient: 'from-teal-500 to-emerald-600', bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-800', badge: 'bg-gradient-to-r from-teal-500 to-emerald-600', icon: <Star className="w-4 h-4" />, label: getPassDisplayTitle('weekly', 'en') };
-  }
-  if (type === 'monthly') {
-    return { gradient: 'from-orange-500 to-amber-600', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', badge: 'bg-gradient-to-r from-orange-500 to-amber-600', icon: <Crown className="w-4 h-4" />, label: getPassDisplayTitle('monthly', 'en') };
-  }
   if (type.includes('gold') || type.includes('premium') || type.includes('vip')) {
     return { gradient: 'from-yellow-400 via-amber-500 to-yellow-600', bg: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-800', badge: 'bg-gradient-to-r from-yellow-400 to-amber-500', icon: <Crown className="w-4 h-4" />, label: 'GOLD' };
   }
@@ -1740,7 +1744,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                   <span className="text-sm font-extrabold text-emerald-900">Valid pass</span>
                 </div>
                 <p className="text-xs text-emerald-800">
-                  {verifiedForOfferFlow.tourist?.name} · {getPassDisplayTitle(verifiedForOfferFlow.pass?.type || 'weekly', 'en')}
+                  {verifiedForOfferFlow.tourist?.name} · {getPassDisplayTitle(verifiedForOfferFlow.pass?.type || 'extended_group_adventure', 'en')}
                 </p>
                 {(() => {
                   const p = partyFromValidityApi(verifiedForOfferFlow.party);

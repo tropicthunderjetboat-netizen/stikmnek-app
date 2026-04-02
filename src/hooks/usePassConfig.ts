@@ -4,6 +4,8 @@ import {
   EXTENDED_GROUP_ADVENTURE_PASS,
   ULTIMATE_CREW_EXPERIENCE_PASS,
   MEGA_GROUP_EXPERIENCE_PASS,
+  type PassProductId,
+  PASS_PRODUCT_ORDER,
 } from '@/data/pricing';
 
 export interface PassFeature {
@@ -24,7 +26,8 @@ export interface ShareBonus {
 
 export interface PassConfig {
   id: string;
-  type: 'daily' | 'weekly' | 'monthly' | 'mega_group';
+  /** Canonical product id (same as `PassProductConfig.id`; DB stores legacy `pass_type` — map at boundaries). */
+  type: PassProductId;
   name: string;
   nameFr: string;
   nameBi: string;
@@ -52,27 +55,41 @@ export interface PassConfig {
   shareBonus: ShareBonus;
 }
 
+/** Migrate stored admin config or URLs that still use legacy DB pass_type strings. */
+function passProductIdFromLegacyOrId(raw: string): PassProductId | null {
+  const k = String(raw).toLowerCase().trim();
+  const legacy: Record<string, PassProductId> = {
+    daily: 'family_explorer',
+    weekly: 'extended_group_adventure',
+    monthly: 'ultimate_crew_experience',
+    mega_group: 'mega_group_experience',
+  };
+  if (legacy[k]) return legacy[k];
+  if ((PASS_PRODUCT_ORDER as readonly string[]).includes(k)) return k as PassProductId;
+  return null;
+}
+
 // ─── Pass name helpers (from pricing.ts) ───
-export const PASS_NAMES: Record<string, { en: string; fr: string; bi: string; short: string }> = {
-  daily: {
+export const PASS_NAMES: Record<PassProductId, { en: string; fr: string; bi: string; short: string }> = {
+  family_explorer: {
     en: FAMILY_EXPLORER_PASS.title,
     fr: FAMILY_EXPLORER_PASS.titleFr,
     bi: FAMILY_EXPLORER_PASS.titleBi,
     short: 'Family Explorer',
   },
-  weekly: {
+  extended_group_adventure: {
     en: EXTENDED_GROUP_ADVENTURE_PASS.title,
     fr: EXTENDED_GROUP_ADVENTURE_PASS.titleFr,
     bi: EXTENDED_GROUP_ADVENTURE_PASS.titleBi,
     short: 'Group Adventure',
   },
-  monthly: {
+  ultimate_crew_experience: {
     en: ULTIMATE_CREW_EXPERIENCE_PASS.title,
     fr: ULTIMATE_CREW_EXPERIENCE_PASS.titleFr,
     bi: ULTIMATE_CREW_EXPERIENCE_PASS.titleBi,
     short: 'Crew Experience',
   },
-  mega_group: {
+  mega_group_experience: {
     en: MEGA_GROUP_EXPERIENCE_PASS.title,
     fr: MEGA_GROUP_EXPERIENCE_PASS.titleFr,
     bi: MEGA_GROUP_EXPERIENCE_PASS.titleBi,
@@ -81,13 +98,15 @@ export const PASS_NAMES: Record<string, { en: string; fr: string; bi: string; sh
 };
 
 export function getPassDisplayName(passType: string, language: 'en' | 'fr' | 'bi' = 'en'): string {
-  const names = PASS_NAMES[passType];
+  const id = passProductIdFromLegacyOrId(passType);
+  const names = id ? PASS_NAMES[id] : undefined;
   if (!names) return passType;
   return names[language] || names.en;
 }
 
 export function getPassShortName(passType: string): string {
-  return PASS_NAMES[passType]?.short || passType;
+  const id = passProductIdFromLegacyOrId(passType);
+  return id ? PASS_NAMES[id]?.short ?? passType : passType;
 }
 
 // Map pricing product to usePassConfig ShareBonus format (extraKids=0 for people-only)
@@ -105,7 +124,7 @@ function toShareBonus(sb: { extraPeople: number; extraDays: number; description:
 const DEFAULT_PASSES: PassConfig[] = [
   {
     id: 'pass-daily',
-    type: 'daily',
+    type: 'family_explorer',
     name: FAMILY_EXPLORER_PASS.title,
     nameFr: FAMILY_EXPLORER_PASS.titleFr,
     nameBi: FAMILY_EXPLORER_PASS.titleBi,
@@ -140,7 +159,7 @@ const DEFAULT_PASSES: PassConfig[] = [
   },
   {
     id: 'pass-weekly',
-    type: 'weekly',
+    type: 'extended_group_adventure',
     name: EXTENDED_GROUP_ADVENTURE_PASS.title,
     nameFr: EXTENDED_GROUP_ADVENTURE_PASS.titleFr,
     nameBi: EXTENDED_GROUP_ADVENTURE_PASS.titleBi,
@@ -175,7 +194,7 @@ const DEFAULT_PASSES: PassConfig[] = [
   },
   {
     id: 'pass-monthly',
-    type: 'monthly',
+    type: 'ultimate_crew_experience',
     name: ULTIMATE_CREW_EXPERIENCE_PASS.title,
     nameFr: ULTIMATE_CREW_EXPERIENCE_PASS.titleFr,
     nameBi: ULTIMATE_CREW_EXPERIENCE_PASS.titleBi,
@@ -210,7 +229,7 @@ const DEFAULT_PASSES: PassConfig[] = [
   },
   {
     id: 'pass-mega-group',
-    type: 'mega_group',
+    type: 'mega_group_experience',
     name: MEGA_GROUP_EXPERIENCE_PASS.title,
     nameFr: MEGA_GROUP_EXPERIENCE_PASS.titleFr,
     nameBi: MEGA_GROUP_EXPERIENCE_PASS.titleBi,
@@ -246,7 +265,7 @@ const DEFAULT_PASSES: PassConfig[] = [
 ];
 
 const STORAGE_KEY = 'stikmnek-pass-config';
-const CONFIG_VERSION = 5; // v5: Adds Mega Group Experience Pass
+const CONFIG_VERSION = 6; // v6: Pass `type` uses PassProductId (semantic), not legacy weekly/monthly keys
 const VERSION_KEY = 'stikmnek-pass-config-version';
 
 function loadFromStorage(): PassConfig[] {
@@ -264,9 +283,11 @@ function loadFromStorage(): PassConfig[] {
       if (Array.isArray(parsed) && parsed.length > 0) {
         const migrated = parsed.map((p: any, idx: number) => {
           const defaultPass = DEFAULT_PASSES.find(d => d.id === p.id) || DEFAULT_PASSES[idx];
+          const migratedType = passProductIdFromLegacyOrId(p.type) ?? defaultPass?.type ?? 'family_explorer';
           return {
             ...defaultPass,
             ...p,
+            type: migratedType,
             adults: p.adults ?? defaultPass?.adults ?? 4,
             kids: p.kids ?? defaultPass?.kids ?? 0,
             totalPeople: p.totalPeople !== undefined ? p.totalPeople : (defaultPass?.totalPeople ?? 4),

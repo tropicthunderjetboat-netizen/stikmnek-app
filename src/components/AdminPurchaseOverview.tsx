@@ -11,7 +11,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area, LineChart, Line
 } from 'recharts';
-import { PASS_PRODUCTS } from '@/data/pricing';
+import { PASS_PRODUCTS, passProductIdFromDb, type DbPassType } from '@/data/pricing';
+
+const DB_PASS_ORDER: DbPassType[] = ['daily', 'weekly', 'monthly', 'mega_group'];
 
 interface PassPurchase {
   id: string;
@@ -36,26 +38,20 @@ interface AdminPurchaseOverviewProps {
   dbBusinessCount: number;
 }
 
-const PASS_COLORS: Record<string, string> = {
+const PASS_COLORS: Record<DbPassType, string> = {
   daily: '#0EA5E9',
   weekly: '#8B5CF6',
   monthly: '#F59E0B',
   mega_group: '#C026D3',
 };
 
-const PASS_LABELS: Record<string, string> = {
-  daily: PASS_PRODUCTS.daily.title,
-  weekly: PASS_PRODUCTS.weekly.title,
-  monthly: PASS_PRODUCTS.monthly.title,
-  mega_group: PASS_PRODUCTS.mega_group.title,
-};
+const PASS_LABELS: Record<DbPassType, string> = Object.fromEntries(
+  DB_PASS_ORDER.map((db) => [db, PASS_PRODUCTS[passProductIdFromDb(db)!].title]),
+) as Record<DbPassType, string>;
 
-const PASS_PRICES: Record<string, number> = {
-  daily: 15,
-  weekly: 45,
-  monthly: 99,
-  mega_group: 199,
-};
+const PASS_PRICES: Record<DbPassType, number> = Object.fromEntries(
+  DB_PASS_ORDER.map((db) => [db, PASS_PRODUCTS[passProductIdFromDb(db)!].priceAUD]),
+) as Record<DbPassType, number>;
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
@@ -148,7 +144,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
   const avgOrderValue = totalPurchases > 0 ? totalRevenue / totalPurchases : 0;
 
   // Revenue by pass type
-  const revenueByType = ['daily', 'weekly', 'monthly', 'mega_group'].map(type => {
+  const revenueByType = DB_PASS_ORDER.map((type) => {
     const typePurchases = completedPurchases.filter(p => p.pass_type === type);
     return {
       name: PASS_LABELS[type] || type,
@@ -571,10 +567,10 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
                   <Tooltip
                     contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }}
                   />
-                  <Bar dataKey="daily" name={PASS_PRODUCTS.daily.title} fill={PASS_COLORS.daily} radius={[4, 4, 0, 0]} stackId="stack" />
-                  <Bar dataKey="weekly" name={PASS_PRODUCTS.weekly.title} fill={PASS_COLORS.weekly} radius={[0, 0, 0, 0]} stackId="stack" />
-                  <Bar dataKey="monthly" name={PASS_PRODUCTS.monthly.title} fill={PASS_COLORS.monthly} radius={[4, 4, 0, 0]} stackId="stack" />
-                  <Bar dataKey="mega_group" name={PASS_PRODUCTS.mega_group.title} fill={PASS_COLORS.mega_group} radius={[4, 4, 0, 0]} stackId="stack" />
+                  <Bar dataKey="daily" name={PASS_LABELS.daily} fill={PASS_COLORS.daily} radius={[4, 4, 0, 0]} stackId="stack" />
+                  <Bar dataKey="weekly" name={PASS_LABELS.weekly} fill={PASS_COLORS.weekly} radius={[0, 0, 0, 0]} stackId="stack" />
+                  <Bar dataKey="monthly" name={PASS_LABELS.monthly} fill={PASS_COLORS.monthly} radius={[4, 4, 0, 0]} stackId="stack" />
+                  <Bar dataKey="mega_group" name={PASS_LABELS.mega_group} fill={PASS_COLORS.mega_group} radius={[4, 4, 0, 0]} stackId="stack" />
                 </BarChart>
               </ResponsiveContainer>
               <div className="flex items-center gap-4 mt-3">
@@ -652,23 +648,20 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
             Pass purchases will appear here once tourists start buying passes through PayPal.
             All revenue, trends, and analytics will be tracked in real-time.
           </p>
-          <div className="flex items-center justify-center gap-3 mt-6">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-semibold">
-              <CreditCard className="w-3.5 h-3.5" />
-              {PASS_PRODUCTS.daily.title}: ${PASS_PRODUCTS.daily.priceAUD}
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-50 text-purple-700 text-xs font-semibold">
-              <CreditCard className="w-3.5 h-3.5" />
-              {PASS_PRODUCTS.weekly.title}: ${PASS_PRODUCTS.weekly.priceAUD}
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 text-amber-700 text-xs font-semibold">
-              <CreditCard className="w-3.5 h-3.5" />
-              {PASS_PRODUCTS.monthly.title}: ${PASS_PRODUCTS.monthly.priceAUD}
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-fuchsia-50 text-fuchsia-700 text-xs font-semibold">
-              <CreditCard className="w-3.5 h-3.5" />
-              {PASS_PRODUCTS.mega_group.title}: ${PASS_PRODUCTS.mega_group.priceAUD}
-            </div>
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
+            {(
+              [
+                { db: 'daily' as const, box: 'bg-blue-50 text-blue-700' },
+                { db: 'weekly' as const, box: 'bg-purple-50 text-purple-700' },
+                { db: 'monthly' as const, box: 'bg-amber-50 text-amber-700' },
+                { db: 'mega_group' as const, box: 'bg-fuchsia-50 text-fuchsia-700' },
+              ] as const
+            ).map(({ db, box }) => (
+              <div key={db} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold ${box}`}>
+                <CreditCard className="w-3.5 h-3.5" />
+                {PASS_LABELS[db]}: ${PASS_PRICES[db]}
+              </div>
+            ))}
           </div>
         </div>
       )}

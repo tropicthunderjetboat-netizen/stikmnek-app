@@ -8,46 +8,45 @@ import {
   Users, CreditCard, AlertCircle, CheckCircle
 } from 'lucide-react';
 
-import { PASS_PRODUCTS } from '@/data/pricing';
+import { PASS_PRODUCTS, PASS_PRODUCT_ORDER, type PassProductId } from '@/data/pricing';
 
-const PASSES = {
-  daily: {
-    price: PASS_PRODUCTS.daily.priceAUD,
-    days: PASS_PRODUCTS.daily.baseDays,
-    label: PASS_PRODUCTS.daily.title,
-    icon: Zap,
-    color: 'from-sky-500 to-blue-600',
-    shadow: 'shadow-sky-200',
-    group: `Up to ${PASS_PRODUCTS.daily.basePeople} people`,
-  },
-  weekly: {
-    price: PASS_PRODUCTS.weekly.priceAUD,
-    days: PASS_PRODUCTS.weekly.baseDays,
-    label: PASS_PRODUCTS.weekly.title,
-    icon: Star,
-    color: 'from-teal-500 to-emerald-600',
-    shadow: 'shadow-teal-200',
-    group: `Up to ${PASS_PRODUCTS.weekly.basePeople} people`,
-  },
-  monthly: {
-    price: PASS_PRODUCTS.monthly.priceAUD,
-    days: PASS_PRODUCTS.monthly.baseDays,
-    label: PASS_PRODUCTS.monthly.title,
-    icon: Crown,
-    color: 'from-orange-500 to-amber-600',
-    shadow: 'shadow-orange-200',
-    group: `Up to ${PASS_PRODUCTS.monthly.basePeople} people`,
-  },
-  mega_group: {
-    price: PASS_PRODUCTS.mega_group.priceAUD,
-    days: PASS_PRODUCTS.mega_group.baseDays,
-    label: PASS_PRODUCTS.mega_group.title,
-    icon: Crown,
-    color: 'from-fuchsia-600 to-purple-700',
-    shadow: 'shadow-fuchsia-200',
-    group: `Up to ${PASS_PRODUCTS.mega_group.basePeople} people`,
-  },
+type LucideIcon = typeof Zap;
+
+type CheckoutPassRow = {
+  price: number;
+  days: number;
+  label: string;
+  icon: LucideIcon;
+  color: string;
+  shadow: string;
+  group: string;
 };
+
+const CHECKOUT_PASS_UI: Record<PassProductId, { icon: LucideIcon; color: string; shadow: string }> = {
+  family_explorer: { icon: Zap, color: 'from-sky-500 to-blue-600', shadow: 'shadow-sky-200' },
+  extended_group_adventure: { icon: Star, color: 'from-teal-500 to-emerald-600', shadow: 'shadow-teal-200' },
+  ultimate_crew_experience: { icon: Crown, color: 'from-orange-500 to-amber-600', shadow: 'shadow-orange-200' },
+  mega_group_experience: { icon: Crown, color: 'from-fuchsia-600 to-purple-700', shadow: 'shadow-fuchsia-200' },
+};
+
+const PASSES = Object.fromEntries(
+  PASS_PRODUCT_ORDER.map((id) => {
+    const p = PASS_PRODUCTS[id];
+    const ui = CHECKOUT_PASS_UI[id];
+    return [
+      id,
+      {
+        price: p.priceAUD,
+        days: p.baseDays,
+        label: p.title,
+        icon: ui.icon,
+        color: ui.color,
+        shadow: ui.shadow,
+        group: `Up to ${p.basePeople} people`,
+      } satisfies CheckoutPassRow,
+    ];
+  }),
+) as Record<PassProductId, CheckoutPassRow>;
 
 /**
  * Ensures the Supabase SDK has a valid, fresh access token.

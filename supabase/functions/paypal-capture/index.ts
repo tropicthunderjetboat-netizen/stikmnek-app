@@ -8,11 +8,12 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
+import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
 
-const PASS_DAYS: Record<string, number> = { daily: 1, weekly: 6, monthly: 6, mega_group: 7 };
-const PASS_MAX_PEOPLE: Record<string, number> = { daily: 4, weekly: 4, monthly: 7, mega_group: 20 };
-const PASS_PRICES_AUD: Record<string, number> = { daily: 15, weekly: 45, monthly: 99, mega_group: 199 };
-const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = {
+const PASS_DAYS: Record<DbPassType, number> = { daily: 1, weekly: 6, monthly: 6, mega_group: 7 };
+const PASS_MAX_PEOPLE: Record<DbPassType, number> = { daily: 4, weekly: 4, monthly: 7, mega_group: 20 };
+const PASS_PRICES_AUD: Record<DbPassType, number> = { daily: 15, weekly: 45, monthly: 99, mega_group: 199 };
+const SHARE_BONUS: Record<DbPassType, { extraPeople: number; extraDays: number }> = {
   daily: { extraPeople: 2, extraDays: 0 },
   weekly: { extraPeople: 2, extraDays: 1 },
   monthly: { extraPeople: 1, extraDays: 1 },
@@ -20,11 +21,11 @@ const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = 
 };
 
 function passTypeToBrandDisplay(passType: string): string {
-  const t = String(passType ?? '').toLowerCase().trim();
-  if (t === 'daily') return 'Family Explorer Pass';
-  if (t === 'weekly') return 'Extended Group Adventure Pass';
-  if (t === 'monthly') return 'Ultimate Crew Experience Pass';
-  if (t === 'mega_group') return 'Mega Group Experience Pass';
+  const db = normalizePassTypeToDb(passType);
+  if (db === 'daily') return 'Family Explorer Pass';
+  if (db === 'weekly') return 'Extended Group Adventure Pass';
+  if (db === 'monthly') return 'Ultimate Crew Experience Pass';
+  if (db === 'mega_group') return 'Mega Group Experience Pass';
   return 'StikmNek Pass';
 }
 
@@ -180,13 +181,14 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const paypalOrderId = body?.paypalOrderId ?? body?.orderId;
-    const passType = (body?.passType ?? body?.pass_type ?? '').toLowerCase();
+    const rawPassType = String(body?.passType ?? body?.pass_type ?? '').trim();
+    const passTypeDb = normalizePassTypeToDb(rawPassType);
     const startDate = body?.startDate ?? body?.start_date;
 
     if (!paypalOrderId) {
       return errorResponse('Missing paypalOrderId', 400);
     }
-    if (!passType || !['daily', 'weekly', 'monthly', 'mega_group'].includes(passType)) {
+    if (!passTypeDb) {
       return errorResponse('Missing or invalid passType', 400);
     }
     if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
@@ -230,6 +232,7 @@ Deno.serve(async (req) => {
       );
     }
 
+    const passType = passTypeDb;
     const baseDays = PASS_DAYS[passType] ?? 1;
     const baseMaxPeople = PASS_MAX_PEOPLE[passType] ?? 4;
     const amount = PASS_PRICES_AUD[passType] ?? 0;
@@ -254,7 +257,7 @@ Deno.serve(async (req) => {
 
     const passRow = {
       user_id: user.id,
-      pass_type: passType,
+      pass_type: passTypeDb,
       active: true,
       valid_from: validFrom,
       valid_until: validUntil,
@@ -294,7 +297,7 @@ Deno.serve(async (req) => {
           toEmail: buyerEmail,
           toName: (user.user_metadata as any)?.full_name ?? (user.user_metadata as any)?.name ?? null,
           receiptNumber,
-          passType,
+          passType: passTypeDb,
           amount,
           currency: 'AUD',
           validFrom,
@@ -311,7 +314,7 @@ Deno.serve(async (req) => {
     return jsonResponse({
       success: true,
       receiptNumber,
-      passType,
+      passType: semanticPassIdFromDb(passTypeDb),
       amount,
       currency: 'AUD',
       expiresAt,

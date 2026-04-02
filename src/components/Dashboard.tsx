@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { getPassDisplayTitle } from '@/data/pricing';
+import { getPassDisplayTitle, type PassProductId } from '@/data/pricing';
 import { t } from '@/data/translations';
 import { businesses as localBusinesses } from '@/data/businesses';
 import {
@@ -80,10 +80,11 @@ const Dashboard: React.FC = () => {
     };
   }, [redemptions, allBusinesses, totalSaved]);
 
-  const passColors: Record<string, string> = {
-    daily: 'from-sky-500 to-blue-600',
-    weekly: 'from-teal-500 to-emerald-600',
-    monthly: 'from-orange-500 to-amber-600',
+  const passColors: Record<PassProductId, string> = {
+    family_explorer: 'from-sky-500 to-blue-600',
+    extended_group_adventure: 'from-teal-500 to-emerald-600',
+    ultimate_crew_experience: 'from-orange-500 to-amber-600',
+    mega_group_experience: 'from-fuchsia-600 to-purple-700',
   };
 
   const categoryLabels: Record<string, string> = {
@@ -189,7 +190,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   {user.pass ? (
                     <div className="p-5">
-                      <div className={`relative bg-gradient-to-r ${passColors[user.pass] || passColors.weekly} rounded-2xl p-6 text-white overflow-hidden`}>
+                      <div className={`relative bg-gradient-to-r ${passColors[user.pass] || passColors.extended_group_adventure} rounded-2xl p-6 text-white overflow-hidden`}>
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-8 translate-x-8" />
                         <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-6 -translate-x-6" />
                         <div className="relative">

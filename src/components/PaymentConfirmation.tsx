@@ -7,7 +7,13 @@ import {
   CalendarRange, Users, Share2, Gift, Baby, Sparkles, PartyPopper
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { PASS_PRODUCTS, getPassDisplayTitle } from '@/data/pricing';
+import {
+  PASS_PRODUCTS,
+  PASS_PRODUCT_ORDER,
+  getPassDisplayTitle,
+  passProductIdFromDb,
+  type PassProductId,
+} from '@/data/pricing';
 import {
   Dialog,
   DialogContent,
@@ -38,39 +44,36 @@ interface PaymentResult {
   peopleCount?: number;
 }
 
-const PASS_GROUPS: Record<string, string> = {
-  daily: `Up to ${PASS_PRODUCTS.daily.basePeople} people`,
-  weekly: `Up to ${PASS_PRODUCTS.weekly.basePeople} people`,
-  monthly: `Up to ${PASS_PRODUCTS.monthly.basePeople} people`,
-  mega_group: `Up to ${PASS_PRODUCTS.mega_group.basePeople} people`,
-};
+const FALLBACK_PASS_PRODUCT: PassProductId = 'extended_group_adventure';
 
-const SHARE_BONUSES: Record<string, { extraDays: number; extraPeople: number; extraKids: number; description: string }> = {
-  daily: {
-    extraDays: 0,
-    extraPeople: PASS_PRODUCTS.daily.shareBonus.extraPeople,
-    extraKids: 0,
-    description: PASS_PRODUCTS.daily.shareBonus.description,
-  },
-  weekly: {
-    extraDays: PASS_PRODUCTS.weekly.shareBonus.extraDays,
-    extraPeople: PASS_PRODUCTS.weekly.shareBonus.extraPeople,
-    extraKids: 0,
-    description: PASS_PRODUCTS.weekly.shareBonus.description,
-  },
-  monthly: {
-    extraDays: PASS_PRODUCTS.monthly.shareBonus.extraDays,
-    extraPeople: PASS_PRODUCTS.monthly.shareBonus.extraPeople,
-    extraKids: 0,
-    description: PASS_PRODUCTS.monthly.shareBonus.description,
-  },
-  mega_group: {
-    extraDays: PASS_PRODUCTS.mega_group.shareBonus.extraDays,
-    extraPeople: PASS_PRODUCTS.mega_group.shareBonus.extraPeople,
-    extraKids: 0,
-    description: PASS_PRODUCTS.mega_group.shareBonus.description,
-  },
-};
+const PASS_GROUPS: Record<PassProductId, string> = Object.fromEntries(
+  PASS_PRODUCT_ORDER.map((id) => [id, `Up to ${PASS_PRODUCTS[id].basePeople} people`]),
+) as Record<PassProductId, string>;
+
+type ShareBonusRow = { extraDays: number; extraPeople: number; extraKids: number; description: string };
+
+const SHARE_BONUSES = Object.fromEntries(
+  PASS_PRODUCT_ORDER.map((id) => {
+    const sb = PASS_PRODUCTS[id].shareBonus;
+    return [
+      id,
+      {
+        extraDays: sb.extraDays ?? 0,
+        extraPeople: sb.extraPeople,
+        extraKids: 0,
+        description: sb.description,
+      } satisfies ShareBonusRow,
+    ];
+  }),
+) as Record<PassProductId, ShareBonusRow>;
+
+/** LocalStorage keys for share CTA — covers legacy `weekly` receipts and semantic ids. */
+function passShareStorageKeys(raw: string): string[] {
+  const id = passProductIdFromDb(raw);
+  const keys = new Set<string>([`pass-${raw}`]);
+  if (id) keys.add(`pass-${id}`);
+  return [...keys];
+}
 
 // ─── Ensure fresh session helper (replaces getValidAccessToken) ───
 async function ensureFreshSession(): Promise<string | null> {
@@ -238,19 +241,20 @@ const ShareCTA: React.FC<{
   onBonusApplied?: (bonus: ShareBonusApplied) => void;
 }> = ({ passType, userId, onBonusApplied }) => {
   const { language } = useAppContext();
+  const productId = passProductIdFromDb(passType);
   const [shareState, setShareState] = useState<'idle' | 'sharing' | 'success' | 'already-claimed' | 'error'>(() => {
     try {
       const stored = localStorage.getItem('stikmnek-shared-passes');
       if (stored) {
         const shared = new Set(JSON.parse(stored));
-        if (shared.has(`pass-${passType}`)) return 'success';
+        if (passShareStorageKeys(passType).some((k) => shared.has(k))) return 'success';
       }
     } catch {}
     return 'idle';
   });
   const [retrying, setRetrying] = useState(false);
 
-  const bonus = SHARE_BONUSES[passType];
+  const bonus = productId ? SHARE_BONUSES[productId] : undefined;
   if (!bonus) return null;
 
   const hasBonus = bonus.extraDays > 0 || bonus.extraPeople > 0 || bonus.extraKids > 0;
@@ -260,7 +264,7 @@ const ShareCTA: React.FC<{
     try {
       const stored = localStorage.getItem('stikmnek-shared-passes');
       const shared = stored ? new Set(JSON.parse(stored)) : new Set();
-      shared.add(`pass-${passType}`);
+      for (const k of passShareStorageKeys(passType)) shared.add(k);
       localStorage.setItem('stikmnek-shared-passes', JSON.stringify([...shared]));
     } catch {}
   };
@@ -619,6 +623,8 @@ const PaymentConfirmation: React.FC = () => {
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as PaymentResult;
+        const normalized = passProductIdFromDb(parsed.passType);
+        if (normalized) parsed.passType = normalized;
         const span = inclusiveCalendarDaysBetween(parsed.validFrom, parsed.validUntil);
         if (span != null) {
           parsed.days = span;
@@ -633,7 +639,8 @@ const PaymentConfirmation: React.FC = () => {
   // After purchase, `refreshUserPass` loads the real pass row — sync receipt dates/duration/share flag from DB.
   useEffect(() => {
     if (!payment || !user?.id) return;
-    if (user.pass !== payment.passType) return;
+    const paymentPid = passProductIdFromDb(payment.passType);
+    if (paymentPid == null || user.pass !== paymentPid) return;
     if (!user.passValidFrom || !user.passValidUntil) return;
 
     setPayment((prev) => {
@@ -703,9 +710,8 @@ const PaymentConfirmation: React.FC = () => {
   const handleShareBonusApplied = React.useCallback((bonus: ShareBonusApplied) => {
     setPayment((prev) => {
       if (!prev) return prev;
-      const basePeople = prev.passType && PASS_PRODUCTS[prev.passType as keyof typeof PASS_PRODUCTS]
-        ? PASS_PRODUCTS[prev.passType as keyof typeof PASS_PRODUCTS].basePeople
-        : 4;
+      const prevPid = passProductIdFromDb(prev.passType);
+      const basePeople = prevPid ? PASS_PRODUCTS[prevPid].basePeople : 4;
       const newPeople = (prev.peopleCount ?? basePeople) + (bonus.people ?? 0);
       const newValidUntil = addDaysToDate(prev.validUntil, bonus.days ?? 0) || prev.validUntil;
       const spanDays = inclusiveCalendarDaysBetween(prev.validFrom, newValidUntil);
@@ -798,24 +804,25 @@ const PaymentConfirmation: React.FC = () => {
     );
   }
 
+  const passProductId = passProductIdFromDb(payment.passType) ?? FALLBACK_PASS_PRODUCT;
+
   const passLabel = payment.passLabel || getPassDisplayTitle(payment.passType, language);
-  const passGroup = payment.group || PASS_GROUPS[payment.passType] || '';
+  const passGroup = payment.group || PASS_GROUPS[passProductId] || '';
   const shareBonusApplied = payment.shareBonusApplied ?? false;
-  const peopleCount = payment.peopleCount ?? (payment.passType && PASS_PRODUCTS[payment.passType as keyof typeof PASS_PRODUCTS] ? PASS_PRODUCTS[payment.passType as keyof typeof PASS_PRODUCTS].basePeople : 4);
+  const peopleCount = payment.peopleCount ?? PASS_PRODUCTS[passProductId].basePeople;
 
-
-  const passIcons: Record<string, React.ReactNode> = {
-    daily: <Zap className="w-6 h-6" />,
-    weekly: <Star className="w-6 h-6" />,
-    monthly: <Crown className="w-6 h-6" />,
-    mega_group: <Crown className="w-6 h-6" />,
+  const passIcons: Record<PassProductId, React.ReactNode> = {
+    family_explorer: <Zap className="w-6 h-6" />,
+    extended_group_adventure: <Star className="w-6 h-6" />,
+    ultimate_crew_experience: <Crown className="w-6 h-6" />,
+    mega_group_experience: <Crown className="w-6 h-6" />,
   };
 
-  const passColors: Record<string, string> = {
-    daily: 'from-sky-500 to-blue-600',
-    weekly: 'from-teal-500 to-emerald-600',
-    monthly: 'from-orange-500 to-amber-600',
-    mega_group: 'from-fuchsia-600 to-purple-700',
+  const passColors: Record<PassProductId, string> = {
+    family_explorer: 'from-sky-500 to-blue-600',
+    extended_group_adventure: 'from-teal-500 to-emerald-600',
+    ultimate_crew_experience: 'from-orange-500 to-amber-600',
+    mega_group_experience: 'from-fuchsia-600 to-purple-700',
   };
 
   const expiryDate = new Date(payment.expiresAt);
@@ -974,11 +981,11 @@ Enjoy your deals in Vanuatu!
         {/* Receipt Card */}
         <div ref={receiptRef} className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden print:shadow-none">
           {/* Receipt Header */}
-          <div className={`bg-gradient-to-r ${passColors[payment.passType] || passColors.weekly} p-6 text-white`}>
+          <div className={`bg-gradient-to-r ${passColors[passProductId]} p-6 text-white`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-                  {passIcons[payment.passType]}
+                  {passIcons[passProductId]}
                 </div>
                 <div>
                   <p className="text-white/80 text-sm font-medium">StikmNek</p>

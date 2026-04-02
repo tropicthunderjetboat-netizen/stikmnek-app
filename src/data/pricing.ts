@@ -1,20 +1,27 @@
 /**
  * StikmNek Pricing & Product Definitions
  * ─────────────────────────────────────
- * Central source of truth for pass types, prices, share bonuses,
- * and micro-transactions. Used across payment, receipts, and UI.
+ * Pass products are keyed by PassProductId (semantic). DB column `passes.pass_type`
+ * uses legacy strings — map with passCatalog helpers.
  */
 
-export const SUPERSTAR_PRICE_AUD = 5;
+import {
+  type PassProductId,
+  type DbPassType,
+  passProductIdFromDb,
+  toDbPassType,
+  PASS_PRODUCT_ORDER,
+} from '@/data/passCatalog';
 
-export type PassType = 'daily' | 'weekly' | 'monthly' | 'mega_group';
+export type { PassProductId, DbPassType };
+export { passProductIdFromDb, toDbPassType, PASS_PRODUCT_ORDER };
+
+export const SUPERSTAR_PRICE_AUD = 5;
 
 export interface ShareBonusConfig {
   extraPeople: number;
   extraDays: number;
-  /** Total people after share bonus applied */
   totalPeopleAfterShare: number;
-  /** Total days after share bonus applied (for passes that get +1 day) */
   totalDaysAfterShare?: number;
   description: string;
   descriptionFr: string;
@@ -22,7 +29,8 @@ export interface ShareBonusConfig {
 }
 
 export interface PassProductConfig {
-  type: PassType;
+  /** Canonical app identifier */
+  id: PassProductId;
   title: string;
   titleFr: string;
   titleBi: string;
@@ -32,9 +40,8 @@ export interface PassProductConfig {
   shareBonus: ShareBonusConfig;
 }
 
-/** Product A: 1-Day Pass */
 export const FAMILY_EXPLORER_PASS: PassProductConfig = {
-  type: 'daily',
+  id: 'family_explorer',
   title: 'Family Explorer Pass',
   titleFr: 'Pass Explorateur Familial',
   titleBi: 'Famili Eksplora Pas',
@@ -51,9 +58,8 @@ export const FAMILY_EXPLORER_PASS: PassProductConfig = {
   },
 };
 
-/** Product B: 6-Day Pass */
 export const EXTENDED_GROUP_ADVENTURE_PASS: PassProductConfig = {
-  type: 'weekly',
+  id: 'extended_group_adventure',
   title: 'Extended Group Adventure Pass',
   titleFr: 'Pass Aventure Groupe Étendu',
   titleBi: 'Grup Advenija Pas',
@@ -71,9 +77,8 @@ export const EXTENDED_GROUP_ADVENTURE_PASS: PassProductConfig = {
   },
 };
 
-/** Product C: Group Pass (6 Days) */
 export const ULTIMATE_CREW_EXPERIENCE_PASS: PassProductConfig = {
-  type: 'monthly',
+  id: 'ultimate_crew_experience',
   title: 'Ultimate Crew Experience Pass',
   titleFr: 'Pass Expérience Ultime Équipe',
   titleBi: 'Ultimet Kru Eksperiens Pas',
@@ -91,9 +96,8 @@ export const ULTIMATE_CREW_EXPERIENCE_PASS: PassProductConfig = {
   },
 };
 
-/** Product D: Mega Group Pass (7 Days) */
 export const MEGA_GROUP_EXPERIENCE_PASS: PassProductConfig = {
-  type: 'mega_group',
+  id: 'mega_group_experience',
   title: 'Mega Group Experience Pass',
   titleFr: 'Pass Expérience Méga Groupe',
   titleBi: 'Mega Grup Eksperiens Pas',
@@ -111,45 +115,48 @@ export const MEGA_GROUP_EXPERIENCE_PASS: PassProductConfig = {
   },
 };
 
-export const PASS_PRODUCTS: Record<PassType, PassProductConfig> = {
-  daily: FAMILY_EXPLORER_PASS,
-  weekly: EXTENDED_GROUP_ADVENTURE_PASS,
-  monthly: ULTIMATE_CREW_EXPERIENCE_PASS,
-  mega_group: MEGA_GROUP_EXPERIENCE_PASS,
+export const PASS_PRODUCTS: Record<PassProductId, PassProductConfig> = {
+  family_explorer: FAMILY_EXPLORER_PASS,
+  extended_group_adventure: EXTENDED_GROUP_ADVENTURE_PASS,
+  ultimate_crew_experience: ULTIMATE_CREW_EXPERIENCE_PASS,
+  mega_group_experience: MEGA_GROUP_EXPERIENCE_PASS,
 };
 
-export function getPassTitle(passType: PassType, lang: 'en' | 'fr' | 'bi' = 'en'): string {
-  const p = PASS_PRODUCTS[passType];
-  if (!p) return passType;
+/** Ordered list for UI (cards, checkout). */
+export const PASS_PRODUCTS_IN_ORDER: PassProductConfig[] = PASS_PRODUCT_ORDER.map((id) => PASS_PRODUCTS[id]);
+
+/** @deprecated Use PassProductId — same union, semantic names */
+export type PassType = PassProductId;
+
+export function getPassTitle(passId: PassProductId, lang: 'en' | 'fr' | 'bi' = 'en'): string {
+  const p = PASS_PRODUCTS[passId];
+  if (!p) return passId;
   return lang === 'fr' ? p.titleFr : lang === 'bi' ? p.titleBi : p.title;
 }
 
 /**
- * Safe display title for any string coming from DB / API.
- * Never surfaces raw keys like "monthly" to users — unknown values fall back to generic StikmNek Pass.
+ * Display title for DB legacy key, semantic id, or unknown string.
  */
 export function getPassDisplayTitle(
-  passType: string | null | undefined,
-  lang: 'en' | 'fr' | 'bi' = 'en'
+  raw: string | null | undefined,
+  lang: 'en' | 'fr' | 'bi' = 'en',
 ): string {
-  if (passType == null || String(passType).trim() === '') {
+  if (raw == null || String(raw).trim() === '') {
     return lang === 'fr' ? 'Pass StikmNek' : lang === 'bi' ? 'StikmNek Pas' : 'StikmNek Pass';
   }
-  const key = String(passType).toLowerCase().trim();
-  if (key === 'daily' || key === 'weekly' || key === 'monthly' || key === 'mega_group') {
-    return getPassTitle(key, lang);
-  }
+  const id = passProductIdFromDb(String(raw));
+  if (id) return getPassTitle(id, lang);
   return lang === 'fr' ? 'Pass StikmNek' : lang === 'bi' ? 'StikmNek Pas' : 'StikmNek Pass';
 }
 
-export function getPassPrice(passType: PassType): number {
-  return PASS_PRODUCTS[passType]?.priceAUD ?? 0;
+export function getPassPrice(passId: PassProductId): number {
+  return PASS_PRODUCTS[passId]?.priceAUD ?? 0;
 }
 
-export function getBasePeople(passType: PassType): number {
-  return PASS_PRODUCTS[passType]?.basePeople ?? 4;
+export function getBasePeople(passId: PassProductId): number {
+  return PASS_PRODUCTS[passId]?.basePeople ?? 4;
 }
 
-export function getShareBonusTotalPeople(passType: PassType): number {
-  return PASS_PRODUCTS[passType]?.shareBonus.totalPeopleAfterShare ?? 6;
+export function getShareBonusTotalPeople(passId: PassProductId): number {
+  return PASS_PRODUCTS[passId]?.shareBonus.totalPeopleAfterShare ?? 6;
 }

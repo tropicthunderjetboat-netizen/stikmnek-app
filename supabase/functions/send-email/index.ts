@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
+import { normalizePassTypeToDb } from '../_shared/passTypes.ts';
 
 /**
  * send-email Edge Function
@@ -88,13 +89,13 @@ function maskEmailForLog(email: string): string {
   return `${show}***@${domain}`;
 }
 
-/** StikmNek branded pass names (DB pass_type keys — never show raw keys to users). */
+/** StikmNek branded pass names (accepts legacy DB `pass_type` or semantic product id). */
 function passTypeToBrandDisplay(passType: unknown): string {
-  const t = String(passType ?? '').toLowerCase().trim();
-  if (t === 'daily') return 'Family Explorer Pass';
-  if (t === 'weekly') return 'Extended Group Adventure Pass';
-  if (t === 'monthly') return 'Ultimate Crew Experience Pass';
-  if (t === 'mega_group') return 'Mega Group Experience Pass';
+  const db = normalizePassTypeToDb(String(passType ?? ''));
+  if (db === 'daily') return 'Family Explorer Pass';
+  if (db === 'weekly') return 'Extended Group Adventure Pass';
+  if (db === 'monthly') return 'Ultimate Crew Experience Pass';
+  if (db === 'mega_group') return 'Mega Group Experience Pass';
   return 'StikmNek Pass';
 }
 
@@ -143,10 +144,16 @@ function inclusiveCalendarDaysBetweenDateOnly(from: string, until: string): numb
 }
 
 function shareBonusPromoText(passType: unknown): { headline: string; body: string } {
-  const t = String(passType ?? '').toLowerCase().trim();
+  const t = normalizePassTypeToDb(String(passType ?? ''));
   // Keep messaging generic enough for all pass types, but slightly more specific when we can.
   const base =
     `Log into your dashboard and click “Share App” to instantly upgrade your pass for FREE.`;
+  if (!t) {
+    return {
+      headline: 'Unlock more value (free upgrade)',
+      body: base,
+    };
+  }
   if (t === 'daily') {
     return {
       headline: 'Unlock more value (free upgrade)',
