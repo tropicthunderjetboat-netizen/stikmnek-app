@@ -187,7 +187,7 @@ const CardBrandIcon: React.FC<{ brand: string; className?: string }> = ({ brand,
 };
 
 const PaymentCheckout: React.FC = () => {
-  const { user, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass } = useAppContext();
+  const { user, userProfile, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass } = useAppContext();
   const [processing, setProcessing] = useState(false);
   const [step, setStep] = useState<'dates' | 'payment' | 'processing' | 'success'>('dates');
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -195,7 +195,33 @@ const PaymentCheckout: React.FC = () => {
   // Date state
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
-  const [startDate, setStartDate] = useState(todayStr);
+  const normalizeDateOnly = (v: unknown): string | null => {
+    if (!v) return null;
+    const s = String(v).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+  };
+
+  /**
+   * Source of truth for pass startDate:
+   * - Prefer the user's selected travel arrival date (user_profiles.expected_arrival_date) when present.
+   * - Do NOT silently default to "today" once an arrival date exists.
+   */
+  const preferredArrivalDate = normalizeDateOnly(userProfile?.expected_arrival_date);
+  const initialStartDate = preferredArrivalDate ?? todayStr;
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const startDateTouchedRef = useRef(false);
+
+  // Keep startDate aligned to profile arrival date unless the user manually changes it in this checkout.
+  useEffect(() => {
+    if (startDateTouchedRef.current) return;
+    if (!preferredArrivalDate) return;
+    if (preferredArrivalDate !== startDate) {
+      setStartDate(preferredArrivalDate);
+    }
+  }, [preferredArrivalDate, startDate]);
 
   // Card state
   const [cardNumber, setCardNumber] = useState('');
@@ -586,7 +612,10 @@ const PaymentCheckout: React.FC = () => {
                       value={startDate}
                       min={todayStr}
                       max={maxStartDate}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      onChange={(e) => {
+                        startDateTouchedRef.current = true;
+                        setStartDate(e.target.value);
+                      }}
                       className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer hover:border-teal-300"
                     />
                     <p className="text-xs text-gray-400 mt-1.5">

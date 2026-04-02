@@ -20,6 +20,42 @@ function jsonResponse(req: Request, data: object, status = 200) {
   });
 }
 
+// TEMP_DEBUG_PAYMENT — structured logs for production debugging
+function dbg(label: string, payload: Record<string, unknown>) {
+  try {
+    console.log(`[process-card-payment][TEMP_DEBUG_PAYMENT] ${label}`, JSON.stringify(payload));
+  } catch {
+    console.log(`[process-card-payment][TEMP_DEBUG_PAYMENT] ${label}`, payload);
+  }
+}
+
+function safeBoolEnv(name: string): boolean | null {
+  const v = (Deno.env.get(name) ?? '').trim().toLowerCase();
+  if (!v) return null;
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  return null;
+}
+
+function maskBodyForLog(body: any): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!body || typeof body !== 'object') return out;
+  out.action = body.action ?? body.Action ?? null;
+  out.passType = body.passType ?? body.pass_type ?? null;
+  out.startDate = body.startDate ?? body.start_date ?? null;
+  out.hasReferralCode = typeof body.referralCode === 'string' && body.referralCode.length > 0;
+  out.hasPaymentTransactionId =
+    typeof body.paymentTransactionId === 'string' ||
+    typeof body.payment_transaction_id === 'string' ||
+    typeof body.idempotencyKey === 'string';
+  // Never log raw card data
+  out.cardNumber = body.cardNumber ? `[len=${String(body.cardNumber).length}]` : null;
+  out.cardExpiry = body.cardExpiry ? `[len=${String(body.cardExpiry).length}]` : null;
+  out.cardCvv = body.cardCvv ? `[len=${String(body.cardCvv).length}]` : null;
+  out.cardName = body.cardName ? `[len=${String(body.cardName).length}]` : null;
+  return out;
+}
+
 function errorResponse(
   req: Request,
   message: string,
@@ -30,17 +66,22 @@ function errorResponse(
 }
 
 async function getAuthUser(
-  supabase: SupabaseServiceClient,
+  authClient: SupabaseServiceClient,
   req: Request,
 ): Promise<{ user: { id: string; email?: string } } | { response: Response }> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.trim()) {
-    return { response: errorResponse(req, 'Missing Authorization header', 401) };
+    return { response: errorResponse(req, 'Missing Authorization header', 401, { reason: 'missing_authorization' }) };
   }
   const token = authHeader.replace(BEARER_PREFIX, '').trim();
-  const { data: { user }, error } = await supabase.auth.getUser(token);
+  const { data: { user }, error } = await authClient.auth.getUser(token);
   if (error || !user) {
-    return { response: errorResponse(req, 'Invalid or expired session', 401) };
+    return {
+      response: errorResponse(req, 'Invalid or expired session', 401, {
+        reason: 'auth_invalid',
+        authError: error?.message ?? null,
+      }),
+    };
   }
   return { user };
 }
@@ -101,25 +142,61 @@ Deno.serve(async (req) => {
   }
 
   try {
+    let path = '';
+    try {
+      path = new URL(req.url).pathname;
+    } catch {
+      path = '(unparsed)';
+    }
+    dbg('entry', {
+      method: req.method,
+      path,
+      origin: req.headers.get('Origin') ?? null,
+      hasAuthHeader: Boolean(req.headers.get('Authorization')?.trim()),
+      corsAllowedOriginsSet: Boolean((Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim()),
+      cardMockEnabledEnv: safeBoolEnv('CARD_MOCK_ENABLED'),
+    });
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
     if (!supabaseUrl.trim() || !supabaseServiceKey.trim()) {
+      dbg('missing_supabase_secrets', {
+        hasSupabaseUrl: Boolean(supabaseUrl.trim()),
+        hasServiceKey: Boolean(supabaseServiceKey.trim()),
+      });
       return errorResponse(req, 'Server configuration error', 500, {
         reason: 'missing_supabase_secrets',
       });
     }
+    if (!supabaseAnonKey.trim()) {
+      dbg('missing_supabase_anon_key', { hasAnonKey: false });
+      return errorResponse(req, 'Server configuration error', 500, {
+        reason: 'missing_supabase_anon_key',
+      });
+    }
+
+    // Use anon key to validate caller JWT (GoTrue auth context).
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    // Use service role for DB operations (bypasses RLS).
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const authResult = await getAuthUser(supabase, req);
+    const authResult = await getAuthUser(authClient, req);
     if ('response' in authResult) {
+      dbg('auth_failed', { status: 401 });
       return authResult.response;
     }
     const authUser = authResult.user;
+    dbg('auth_ok', { userId: authUser.id, hasEmail: Boolean(authUser.email) });
 
     const body = await req.json().catch(() => ({}));
     const action = body?.action ?? body?.Action;
+    dbg('body', maskBodyForLog(body));
 
     if (!action) {
       return errorResponse(req, 'Missing action. Use action: purchase_pass for pass purchase.', 400);
@@ -137,9 +214,11 @@ Deno.serve(async (req) => {
 
       if (rpcError) {
         console.error('increment_superstar_credits error:', rpcError);
+        dbg('purchase_superstar_failed', { reason: 'rpc_error', postgresCode: rpcError.code ?? null });
         return errorResponse(req, 'Failed to add Super Star credit', 500);
       }
 
+      dbg('purchase_superstar_ok', { newCount: newCount ?? null });
       return jsonResponse(req, {
         success: true,
         superstar_credits: newCount ?? 1,
@@ -161,6 +240,7 @@ Deno.serve(async (req) => {
       //   CARD_MOCK_ENABLED=true
 
       const mockEnabled = (Deno.env.get('CARD_MOCK_ENABLED') ?? '').toLowerCase() === 'true';
+      dbg('purchase_pass_mock_flag', { mockEnabled });
       if (!mockEnabled) {
         return jsonResponse(req, {
           success: false,
@@ -180,6 +260,8 @@ Deno.serve(async (req) => {
       if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
         return errorResponse(req, 'Missing or invalid startDate (YYYY-MM-DD)', 400);
       }
+
+      dbg('purchase_pass_input_ok', { passType: rawPassType, startDate });
 
       // ─── Server-side: start date must not be before today's calendar date (UTC) ───
       // Compare date-only fields at UTC midnight so behavior is stable regardless of
@@ -210,12 +292,14 @@ Deno.serve(async (req) => {
       // If the user unlocked share bonus before purchase, apply it automatically and consume the flag.
       let applyShareBonus = false;
       try {
+        dbg('share_bonus_lookup_start', {});
         const { data: profileRow } = await supabase
           .from('user_profiles')
           .select('share_bonus_unlocked')
           .eq('user_id', authUser.id)
           .maybeSingle();
         applyShareBonus = Boolean(profileRow?.share_bonus_unlocked);
+        dbg('share_bonus_lookup_ok', { applyShareBonus });
       } catch {}
 
       const bonus = SHARE_BONUS[passType] ?? { extraPeople: 0, extraDays: 0 };
@@ -243,6 +327,8 @@ Deno.serve(async (req) => {
           ? crypto.randomUUID()
           : `txn-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`);
 
+      dbg('idempotency', { hasClientKey: Boolean(rawTxnId), keyPrefix: rawTxnId ? rawTxnId.slice(0, 8) : null });
+
       if (rawTxnId) {
         const { data: existingPass, error: existingErr } = await supabase
           .from('passes')
@@ -255,7 +341,9 @@ Deno.serve(async (req) => {
 
         if (existingErr) {
           console.error('process-card-payment: idempotent pass lookup:', existingErr);
+          dbg('idempotency_lookup_error', { postgresCode: existingErr.code ?? null, message: existingErr.message ?? null });
         } else if (existingPass) {
+          dbg('idempotency_replay', { existingPassId: (existingPass as any)?.id ?? null });
           const ep = existingPass as Record<string, unknown>;
           const vf = String(ep.valid_from ?? '') || validFrom;
           const vu = String(ep.valid_until ?? '') || validUntil;
@@ -296,6 +384,7 @@ Deno.serve(async (req) => {
         purchased_at: new Date().toISOString(),
       };
 
+      dbg('pass_insert_start', { passType, validFrom, validUntil, expiresAt, maxPeople, applyShareBonus });
       const { data: insertedPass, error: insertErr } = await supabase
         .from('passes')
         .insert(passRow)
@@ -305,6 +394,7 @@ Deno.serve(async (req) => {
       if (insertErr) {
         // Unique violation: concurrent insert with same idempotency key — return existing row.
         if (insertErr.code === '23505' && rawTxnId) {
+          dbg('pass_insert_unique_violation', { rawTxnIdPrefix: rawTxnId.slice(0, 8) });
           const { data: racedPass } = await supabase
             .from('passes')
             .select(
@@ -315,6 +405,7 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           if (racedPass) {
+            dbg('pass_insert_race_replay', { racedPassId: (racedPass as any)?.id ?? null });
             const ep = racedPass as Record<string, unknown>;
             const vf = String(ep.valid_from ?? '') || validFrom;
             const vu = String(ep.valid_until ?? '') || validUntil;
@@ -339,6 +430,7 @@ Deno.serve(async (req) => {
           }
         }
         console.error('process-card-payment: insert passes error:', insertErr);
+        dbg('pass_insert_failed', { postgresCode: insertErr.code ?? null, message: insertErr.message ?? null });
         return errorResponse(req, 'Payment captured but failed to create pass: ' + insertErr.message, 500, {
           reason: 'pass_insert_failed',
           postgresCode: insertErr.code ?? null,
@@ -347,12 +439,15 @@ Deno.serve(async (req) => {
 
       if (applyShareBonus) {
         // Consume the pre-purchase share bonus so it can't be reused.
+        dbg('share_bonus_consume_start', {});
         await supabase
           .from('user_profiles')
           .update({ share_bonus_unlocked: false, updated_at: new Date().toISOString() })
           .eq('user_id', authUser.id);
+        dbg('share_bonus_consume_ok', {});
       }
 
+      dbg('purchase_pass_ok', { insertedPassId: insertedPass?.id ?? null, receiptNumber });
       return jsonResponse(req, {
         success: true,
         receiptNumber,
@@ -373,6 +468,11 @@ Deno.serve(async (req) => {
     return errorResponse(req, `Unknown action: ${action}. Use action: purchase_pass for pass purchase.`, 400);
   } catch (err) {
     console.error('process-card-payment error:', err);
+    dbg('unexpected_error', {
+      message: err instanceof Error ? err.message : String(err ?? ''),
+      name: (err as any)?.name ?? null,
+      stack: (err as any)?.stack ? String((err as any).stack).slice(0, 1500) : null,
+    });
     const msg = err instanceof Error ? err.message : String(err ?? 'Internal server error');
     return errorResponse(req, msg || 'Internal server error', 500, { reason: 'unexpected' });
   }
