@@ -7,23 +7,33 @@
  * CORS enabled for browser invokes.
  */
 
-/**
- * CORS: set CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
- */
-function getSafeCorsHeaders(req: Request): Record<string, string> {
-  const raw = (Deno.env.get("CORS_ALLOWED_ORIGINS") ?? "").trim();
-  const allowed = raw.split(",").map((s) => s.trim()).filter(Boolean);
-  const origin = req.headers.get("Origin") ?? "";
-  const base: Record<string, string> = {
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  };
-  if (allowed.length === 0) {
-    base["Access-Control-Allow-Origin"] = "*";
-    return base;
-  }
-  base["Access-Control-Allow-Origin"] = allowed.includes(origin) ? origin : allowed[0]!;
-  return base;
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getSafeCorsHeaders } from "../_shared/cors.ts";
+
+// NOTE: sentry-relay should never block the app on auth problems.
+// Auth is OPTIONAL: if Authorization is present and valid, we attach user.id.
+// If missing/invalid, we still relay the event (with no user context).
+const BEARER_PREFIX = /^Bearer\s+/i;
+
+async function tryGetUserIdFromAuthHeader(req: Request): Promise<string | null> {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.trim()) return null;
+
+  const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
+  const anonKey =
+    (Deno.env.get("APP_SUPABASE_ANON_KEY") ?? "").trim() ||
+    (Deno.env.get("SUPABASE_ANON_KEY") ?? "").trim() ||
+    (Deno.env.get("SUPABASE_ANON_KEY_PUBLIC") ?? "").trim();
+
+  if (!supabaseUrl || !anonKey) return null;
+
+  const authClient = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const token = authHeader.replace(BEARER_PREFIX, "").trim();
+  const { data: { user }, error } = await authClient.auth.getUser(token);
+  if (error || !user) return null;
+  return user.id ?? null;
 }
 
 function parseDsn(dsn: string): { publicKey: string; host: string; projectId: string } | null {
@@ -108,7 +118,9 @@ Deno.serve(async (req) => {
       const extra = (body?.extra && typeof body.extra === "object")
         ? body.extra as Record<string, unknown>
         : {};
-      const userId = body?.user_id ? String(body.user_id) : undefined;
+      const userId =
+        (body?.user_id ? String(body.user_id) : undefined) ||
+        (await tryGetUserIdFromAuthHeader(req) ?? undefined);
 
       const event = {
         message,
@@ -149,7 +161,9 @@ Deno.serve(async (req) => {
       const metadata = (body?.metadata && typeof body.metadata === "object")
         ? body.metadata as Record<string, unknown>
         : {};
-      const userId = body?.user_id ? String(body.user_id) : undefined;
+      const userId =
+        (body?.user_id ? String(body.user_id) : undefined) ||
+        (await tryGetUserIdFromAuthHeader(req) ?? undefined);
       const tags = (body?.tags && typeof body.tags === "object")
         ? body.tags as Record<string, string>
         : {};
