@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabase } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { businesses as localBusinesses } from '@/data/businesses';
 import {
@@ -50,12 +50,13 @@ async function invokeWithRetry(
 ): Promise<{ data: any; error: any }> {
   let lastError: any = null;
   let lastData: any = null;
+  const headers = await getEdgeAuthHeaders();
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       if (attempt > 0) {
         await new Promise(r => setTimeout(r, 500 * attempt));
       }
-      const result = await supabase.functions.invoke(fnName, { body });
+      const result = await supabase.functions.invoke(fnName, { headers, body });
       if (result.error) {
         lastError = result.error;
         lastData = result.data ?? lastData; // Preserve response body on non-2xx (may contain error message)
@@ -366,8 +367,10 @@ const BusinessOwnerDashboard: React.FC = () => {
     console.log('[Dashboard] Loading all owner data for userId:', user.id);
 
     try {
+      const headers = await getEdgeAuthHeaders();
       // Strategy 1: Use the new unified endpoint
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers,
         body: { action: 'get_all_owner_data', userId: user.id },
       });
 
@@ -451,11 +454,14 @@ const BusinessOwnerDashboard: React.FC = () => {
 
     // Strategy 2: Fallback - load separately
     try {
+      const headers = await getEdgeAuthHeaders();
       const [ownerRes, pendingRes] = await Promise.all([
         supabase.functions.invoke('manage-business', {
+          headers,
           body: { action: 'get_owner_businesses', userId: user.id },
         }),
         supabase.functions.invoke('manage-business', {
+          headers,
           body: { action: 'get_pending', userId: user.id },
         }),
       ]);
@@ -697,6 +703,7 @@ const BusinessOwnerDashboard: React.FC = () => {
     setLoadingEdits(true);
     try {
       const { data } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_pending_edits', userId: user.id, businessId: selectedProfileId },
       });
       if (data?.edits) setPendingEdits(data.edits);
@@ -805,6 +812,7 @@ const BusinessOwnerDashboard: React.FC = () => {
       const { error } = await supabase.from('business_photos').update({ is_main: true }).eq('id', photo.id);
       if (error) throw error;
       await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'update_business', userId: user?.id, businessId: selectedProfileId, updates: { image: photo.url } },
       });
       setGalleryPhotos(prev => prev.map(p => ({ ...p, is_main: p.id === photo.id })));
@@ -844,6 +852,7 @@ const BusinessOwnerDashboard: React.FC = () => {
       if (editForm.original_price !== originalEditForm.original_price) changes.original_price = editForm.original_price;
 
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'submit_edit', userId: user.id, businessId: selectedProfileId, changes },
       });
       if (error) throw error;
@@ -861,6 +870,7 @@ const BusinessOwnerDashboard: React.FC = () => {
     if (!selectedBusiness || !selectedProfileId) return;
     try {
       await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'toggle_active', userId: user?.id, businessId: selectedProfileId, active },
       });
       toast.success(active ? 'Listing activated!' : 'Listing deactivated');
