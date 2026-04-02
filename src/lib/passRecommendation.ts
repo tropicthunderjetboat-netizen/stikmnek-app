@@ -1,34 +1,18 @@
+/**
+ * Trip guidance: explains base vs Share Bonus limits from profile dates & party size.
+ * (Filename is legacy; there is no pass “recommendation” here.)
+ */
 import type { UserProfile } from '@/contexts/AppContext';
-import type { PassProductConfig, PassProductId } from '@/data/pricing';
+import type { PassProductConfig } from '@/data/pricing';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 
-export interface PassRecommendation {
-  recommendedPass: PassProductConfig;
-  /** Same as `recommendedPass.id` — kept for UI comparison to pass config `type` field */
-  recommendedPassType: PassProductId;
+/**
+ * Explains base vs Share Bonus limits for the user’s trip — no product recommendations or prices.
+ */
+export interface PassTripGuidance {
+  guidanceText: string;
   totalPeople: number;
   totalDays: number;
-  /** True when the winning option assumes Share Bonus capacity (post-purchase share). */
-  usesShareBonus: boolean;
-  recommendationText: string;
-  /** Always 1 — the app supports one pass purchase per flow; see recommendationText when the trip exceeds one pass. */
-  totalPassesNeeded: number;
-  /** Price of one recommended pass (AUD). */
-  totalEstimatedCostAUD: number;
-  /**
-   * Other feasible single-pass options (same trip, one purchase), for “also consider” copy.
-   * Sorted for display: typically cheaper or no-share alternatives after the primary pick.
-   */
-  alternatives?: PassRecommendationAlternative[];
-}
-
-export interface PassRecommendationAlternative {
-  passProductId: PassProductId;
-  titleEn: string;
-  titleFr: string;
-  titleBi: string;
-  priceAUD: number;
-  mode: 'base' | 'share';
 }
 
 function clampInt(n: unknown, fallback: number): number {
@@ -37,9 +21,7 @@ function clampInt(n: unknown, fallback: number): number {
   return Math.max(0, Math.floor(x));
 }
 
-function displayPassTitle(p: PassProductConfig, lang: 'en' | 'fr' | 'bi'): string {
-  return lang === 'fr' ? p.titleFr : lang === 'bi' ? p.titleBi : p.title;
-}
+type CapacityMode = 'base' | 'share';
 
 function peopleAfterShare(p: PassProductConfig): number {
   return p.shareBonus?.totalPeopleAfterShare ?? (p.basePeople + (p.shareBonus?.extraPeople || 0));
@@ -47,20 +29,6 @@ function peopleAfterShare(p: PassProductConfig): number {
 
 function daysAfterShare(p: PassProductConfig): number {
   return p.shareBonus?.totalDaysAfterShare ?? (p.baseDays + (p.shareBonus?.extraDays || 0));
-}
-
-type CapacityMode = 'base' | 'share';
-
-interface FeasibleOption {
-  pass: PassProductConfig;
-  mode: CapacityMode;
-  peopleCap: number;
-  daysCap: number;
-  price: number;
-  /** (P/peopleCap)*(D/daysCap) — higher means less wasted capacity */
-  utilization: number;
-  /** Trip person-days per AUD — higher means better value */
-  valueDensity: number;
 }
 
 function capsForMode(pass: PassProductConfig, mode: CapacityMode): { people: number; days: number } {
@@ -73,7 +41,6 @@ function capsForMode(pass: PassProductConfig, mode: CapacityMode): { people: num
   };
 }
 
-/** True if one pass in this mode covers the whole trip (people + calendar days). */
 function coversTrip(
   pass: PassProductConfig,
   mode: CapacityMode,
@@ -84,87 +51,126 @@ function coversTrip(
   return totalPeople <= people && totalDays <= days;
 }
 
-function buildFeasibleOption(
-  pass: PassProductConfig,
-  mode: CapacityMode,
+function buildGuidanceText(
+  language: 'en' | 'fr' | 'bi',
   totalPeople: number,
   totalDays: number,
-): FeasibleOption | null {
-  if (!coversTrip(pass, mode, totalPeople, totalDays)) return null;
-  const { people: peopleCap, days: daysCap } = capsForMode(pass, mode);
-  const utilization = (totalPeople / peopleCap) * (totalDays / daysCap);
-  const personDays = totalPeople * totalDays;
-  const price = pass.priceAUD ?? 0;
-  const valueDensity = price > 0 ? personDays / price : 0;
-  return { pass, mode, peopleCap, daysCap, price, utilization, valueDensity };
-}
-
-/**
- * Sort feasible single-pass options for a **logical** default, not “cheapest at any cost”.
- *
- * 1. Prefer **base** capacity (trip works without sharing) over **share** — clearer for guests.
- * 2. Prefer **higher value density** (person-days per dollar).
- * 3. Prefer **higher utilization** (tighter fit — avoids Mega for mid-size groups when a smaller pass fits).
- * 4. Prefer **lower price** as final tie-breaker.
- */
-function compareFeasibleOptions(a: FeasibleOption, b: FeasibleOption): number {
-  if (a.mode !== b.mode) return a.mode === 'base' ? -1 : 1;
-  const vd = b.valueDensity - a.valueDensity;
-  if (Math.abs(vd) > 1e-6) return vd > 0 ? 1 : -1;
-  const u = b.utilization - a.utilization;
-  if (Math.abs(u) > 1e-6) return u > 0 ? 1 : -1;
-  return a.price - b.price;
-}
-
-/** Pass with the highest post-share people capacity (then days), for “one pass” overflow messaging. */
-function getHighestCapacityPass(passProducts: PassProductConfig[]): PassProductConfig {
-  return passProducts.reduce((best, p) => {
-    const pa = peopleAfterShare(p);
-    const pb = peopleAfterShare(best);
-    if (pa > pb) return p;
-    if (pa < pb) return best;
-    const da = daysAfterShare(p);
-    const db = daysAfterShare(best);
-    return da >= db ? p : best;
-  });
-}
-
-function formatAlternativesLine(
-  alts: PassRecommendationAlternative[],
-  lang: 'en' | 'fr' | 'bi',
+  passProducts: PassProductConfig[],
 ): string {
-  if (alts.length === 0) return '';
-  const parts = alts.slice(0, 2).map((a) => {
-    const t = lang === 'fr' ? a.titleFr : lang === 'bi' ? a.titleBi : a.titleEn;
-    const modeNote =
-      a.mode === 'share'
-        ? lang === 'fr'
-          ? ' (après partage)'
-          : lang === 'bi'
-            ? ' (afta serem)'
-            : ' (after share)'
-        : '';
-    return `${t} ~A$${a.priceAUD.toFixed(0)}${modeNote}`;
-  });
-  if (lang === 'fr') {
-    return ` Autres options possibles : ${parts.join(' · ')}.`;
+  const canCoverWithoutShare = passProducts.some((p) => coversTrip(p, 'base', totalPeople, totalDays));
+  const canCoverWithShare = passProducts.some((p) => coversTrip(p, 'share', totalPeople, totalDays));
+  const anyShareOnly = passProducts.some(
+    (p) => !coversTrip(p, 'base', totalPeople, totalDays) && coversTrip(p, 'share', totalPeople, totalDays),
+  );
+  const somePassHasFewerBaseDaysThanTrip = passProducts.some(
+    (p) => coversTrip(p, 'share', totalPeople, totalDays) && capsForMode(p, 'base').days < totalDays,
+  );
+
+  const paragraphs: string[] = [];
+
+  if (language === 'fr') {
+    paragraphs.push(
+      `Vous prévoyez ${totalPeople} personne${totalPeople > 1 ? 's' : ''} et ${totalDays} jour${totalDays > 1 ? 's' : ''} de réductions. Chaque pass indique combien de personnes et combien de jours de réduction sont inclus avant tout partage. Le bonus de partage n’ajoute des places et/ou des jours qu’après l’achat, lorsque vous utilisez « Partager l’app » — vérifiez les chiffres sur chaque carte.`,
+    );
+  } else if (language === 'bi') {
+    paragraphs.push(
+      `Yu planem ${totalPeople} man mo ${totalDays} dei blong diskount. Evri pas i soem hamas pipol mo hamas dei i stap insaed bifo yu serem. Bonus afta serem i adem moa pipol mo/oba moa dei afta yu bai, taem yu serem app — lukluk long namba long evri kaed.`,
+    );
+  } else {
+    paragraphs.push(
+      `You’re planning for ${totalPeople} ${totalPeople === 1 ? 'person' : 'people'} and ${totalDays} calendar day${totalDays > 1 ? 's' : ''} of discounts. Each pass shows how many people and how many discount days are included before you share anything. Share Bonus only adds extra people and/or days after you buy and use Share the app—check each card for the exact numbers.`,
+    );
   }
-  if (lang === 'bi') {
-    return ` Narafala joice: ${parts.join(' · ')}.`;
+
+  if (!canCoverWithShare) {
+    if (language === 'fr') {
+      paragraphs.push(
+        `Pour ce nombre de personnes et cette durée, un seul pass proposé ici peut ne pas suffire. Contactez le support pour les très grands groupes ou les longs séjours, ou envisagez plusieurs pass si c’est possible.`,
+      );
+    } else if (language === 'bi') {
+      paragraphs.push(
+        `Long olgeta man mo taem olsem, wan pas long app i no save kavrem evri samting. Askem support o tingbaot moa wan pas.`,
+      );
+    } else {
+      paragraphs.push(
+        `For this party size and trip length, one pass offered here may not cover everything. Contact support for very large groups or long stays, or plan multiple passes if that works for you.`,
+      );
+    }
+    return paragraphs.join('\n\n');
   }
-  return ` Other options that fit your trip: ${parts.join(' · ')}.`;
+
+  if (anyShareOnly && !canCoverWithoutShare) {
+    if (language === 'fr') {
+      paragraphs.push(
+        `Pour votre groupe et vos dates, tout pass qui couvre l’ensemble du séjour dépend du bonus de partage : prévoyez de partager l’app juste après l’achat.`,
+      );
+    } else if (language === 'bi') {
+      paragraphs.push(
+        `Blong grup mo det blong yu, evri pas we i stret long hol trip i nidim bonus afta serem — serem app afta yu bai.`,
+      );
+    } else {
+      paragraphs.push(
+        `For your party and dates, any pass that covers the full trip relies on Share Bonus—plan to share the app right after you purchase.`,
+      );
+    }
+  } else if (canCoverWithoutShare && anyShareOnly) {
+    if (language === 'fr') {
+      paragraphs.push(
+        `Certaines combinaisons peuvent déjà tenir dans les limites « incluses » d’au moins un pass ; d’autres ne donnent toute la durée ou toute la capacité qu’après le partage. Comparez la ligne de base et le bonus sur chaque carte.`,
+      );
+    } else if (language === 'bi') {
+      paragraphs.push(
+        `Sam pas i save stret long base lim long wan pas; narafala i nidim serem bifo i stret. Kompem base mo bonus long evri kaed.`,
+      );
+    } else {
+      paragraphs.push(
+        `Some options already fit your whole trip within the included limits on at least one pass; others only reach your full head count or full dates after Share Bonus. Compare the base row and the bonus on each card.`,
+      );
+    }
+  } else if (canCoverWithoutShare) {
+    if (language === 'fr') {
+      paragraphs.push(
+        `Votre groupe et vos dates peuvent tenir dans les limites incluses d’au moins un pass : le bonus de partage peut rester optionnel pour couvrir tout le séjour. Vérifiez tout de même chaque carte.`,
+      );
+    } else if (language === 'bi') {
+      paragraphs.push(
+        `Grup mo det blong yu i save long insaed long wan pas we i no nidim serem. Hemi stret, taswe yu ridim evri kaed.`,
+      );
+    } else {
+      paragraphs.push(
+        `Your group and dates can fit within the included limits on at least one pass, so Share Bonus might not be required to cover the whole trip—still read each card to be sure.`,
+      );
+    }
+  }
+
+  if (somePassHasFewerBaseDaysThanTrip) {
+    if (language === 'fr') {
+      paragraphs.push(
+        `Attention : plusieurs passes n’affichent pas autant de jours de réduction « inclus » que la durée totale de votre voyage. Si la durée incluse est plus courte que votre séjour, ce sont les jours supplémentaires du bonus de partage qui comblent l’écart — pas le forfait de base seul.`,
+      );
+    } else if (language === 'bi') {
+      paragraphs.push(
+        `Sam pas i gat les base dei long diskount long trip blong yu. Sapos base dei i liklik long ful taem blong yu, bonus afta serem i mas kavrem ol narafala dei — no base wan.`,
+      );
+    } else {
+      paragraphs.push(
+        `Watch for passes whose included discount days are shorter than your full trip. If the included day count is below your trip length, the extra days come from Share Bonus—not from the base package alone.`,
+      );
+    }
+  }
+
+  return paragraphs.join('\n\n');
 }
 
 /**
- * Recommends **one** pass purchase that matches app constraints (no multi-instance checkout).
- * If the trip cannot be covered by a single pass (any product, base or share), recommends the
- * highest-capacity pass and directs users to support for larger groups / longer stays.
+ * Guidance on base limits vs Share Bonus for the user’s profile dates and party size.
+ * Does not recommend a specific pass or show prices.
  */
-export function getPassRecommendation(
+export function getPassTripGuidance(
   userProfile: UserProfile,
   passProducts: PassProductConfig[],
   opts?: { language?: 'en' | 'fr' | 'bi' },
-): PassRecommendation | null {
+): PassTripGuidance | null {
   const language = opts?.language ?? 'en';
   if (!userProfile || !passProducts || passProducts.length === 0) return null;
 
@@ -173,102 +179,14 @@ export function getPassRecommendation(
   const infants = clampInt(userProfile.num_infants, 0);
   const totalPeople = Math.max(1, adults + children + infants);
 
-  const arrival = String((userProfile as any).expected_arrival_date ?? '').slice(0, 10);
-  const departure = String((userProfile as any).expected_departure_date ?? '').slice(0, 10);
+  const arrival = String((userProfile as { expected_arrival_date?: string }).expected_arrival_date ?? '').slice(0, 10);
+  const departure = String((userProfile as { expected_departure_date?: string }).expected_departure_date ?? '').slice(0, 10);
   const totalDays =
-    arrival && departure
-      ? inclusiveCalendarDaysBetween(arrival, departure) ?? 1
-      : 1;
-
-  const feasible: FeasibleOption[] = [];
-  for (const p of passProducts) {
-    const baseOpt = buildFeasibleOption(p, 'base', totalPeople, totalDays);
-    if (baseOpt) feasible.push(baseOpt);
-    const shareOpt = buildFeasibleOption(p, 'share', totalPeople, totalDays);
-    if (shareOpt) feasible.push(shareOpt);
-  }
-
-  const maxPass = getHighestCapacityPass(passProducts);
-  const maxP = peopleAfterShare(maxPass);
-  const maxD = daysAfterShare(maxPass);
-
-  if (feasible.length === 0) {
-    const recommended = maxPass;
-    const title = displayPassTitle(recommended, language);
-    const price = recommended.priceAUD ?? 0;
-    const priceStr = price.toFixed(0);
-
-    const body =
-      language === 'fr'
-        ? `Pour votre groupe de ${totalPeople} personne${totalPeople > 1 ? 's' : ''} pour ${totalDays} jour${totalDays > 1 ? 's' : ''}, aucun pass seul ne couvre tout le voyage dans l’app. Le ${title} offre le plus de marge après partage (jusqu’à ${maxP} personnes, ${maxD} jour${maxD > 1 ? 's' : ''}). Contactez le support pour un devis groupe, ou envisagez plusieurs pass si votre séjour le permet. À partir d’environ A$${priceStr}.`
-        : language === 'bi'
-          ? `Blong grup ${totalPeople} man mo ${totalDays} dei, no gat wan pas we i kavrem evriwan long app ia. ${title} i gat bigwan kapasiti afta yu serem (kasem ${maxP} man, ${maxD} dei). Askem support o tingbaot moa pas. Klosap A$${priceStr}.`
-          : `For your party of ${totalPeople} over ${totalDays} day${totalDays > 1 ? 's' : ''}, no single pass covers the whole trip in the app. The ${title} has the largest capacity after sharing (up to ${maxP} people, ${maxD} day${maxD > 1 ? 's' : ''}). Contact support for a group quote, or plan multiple passes if that fits your stay. From about A$${priceStr}.`;
-
-    return {
-      recommendedPass: recommended,
-      recommendedPassType: recommended.id,
-      totalPeople,
-      totalDays,
-      usesShareBonus: true,
-      totalPassesNeeded: 1,
-      totalEstimatedCostAUD: price,
-      recommendationText: body.trim(),
-    };
-  }
-
-  feasible.sort(compareFeasibleOptions);
-  const winner = feasible[0]!;
-  const recommended = winner.pass;
-  const usesShareBonus = winner.mode === 'share';
-  const title = displayPassTitle(recommended, language);
-  const price = recommended.priceAUD ?? 0;
-  const priceStr = price.toFixed(0);
-
-  const rest = feasible
-    .filter(
-      (o) =>
-        !(o.pass.id === winner.pass.id && o.mode === winner.mode) &&
-        (o.pass.id !== winner.pass.id || o.mode !== winner.mode),
-    )
-    .slice(0, 3);
-
-  const alternatives: PassRecommendationAlternative[] = rest.map((o) => ({
-    passProductId: o.pass.id,
-    titleEn: o.pass.title,
-    titleFr: o.pass.titleFr,
-    titleBi: o.pass.titleBi,
-    priceAUD: o.priceAUD ?? 0,
-    mode: o.mode,
-  }));
-
-  // If we picked a share-mode option, no base-only pass covered the trip (base options sort first).
-  const shareTip = usesShareBonus
-    ? language === 'fr'
-      ? ` Après l’achat, partagez l’app pour activer jusqu’à ${peopleAfterShare(recommended)} personnes et ${daysAfterShare(recommended)} jour${daysAfterShare(recommended) > 1 ? 's' : ''} sur ce pass.`
-      : language === 'bi'
-        ? ` Bifo trip i stret, serem app blong kasem kasem ${peopleAfterShare(recommended)} man mo ${daysAfterShare(recommended)} dei long pas ia.`
-        : ` After purchase, share the app to unlock up to ${peopleAfterShare(recommended)} people and ${daysAfterShare(recommended)} day${daysAfterShare(recommended) > 1 ? 's' : ''} on this pass.`
-    : '';
-
-  const baseLine =
-    language === 'fr'
-      ? `Pour ${totalPeople} personne${totalPeople > 1 ? 's' : ''} et ${totalDays} jour${totalDays > 1 ? 's' : ''}, nous recommandons le ${title} — un seul achat couvre votre voyage (environ A$${priceStr}).`
-      : language === 'bi'
-        ? `Blong ${totalPeople} man mo ${totalDays} dei, mifala i rekomendem ${title} — wan pas i kavrem trip blong yu (klosap A$${priceStr}).`
-        : `For your party of ${totalPeople} over ${totalDays} day${totalDays > 1 ? 's' : ''}, we recommend the ${title} — one purchase covers your trip (about A$${priceStr}).`;
-
-  const altLine = formatAlternativesLine(alternatives, language);
+    arrival && departure ? inclusiveCalendarDaysBetween(arrival, departure) ?? 1 : 1;
 
   return {
-    recommendedPass: recommended,
-    recommendedPassType: recommended.id,
+    guidanceText: buildGuidanceText(language, totalPeople, totalDays, passProducts),
     totalPeople,
     totalDays,
-    usesShareBonus,
-    totalPassesNeeded: 1,
-    totalEstimatedCostAUD: price,
-    recommendationText: (baseLine + shareTip + altLine).trim(),
-    alternatives: alternatives.length > 0 ? alternatives : undefined,
   };
 }

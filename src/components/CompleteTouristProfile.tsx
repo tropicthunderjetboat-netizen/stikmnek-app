@@ -46,10 +46,10 @@ const CompleteTouristProfile: React.FC = () => {
                     ? 'Reprenez où vous en étiez — vos informations sont enregistrées au fil du remplissage.'
                     : 'Go hed wea yu stap — ol samting i save lelebet.'
                 : language === 'en'
-                  ? 'We use this to recommend the right pass for your group and dates.'
+                  ? 'We use this to show how pass limits relate to your group and travel dates.'
                   : language === 'fr'
-                    ? 'Nous l’utilisons pour recommander le bon pass selon votre groupe et vos dates.'
-                    : 'Mifala i yusum blong rekomendem stret pas blong grup mo ol det.'}
+                    ? 'Nous l’utilisons pour expliquer comment les limites des passes correspondent à votre groupe et à vos dates.'
+                    : 'Mifala i yusum blong soem ol lim long pas wetem grup mo det blong trip blong yu.'}
             </p>
           </div>
 

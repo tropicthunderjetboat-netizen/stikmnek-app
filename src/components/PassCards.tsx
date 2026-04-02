@@ -8,7 +8,7 @@ import { usePassConfig, PassConfig } from '@/hooks/usePassConfig';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { PASS_PRODUCTS } from '@/data/pricing';
-import { getPassRecommendation } from '@/lib/passRecommendation';
+import { getPassTripGuidance } from '@/lib/passRecommendation';
 
 const getIconComponent = (icon: PassConfig['icon'], className = 'w-6 h-6') => {
   switch (icon) {
@@ -387,11 +387,11 @@ const PassCards: React.FC = () => {
       refreshUserProfile();
     }
   }, [user?.id, userProfile, refreshUserProfile]);
-  const recommendation = useMemo(() => {
+  const tripGuidance = useMemo(() => {
     if (!userProfile) return null;
     const products = Object.values(PASS_PRODUCTS);
     const lang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
-    return getPassRecommendation(userProfile, products, { language: lang });
+    return getPassTripGuidance(userProfile, products, { language: lang });
   }, [userProfile, language]);
   const [sharedPasses, setSharedPasses] = useState<Set<string>>(
     () => {
@@ -771,15 +771,19 @@ const PassCards: React.FC = () => {
             </p>
           </div>
 
-          {recommendation && (
+          {tripGuidance && (
             <div className="max-w-5xl mx-auto mb-8">
               <div className="rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50 to-emerald-50 p-5 sm:p-6">
                 <p className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">
-                  {language === 'en' ? 'Recommended for your trip' : language === 'fr' ? 'Recommandé pour votre séjour' : 'Rekomendesen blong trip'}
+                  {language === 'en'
+                    ? 'Know before you buy'
+                    : language === 'fr'
+                      ? 'À savoir avant d’acheter'
+                      : 'Save bifo yu bai'}
                 </p>
-                <p className="text-sm sm:text-base text-teal-900 font-semibold leading-relaxed">
-                  {recommendation.recommendationText}
-                </p>
+                <div className="text-sm sm:text-base text-teal-900 font-medium leading-relaxed space-y-3 whitespace-pre-line">
+                  {tripGuidance.guidanceText}
+                </div>
               </div>
             </div>
           )}
@@ -799,8 +803,6 @@ const PassCards: React.FC = () => {
               const hasBonusDays = bonus.extraDays > 0;
               const hasBonusPeople = bonus.extraPeople > 0 || bonus.extraKids > 0;
               const hasBonus = hasBonusDays || hasBonusPeople;
-              const isRecommended = recommendation?.recommendedPassType === pass.type;
-
               // Calculate group display
               const groupLabel = pass.totalPeople
                 ? (language === 'en' ? `${pass.totalPeople} people` : language === 'fr' ? `${pass.totalPeople} personnes` : `${pass.totalPeople} man`)
@@ -832,20 +834,11 @@ const PassCards: React.FC = () => {
                   className={`relative bg-white rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-2 ${
                     shared ? 'animate-card-glow' : ''
                   } ${
-                    isRecommended
-                      ? `ring-2 ring-indigo-500 shadow-xl shadow-indigo-200/40 ${shadow}`
-                      : pass.popular
-                        ? `ring-2 ring-teal-500 shadow-xl ${shadow}`
-                        : 'border border-gray-200 shadow-sm hover:shadow-lg'
+                    pass.popular
+                      ? `ring-2 ring-teal-500 shadow-xl ${shadow}`
+                      : 'border border-gray-200 shadow-sm hover:shadow-lg'
                   }`}
                 >
-                  {isRecommended && (
-                    <div className="absolute top-3 right-3 z-10">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full bg-indigo-600 text-white text-[11px] font-extrabold shadow-lg">
-                        {language === 'en' ? 'Recommended' : language === 'fr' ? 'Recommandé' : 'Rekomendem'}
-                      </span>
-                    </div>
-                  )}
                   {/* Popular Badge */}
                   {pass.popular && (
                     <div className={`absolute top-0 left-0 right-0 bg-gradient-to-r ${color} text-white text-center py-1.5 text-xs font-bold uppercase tracking-wider`}>
