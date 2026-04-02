@@ -275,7 +275,15 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim();
     const serviceKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
-    const anonKey = (Deno.env.get('SUPABASE_ANON_KEY') ?? '').trim();
+    // Dashboard secret bug workaround:
+    // Some projects cannot edit/delete reserved `SUPABASE_*` secrets in the Dashboard.
+    // Prefer a non-reserved secret name for the anon key (used ONLY to validate caller JWT):
+    //   APP_SUPABASE_ANON_KEY = <project anon public key>
+    // Keep legacy fallbacks for safety.
+    const anonKey =
+      (Deno.env.get('APP_SUPABASE_ANON_KEY') ?? '').trim() ||
+      (Deno.env.get('SUPABASE_ANON_KEY') ?? '').trim() ||
+      (Deno.env.get('SUPABASE_ANON_KEY_PUBLIC') ?? '').trim();
     if (!supabaseUrl || !serviceKey) {
       console.error(
         '[verify-redemption] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY — cannot read public.passes',
@@ -285,14 +293,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use ANON key for validating caller JWT (auth context). If not available, fall back to service key
-    // (still works for auth calls, but keeping auth/DB clients separate reduces confusion).
-    const authClientKey = anonKey || serviceKey;
+    // Use ANON key for validating caller JWT (auth context).
+    // Do NOT fall back to service role here—misconfiguration will surface as "Invalid JWT" and block scanning.
     if (!anonKey) {
-      logDiag('warn', { message: 'SUPABASE_ANON_KEY missing; auth validation falling back to service role key' });
+      logDiag('warn', { message: 'Anon key missing; cannot validate caller JWT (set APP_SUPABASE_ANON_KEY)' });
+      return errorResponse('Server configuration error', 500, {
+        reason: 'missing_supabase_anon_key',
+      });
     }
 
-    const authClient = createClient(supabaseUrl, authClientKey, {
+    const authClient = createClient(supabaseUrl, anonKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 

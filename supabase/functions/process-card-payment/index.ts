@@ -159,7 +159,15 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    // Dashboard secret bug workaround:
+    // Some projects cannot edit/delete reserved `SUPABASE_*` secrets in the Dashboard.
+    // Prefer a non-reserved secret name for the anon key (used ONLY to validate caller JWT):
+    //   APP_SUPABASE_ANON_KEY = <project anon public key>
+    // Keep legacy fallbacks for safety.
+    const supabaseAnonKey =
+      (Deno.env.get('APP_SUPABASE_ANON_KEY') ?? '').trim() ||
+      (Deno.env.get('SUPABASE_ANON_KEY') ?? '').trim() ||
+      (Deno.env.get('SUPABASE_ANON_KEY_PUBLIC') ?? '').trim();
     if (!supabaseUrl.trim() || !supabaseServiceKey.trim()) {
       dbg('missing_supabase_secrets', {
         hasSupabaseUrl: Boolean(supabaseUrl.trim()),
@@ -169,8 +177,8 @@ Deno.serve(async (req) => {
         reason: 'missing_supabase_secrets',
       });
     }
-    if (!supabaseAnonKey.trim()) {
-      dbg('missing_supabase_anon_key', { hasAnonKey: false });
+    if (!supabaseAnonKey) {
+      dbg('missing_supabase_anon_key', { hasAnonKey: false, note: 'Set APP_SUPABASE_ANON_KEY (recommended)' });
       return errorResponse(req, 'Server configuration error', 500, {
         reason: 'missing_supabase_anon_key',
       });
