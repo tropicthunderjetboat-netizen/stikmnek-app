@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { Check, Zap, Crown, Star, CreditCard, Lock, ShieldCheck, Users, Baby, Calendar, Share2, Gift, Sparkles, Loader2, PartyPopper, AlertTriangle } from 'lucide-react';
+import { Check, Zap, Crown, Star, CreditCard, Lock, ShieldCheck, Users, Baby, Calendar, Share2, Gift, Sparkles, Loader2, PartyPopper, Info } from 'lucide-react';
 
 import { usePassConfig, PassConfig } from '@/hooks/usePassConfig';
 import { supabase } from '@/lib/supabase';
@@ -10,9 +10,12 @@ import { toast } from 'sonner';
 import { PASS_PRODUCTS } from '@/data/pricing';
 import {
   getPassTripGuidance,
-  recommendedPassForPartySize,
+  recommendedPassFromUserProfile,
   buildPassStayMismatchMessage,
 } from '@/lib/passRecommendation';
+
+const KNOW_BEFORE_KEYS = ['pass.know_bullet_1', 'pass.know_bullet_2', 'pass.know_bullet_3', 'pass.know_bullet_4'] as const;
+const KNOW_BEFORE_ICONS = [Share2, Users, Share2, Calendar] as const;
 
 const getIconComponent = (icon: PassConfig['icon'], className = 'w-6 h-6') => {
   switch (icon) {
@@ -391,19 +394,20 @@ const PassCards: React.FC = () => {
       refreshUserProfile();
     }
   }, [user?.id, userProfile, refreshUserProfile]);
-  const uiLang: 'en' | 'fr' | 'bi' = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
-
   const tripGuidance = useMemo(() => {
     if (!userProfile) return null;
     const products = Object.values(PASS_PRODUCTS);
-    return getPassTripGuidance(userProfile, products, { language: uiLang });
-  }, [userProfile, uiLang]);
-
-  /** Adults + children only (infants excluded), when profile exists. */
-  const recommendedPassType = useMemo(() => {
-    if (!userProfile) return null;
-    return recommendedPassForPartySize(userProfile.num_adults, userProfile.num_children);
+    return getPassTripGuidance(userProfile, products);
   }, [userProfile]);
+
+  /** Adults + children only — infants never counted (see `recommendedPassFromUserProfile`). */
+  const recommendedPassType = useMemo(
+    () => recommendedPassFromUserProfile(userProfile),
+    [userProfile],
+  );
+
+  const passI18nLang: 'en' | 'fr' | 'bi' = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+
   const [sharedPasses, setSharedPasses] = useState<Set<string>>(
     () => {
       try {
@@ -783,18 +787,34 @@ const PassCards: React.FC = () => {
           </div>
 
           {tripGuidance && (
-            <div className="max-w-5xl mx-auto mb-8">
-              <div className="rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50 to-emerald-50 p-5 sm:p-6">
-                <p className="text-xs font-bold text-teal-700 uppercase tracking-wider mb-2">
-                  {language === 'en'
-                    ? 'Know before you buy'
-                    : language === 'fr'
-                      ? 'À savoir avant d’acheter'
-                      : 'Save bifo yu bai'}
+            <div className="max-w-5xl mx-auto mb-10">
+              <div className="rounded-2xl border border-teal-100 bg-white shadow-sm ring-1 ring-teal-50 p-5 sm:p-6">
+                <h3 className="text-sm font-bold text-teal-800 tracking-wide uppercase mb-3">
+                  {t('pass.know_before_title', language)}
+                </h3>
+                <p className="text-sm text-gray-600 mb-4 leading-snug">
+                  {t('pass.know_trip_line', language)
+                    .replace('{days}', String(tripGuidance.tripDays))
+                    .replace('{party}', String(tripGuidance.partyCountExInfants))}
                 </p>
-                <div className="text-sm sm:text-base text-teal-900 font-medium leading-relaxed space-y-3 whitespace-pre-line">
-                  {tripGuidance.guidanceText}
-                </div>
+                <ul className="space-y-3">
+                  {KNOW_BEFORE_KEYS.map((key, i) => {
+                    const Icon = KNOW_BEFORE_ICONS[i] ?? Info;
+                    return (
+                      <li key={key} className="flex gap-3 text-sm text-gray-800 leading-snug">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-teal-600">
+                          <Icon className="w-4 h-4" aria-hidden />
+                        </span>
+                        <span className="pt-1">{t(key, language)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {tripGuidance.showSupportHint && (
+                  <p className="mt-4 rounded-xl border border-amber-100 bg-amber-50/80 px-3.5 py-2.5 text-sm text-amber-950 leading-snug">
+                    {t('pass.know_support', language)}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -825,7 +845,7 @@ const PassCards: React.FC = () => {
                       pass.baseDays,
                       pass.fullDays,
                       pass.shareBonus.extraDays,
-                      uiLang,
+                      passI18nLang,
                     )
                   : null;
               // Calculate group display
@@ -903,9 +923,9 @@ const PassCards: React.FC = () => {
                     </div>
 
                     {stayMismatchMsg && (
-                      <div className="mb-4 flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50/90 p-3.5 text-left">
-                        <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" aria-hidden />
-                        <p className="text-xs sm:text-sm text-amber-950 font-medium leading-relaxed">{stayMismatchMsg}</p>
+                      <div className="mb-4 flex gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-left">
+                        <Info className="w-4 h-4 shrink-0 text-slate-500 mt-0.5" aria-hidden />
+                        <p className="text-xs text-slate-700 leading-snug">{stayMismatchMsg}</p>
                       </div>
                     )}
 

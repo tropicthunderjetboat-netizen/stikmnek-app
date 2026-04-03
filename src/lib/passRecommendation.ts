@@ -1,18 +1,17 @@
 /**
- * Trip guidance: explains base vs Share Bonus limits from profile dates & party size.
- * (Filename is legacy; there is no pass “recommendation” here.)
+ * Trip guidance + party-size recommendation helpers for pass purchase UI.
  */
 import type { UserProfile } from '@/contexts/AppContext';
 import type { PassProductConfig, PassProductId } from '@/data/pricing';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 
-/**
- * Explains base vs Share Bonus limits for the user’s trip — no product recommendations or prices.
- */
 export interface PassTripGuidance {
-  guidanceText: string;
-  totalPeople: number;
-  totalDays: number;
+  /** Inclusive calendar days between arrival and departure (1 if dates missing). */
+  tripDays: number;
+  /** Adults + children only — infants excluded (pass capacity). */
+  partyCountExInfants: number;
+  /** True when no pass in the catalog can cover this trip even with Share Bonus. */
+  showSupportHint: boolean;
 }
 
 function clampInt(n: unknown, fallback: number): number {
@@ -51,147 +50,37 @@ function coversTrip(
   return totalPeople <= people && totalDays <= days;
 }
 
-function buildGuidanceText(
-  language: 'en' | 'fr' | 'bi',
-  totalPeople: number,
-  totalDays: number,
-  passProducts: PassProductConfig[],
-): string {
-  const canCoverWithoutShare = passProducts.some((p) => coversTrip(p, 'base', totalPeople, totalDays));
-  const canCoverWithShare = passProducts.some((p) => coversTrip(p, 'share', totalPeople, totalDays));
-  const anyShareOnly = passProducts.some(
-    (p) => !coversTrip(p, 'base', totalPeople, totalDays) && coversTrip(p, 'share', totalPeople, totalDays),
-  );
-  const somePassHasFewerBaseDaysThanTrip = passProducts.some(
-    (p) => coversTrip(p, 'share', totalPeople, totalDays) && capsForMode(p, 'base').days < totalDays,
-  );
-
-  const paragraphs: string[] = [];
-
-  if (language === 'fr') {
-    paragraphs.push(
-      `Vous prévoyez ${totalPeople} personne${totalPeople > 1 ? 's' : ''} et ${totalDays} jour${totalDays > 1 ? 's' : ''} de réductions. Chaque pass indique combien de personnes et combien de jours de réduction sont inclus avant tout partage. Le bonus de partage n’ajoute des places et/ou des jours qu’après l’achat, lorsque vous utilisez « Partager l’app » — vérifiez les chiffres sur chaque carte.`,
-    );
-  } else if (language === 'bi') {
-    paragraphs.push(
-      `Yu planem ${totalPeople} man mo ${totalDays} dei blong diskount. Evri pas i soem hamas pipol mo hamas dei i stap insaed bifo yu serem. Bonus afta serem i adem moa pipol mo/oba moa dei afta yu bai, taem yu serem app — lukluk long namba long evri kaed.`,
-    );
-  } else {
-    paragraphs.push(
-      `You’re planning for ${totalPeople} ${totalPeople === 1 ? 'person' : 'people'} and ${totalDays} calendar day${totalDays > 1 ? 's' : ''} of discounts. Each pass shows how many people and how many discount days are included before you share anything. Share Bonus only adds extra people and/or days after you buy and use Share the app—check each card for the exact numbers.`,
-    );
-  }
-
-  if (!canCoverWithShare) {
-    if (language === 'fr') {
-      paragraphs.push(
-        `Pour ce nombre de personnes et cette durée, un seul pass proposé ici peut ne pas suffire. Contactez le support pour les très grands groupes ou les longs séjours, ou envisagez plusieurs pass si c’est possible.`,
-      );
-    } else if (language === 'bi') {
-      paragraphs.push(
-        `Long olgeta man mo taem olsem, wan pas long app i no save kavrem evri samting. Askem support o tingbaot moa wan pas.`,
-      );
-    } else {
-      paragraphs.push(
-        `For this party size and trip length, one pass offered here may not cover everything. Contact support for very large groups or long stays, or plan multiple passes if that works for you.`,
-      );
-    }
-    return paragraphs.join('\n\n');
-  }
-
-  if (anyShareOnly && !canCoverWithoutShare) {
-    if (language === 'fr') {
-      paragraphs.push(
-        `Pour votre groupe et vos dates, tout pass qui couvre l’ensemble du séjour dépend du bonus de partage : prévoyez de partager l’app juste après l’achat.`,
-      );
-    } else if (language === 'bi') {
-      paragraphs.push(
-        `Blong grup mo det blong yu, evri pas we i stret long hol trip i nidim bonus afta serem — serem app afta yu bai.`,
-      );
-    } else {
-      paragraphs.push(
-        `For your party and dates, any pass that covers the full trip relies on Share Bonus—plan to share the app right after you purchase.`,
-      );
-    }
-  } else if (canCoverWithoutShare && anyShareOnly) {
-    if (language === 'fr') {
-      paragraphs.push(
-        `Certaines combinaisons peuvent déjà tenir dans les limites « incluses » d’au moins un pass ; d’autres ne donnent toute la durée ou toute la capacité qu’après le partage. Comparez la ligne de base et le bonus sur chaque carte.`,
-      );
-    } else if (language === 'bi') {
-      paragraphs.push(
-        `Sam pas i save stret long base lim long wan pas; narafala i nidim serem bifo i stret. Kompem base mo bonus long evri kaed.`,
-      );
-    } else {
-      paragraphs.push(
-        `Some options already fit your whole trip within the included limits on at least one pass; others only reach your full head count or full dates after Share Bonus. Compare the base row and the bonus on each card.`,
-      );
-    }
-  } else if (canCoverWithoutShare) {
-    if (language === 'fr') {
-      paragraphs.push(
-        `Votre groupe et vos dates peuvent tenir dans les limites incluses d’au moins un pass : le bonus de partage peut rester optionnel pour couvrir tout le séjour. Vérifiez tout de même chaque carte.`,
-      );
-    } else if (language === 'bi') {
-      paragraphs.push(
-        `Grup mo det blong yu i save long insaed long wan pas we i no nidim serem. Hemi stret, taswe yu ridim evri kaed.`,
-      );
-    } else {
-      paragraphs.push(
-        `Your group and dates can fit within the included limits on at least one pass, so Share Bonus might not be required to cover the whole trip—still read each card to be sure.`,
-      );
-    }
-  }
-
-  if (somePassHasFewerBaseDaysThanTrip) {
-    if (language === 'fr') {
-      paragraphs.push(
-        `Attention : plusieurs passes n’affichent pas autant de jours de réduction « inclus » que la durée totale de votre voyage. Si la durée incluse est plus courte que votre séjour, ce sont les jours supplémentaires du bonus de partage qui comblent l’écart — pas le forfait de base seul.`,
-      );
-    } else if (language === 'bi') {
-      paragraphs.push(
-        `Sam pas i gat les base dei long diskount long trip blong yu. Sapos base dei i liklik long ful taem blong yu, bonus afta serem i mas kavrem ol narafala dei — no base wan.`,
-      );
-    } else {
-      paragraphs.push(
-        `Watch for passes whose included discount days are shorter than your full trip. If the included day count is below your trip length, the extra days come from Share Bonus—not from the base package alone.`,
-      );
-    }
-  }
-
-  return paragraphs.join('\n\n');
-}
-
 /**
- * Guidance on base limits vs Share Bonus for the user’s profile dates and party size.
- * Does not recommend a specific pass or show prices.
+ * Feasibility for guidance / support hint uses **adults + children only** (infants excluded).
  */
 export function getPassTripGuidance(
   userProfile: UserProfile,
   passProducts: PassProductConfig[],
-  opts?: { language?: 'en' | 'fr' | 'bi' },
+  _opts?: { language?: 'en' | 'fr' | 'bi' },
 ): PassTripGuidance | null {
-  const language = opts?.language ?? 'en';
   if (!userProfile || !passProducts || passProducts.length === 0) return null;
 
   const adults = clampInt(userProfile.num_adults, 1);
   const children = clampInt(userProfile.num_children, 0);
-  const infants = clampInt(userProfile.num_infants, 0);
-  const totalPeople = Math.max(1, adults + children + infants);
+  const partyCountExInfants = Math.max(1, adults + children);
 
   const arrival = String((userProfile as { expected_arrival_date?: string }).expected_arrival_date ?? '').slice(0, 10);
   const departure = String((userProfile as { expected_departure_date?: string }).expected_departure_date ?? '').slice(0, 10);
-  const totalDays =
+  const tripDays =
     arrival && departure ? inclusiveCalendarDaysBetween(arrival, departure) ?? 1 : 1;
 
+  const canCoverWithShare = passProducts.some((p) =>
+    coversTrip(p, 'share', partyCountExInfants, tripDays),
+  );
+
   return {
-    guidanceText: buildGuidanceText(language, totalPeople, totalDays, passProducts),
-    totalPeople,
-    totalDays,
+    tripDays,
+    partyCountExInfants,
+    showSupportHint: !canCoverWithShare,
   };
 }
 
-// ─── Party-size “Recommended” badge (adults + children only; infants excluded) ───
+// ─── Party-size “Recommended” badge: adults + children only; infants excluded ───
 
 function clampPartyCount(n: unknown): number {
   const x = Number(n);
@@ -200,8 +89,7 @@ function clampPartyCount(n: unknown): number {
 }
 
 /**
- * Smallest pass tier we steer groups toward by headcount (adults + children).
- * Infants are not counted toward party size here.
+ * Recommended pass tier from headcount (**adults + children**). Infants are ignored.
  */
 export function recommendedPassForPartySize(adults: unknown, children: unknown): PassProductId {
   const a = clampPartyCount(adults);
@@ -213,24 +101,19 @@ export function recommendedPassForPartySize(adults: unknown, children: unknown):
   return 'mega_group_experience';
 }
 
-function addCalendarDaysIso(isoDate: string, deltaDays: number): string | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
-  const [y, m, d] = isoDate.split('-').map(Number);
-  const t = Date.UTC(y, m - 1, d, 12, 0, 0, 0);
-  const next = new Date(t + deltaDays * 86400000);
-  return next.toISOString().slice(0, 10);
-}
-
-function formatIsoDateShort(iso: string, language: 'en' | 'fr' | 'bi'): string {
-  const d = new Date(iso + 'T12:00:00.000Z');
-  if (Number.isNaN(d.getTime())) return iso;
-  const loc = language === 'fr' ? 'fr-FR' : 'en-AU';
-  return d.toLocaleDateString(loc, { month: 'short', day: 'numeric', year: 'numeric' });
+/**
+ * Same rules as {@link recommendedPassForPartySize}, reading only profile fields (no infants).
+ */
+export function recommendedPassFromUserProfile(
+  profile: Pick<UserProfile, 'num_adults' | 'num_children'> | null | undefined,
+): PassProductId | null {
+  if (!profile) return null;
+  return recommendedPassForPartySize(profile.num_adults, profile.num_children);
 }
 
 /**
- * When the tourist’s stay is longer than this pass’s base discount days, explain expiry vs Share Bonus.
- * Uses arrival as an illustrative “first discount day” so we can show example end dates.
+ * Short note when trip length exceeds this pass’s base discount days.
+ * No calendar dates — numbers only for quick scanning.
  */
 export function buildPassStayMismatchMessage(
   arrival: string,
@@ -249,68 +132,36 @@ export function buildPassStayMismatchMessage(
 
   const baseDays = Math.max(1, passBaseDays);
   const fullDays = Math.max(baseDays, passFullDays);
-  const endBaseIso = addCalendarDaysIso(a, baseDays - 1);
-  const endShareIso = addCalendarDaysIso(a, fullDays - 1);
-  if (!endBaseIso || !endShareIso) return null;
-
-  const arrivalFmt = formatIsoDateShort(a, language);
-  const endBaseFmt = formatIsoDateShort(endBaseIso, language);
-  const endShareFmt = formatIsoDateShort(endShareIso, language);
   const exceedsShareWindow = tripDays > fullDays;
 
   if (language === 'fr') {
-    const parts: string[] = [
-      `Votre séjour compte ${tripDays} jour${tripDays > 1 ? 's' : ''}, alors que ce pass inclut ${baseDays} jour${baseDays > 1 ? 's' : ''} de réductions avant le bonus de partage — pas toute la durée sur place.`,
-      `Si vous commencez à utiliser les réductions le ${arrivalFmt}, la période « incluse » se termine le ${endBaseFmt}. Après cette date, le pass n’est plus valable pour les offres, même si vous êtes encore au Vanuatu. Vous choisissez quels jours utiliser ; beaucoup de voyageurs prennent des jours sans activités.`,
-    ];
+    let s = `Séjour : ${tripDays} j · Pass : ${baseDays} j de réduction avant bonus.`;
     if (shareExtraDays > 0) {
-      parts.push(
-        `Avec le bonus de partage (après achat, en partageant l’app), ce pass monte à ${fullDays} jour${fullDays > 1 ? 's' : ''} de réductions, jusqu’au ${endShareFmt}.`,
-      );
+      s += ` Partage après achat → jusqu’à ${fullDays} j.`;
     } else {
-      parts.push(
-        `Le bonus de partage sur ce pass ajoute surtout de la capacité (personnes), pas de jours supplémentaires.`,
-      );
+      s += ` Bonus = surtout plus de personnes.`;
     }
-    if (exceedsShareWindow) {
-      parts.push(
-        `Votre séjour dépasse même cette durée étendue : un seul pass ne couvrira pas chaque jour en réductions.`,
-      );
-    }
-    return parts.join(' ');
+    if (exceedsShareWindow) s += ` Séjour plus long que ce pass.`;
+    return s;
   }
 
   if (language === 'bi') {
-    const parts: string[] = [
-      `Trip blong yu i gat ${tripDays} dei, be pas ia i gat ${baseDays} dei blong diskount bifo bonus afta serem — no long evri dei long aelan.`,
-      `Sapos yu stat yusum diskount long ${arrivalFmt}, taem « insaed » i finis long ${endBaseFmt}. Afta det, pas i finis blong ol dils, maski yu stap yet long Vanuatu. Yu save josem wanwan dei we yu laik; fulap taem ol man i tek rest dei.`,
-    ];
+    let s = `Trip: ${tripDays} dei · Pas: ${baseDays} dei diskount bifo bonus.`;
     if (shareExtraDays > 0) {
-      parts.push(
-        `Wetem bonus afta serem (afta bai, serem app), pas i kasem ${fullDays} dei blong diskount, kasem ${endShareFmt}.`,
-      );
+      s += ` Serem afta bai → kasem ${fullDays} dei.`;
     } else {
-      parts.push(`Bonus afta serem long pas ia i adem moa pipol, no moa dei.`);
+      s += ` Bonus = moa pipol.`;
     }
-    if (exceedsShareWindow) {
-      parts.push(`Trip blong yu i lonmoa tu long hem : wan pas bambae no kavrem evri dei long diskount.`);
-    }
-    return parts.join(' ');
+    if (exceedsShareWindow) s += ` Trip i lonmoa pas.`;
+    return s;
   }
 
-  const parts: string[] = [
-    `Your travel dates span ${tripDays} days, but this pass includes ${baseDays} discount day${baseDays > 1 ? 's' : ''} before Share Bonus—not your whole time on island.`,
-    `If you start using discounts on ${arrivalFmt}, the included period ends ${endBaseFmt}. After that, the pass is expired for deals, even if you’re still in Vanuatu. You choose which days to use; many guests take rest days and skip redemptions.`,
-  ];
+  let s = `Trip: ${tripDays} days · Pass: ${baseDays} discount day${baseDays > 1 ? 's' : ''} before Share Bonus.`;
   if (shareExtraDays > 0) {
-    parts.push(
-      `With Share Bonus (after purchase, share the app), this pass reaches ${fullDays} discount day${fullDays > 1 ? 's' : ''}, through ${endShareFmt}.`,
-    );
+    s += ` Share after purchase → up to ${fullDays} day${fullDays > 1 ? 's' : ''}.`;
   } else {
-    parts.push(`Share Bonus on this pass adds capacity (people), not extra discount days.`);
+    s += ` Share Bonus adds people here, not days.`;
   }
-  if (exceedsShareWindow) {
-    parts.push(`Your stay is still longer than that—even with Share Bonus, one pass won’t cover every day with discounts.`);
-  }
-  return parts.join(' ');
+  if (exceedsShareWindow) s += ` Stay is longer than this pass covers.`;
+  return s;
 }

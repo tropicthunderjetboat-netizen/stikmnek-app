@@ -47,6 +47,38 @@ export const translations: Record<string, Record<Language, string>> = {
   'pass.feature2': { en: 'QR code coupons', fr: 'Coupons QR code', bi: 'QR kod kupons' },
   'pass.feature3': { en: 'Map navigation', fr: 'Navigation carte', bi: 'Map navigesen' },
 
+  'pass.know_before_title': { en: 'Know before you buy', fr: 'À savoir avant d’acheter', bi: 'Save bifo yu bai' },
+  'pass.know_trip_line': {
+    en: 'From your profile: {days} days · {party} people toward pass limits (adults & children only; infants not counted).',
+    fr: 'D’après votre profil : {days} j · {party} personnes pour les limites du pass (adultes et enfants ; bébés non comptés).',
+    bi: 'Long profil: {days} dei · {party} man long pas (bigman mo pikinini taswe; bebi i no kaont).',
+  },
+  'pass.know_bullet_1': {
+    en: 'Share Bonus — unlocks extra people and/or discount days after you purchase (via Share the app).',
+    fr: 'Bonus de partage — débloque des places et/ou des jours de réduction après l’achat (via Partager l’app).',
+    bi: 'Bonus afta serem — i adem moa pipol mo/oba moa dei diskount afta yu bai (serem app).',
+  },
+  'pass.know_bullet_2': {
+    en: 'Each pass card shows its base limits — compare them to your trip length and group size.',
+    fr: 'Chaque carte indique ses limites de base — comparez-les à la durée du séjour et à la taille du groupe.',
+    bi: 'Evri kaed i soem base lim — kompem wetem len blong trip mo grup.',
+  },
+  'pass.know_bullet_3': {
+    en: 'After buying, use Share the app on your pass screen to apply Share Bonus.',
+    fr: 'Après l’achat, utilisez Partager l’app sur l’écran du pass pour activer le bonus.',
+    bi: 'Afta bai, yusum Serem app long skrin pas blong bonus.',
+  },
+  'pass.know_bullet_4': {
+    en: 'You choose which days to use discounts; the pass expires on its end date, not when you leave the island.',
+    fr: 'Vous choisissez les jours d’utilisation ; le pass expire à sa date de fin, pas à votre départ.',
+    bi: 'Yu josem dei blong yusum diskount; pas i finis long det blong hem, no taem yu liv aelan.',
+  },
+  'pass.know_support': {
+    en: 'For very large groups or long stays, one pass may not be enough — contact support or consider multiple passes.',
+    fr: 'Pour les très grands groupes ou longs séjours, un pass peut ne pas suffire — contactez le support ou plusieurs pass.',
+    bi: 'Long bigfala grup o lon taem, wan pas i no save stret — askem support o tingbaot moa pas.',
+  },
+
   // Business
   'biz.featured': { en: 'Featured Deals', fr: 'Offres en vedette', bi: 'Fitjad Dils' },
   'biz.all': { en: 'All Deals', fr: 'Toutes les offres', bi: 'Olgeta Dils' },
