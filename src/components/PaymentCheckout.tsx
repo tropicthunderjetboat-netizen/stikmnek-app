@@ -405,18 +405,42 @@ const PaymentCheckout: React.FC = () => {
       // The Supabase SDK automatically includes the session JWT.
       // Passing a custom header can cause conflicts with the relay's JWT validation.
 
+      const invokeBody = {
+        action: 'purchase_pass' as const,
+        passType: cart.passType,
+        startDate,
+        cardNumber: cardNumber.replace(/\s/g, ''),
+        cardExpiry,
+        cardCvv,
+        cardName: cardName.trim(),
+        referralCode,
+        paymentTransactionId: getOrCreatePassPurchaseIdempotencyKey(),
+      };
+      // #region agent log
+      fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
+        body: JSON.stringify({
+          sessionId: '7b96fa',
+          location: 'PaymentCheckout.tsx:handlePayWithCard',
+          message: 'before process-card-payment invoke',
+          data: {
+            hypothesisId: 'H1-H2',
+            cartPassType: cart?.passType ?? null,
+            cartKeys: cart ? Object.keys(cart) : [],
+            bodyPassType: invokeBody.passType,
+            bodyAction: invokeBody.action,
+            startDate: invokeBody.startDate,
+          },
+          timestamp: Date.now(),
+          hypothesisId: 'H1-H2',
+        }),
+      }).catch(() => {});
+      // #endregion
+      console.log('[PaymentCheckout] process-card-payment body.passType', invokeBody.passType);
+
       const { data, error } = await supabase.functions.invoke('process-card-payment', {
-        body: {
-          action: 'purchase_pass',
-          passType: cart.passType,
-          startDate,
-          cardNumber: cardNumber.replace(/\s/g, ''),
-          cardExpiry,
-          cardCvv,
-          cardName: cardName.trim(),
-          referralCode,
-          paymentTransactionId: getOrCreatePassPurchaseIdempotencyKey(),
-        },
+        body: invokeBody,
         // NO custom headers — let the SDK handle Authorization automatically
       });
 

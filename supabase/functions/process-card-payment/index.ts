@@ -206,6 +206,26 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = body?.action ?? body?.Action;
     dbg('body', maskBodyForLog(body));
+    // #region agent log
+    fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
+      body: JSON.stringify({
+        sessionId: '7b96fa',
+        location: 'process-card-payment/index.ts:parsedBody',
+        message: 'after req.json',
+        data: {
+          hypothesisId: 'H3',
+          action: action ?? null,
+          bodyKeys: body && typeof body === 'object' ? Object.keys(body as object) : [],
+          passTypeField: (body as { passType?: unknown })?.passType ?? null,
+          pass_typeField: (body as { pass_type?: unknown })?.pass_type ?? null,
+        },
+        timestamp: Date.now(),
+        hypothesisId: 'H3',
+      }),
+    }).catch(() => {});
+    // #endregion
 
     if (!action) {
       return errorResponse(req, 'Missing action. Use action: purchase_pass for pass purchase.', 400);
@@ -263,8 +283,32 @@ Deno.serve(async (req) => {
       const startDate = body?.startDate ?? body?.start_date;
 
       const passTypeDb = normalizePassTypeToDb(rawPassType);
+      // #region agent log
+      fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
+        body: JSON.stringify({
+          sessionId: '7b96fa',
+          location: 'process-card-payment/index.ts:purchase_pass',
+          message: 'passType normalize',
+          data: {
+            hypothesisId: 'H2-H4',
+            rawLen: rawPassType.length,
+            rawSnippet: rawPassType.slice(0, 80),
+            normalized: passTypeDb,
+          },
+          timestamp: Date.now(),
+          hypothesisId: 'H2-H4',
+        }),
+      }).catch(() => {});
+      // #endregion
       if (!passTypeDb) {
-        return errorResponse(req, 'Missing or invalid passType', 400);
+        const hint =
+          rawPassType === '' ? '(empty)' : JSON.stringify(rawPassType);
+        return errorResponse(req, `Missing or invalid passType: ${hint}`, 400, {
+          reason: 'invalid_pass_type',
+          receivedPassType: rawPassType === '' ? null : rawPassType,
+        });
       }
 
       if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
