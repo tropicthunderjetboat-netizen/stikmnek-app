@@ -5,6 +5,11 @@
 -- ─── 1) user_profiles: remove world-readable full-row policy ──────────────
 DROP POLICY IF EXISTS "user_profiles_select_public_info" ON public.user_profiles;
 
+-- Older / hand-provisioned DBs may lack columns the app expects; view needs these.
+ALTER TABLE public.user_profiles
+  ADD COLUMN IF NOT EXISTS display_name text,
+  ADD COLUMN IF NOT EXISTS avatar_url text;
+
 -- Safe projection: only these columns are visible via this view.
 -- security_invoker = false (definer): anon can read the slice without a permissive RLS policy on the base table.
 CREATE OR REPLACE VIEW public.user_profiles_public

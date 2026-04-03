@@ -26,6 +26,7 @@ CREATE POLICY "review_responses_select_all"
 
 -- Replace loose INSERT (any authenticated) with business-owner only
 DROP POLICY IF EXISTS "review_responses_insert_auth" ON public.review_responses;
+DROP POLICY IF EXISTS "review_responses_insert_business_owner" ON public.review_responses;
 CREATE POLICY "review_responses_insert_business_owner"
   ON public.review_responses FOR INSERT
   TO authenticated
@@ -44,6 +45,7 @@ CREATE POLICY "review_responses_insert_business_owner"
 
 -- Owner can update their business's responses
 DROP POLICY IF EXISTS "review_responses_update_own" ON public.review_responses;
+DROP POLICY IF EXISTS "review_responses_update_own_business_owner" ON public.review_responses;
 CREATE POLICY "review_responses_update_own_business_owner"
   ON public.review_responses FOR UPDATE
   TO authenticated

@@ -31,6 +31,13 @@ function normalizeEmbeddedOfferings(raw: unknown): Record<string, unknown>[] {
 // ═══════════════════════════════════════════════════════════════
 const ADMIN_EMAILS = ['admin@stikmnek.com', 'testadmin@example.com', 'stikmnek@gmail.com'];
 
+/** Reject empty/non-UUID before `.eq('user_id', …)` — PostgREST returns 400 for invalid uuid filters. */
+function isAuthUserIdUuid(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const s = value.trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
+
 /** Active pass on the user; null if none. Canonical product id (not legacy DB strings). */
 export type PassType = PassProductId | null;
 
@@ -640,41 +647,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let profile: UserProfile | null = null;
     let dbQuerySucceeded = false;
     try {
-      // Avoid `select('*')` here: resolveRole is on the hot auth path, and the dashboard
-      // only needs a subset of profile fields to establish role + basic onboarding state.
-      const PROFILE_ROLE_COLUMNS =
-        'id,user_id,role,user_type,name,full_name,display_name,email,avatar_url,' +
-        'superstar_credits,share_bonus_unlocked,' +
-        'onboarding_complete,post_pass_profile_completed,' +
-        'num_adults,num_children,num_infants,expected_arrival_date,expected_departure_date,' +
-        'created_at,updated_at';
-      const startedAt = Date.now();
-      const fetchPromise = supabase
-        .from('user_profiles')
-        .select(PROFILE_ROLE_COLUMNS)
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('resolveRole: DB query timeout')), ROLE_RESOLVE_TIMEOUT_MS)
-      );
-
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-      const elapsedMs = Date.now() - startedAt;
-
-      if (error) {
-        // Keep logs low-noise; timeout and slow queries are actionable.
-        console.error('[resolveRole] DB query error:', { message: error.message, elapsedMs });
-      } else if (data) {
-        profile = data as UserProfile;
-        dbQuerySucceeded = true;
-        if (elapsedMs > 2500) {
-          console.warn('[resolveRole] Slow profile fetch:', { elapsedMs });
-        }
+      if (!isAuthUserIdUuid(userId)) {
+        console.warn('[resolveRole] skip user_profiles query: invalid or empty userId', {
+          typeofUserId: typeof userId,
+          length: typeof userId === 'string' ? userId.length : null,
+        });
       } else {
-        dbQuerySucceeded = true;
-        if (elapsedMs > 2500) {
-          console.warn('[resolveRole] Slow profile fetch (no row):', { elapsedMs });
+        // Avoid `select('*')` here: resolveRole is on the hot auth path, and the dashboard
+        // only needs a subset of profile fields to establish role + basic onboarding state.
+        // All listed columns must exist in public.user_profiles (see supabase migrations);
+        // unknown column names cause PostgREST 400.
+        const PROFILE_ROLE_COLUMNS =
+          'id,user_id,role,user_type,name,full_name,display_name,email,avatar_url,' +
+          'superstar_credits,share_bonus_unlocked,' +
+          'onboarding_complete,post_pass_profile_completed,' +
+          'num_adults,num_children,num_infants,expected_arrival_date,expected_departure_date,' +
+          'created_at,updated_at';
+        console.log('resolveRole: Querying for userId:', userId);
+        const startedAt = Date.now();
+        const fetchPromise = supabase
+          .from('user_profiles')
+          .select(PROFILE_ROLE_COLUMNS)
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('resolveRole: DB query timeout')), ROLE_RESOLVE_TIMEOUT_MS)
+        );
+
+        const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+        const elapsedMs = Date.now() - startedAt;
+
+        if (error) {
+          const err = error as { message?: string; code?: string; details?: string; hint?: string };
+          console.error('[resolveRole] DB query error:', {
+            message: err.message,
+            code: err.code,
+            details: err.details,
+            hint: err.hint,
+            elapsedMs,
+          });
+        } else if (data) {
+          profile = data as UserProfile;
+          dbQuerySucceeded = true;
+          if (elapsedMs > 2500) {
+            console.warn('[resolveRole] Slow profile fetch:', { elapsedMs });
+          }
+        } else {
+          dbQuerySucceeded = true;
+          if (elapsedMs > 2500) {
+            console.warn('[resolveRole] Slow profile fetch (no row):', { elapsedMs });
+          }
         }
       }
     } catch (err) {

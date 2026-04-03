@@ -4,7 +4,22 @@
 --
 -- Uses SECURITY DEFINER so it runs as the function owner (postgres)
 -- and bypasses RLS. Verifies auth.uid() = owner_id for security.
+--
+-- If multiple overloads of this name already exist (e.g. DB ahead of migrations),
+-- `GRANT EXECUTE ON FUNCTION public.insert_pending_business` without a signature
+-- fails with: function name "public.insert_pending_business" is not unique.
+-- Drop known signatures first; later migrations recreate the evolved overloads.
 -- ═══════════════════════════════════════════════════════════════
+
+DROP FUNCTION IF EXISTS public.insert_pending_business(
+  uuid, text, text, text, text, numeric, numeric, text, text, text, text, text, text, text, date, date, text, jsonb, uuid
+);
+DROP FUNCTION IF EXISTS public.insert_pending_business(
+  uuid, text, text, text, text, numeric, numeric, text, text, text, text, text, text, text, date, date, text, jsonb
+);
+DROP FUNCTION IF EXISTS public.insert_pending_business(
+  uuid, text, text, text, text, numeric, numeric, text, text, text, text, text, text, text, date, date, text
+);
 
 CREATE OR REPLACE FUNCTION public.insert_pending_business(
   p_owner_id uuid,
@@ -60,5 +75,9 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.insert_pending_business TO authenticated;
-GRANT EXECUTE ON FUNCTION public.insert_pending_business TO service_role;
+GRANT EXECUTE ON FUNCTION public.insert_pending_business(
+  uuid, text, text, text, text, numeric, numeric, text, text, text, text, text, text, text, date, date, text
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.insert_pending_business(
+  uuid, text, text, text, text, numeric, numeric, text, text, text, text, text, text, text, date, date, text
+) TO service_role;
