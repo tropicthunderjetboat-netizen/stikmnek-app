@@ -14,10 +14,8 @@ interface ReviewFormProps {
 }
 
 /**
- * Ensures the Supabase SDK has a valid, fresh session token.
- * We do NOT pass this token as a custom Authorization header.
- * The SDK's functions.invoke() automatically uses its internal session token.
- * We only call this to FORCE a refresh before the invoke.
+ * Ensures a valid, fresh access token and passes it explicitly as
+ * `Authorization: Bearer` on `functions.invoke` (reliable with Edge Functions).
  */
 async function ensureFreshSession(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -169,7 +167,6 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     setSsPaymentError(null);
 
     try {
-      // Ensure the SDK has a fresh session (do NOT pass custom Authorization header)
       const token = await ensureFreshSession();
       if (!token) {
         toast.error('Session expired. Please sign in again.');
@@ -178,7 +175,6 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
         return;
       }
 
-      // FIXED: No custom Authorization header — let the SDK handle it
       const { data, error } = await supabase.functions.invoke('process-card-payment', {
         body: {
           action: 'purchase_superstar',
@@ -190,7 +186,9 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           cardCvv: ssCardCvv,
           cardName: ssCardName.trim(),
         },
-        // NO custom headers — SDK sends its own Authorization automatically
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
 

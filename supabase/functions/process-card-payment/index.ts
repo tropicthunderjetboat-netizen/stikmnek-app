@@ -14,6 +14,32 @@ import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '..
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
 
+/** Decode JWT `iss` without verifying signature (diagnostics only). */
+function decodeJwtIssUnverified(token: string): string | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const seg = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = seg + '='.repeat((4 - (seg.length % 4)) % 4);
+    const json = atob(pad);
+    const payload = JSON.parse(json) as { iss?: unknown };
+    return typeof payload.iss === 'string' ? payload.iss : null;
+  } catch {
+    return null;
+  }
+}
+
+function expectedJwtIssuerFromSupabaseUrl(url: string): string | null {
+  const u = url.trim();
+  if (!u) return null;
+  try {
+    const origin = new URL(u).origin;
+    return `${origin}/auth/v1`;
+  } catch {
+    return null;
+  }
+}
+
 function jsonResponse(req: Request, data: object, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -69,6 +95,7 @@ function errorResponse(
 async function getAuthUser(
   authClient: SupabaseServiceClient,
   req: Request,
+  ctx: { supabaseUrl: string; authClientKeySource: string },
 ): Promise<{ user: { id: string; email?: string } } | { response: Response }> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.trim()) {
@@ -78,7 +105,15 @@ async function getAuthUser(
       userId: null,
       authErrorMessage: null,
     });
-    return { response: errorResponse(req, 'Missing Authorization header', 401, { reason: 'missing_authorization' }) };
+    return {
+      response: errorResponse(req, 'Missing Authorization header', 401, {
+        reason: 'missing_authorization',
+        diagnostic: {
+          authClientKeySource: ctx.authClientKeySource,
+          hint: 'Supabase client did not send Authorization; sign in again or refresh session.',
+        },
+      }),
+    };
   }
   const token = authHeader.replace(BEARER_PREFIX, '').trim();
   dbg('auth_jwt_validation', {
@@ -87,6 +122,8 @@ async function getAuthUser(
     jwtSegmentCount: token.split('.').length,
   });
   const { data: { user }, error } = await authClient.auth.getUser(token);
+  const jwtIss = decodeJwtIssUnverified(token);
+  const expectedIss = expectedJwtIssuerFromSupabaseUrl(ctx.supabaseUrl);
   dbg('auth_jwt_validation', {
     stage: 'after_getUser',
     authOk: Boolean(user) && !error,
@@ -94,12 +131,25 @@ async function getAuthUser(
     authErrorMessage: error?.message ?? null,
     authErrorName: (error as { name?: string } | null)?.name ?? null,
     authErrorStatus: (error as { status?: number } | null)?.status ?? null,
+    jwtIssuer: jwtIss,
+    expectedJwtIssuer: expectedIss,
+    jwtIssuerMismatch: Boolean(jwtIss && expectedIss && jwtIss !== expectedIss),
   });
   if (error || !user) {
     return {
       response: errorResponse(req, 'Invalid or expired session', 401, {
         reason: 'auth_invalid',
         authError: error?.message ?? null,
+        diagnostic: {
+          authClientKeySource: ctx.authClientKeySource,
+          jwtIssuer: jwtIss,
+          expectedJwtIssuer: expectedIss,
+          jwtIssuerMismatch: Boolean(jwtIss && expectedIss && jwtIss !== expectedIss),
+          hint:
+            jwtIss && expectedIss && jwtIss !== expectedIss
+              ? 'JWT was issued for a different auth server than this function SUPABASE_URL. Set APP_SUPABASE_ANON_KEY (and SUPABASE_URL) to this project.'
+              : 'Token rejected by GoTrue — expired session, wrong signing key, or malformed JWT.',
+        },
       }),
     };
   }
@@ -238,7 +288,10 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const authResult = await getAuthUser(authClient, req);
+    const authResult = await getAuthUser(authClient, req, {
+      supabaseUrl,
+      authClientKeySource,
+    });
     if ('response' in authResult) {
       dbg('auth_failed', {
         status: 401,
@@ -252,26 +305,6 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = body?.action ?? body?.Action;
     dbg('body', maskBodyForLog(body));
-    // #region agent log
-    fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
-      body: JSON.stringify({
-        sessionId: '7b96fa',
-        location: 'process-card-payment/index.ts:parsedBody',
-        message: 'after req.json',
-        data: {
-          hypothesisId: 'H3',
-          action: action ?? null,
-          bodyKeys: body && typeof body === 'object' ? Object.keys(body as object) : [],
-          passTypeField: (body as { passType?: unknown })?.passType ?? null,
-          pass_typeField: (body as { pass_type?: unknown })?.pass_type ?? null,
-        },
-        timestamp: Date.now(),
-        hypothesisId: 'H3',
-      }),
-    }).catch(() => {});
-    // #endregion
 
     if (!action) {
       return errorResponse(req, 'Missing action. Use action: purchase_pass for pass purchase.', 400);
@@ -329,25 +362,6 @@ Deno.serve(async (req) => {
       const startDate = body?.startDate ?? body?.start_date;
 
       const passTypeDb = normalizePassTypeToDb(rawPassType);
-      // #region agent log
-      fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
-        body: JSON.stringify({
-          sessionId: '7b96fa',
-          location: 'process-card-payment/index.ts:purchase_pass',
-          message: 'passType normalize',
-          data: {
-            hypothesisId: 'H2-H4',
-            rawLen: rawPassType.length,
-            rawSnippet: rawPassType.slice(0, 80),
-            normalized: passTypeDb,
-          },
-          timestamp: Date.now(),
-          hypothesisId: 'H2-H4',
-        }),
-      }).catch(() => {});
-      // #endregion
       if (!passTypeDb) {
         const hint =
           rawPassType === '' ? '(empty)' : JSON.stringify(rawPassType);

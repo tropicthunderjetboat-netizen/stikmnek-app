@@ -53,11 +53,10 @@ const PASSES = Object.fromEntries(
  * 
  * This does TWO things:
  * 1. Refreshes the session if it's close to expiry (< 120s)
- * 2. Returns the token so we can verify it exists
- * 
- * IMPORTANT: We do NOT pass this token as a custom Authorization header.
- * The SDK's functions.invoke() automatically uses its internal session token.
- * We only call this to FORCE a refresh before the invoke.
+ * 2. Returns the access token for explicit `Authorization: Bearer` on `functions.invoke`
+ *
+ * We pass this header explicitly (same pattern as QRScanner / getEdgeAuthHeaders) because
+ * relying on the SDK alone has produced missing Authorization → Edge 401 on some builds.
  */
 async function ensureFreshSession(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -98,12 +97,12 @@ function getInvokeStatus(error: any): number | null {
 }
 
 /** Get response body from Edge Function error (FunctionsHttpError has context = Response). */
-async function getInvokeErrorBody(error: any): Promise<{ error?: string } | null> {
+async function getInvokeErrorBody(error: any): Promise<Record<string, unknown> | null> {
   try {
     const res = error?.context as Response | undefined;
     if (res && typeof res.json === 'function') {
       const body = await res.json();
-      return body && typeof body === 'object' ? body : null;
+      return body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
     }
   } catch {}
   return null;
@@ -365,14 +364,9 @@ const PaymentCheckout: React.FC = () => {
 
   // ═══ PROCESS CARD PAYMENT (direct card on StikmNek — no redirect) ═══
   //
-  // KEY FIX (2026-02-28): 
-  // 1. We call ensureFreshSession() to guarantee the SDK has a valid JWT
-  // 2. We do NOT pass a custom Authorization header — the SDK handles it
-  // 3. We extract error details from both `data` and `error` objects
-  //
-  // The old code passed `headers: { Authorization: ... }` which could
-  // conflict with the SDK's internal auth header management and cause
-  // the Supabase relay to reject the request with 401.
+  // 1. ensureFreshSession() refreshes JWT when near expiry.
+  // 2. Pass Authorization: Bearer <token> on invoke (explicit), matching QRScanner / Edge patterns.
+  // 3. Parse non-2xx bodies (401 diagnostics, passType errors, etc.).
   // ═══════════════════════════════════════════════════════════════
   const handlePayWithCard = async () => {
     if (!validateCard()) return;
@@ -441,7 +435,9 @@ const PaymentCheckout: React.FC = () => {
 
       const { data, error } = await supabase.functions.invoke('process-card-payment', {
         body: invokeBody,
-        // NO custom headers — let the SDK handle Authorization automatically
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       // Step 4: Handle the response
@@ -452,7 +448,19 @@ const PaymentCheckout: React.FC = () => {
         const status = getInvokeStatus(error);
         const body = await getInvokeErrorBody(error);
         const fromBody = typeof body?.error === 'string' ? body.error : null;
-        const serverError = fromBody ?? data?.error ?? data?.message;
+        const serverError =
+          fromBody ??
+          (typeof data?.error === 'string' ? data.error : null) ??
+          (typeof data?.message === 'string' ? data.message : null);
+
+        if (status === 401) {
+          console.warn('[PaymentCheckout] process-card-payment 401 — response body (diagnostics):', {
+            error: body?.error,
+            reason: body?.reason,
+            authError: body?.authError,
+            diagnostic: body?.diagnostic,
+          });
+        }
 
         if (serverError) {
           throw new Error(serverError);
@@ -462,6 +470,11 @@ const PaymentCheckout: React.FC = () => {
           if (status === 404) throw new Error('Payment server: "process-card-payment" not found. Deploy the Edge Function in Supabase.');
           if (status === 501) throw new Error('Card payment is temporarily unavailable. Please try again later.');
           if (status === 400) throw new Error(fromBody || 'Invalid request. Please check your details and try again.');
+          if (status === 401) {
+            throw new Error(
+              'Your session could not be verified for payment. Please sign out and sign in again, then retry.',
+            );
+          }
           throw new Error('Payment server unavailable. Check your connection or try again.');
         }
         throw new Error(errMsg);
