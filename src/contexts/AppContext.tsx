@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { toast } from 'sonner';
 import { Language } from '@/data/translations';
 import { Business } from '@/data/businesses';
-import { supabase, directProfileInsert, SUPABASE_URL } from '@/lib/supabase';
+import { supabase, directProfileInsert, SUPABASE_URL, ENDPOINTS } from '@/lib/supabase';
 import { mapJoinedOfferingToBusiness, OFFERING_LISTING_COLUMNS } from '@/lib/businessOfferingMap';
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
@@ -663,7 +663,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           'onboarding_complete,post_pass_profile_completed,' +
           'num_adults,num_children,num_infants,expected_arrival_date,expected_departure_date,' +
           'created_at,updated_at';
-        console.log('resolveRole: Querying for userId:', userId);
+        const approxRestUrl =
+          `${ENDPOINTS.rest}/user_profiles?select=${encodeURIComponent(PROFILE_ROLE_COLUMNS)}` +
+          `&user_id=eq.${encodeURIComponent(userId)}`;
+        console.log('[resolveRole][TEMP_DEBUG_QUERY] Querying user_profiles:', {
+          userId,
+          profileColumns: PROFILE_ROLE_COLUMNS,
+          supabaseRestBase: ENDPOINTS.rest,
+          table: 'user_profiles',
+          filter: { column: 'user_id', op: 'eq', value: userId },
+          approxGetUrl: approxRestUrl,
+        });
         const startedAt = Date.now();
         const fetchPromise = supabase
           .from('user_profiles')
@@ -679,14 +689,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const elapsedMs = Date.now() - startedAt;
 
         if (error) {
-          const err = error as { message?: string; code?: string; details?: string; hint?: string };
-          console.error('[resolveRole] DB query error:', {
-            message: err.message,
-            code: err.code,
-            details: err.details,
-            hint: err.hint,
+          const err = error as {
+            message?: string;
+            code?: string;
+            details?: string;
+            hint?: string;
+            status?: number;
+            statusCode?: number;
+          };
+          const errorPayload = {
+            userId,
+            profileColumns: PROFILE_ROLE_COLUMNS,
+            approxGetUrl: approxRestUrl,
             elapsedMs,
-          });
+            message: err.message ?? null,
+            code: err.code ?? null,
+            details: err.details ?? null,
+            hint: err.hint ?? null,
+            httpStatus: err.status ?? err.statusCode ?? null,
+          };
+          console.error('[resolveRole][TEMP_DEBUG_QUERY] DB query error:', errorPayload);
+          console.error(
+            '[resolveRole][TEMP_DEBUG_QUERY] DB query error (JSON):',
+            JSON.stringify(errorPayload),
+          );
         } else if (data) {
           profile = data as UserProfile;
           dbQuerySucceeded = true;

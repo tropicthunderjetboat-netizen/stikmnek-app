@@ -72,10 +72,29 @@ async function getAuthUser(
 ): Promise<{ user: { id: string; email?: string } } | { response: Response }> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.trim()) {
+    dbg('auth_jwt_validation', {
+      stage: 'missing_authorization_header',
+      authOk: false,
+      userId: null,
+      authErrorMessage: null,
+    });
     return { response: errorResponse(req, 'Missing Authorization header', 401, { reason: 'missing_authorization' }) };
   }
   const token = authHeader.replace(BEARER_PREFIX, '').trim();
+  dbg('auth_jwt_validation', {
+    stage: 'before_getUser',
+    tokenLen: token.length,
+    jwtSegmentCount: token.split('.').length,
+  });
   const { data: { user }, error } = await authClient.auth.getUser(token);
+  dbg('auth_jwt_validation', {
+    stage: 'after_getUser',
+    authOk: Boolean(user) && !error,
+    userId: user?.id ?? null,
+    authErrorMessage: error?.message ?? null,
+    authErrorName: (error as { name?: string } | null)?.name ?? null,
+    authErrorStatus: (error as { status?: number } | null)?.status ?? null,
+  });
   if (error || !user) {
     return {
       response: errorResponse(req, 'Invalid or expired session', 401, {
@@ -165,10 +184,34 @@ Deno.serve(async (req) => {
     // Prefer a non-reserved secret name for the anon key (used ONLY to validate caller JWT):
     //   APP_SUPABASE_ANON_KEY = <project anon public key>
     // Keep legacy fallbacks for safety.
-    const supabaseAnonKey =
-      (Deno.env.get('APP_SUPABASE_ANON_KEY') ?? '').trim() ||
-      (Deno.env.get('SUPABASE_ANON_KEY') ?? '').trim() ||
-      (Deno.env.get('SUPABASE_ANON_KEY_PUBLIC') ?? '').trim();
+    const hasAppSupabaseAnonKey = Boolean((Deno.env.get('APP_SUPABASE_ANON_KEY') ?? '').trim());
+    const hasSupabaseAnonKey = Boolean((Deno.env.get('SUPABASE_ANON_KEY') ?? '').trim());
+    const hasSupabaseAnonKeyPublic = Boolean((Deno.env.get('SUPABASE_ANON_KEY_PUBLIC') ?? '').trim());
+    const rawAppAnon = (Deno.env.get('APP_SUPABASE_ANON_KEY') ?? '').trim();
+    const rawSupabaseAnon = (Deno.env.get('SUPABASE_ANON_KEY') ?? '').trim();
+    const rawSupabaseAnonPublic = (Deno.env.get('SUPABASE_ANON_KEY_PUBLIC') ?? '').trim();
+    const supabaseAnonKey = rawAppAnon || rawSupabaseAnon || rawSupabaseAnonPublic;
+    const authClientKeySource = rawAppAnon
+      ? 'APP_SUPABASE_ANON_KEY'
+      : rawSupabaseAnon
+        ? 'SUPABASE_ANON_KEY'
+        : rawSupabaseAnonPublic
+          ? 'SUPABASE_ANON_KEY_PUBLIC'
+          : 'NONE';
+    dbg('anon_key_env', {
+      hasAppSupabaseAnonKey,
+      hasSupabaseAnonKey,
+      hasSupabaseAnonKeyPublic,
+      authClientKeySource,
+      anonKeyCharLength: supabaseAnonKey.length,
+      supabaseUrlHost: (() => {
+        try {
+          return new URL(supabaseUrl.trim() || 'https://invalid.local').hostname;
+        } catch {
+          return null;
+        }
+      })(),
+    });
     if (!supabaseUrl.trim() || !supabaseServiceKey.trim()) {
       dbg('missing_supabase_secrets', {
         hasSupabaseUrl: Boolean(supabaseUrl.trim()),
@@ -197,7 +240,10 @@ Deno.serve(async (req) => {
 
     const authResult = await getAuthUser(authClient, req);
     if ('response' in authResult) {
-      dbg('auth_failed', { status: 401 });
+      dbg('auth_failed', {
+        status: 401,
+        note: 'JWT validation failed; see auth_jwt_validation logs above in same invocation',
+      });
       return authResult.response;
     }
     const authUser = authResult.user;
