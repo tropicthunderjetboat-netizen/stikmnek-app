@@ -14,8 +14,8 @@ interface ReviewFormProps {
 }
 
 /**
- * Ensures a valid, fresh access token and passes it explicitly as
- * `Authorization: Bearer` on `functions.invoke` (reliable with Edge Functions).
+ * Refreshes session when near expiry; `functions.invoke` uses the SDK session token
+ * (do not set Authorization manually — avoids Kong JWT mismatches).
  */
 async function ensureFreshSession(): Promise<string | null> {
   const { data: { session } } = await supabase.auth.getSession();
@@ -185,9 +185,6 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           cardExpiry: ssCardExpiry,
           cardCvv: ssCardCvv,
           cardName: ssCardName.trim(),
-        },
-        headers: {
-          Authorization: `Bearer ${token}`,
         },
       });
 

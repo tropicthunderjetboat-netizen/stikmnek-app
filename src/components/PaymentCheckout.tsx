@@ -49,14 +49,10 @@ const PASSES = Object.fromEntries(
 ) as Record<PassProductId, CheckoutPassRow>;
 
 /**
- * Ensures the Supabase SDK has a valid, fresh access token.
- * 
- * This does TWO things:
- * 1. Refreshes the session if it's close to expiry (< 120s)
- * 2. Returns the access token for explicit `Authorization: Bearer` on `functions.invoke`
- *
- * We pass this header explicitly (same pattern as QRScanner / getEdgeAuthHeaders) because
- * relying on the SDK alone has produced missing Authorization → Edge 401 on some builds.
+ * Ensures the Supabase SDK has a valid, fresh access token before Edge invokes.
+ * Refreshes when missing or within 120s of expiry. Do not pass a custom Authorization
+ * header on `functions.invoke` — supabase-js sets it from the session; a mismatched
+ * manual Bearer token can cause Kong "Invalid JWT" before the Edge handler runs.
  */
 async function ensureFreshSession(): Promise<string | null> {
   let { data: { session } } = await supabase.auth.getSession();
@@ -89,6 +85,39 @@ async function ensureFreshSession(): Promise<string | null> {
   }
 
   return session.access_token;
+}
+
+/** Safe JWT metadata for debug ingest (no token material). */
+function jwtMetaForDebug(token: string | null): Record<string, unknown> {
+  if (!token) return { hasToken: false };
+  const parts = token.split('.');
+  const padSegment = (s: string) => {
+    const seg = s.replace(/-/g, '+').replace(/_/g, '/');
+    return seg + '='.repeat((4 - (seg.length % 4)) % 4);
+  };
+  try {
+    if (parts.length < 2) {
+      return { hasToken: true, parts: parts.length, decodeOk: false, len: token.length };
+    }
+    const raw = atob(padSegment(parts[1]));
+    const payload = JSON.parse(raw) as Record<string, unknown>;
+    const now = Math.floor(Date.now() / 1000);
+    const exp = typeof payload.exp === 'number' ? payload.exp : null;
+    return {
+      hasToken: true,
+      parts: parts.length,
+      decodeOk: true,
+      len: token.length,
+      iss: payload.iss,
+      aud: payload.aud,
+      role: payload.role,
+      exp,
+      expired: exp != null ? exp < now : null,
+      skewSec: exp != null ? exp - now : null,
+    };
+  } catch {
+    return { hasToken: true, parts: parts.length, decodeOk: false, len: token.length };
+  }
 }
 
 /** Get HTTP status from Supabase Edge Function invoke error. */
@@ -368,9 +397,8 @@ const PaymentCheckout: React.FC = () => {
 
   // ═══ PROCESS CARD PAYMENT (direct card on StikmNek — no redirect) ═══
   //
-  // 1. ensureFreshSession() refreshes JWT when near expiry.
-  // 2. Pass Authorization: Bearer <token> on invoke (explicit), matching QRScanner / Edge patterns.
-  // 3. Parse non-2xx bodies (401 diagnostics, passType errors, etc.).
+  // 1. ensureFreshSession() refreshes JWT when near expiry (SDK attaches Authorization).
+  // 2. Parse non-2xx bodies (401 diagnostics, passType errors, etc.).
   // ═══════════════════════════════════════════════════════════════
   const handlePayWithCard = async () => {
     if (!validateCard()) return;
@@ -410,11 +438,42 @@ const PaymentCheckout: React.FC = () => {
         paymentTransactionId: getOrCreatePassPurchaseIdempotencyKey(),
       };
 
+      // #region agent log
+      {
+        const { data: snap } = await supabase.auth.getSession();
+        const snapTok = snap?.session?.access_token ?? null;
+        const expectedIss = `${String(import.meta.env.VITE_SUPABASE_URL || 'https://hbaflbmfptobyfqbudrt.supabase.co').replace(/\/$/, '')}/auth/v1`;
+        const ensureMeta = jwtMetaForDebug(token);
+        const snapMeta = jwtMetaForDebug(snapTok);
+        const jwtDebugPayload = {
+          hypothesisId: 'H1-H5',
+          tokensMatch: snapTok === token,
+          expectedIss,
+          ensureIssMatches:
+            ensureMeta && typeof ensureMeta.iss === 'string' ? ensureMeta.iss === expectedIss : null,
+          snapIssMatches:
+            snapMeta && typeof snapMeta.iss === 'string' ? snapMeta.iss === expectedIss : null,
+          ensure: ensureMeta,
+          snap: snapMeta,
+        };
+        // Same safe fields as ingest — works on live/staging (127.0.0.1 ingest only hits local dev).
+        console.log('[PaymentCheckout][TEMP_DEBUG_JWT] pre process-card-payment', jwtDebugPayload);
+        fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
+          body: JSON.stringify({
+            sessionId: '7b96fa',
+            location: 'PaymentCheckout.tsx:pre-invoke',
+            message: 'process-card-payment JWT vs getSession snapshot',
+            data: jwtDebugPayload,
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      }
+      // #endregion
+
       const { data, error } = await supabase.functions.invoke('process-card-payment', {
         body: invokeBody,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       });
 
       // Step 4: Handle the response

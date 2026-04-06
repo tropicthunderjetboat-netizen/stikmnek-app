@@ -1,0 +1,25 @@
+# Supabase CLI — https://supabase.com/docs/guides/cli/config
+# After adding this file: run `supabase link` if not already linked, then
+# `supabase functions deploy` so Dashboard picks up verify_jwt settings per function.
+
+# Dashboard URL: https://supabase.com/dashboard/project/<project_ref>
+# Override via `supabase link` if this repo targets a different project.
+project_id = "hbaflbmfptobyfqbudrt"
+
+# Kong JWT verification off: these handlers call auth.getUser() themselves.
+# Prevents "Invalid JWT" at the gateway when the header must match the session exactly.
+[functions.process-card-payment]
+verify_jwt = false
+
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.paypal-capture]
+verify_jwt = false
+
+[functions.verify-redemption]
+verify_jwt = false
+
+# Optional auth in handler; do not block relay on Kong JWT validation.
+[functions.sentry-relay]
+verify_jwt = false
