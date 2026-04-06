@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import {
   looksLikeRichDescriptionHtml,
-  looksLikeSqlOrTechnicalDump,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
 import { formatVT } from '@/lib/utils';
@@ -53,11 +52,8 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const ratingScore = (selectedBusiness.rating / 5) * 25;
   const reviewScore = Math.min(selectedBusiness.reviewCount / 100, 1) * 25;
   const redemptionScore = Math.min(totalRedemptions / 200, 1) * 25;
-  const descriptionIsUsable =
-    Boolean(selectedBusiness.description?.trim()) &&
-    !looksLikeSqlOrTechnicalDump(selectedBusiness.description || '');
   const completenessScore = [
-    descriptionIsUsable ? selectedBusiness.description : '',
+    selectedBusiness.description,
     selectedBusiness.phone,
     selectedBusiness.hours,
     selectedBusiness.image,
@@ -175,24 +171,24 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <span className="text-xs font-semibold text-green-600">Online</span>
           </div>
         </div>
-        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-3">
           {quickActions.map((action, index) => (
             <button
               key={index}
               type="button"
               onClick={action.onClick}
-              className={`group relative flex min-h-[5.5rem] flex-row items-center gap-4 p-4 sm:flex-col sm:items-center sm:gap-3 sm:p-6 rounded-2xl bg-white border-2 border-gray-100 hover:border-transparent transition-all duration-300 active:scale-[0.99] shadow-sm hover:shadow-xl sm:hover:-translate-y-1 ${action.bgHover}`}
+              className={`group relative flex flex-col items-center gap-3 p-5 sm:p-6 rounded-2xl bg-white border-2 border-gray-100 hover:border-transparent transition-all duration-300 hover:-translate-y-1 shadow-sm hover:shadow-xl ${action.bgHover}`}
             >
               {/* Icon Container */}
-              <div className={`w-14 h-14 shrink-0 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${action.gradient} flex items-center justify-center text-white shadow-lg ${action.shadowColor} sm:group-hover:scale-110 transition-transform duration-300`}>
+              <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${action.gradient} flex items-center justify-center text-white shadow-lg ${action.shadowColor} group-hover:scale-110 transition-transform duration-300`}>
                 {action.icon}
               </div>
               {/* Label */}
-              <div className="min-w-0 flex-1 text-left sm:flex-none sm:text-center">
-                <p className="text-base font-bold text-gray-900 group-hover:text-gray-800">
+              <div className="text-center">
+                <p className="text-sm sm:text-base font-bold text-gray-900 group-hover:text-gray-800">
                   {action.label}
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5 sm:text-gray-400">
+                <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5">
                   {action.description}
                 </p>
               </div>
@@ -204,8 +200,8 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* Top Stats Row */}
-      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow min-h-[8.5rem]">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-4">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200/50">
               <Users className="w-5 h-5 text-white" />
@@ -225,7 +221,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow min-h-[8.5rem]">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-200/50">
               <DollarSign className="w-5 h-5 text-white" />
@@ -242,7 +238,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <p className="text-[10px] text-gray-400 mt-1">72% of monthly target</p>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow min-h-[8.5rem]">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-200/50">
               <Star className="w-5 h-5 text-white" />
@@ -260,7 +256,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow min-h-[8.5rem]">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between mb-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-200/50">
               <Eye className="w-5 h-5 text-white" />
@@ -312,31 +308,16 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </div>
             </div>
 
-            <div className="p-4 sm:p-5">
-              {looksLikeSqlOrTechnicalDump(selectedBusiness.description || '') ? (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                  <p className="text-sm font-bold text-amber-900">Description needs an update</p>
-                  <p className="text-xs text-amber-800/90 mt-2 leading-relaxed">
-                    This listing’s description field contains database or technical text (not shown here for safety).
-                    Open <strong>Edit Listing</strong> and replace it with a short customer-facing description of your business.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => onSwitchTab('edit')}
-                    className="mt-3 w-full rounded-xl bg-amber-700 px-4 py-3 text-sm font-bold text-white hover:bg-amber-800 sm:w-auto"
-                  >
-                    Go to Edit Listing
-                  </button>
-                </div>
-              ) : looksLikeRichDescriptionHtml(selectedBusiness.description || '') ? (
+            <div className="p-5">
+              {looksLikeRichDescriptionHtml(selectedBusiness.description || '') ? (
                 <div
-                  className="prose prose-sm max-w-none max-h-64 overflow-y-auto text-gray-600 leading-relaxed sm:max-h-none"
+                  className="prose prose-sm max-w-none text-gray-600 leading-relaxed"
                   dangerouslySetInnerHTML={{
                     __html: sanitizeBusinessDescriptionHtml(selectedBusiness.description || ''),
                   }}
                 />
               ) : (
-                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto sm:max-h-none">
+                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
                   {selectedBusiness.description}
                 </p>
               )}

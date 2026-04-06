@@ -19,7 +19,6 @@ import {
 } from '@/lib/urlHelpers';
 import {
   looksLikeRichDescriptionHtml,
-  looksLikeSqlOrTechnicalDump,
   plainTextFromHtml,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
@@ -468,21 +467,13 @@ const BusinessDetail: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              {looksLikeSqlOrTechnicalDump(desc || '') ? (
-                <p className="text-gray-600 text-sm leading-relaxed">
-                  {language === 'en'
-                    ? 'Full description for this listing is not available. Please use Request booking or WhatsApp to reach the business.'
-                    : language === 'fr'
-                      ? 'La description complète n’est pas disponible. Contactez l’établissement via la réservation ou WhatsApp.'
-                      : 'Ful diskripsen i no save. Yusum Askem bukin o WhatsApp blong toktok wetem bisnis.'}
-                </p>
-              ) : looksLikeRichDescriptionHtml(desc || '') ? (
+              {looksLikeRichDescriptionHtml(desc || '') ? (
                 <div
                   className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: sanitizeBusinessDescriptionHtml(desc || '') }}
                 />
               ) : (
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{desc}</p>
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap break-words">{desc}</p>
               )}
               <div className="flex flex-wrap gap-2 mt-4">
                 {biz.tags.map(tag => (
