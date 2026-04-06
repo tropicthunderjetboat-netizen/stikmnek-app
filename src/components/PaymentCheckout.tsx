@@ -29,6 +29,36 @@ const CHECKOUT_PASS_UI: Record<PassProductId, { icon: LucideIcon; color: string;
   mega_group_experience: { icon: Crown, color: 'from-fuchsia-600 to-purple-700', shadow: 'shadow-fuchsia-200' },
 };
 
+/** Local calendar YYYY-MM-DD */
+function dateOnlyLocal(d = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** UTC calendar YYYY-MM-DD (matches process-card-payment validity checks). */
+function dateOnlyUtc(d = new Date()): string {
+  return d.toISOString().split('T')[0];
+}
+
+/**
+ * First day allowed for pass start: later of local "today" and UTC "today" (ISO string compare).
+ * Avoids sending a date the Edge function treats as before UTC midnight "today".
+ */
+function earliestPassStartDateIso(now = new Date()): string {
+  const local = dateOnlyLocal(now);
+  const utc = dateOnlyUtc(now);
+  return local > utc ? local : utc;
+}
+
+/** Last start day allowed by Edge: UTC today + 30 days (same as process-card-payment). */
+function latestPassStartDateUtc(now = new Date()): string {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  d.setUTCDate(d.getUTCDate() + 30);
+  return d.toISOString().split('T')[0];
+}
+
 const PASSES = Object.fromEntries(
   PASS_PRODUCT_ORDER.map((id) => {
     const p = PASS_PRODUCTS[id];
@@ -223,9 +253,9 @@ const PaymentCheckout: React.FC = () => {
   const [step, setStep] = useState<'dates' | 'payment' | 'processing' | 'success'>('dates');
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  // Date state
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  // Date state — min/max aligned with process-card-payment (UTC) + timezone-safe earliest day
+  const minStartDate = earliestPassStartDateIso();
+  const maxStartDate = latestPassStartDateUtc();
   const normalizeDateOnly = (v: unknown): string | null => {
     if (!v) return null;
     const s = String(v).trim();
@@ -241,7 +271,10 @@ const PaymentCheckout: React.FC = () => {
    * - Do NOT silently default to "today" once an arrival date exists.
    */
   const preferredArrivalDate = normalizeDateOnly(userProfile?.expected_arrival_date);
-  const initialStartDate = preferredArrivalDate ?? todayStr;
+  const initialStartDate =
+    preferredArrivalDate != null && preferredArrivalDate >= minStartDate
+      ? preferredArrivalDate
+      : minStartDate;
   const [startDate, setStartDate] = useState(initialStartDate);
   const startDateTouchedRef = useRef(false);
 
@@ -249,10 +282,23 @@ const PaymentCheckout: React.FC = () => {
   useEffect(() => {
     if (startDateTouchedRef.current) return;
     if (!preferredArrivalDate) return;
-    if (preferredArrivalDate !== startDate) {
-      setStartDate(preferredArrivalDate);
+    const next =
+      preferredArrivalDate >= minStartDate ? preferredArrivalDate : minStartDate;
+    if (next !== startDate) {
+      setStartDate(next);
     }
-  }, [preferredArrivalDate, startDate]);
+  }, [preferredArrivalDate, minStartDate, startDate]);
+
+  // If clock crosses midnight or min moves, keep start in [minStartDate, maxStartDate].
+  useEffect(() => {
+    if (startDate < minStartDate) {
+      setStartDate(minStartDate);
+      return;
+    }
+    if (startDate > maxStartDate) {
+      setStartDate(maxStartDate);
+    }
+  }, [minStartDate, maxStartDate, startDate]);
 
   // Card state
   const [cardNumber, setCardNumber] = useState('');
@@ -329,12 +375,6 @@ const PaymentCheckout: React.FC = () => {
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
   };
-
-  const maxStartDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 90);
-    return d.toISOString().split('T')[0];
-  }, []);
 
   if (!user) return null;
 
@@ -426,10 +466,15 @@ const PaymentCheckout: React.FC = () => {
         referralCode = localStorage.getItem('stikmnek-referral-code');
       } catch {}
 
+      const minPay = earliestPassStartDateIso();
+      const maxPay = latestPassStartDateUtc();
+      const payStartDate =
+        startDate < minPay ? minPay : startDate > maxPay ? maxPay : startDate;
+
       const invokeBody = {
         action: 'purchase_pass' as const,
         passType: cart.passType,
-        startDate,
+        startDate: payStartDate,
         cardNumber: cardNumber.replace(/\s/g, ''),
         cardExpiry,
         cardCvv,
@@ -680,7 +725,7 @@ const PaymentCheckout: React.FC = () => {
                     <input
                       type="date"
                       value={startDate}
-                      min={todayStr}
+                      min={minStartDate}
                       max={maxStartDate}
                       onChange={(e) => {
                         startDateTouchedRef.current = true;
@@ -689,7 +734,7 @@ const PaymentCheckout: React.FC = () => {
                       className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer hover:border-teal-300"
                     />
                     <p className="text-xs text-gray-400 mt-1.5">
-                      You can start your pass up to 90 days from today
+                      You can start your pass up to 30 days from today (UTC calendar, same as checkout validation)
                     </p>
                   </div>
 
@@ -736,13 +781,13 @@ const PaymentCheckout: React.FC = () => {
                       </div>
                     </div>
 
-                    {startDate === todayStr && (
+                    {startDate === minStartDate && (
                       <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
                         <Zap className="w-3.5 h-3.5" />
-                        Starting today! Your discounts will be active immediately after purchase.
+                        Starting on the earliest available day — discounts activate right after purchase.
                       </p>
                     )}
-                    {startDate > todayStr && (
+                    {startDate > minStartDate && (
                       <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5" />
                         Your discounts will activate on {formatDate(startDate)}.
