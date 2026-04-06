@@ -27,7 +27,15 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
+import PricingTiersEditor from './PricingTiersEditor';
 import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
+import {
+  categoryUsesTieredPricing,
+  pricingTiersFromDb,
+  pricingTiersEqual,
+  validatePricingTiersForSubmit,
+  type PricingTierInput,
+} from '@/lib/pricingTiers';
 
 
 interface PendingEdit {
@@ -98,7 +106,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
   onListingDeleted,
   initialSection,
 }) => {
-  const { user } = useAppContext();
+  const { user, language } = useAppContext();
   const profileId = effectiveProfileBusinessId(
     selectedBusiness as Business & { _profileBusinessId?: string },
   );
@@ -120,6 +128,8 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
   const [loadingEdits, setLoadingEdits] = useState(false);
   const [newTag, setNewTag] = useState('');
   const [isActive, setIsActive] = useState(true);
+  const [pricingTiers, setPricingTiers] = useState<PricingTierInput[]>([]);
+  const [originalPricingTiers, setOriginalPricingTiers] = useState<PricingTierInput[]>([]);
 
   // Form state
   const [form, setForm] = useState<EditFormData>({
@@ -165,8 +175,19 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
       };
       setForm(data);
       setOriginal(data);
+      const tiers = pricingTiersFromDb(selectedBusiness.pricingTiers ?? null);
+      setPricingTiers(tiers.map((t) => ({ ...t })));
+      setOriginalPricingTiers(tiers.map((t) => ({ ...t })));
     }
   }, [selectedBusiness]);
+
+  /** Parse e.g. "25% OFF" from discount label for tier StikmNek auto-fill (same idea as new listing form). */
+  const tierDiscountPercent = useMemo(() => {
+    const m = form.discount.match(/(\d+(?:\.\d+)?)\s*%/);
+    if (!m) return null;
+    const p = parseFloat(m[1]);
+    return Number.isFinite(p) && p >= 0 && p <= 100 ? p : null;
+  }, [form.discount]);
 
   // Load pending edits
   useEffect(() => {
@@ -200,8 +221,14 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
     if (form.location !== original.location) changes.push('location');
     if (JSON.stringify(form.tags) !== JSON.stringify(original.tags)) changes.push('tags');
     if (form.whatsapp_number !== original.whatsapp_number) changes.push('whatsapp_number');
+    if (
+      categoryUsesTieredPricing(selectedBusiness.category) &&
+      !pricingTiersEqual(pricingTiers, originalPricingTiers)
+    ) {
+      changes.push('pricing_tiers');
+    }
     return changes;
-  }, [form, original]);
+  }, [form, original, selectedBusiness.category, pricingTiers, originalPricingTiers]);
 
   const hasChanges = changedFields.length > 0;
   const currentPendingEdit = pendingEdits.find(e => e.business_id === profileId && e.status === 'pending');
@@ -213,8 +240,13 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
     setForm(prev => ({ ...prev, [field]: original[field] }));
   };
 
+  const resetPricingTiers = () => {
+    setPricingTiers(originalPricingTiers.map((t) => ({ ...t })));
+  };
+
   const resetAll = () => {
     setForm({ ...original });
+    resetPricingTiers();
     toast.info('All changes reverted');
   };
 
@@ -255,10 +287,19 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
       }
     }
 
+    if (changedFields.includes('pricing_tiers')) {
+      const { data: tierPayload, error: tierErr } = validatePricingTiersForSubmit(pricingTiers);
+      if (tierErr) {
+        toast.error(tierErr);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const changes: Record<string, any> = {};
       changedFields.forEach(field => {
+        if (field === 'pricing_tiers') return;
         const value = (form as any)[field];
         // For whatsapp_number, send null if empty string (to allow removal)
         if (field === 'whatsapp_number') {
@@ -267,6 +308,10 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
           changes[field] = value;
         }
       });
+      if (changedFields.includes('pricing_tiers')) {
+        const { data: tierPayload } = validatePricingTiersForSubmit(pricingTiers);
+        changes.pricing_tiers = tierPayload;
+      }
 
       const { data, error } = await supabase.functions.invoke('manage-business', {
         body: { action: 'submit_edit', userId: user.id, businessId: profileId, changes },
@@ -333,7 +378,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
     fields: string[];
   }[] = [
     { key: 'basic', label: 'Basic Info', shortLabel: 'Basic', icon: <FileText className="w-4 h-4" />, fields: ['description', 'location', 'tags'] },
-    { key: 'pricing', label: 'Pricing & Deals', shortLabel: 'Pricing', icon: <DollarSign className="w-4 h-4" />, fields: ['discount', 'original_price', 'deal_price'] },
+    { key: 'pricing', label: 'Pricing & Deals', shortLabel: 'Pricing', icon: <DollarSign className="w-4 h-4" />, fields: ['discount', 'original_price', 'deal_price', 'pricing_tiers'] },
     { key: 'contact', label: 'Contact & Hours', shortLabel: 'Contact', icon: <Phone className="w-4 h-4" />, fields: ['phone', 'hours', 'whatsapp_number'] },
     { key: 'media', label: 'Preview', shortLabel: 'Preview', icon: <Eye className="w-4 h-4" />, fields: [] },
   ];
@@ -625,12 +670,13 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                   <DollarSign className="w-5 h-5 text-teal-600 flex-shrink-0" />
                   Pricing & Deals
                 </h3>
-                {changedFields.some(f => ['discount', 'original_price', 'deal_price'].includes(f)) && (
+                {changedFields.some(f => ['discount', 'original_price', 'deal_price', 'pricing_tiers'].includes(f)) && (
                   <button
                     onClick={() => {
                       resetField('discount');
                       resetField('original_price');
                       resetField('deal_price');
+                      resetPricingTiers();
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors self-start sm:self-auto"
                   >
@@ -747,6 +793,24 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                 <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                   <p className="text-xs text-red-700">Deal price should be lower than the original price to show savings.</p>
+                </div>
+              )}
+
+              {categoryUsesTieredPricing(selectedBusiness.category) && (
+                <div className="min-w-0 max-w-full space-y-2">
+                  {isFieldChanged('pricing_tiers') && (
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1 text-[10px] text-orange-500 font-semibold bg-orange-50 px-1.5 py-0.5 rounded">
+                        <Edit3 className="w-2.5 h-2.5" /> Tiered pricing modified
+                      </span>
+                    </div>
+                  )}
+                  <PricingTiersEditor
+                    tiers={pricingTiers}
+                    onChange={setPricingTiers}
+                    language={language}
+                    discountPercent={tierDiscountPercent}
+                  />
                 </div>
               )}
             </div>
@@ -1153,6 +1217,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
               const newVal = (form as any)[field];
               const isArray = Array.isArray(newVal);
               const isWhatsApp = field === 'whatsapp_number';
+              const isPricingTiers = field === 'pricing_tiers';
               return (
                 <div key={field} className={`flex items-start gap-3 p-3 rounded-xl border ${
                   isWhatsApp
@@ -1172,6 +1237,18 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                       <p className="text-[11px] text-green-600 mt-0.5">
                         {oldVal ? `"${oldVal}"` : '(none)'} → {newVal ? `"${newVal}"` : '(removed)'}
                       </p>
+                    ) : isPricingTiers ? (
+                      <p className="text-[11px] text-orange-600 mt-0.5">
+                        {(() => {
+                          const prevN = validatePricingTiersForSubmit(originalPricingTiers).data?.length ?? 0;
+                          const nextRes = validatePricingTiersForSubmit(pricingTiers);
+                          const nextN = nextRes.data?.length ?? 0;
+                          if (nextRes.error) {
+                            return `Previously ${prevN} tier band(s) — fix tier rows before submitting (${nextRes.error})`;
+                          }
+                          return `${prevN} tier band(s) → ${nextN} tier band(s)`;
+                        })()}
+                      </p>
                     ) : isArray ? (
                       <p className="text-[11px] text-orange-600 mt-0.5">
                         {(oldVal as string[]).join(', ')} → {(newVal as string[]).join(', ')}
@@ -1187,7 +1264,10 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                     )}
                   </div>
                   <button
-                    onClick={() => resetField(field as keyof EditFormData)}
+                    onClick={() => {
+                      if (isPricingTiers) resetPricingTiers();
+                      else resetField(field as keyof EditFormData);
+                    }}
                     className={`p-1 rounded-lg transition-colors flex-shrink-0 ${
                       isWhatsApp
                         ? 'text-green-400 hover:text-red-500 hover:bg-green-100'

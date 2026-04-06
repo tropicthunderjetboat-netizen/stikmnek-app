@@ -110,6 +110,27 @@ export function categoryUsesTieredPricing(category: string): boolean {
   return c === 'tours' || c === 'activities';
 }
 
+/** Deep equality for edit forms / change detection (null max_pax matches undefined). */
+export function pricingTiersEqual(a: PricingTierInput[], b: PricingTierInput[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    const maxA = x.max_pax == null || x.max_pax === undefined ? null : Math.floor(Number(x.max_pax));
+    const maxB = y.max_pax == null || y.max_pax === undefined ? null : Math.floor(Number(y.max_pax));
+    if (
+      (x.label || '').trim() !== (y.label || '').trim() ||
+      Math.floor(Number(x.min_pax) || 0) !== Math.floor(Number(y.min_pax) || 0) ||
+      maxA !== maxB ||
+      Number(x.original_price_vt) !== Number(y.original_price_vt) ||
+      Number(x.deal_price_vt) !== Number(y.deal_price_vt)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Booking inquiry totals from tier rows × Adults / Children / Infants.
  * Single tier: all guests use that per-person price.
