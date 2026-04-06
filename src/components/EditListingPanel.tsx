@@ -325,11 +325,17 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
     ? Math.round(((form.original_price - form.deal_price) / form.original_price) * 100)
     : 0;
 
-  const sections: { key: EditSection; label: string; icon: React.ReactNode; fields: string[] }[] = [
-    { key: 'basic', label: 'Basic Info', icon: <FileText className="w-4 h-4" />, fields: ['description', 'location', 'tags'] },
-    { key: 'pricing', label: 'Pricing & Deals', icon: <DollarSign className="w-4 h-4" />, fields: ['discount', 'original_price', 'deal_price'] },
-    { key: 'contact', label: 'Contact & Hours', icon: <Phone className="w-4 h-4" />, fields: ['phone', 'hours', 'whatsapp_number'] },
-    { key: 'media', label: 'Preview', icon: <Eye className="w-4 h-4" />, fields: [] },
+  const sections: {
+    key: EditSection;
+    label: string;
+    shortLabel: string;
+    icon: React.ReactNode;
+    fields: string[];
+  }[] = [
+    { key: 'basic', label: 'Basic Info', shortLabel: 'Basic', icon: <FileText className="w-4 h-4" />, fields: ['description', 'location', 'tags'] },
+    { key: 'pricing', label: 'Pricing & Deals', shortLabel: 'Pricing', icon: <DollarSign className="w-4 h-4" />, fields: ['discount', 'original_price', 'deal_price'] },
+    { key: 'contact', label: 'Contact & Hours', shortLabel: 'Contact', icon: <Phone className="w-4 h-4" />, fields: ['phone', 'hours', 'whatsapp_number'] },
+    { key: 'media', label: 'Preview', shortLabel: 'Preview', icon: <Eye className="w-4 h-4" />, fields: [] },
   ];
 
   const getSectionChangeCount = (section: EditSection) => {
@@ -339,7 +345,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
   };
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="w-full min-w-0 max-w-5xl space-y-6 overflow-x-hidden">
       {/* Pending Edit Banner */}
       {currentPendingEdit && (
         <div className="bg-gradient-to-r from-yellow-50 to-amber-50 rounded-2xl border border-yellow-200 p-5">
@@ -381,42 +387,72 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
         </div>
       </div>
 
-      {/* Section Tabs */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="flex border-b border-gray-100 overflow-x-auto">
-          {sections.map(section => {
-            const changeCount = getSectionChangeCount(section.key);
-            return (
-              <button
-                key={section.key}
-                onClick={() => setActiveSection(section.key)}
-                className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all ${
-                  activeSection === section.key
-                    ? 'border-teal-600 text-teal-700 bg-teal-50/50'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <span className={activeSection === section.key ? 'text-teal-600' : 'text-gray-400'}>
-                  {section.icon}
-                </span>
-                {section.label}
-                {changeCount > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600 text-[10px] font-bold">
-                    {changeCount}
+      {/* Section Tabs — grid on small screens (no horizontal scroll); row on lg+ */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-w-0 max-w-full">
+        <div>
+          <div className="grid grid-cols-2 gap-2 p-3 border-b border-gray-100 lg:hidden">
+            {sections.map(section => {
+              const changeCount = getSectionChangeCount(section.key);
+              return (
+                <button
+                  key={section.key}
+                  type="button"
+                  onClick={() => setActiveSection(section.key)}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 px-2 py-3 min-h-[4.5rem] text-center transition-all ${
+                    activeSection === section.key
+                      ? 'border-teal-600 bg-teal-50/80 text-teal-800'
+                      : 'border-gray-200 bg-gray-50 text-gray-600'
+                  }`}
+                >
+                  <span className={activeSection === section.key ? 'text-teal-600' : 'text-gray-400'}>
+                    {section.icon}
                   </span>
-                )}
-              </button>
-            );
-          })}
+                  <span className="text-xs font-semibold leading-tight">{section.shortLabel}</span>
+                  {changeCount > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600 text-[10px] font-bold">
+                      {changeCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <div className="hidden lg:flex border-b border-gray-100 min-w-0">
+            {sections.map(section => {
+              const changeCount = getSectionChangeCount(section.key);
+              return (
+                <button
+                  key={section.key}
+                  type="button"
+                  onClick={() => setActiveSection(section.key)}
+                  className={`flex flex-1 min-w-0 items-center justify-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 transition-all ${
+                    activeSection === section.key
+                      ? 'border-teal-600 text-teal-700 bg-teal-50/50'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span className={`flex-shrink-0 ${activeSection === section.key ? 'text-teal-600' : 'text-gray-400'}`}>
+                    {section.icon}
+                  </span>
+                  <span className="truncate">{section.label}</span>
+                  {changeCount > 0 && (
+                    <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-600 text-[10px] font-bold">
+                      {changeCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6 min-w-0">
           {/* Basic Info Section */}
           {activeSection === 'basic' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-teal-600" />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 min-w-0">
+                  <FileText className="w-5 h-5 text-teal-600 flex-shrink-0" />
                   Basic Information
                 </h3>
                 {changedFields.some(f => ['description', 'location', 'tags'].includes(f)) && (
@@ -426,7 +462,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                       resetField('location');
                       resetField('tags');
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors self-start sm:self-auto"
                   >
                     <Undo2 className="w-3.5 h-3.5" />
                     Reset Section
@@ -461,12 +497,12 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                     </span>
                   )}
                 </label>
-                <div className="relative">
+                <div className="relative min-w-0 max-w-full">
                   <BusinessDescriptionEditor
                     value={form.description}
                     onChange={(html) => setForm((prev) => ({ ...prev, description: html }))}
                     placeholder="Describe your business to tourists..."
-                    quillClassName="[&_.ql-editor]:min-h-[8rem]"
+                    quillClassName="[&_.ql-editor]:min-h-[10rem] sm:[&_.ql-editor]:min-h-[8rem]"
                     className={
                       isFieldChanged('description') ? 'border-orange-300 bg-orange-50/30' : undefined
                     }
@@ -482,10 +518,10 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                     </button>
                   )}
                 </div>
-                <div className="flex items-center justify-between mt-1">
-                  <p className="text-[11px] text-gray-400">Write a compelling description for tourists</p>
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mt-1 min-w-0">
+                  <p className="text-[11px] text-gray-400 min-w-0">Write a compelling description for tourists</p>
                   <span
-                    className={`text-[11px] font-medium ${
+                    className={`text-[11px] font-medium flex-shrink-0 tabular-nums ${
                       plainTextFromHtml(form.description).length > BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT
                         ? 'text-orange-500'
                         : 'text-gray-400'
@@ -558,20 +594,20 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                     <span className="text-xs text-gray-400 italic">No tags added yet</span>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 min-[400px]:flex-row min-[400px]:items-center min-[400px]:gap-2">
                   <input
                     type="text"
                     value={newTag}
                     onChange={(e) => setNewTag(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
-                    className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    className="min-w-0 flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                     placeholder="Add a tag (e.g. seafood, waterfront)"
                     maxLength={30}
                   />
                   <button
                     onClick={handleAddTag}
                     disabled={!newTag.trim()}
-                    className="px-4 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full min-[400px]:w-auto shrink-0 px-4 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Add
                   </button>
@@ -584,9 +620,9 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
           {/* Pricing & Deals Section */}
           {activeSection === 'pricing' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-teal-600" />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 min-w-0">
+                  <DollarSign className="w-5 h-5 text-teal-600 flex-shrink-0" />
                   Pricing & Deals
                 </h3>
                 {changedFields.some(f => ['discount', 'original_price', 'deal_price'].includes(f)) && (
@@ -596,7 +632,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                       resetField('original_price');
                       resetField('deal_price');
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors self-start sm:self-auto"
                   >
                     <Undo2 className="w-3.5 h-3.5" />
                     Reset Section
@@ -719,9 +755,9 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
           {/* Contact & Hours Section */}
           {activeSection === 'contact' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <Phone className="w-5 h-5 text-teal-600" />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 min-w-0">
+                  <Phone className="w-5 h-5 text-teal-600 flex-shrink-0" />
                   Contact & Hours
                 </h3>
                 {changedFields.some(f => ['phone', 'hours', 'whatsapp_number'].includes(f)) && (
@@ -731,7 +767,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                       resetField('hours');
                       resetField('whatsapp_number');
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors self-start sm:self-auto"
                   >
                     <Undo2 className="w-3.5 h-3.5" />
                     Reset Section
@@ -773,13 +809,13 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
 
               {/* ─── WhatsApp Number ─── */}
               <div className="p-5 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-3 min-w-0">
+                  <div className="flex items-start gap-2 min-w-0 flex-1">
+                    <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
                       <WhatsAppIcon className="w-4.5 h-4.5 text-green-600" />
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-green-800 flex items-center gap-2">
+                    <div className="min-w-0">
+                      <h4 className="text-sm font-bold text-green-800 flex flex-wrap items-center gap-2">
                         WhatsApp Number
                         <span className="text-[10px] text-green-600 bg-green-100 px-1.5 py-0.5 rounded font-medium">Optional</span>
                         {isFieldChanged('whatsapp_number') && (
@@ -788,13 +824,13 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                           </span>
                         )}
                       </h4>
-                      <p className="text-[11px] text-green-600">Let tourists message you directly on WhatsApp</p>
+                      <p className="text-[11px] text-green-600 break-words">Let tourists message you directly on WhatsApp</p>
                     </div>
                   </div>
                   {isFieldChanged('whatsapp_number') && (
                     <button
                       onClick={() => resetField('whatsapp_number')}
-                      className="p-1.5 rounded-lg bg-white border border-green-200 text-green-500 hover:text-green-700 hover:border-green-300 transition-colors"
+                      className="p-1.5 rounded-lg bg-white border border-green-200 text-green-500 hover:text-green-700 hover:border-green-300 transition-colors self-start sm:self-auto flex-shrink-0"
                       title="Undo WhatsApp changes"
                     >
                       <Undo2 className="w-3.5 h-3.5" />
@@ -938,19 +974,19 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
 
               {/* Listing Status */}
               <div className="p-5 rounded-xl bg-gray-50 border border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? 'bg-emerald-100' : 'bg-gray-200'}`}>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between min-w-0">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isActive ? 'bg-emerald-100' : 'bg-gray-200'}`}>
                       <Power className={`w-5 h-5 ${isActive ? 'text-emerald-600' : 'text-gray-400'}`} />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-bold text-gray-900">Listing Status</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-gray-500 break-words">
                         {isActive ? 'Your listing is visible to tourists' : 'Your listing is hidden from tourists'}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => handleToggle(true)}
                       className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
@@ -1093,10 +1129,10 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
 
       {/* Changes Summary & Submit */}
       {hasChanges && (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-gray-900 flex items-center gap-2">
-              <Edit3 className="w-5 h-5 text-orange-500" />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6 space-y-4 min-w-0 max-w-full">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+            <h3 className="font-bold text-gray-900 flex flex-wrap items-center gap-2 min-w-0">
+              <Edit3 className="w-5 h-5 text-orange-500 flex-shrink-0" />
               Changes Summary
               <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 text-xs font-bold">
                 {changedFields.length} field{changedFields.length > 1 ? 's' : ''}
@@ -1104,7 +1140,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
             </h3>
             <button
               onClick={resetAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors self-start sm:self-auto"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Discard All
@@ -1263,15 +1299,15 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
 
       {editHistory.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-bold text-gray-900 flex items-center gap-2">
-              <History className="w-5 h-5 text-gray-500" />
+          <div className="p-4 sm:p-5 border-b border-gray-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+            <h3 className="font-bold text-gray-900 flex items-center gap-2 min-w-0">
+              <History className="w-5 h-5 text-gray-500 flex-shrink-0" />
               Edit History
             </h3>
             <button
               onClick={loadPendingEdits}
               disabled={loadingEdits}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-50 text-gray-500 text-xs font-medium hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-50 text-gray-500 text-xs font-medium hover:bg-gray-100 transition-colors self-start sm:self-auto"
             >
               <RefreshCw className={`w-3 h-3 ${loadingEdits ? 'animate-spin' : ''}`} />
               Refresh
@@ -1280,23 +1316,23 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
           <div className="divide-y divide-gray-100">
             {editHistory.map(edit => (
               <div key={edit.id} className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
                       edit.status === 'pending' ? 'bg-yellow-50' : edit.status === 'approved' ? 'bg-green-50' : 'bg-red-50'
                     }`}>
                       {edit.status === 'pending' ? <Clock className="w-4 h-4 text-yellow-500" /> :
                        edit.status === 'approved' ? <CheckCircle className="w-4 h-4 text-green-500" /> :
                        <XCircle className="w-4 h-4 text-red-500" />}
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-semibold text-gray-900 capitalize">Edit {edit.status}</p>
                       <p className="text-xs text-gray-400">
                         {new Date(edit.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                     </div>
                   </div>
-                  <span className={`px-2.5 py-1 rounded-lg text-xs font-bold capitalize ${
+                  <span className={`self-start sm:self-auto px-2.5 py-1 rounded-lg text-xs font-bold capitalize ${
                     edit.status === 'pending' ? 'bg-yellow-50 text-yellow-700' :
                     edit.status === 'approved' ? 'bg-green-50 text-green-700' :
                     'bg-red-50 text-red-700'

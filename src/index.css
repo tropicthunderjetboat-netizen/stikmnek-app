@@ -144,6 +144,26 @@
   @apply my-4 ml-6;
 }
 
+/* React Quill — business listing description (mobile: no page overflow; 16px avoids iOS input zoom) */
+.business-description-editor .ql-toolbar.ql-snow {
+  max-width: 100%;
+  padding: 0.5rem 0.5rem 0.25rem;
+}
+.business-description-editor .ql-container.ql-snow {
+  max-width: 100%;
+}
+.business-description-editor .ql-editor {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  overflow-x: hidden;
+}
+@media (max-width: 639px) {
+  .business-description-editor .ql-editor {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+}
+
 /* Proximity Alert Animations */
 @keyframes slide-up {
   0% {

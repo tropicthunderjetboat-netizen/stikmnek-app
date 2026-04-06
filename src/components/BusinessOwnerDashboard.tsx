@@ -1623,8 +1623,8 @@ const BusinessOwnerDashboard: React.FC = () => {
         <div className={`hidden lg:flex flex-col fixed top-0 left-0 bottom-0 bg-white border-r border-gray-100 shadow-sm z-30 transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'}`}>{renderSidebar(false)}</div>
 
         {/* Main Content */}
-        <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
-          <div className="pt-20 lg:pt-8 pb-28 lg:pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className={`flex-1 min-w-0 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
+          <div className="pt-20 lg:pt-8 pb-28 lg:pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-w-0">
             {/* Desktop Header */}
             <div className="hidden lg:flex items-center justify-between mb-8">
               <div>
