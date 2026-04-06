@@ -35,41 +35,23 @@ export const ENDPOINTS = {
 
 
 /**
- * Custom lock implementation that avoids the Navigator LockManager API.
+ * In-memory auth lock only (serializes refresh/getSession across async callers).
+ * Navigator LockManager is NOT used: on production sites it often hits short timeouts
+ * during visibility/refresh storms, which led to _recoverAndRefresh clearing the session
+ * and cascading 401s on REST + Edge Functions (see runtime logs).
  */
 const lockMap = new Map<string, Promise<any>>();
 
-async function navigatorLockFallback<R>(
+async function authSessionLock<R>(
   name: string,
   acquireTimeout: number,
   fn: () => Promise<R>
 ): Promise<R> {
-  if (typeof navigator !== 'undefined' && navigator.locks) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), Math.max(acquireTimeout, 4000));
-
-      const result = await navigator.locks.request(
-        name,
-        { signal: controller.signal },
-        async () => {
-          clearTimeout(timeoutId);
-          return await fn();
-        }
-      );
-      return result as R;
-    } catch (err: any) {
-      if (err?.name === 'AbortError' || err?.message?.includes('timed out')) {
-        console.warn(`[supabase] Navigator lock "${name}" timed out — using in-memory fallback`);
-      } else {
-        console.warn(`[supabase] Navigator lock "${name}" error — using in-memory fallback:`, err?.message || err);
-      }
-    }
-  }
-
   const existing = lockMap.get(name);
-  let resolve: (v?: any) => void;
-  const gate = new Promise<void>((r) => { resolve = r; });
+  let resolveGate: (v?: any) => void;
+  const gate = new Promise<void>((r) => {
+    resolveGate = r;
+  });
   lockMap.set(name, gate);
 
   try {
@@ -81,7 +63,7 @@ async function navigatorLockFallback<R>(
     }
     return await fn();
   } finally {
-    resolve!();
+    resolveGate!();
     if (lockMap.get(name) === gate) {
       lockMap.delete(name);
     }
@@ -96,9 +78,8 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'implicit',
-    lock: navigatorLockFallback,
-    // Session storage lock: slightly higher timeout reduces Navigator lock fallback warnings when tabs compete
-    lockAcquireTimeout: 5000,
+    lock: authSessionLock,
+    lockAcquireTimeout: 15000,
   },
 });
 

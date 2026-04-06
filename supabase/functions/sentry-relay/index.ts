@@ -136,14 +136,13 @@ Deno.serve(async (req) => {
       const result = await sendSentryEvent(dsn, event);
       if (!result.ok) {
         console.warn("[sentry-relay] capture_message failed:", result.status, result.text);
-        return json(
-          {
-            success: false,
-            error: `Sentry HTTP ${result.status}`,
-            detail: result.text,
-          },
-          502,
-        );
+        // HTTP 200 so supabase.functions.invoke does not treat this as Edge failure (avoids client 502 storms).
+        return json({
+          success: false,
+          relay_skipped: true,
+          error: `Sentry HTTP ${result.status}`,
+          detail: result.text,
+        });
       }
       return json({ success: true });
     }
@@ -201,14 +200,12 @@ Deno.serve(async (req) => {
       const result = await sendSentryEvent(dsn, event);
       if (!result.ok) {
         console.warn("[sentry-relay] capture_error failed:", result.status, result.text);
-        return json(
-          {
-            success: false,
-            error: `Sentry HTTP ${result.status}`,
-            detail: result.text,
-          },
-          502,
-        );
+        return json({
+          success: false,
+          relay_skipped: true,
+          error: `Sentry HTTP ${result.status}`,
+          detail: result.text,
+        });
       }
       return json({ success: true });
     }

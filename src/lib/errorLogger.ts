@@ -212,7 +212,13 @@ class ErrorLogger {
         );
         return;
       }
-      if (data && typeof data === 'object' && 'success' in data && (data as { success?: boolean }).success === false) {
+      if (
+        data &&
+        typeof data === 'object' &&
+        'success' in data &&
+        (data as { success?: boolean }).success === false &&
+        !(data as { relay_skipped?: boolean }).relay_skipped
+      ) {
         console.warn(`[ErrorLogger] ${context} — sentry-relay returned success=false`, data);
       }
     } catch (e) {
@@ -336,6 +342,12 @@ class ErrorLogger {
     const entries = [...this.buffer];
     this.buffer = [];
     try {
+      const { data: sess } = await supabase.auth.getSession();
+      if (!sess?.session?.access_token) {
+        // No JWT → PostgREST is anon; error_logs INSERT requires authenticated (401/42501).
+        this.buffer.unshift(...entries);
+        return;
+      }
       const records = entries.map((entry) => ({
         user_id: this.userId || null,
         error_type: entry.error_type,
@@ -347,7 +359,13 @@ class ErrorLogger {
         metadata: entry.metadata || {},
         severity: entry.severity,
       }));
-      await supabase.from('error_logs').insert(records);
+      const { error } = await supabase.from('error_logs').insert(records);
+      if (error) {
+        // Do not re-queue forever; localStorage already has a copy.
+        if (error.code !== '42501') {
+          console.warn('[ErrorLogger] error_logs insert failed:', error.message, error.code);
+        }
+      }
     } catch (_e) {
       // DB insert failed — errors are already in localStorage as fallback.
     }
