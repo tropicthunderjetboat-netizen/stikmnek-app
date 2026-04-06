@@ -32,8 +32,6 @@ interface RedemptionResult {
   success: boolean;
   message?: string;
   error?: string;
-  /** TEMP_DEBUG_QR_SCAN: raw invoke diagnostics — remove after fixing live QR issues */
-  debugDetail?: string;
   redemption?: {
     id: string;
     touristName: string;
@@ -94,8 +92,6 @@ interface ValidityResult {
     lastRedemptions: string[];
   };
   error?: string;
-  /** TEMP_DEBUG_QR_SCAN */
-  debugDetail?: string;
 }
 
 export type OwnerListingOffer = {
@@ -251,41 +247,6 @@ async function extractFunctionsInvokeErrorBody(
   return null;
 }
 
-/** TEMP_DEBUG_QR_SCAN — safe serialization for UI + console (no circular refs). */
-function safeJson(value: unknown): string {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
-/**
- * TEMP_DEBUG_QR_SCAN — full diagnostics for verify-redemption invoke failures.
- * Does not re-read Response.body (extractFunctionsInvokeErrorBody may have consumed it).
- */
-function buildVerifyRedemptionInvokeDiagnostics(
-  error: unknown,
-  data: unknown,
-  parsed: InvokeErrorPayload | null,
-  httpStatus: number | null,
-): string {
-  const e = error as Record<string, unknown> | null;
-  const ctx = e?.context as Response | undefined;
-  return safeJson({
-    phase: 'verify-redemption',
-    errorConstructor: error?.constructor?.name,
-    errorKeys: e ? Object.keys(e) : [],
-    errorMessage: typeof e?.message === 'string' ? e.message : undefined,
-    errorName: typeof e?.name === 'string' ? e.name : undefined,
-    contextResponseStatus: typeof ctx?.status === 'number' ? ctx.status : null,
-    httpStatusFromHelper: httpStatus,
-    dataFromInvoke: data ?? null,
-    parsedJsonBody: parsed ?? null,
-    note: 'If parsedJsonBody is null, the Edge Function may have returned non-JSON or body was already consumed.',
-  });
-}
-
 function getFunctionsInvokeHttpStatus(error: unknown): number | null {
   try {
     const e = error as { context?: Response; status?: number };
@@ -295,29 +256,6 @@ function getFunctionsInvokeHttpStatus(error: unknown): number | null {
     /* ignore */
   }
   return null;
-}
-
-/** TEMP_DEBUG_QR_SCAN: force Authorization header for Edge Function calls. */
-async function getCurrentAccessToken(): Promise<string | null> {
-  try {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) return null;
-    return data.session?.access_token ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** TEMP_DEBUG_QR_SCAN: headers for verify-redemption invoke (explicit bearer). */
-async function buildVerifyRedemptionInvokeHeaders(): Promise<Record<string, string>> {
-  const token = await getCurrentAccessToken();
-  if (!token) return {};
-  return { Authorization: `Bearer ${token}` };
-}
-
-/** TEMP_DEBUG_QR_SCAN: same auth header for manage-business invokes. */
-async function buildManageBusinessInvokeHeaders(): Promise<Record<string, string>> {
-  return await buildVerifyRedemptionInvokeHeaders();
 }
 
 // ═══ FAILURE REASON CONFIG ═══
@@ -375,8 +313,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const [manualCode, setManualCode] = useState('');
   const [cameraReady, setCameraReady] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
-  /** TEMP_DEBUG_QR_SCAN: full invoke error dump for on-screen + console — clear on reset */
-  const [qrDiagnosticDump, setQrDiagnosticDump] = useState<string | null>(null);
 
   /** After pass is valid, owner picks which listing / offer was redeemed */
   const [redeemSubStep, setRedeemSubStep] = useState<RedeemSubStep>('none');
@@ -481,7 +417,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
   ) => {
     const discountLine = formatOfferDiscountLine(listing);
     const preview = computeRedemptionSavingsForListing(listing, party);
-    const headers = await buildVerifyRedemptionInvokeHeaders();
     const { data, error } = await supabase.functions.invoke('verify-redemption', {
       body: {
         action: 'verify_and_redeem',
@@ -495,35 +430,25 @@ const QRScanner: React.FC<QRScannerProps> = ({
         dealPrice: preview.totalDeal,
         verifiedBy: user?.id,
       },
-      headers,
     });
     if (error) {
       const parsed = await extractFunctionsInvokeErrorBody(error);
       const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
       const httpStatus = getFunctionsInvokeHttpStatus(error);
-      const diag = buildVerifyRedemptionInvokeDiagnostics(error, data, parsed, httpStatus);
-      setQrDiagnosticDump(diag);
-      console.error('[QRScanner][TEMP_DEBUG_QR_SCAN] verify_and_redeem invoke failed', {
+      console.error('[QRScanner] verify_and_redeem failed', {
         httpStatus,
-        parsed,
-        data,
-        rawError: error,
-        diagnostics: diag,
+        error: parsed?.error,
+        errorCode: parsed?.errorCode,
       });
       const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
       if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
-      else
-        toast.error(
-          formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280) +
-            ' — see Technical details below.',
-        );
+      else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280));
       setResult({
         success: false,
         error: invalidQr
           ? INVALID_QR_PAYLOAD_USER_MESSAGE
           : formatVerifyInvokeFailure(backendMsg, parsed, httpStatus),
         status: invalidQr ? 'invalid_qr_payload' : undefined,
-        debugDetail: diag,
       });
       setRedeemSubStep('none');
       setOwnerListings([]);
@@ -613,10 +538,8 @@ const QRScanner: React.FC<QRScannerProps> = ({
     }
 
     if (rows.length === 0) {
-      const headers = await buildManageBusinessInvokeHeaders();
       const { data: mbData, error: mbErr } = await supabase.functions.invoke('manage-business', {
         body: { action: 'get_owner_businesses', userId: user.id },
-        headers,
       });
 
       if (mbErr) {
@@ -687,7 +610,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const handleQRData = async (rawData: string) => {
     const normalizedQr = normalizePassQrInput(rawData);
     lastScannedDataRef.current = normalizedQr;
-    setQrDiagnosticDump(null);
     setVerifying(true);
     setVerifyStep(0);
     setShowSuccessAnimation(false);
@@ -697,7 +619,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
     setPendingRedeemQr(null);
     setVerifiedForOfferFlow(null);
     try {
-      const headers = await buildVerifyRedemptionInvokeHeaders();
       if (scanPurpose === 'check') {
         const { data, error } = await supabase.functions.invoke('verify-redemption', {
           body: {
@@ -705,34 +626,24 @@ const QRScanner: React.FC<QRScannerProps> = ({
             qrData: normalizedQr,
             ...(preferredBusinessId ? { businessId: preferredBusinessId, businessName: preferredBusinessName ?? '' } : {}),
           },
-          headers,
         });
         if (error) {
           const parsed = await extractFunctionsInvokeErrorBody(error);
           const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
           const httpStatus = getFunctionsInvokeHttpStatus(error);
-          const diag = buildVerifyRedemptionInvokeDiagnostics(error, data, parsed, httpStatus);
-          setQrDiagnosticDump(diag);
-          console.error('[QRScanner][TEMP_DEBUG_QR_SCAN] check_voucher_validity failed', {
+          console.error('[QRScanner] check_voucher_validity failed', {
             httpStatus,
-            parsed,
-            data,
-            rawError: error,
-            diagnostics: diag,
+            error: parsed?.error,
+            errorCode: parsed?.errorCode,
           });
           const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
           if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
-          else
-            toast.error(
-              formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280) +
-                ' — see Technical details.',
-            );
+          else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280));
           setValidityResult({
             success: false,
             error: invalidQr
               ? INVALID_QR_PAYLOAD_USER_MESSAGE
               : formatVerifyInvokeFailure(backendMsg, parsed, httpStatus),
-            debugDetail: diag,
           } as ValidityResult);
           return;
         }
@@ -748,35 +659,25 @@ const QRScanner: React.FC<QRScannerProps> = ({
             action: 'check_voucher_validity',
             qrData: normalizedQr,
           },
-          headers,
         });
         if (error) {
           const parsed = await extractFunctionsInvokeErrorBody(error);
           const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
           const httpStatus = getFunctionsInvokeHttpStatus(error);
-          const diag = buildVerifyRedemptionInvokeDiagnostics(error, data, parsed, httpStatus);
-          setQrDiagnosticDump(diag);
-          console.error('[QRScanner][TEMP_DEBUG_QR_SCAN] redeem flow check failed', {
+          console.error('[QRScanner] redeem flow validity check failed', {
             httpStatus,
-            parsed,
-            data,
-            rawError: error,
-            diagnostics: diag,
+            error: parsed?.error,
+            errorCode: parsed?.errorCode,
           });
           const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
           if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
-          else
-            toast.error(
-              formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280) +
-                ' — see Technical details.',
-            );
+          else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280));
           setResult({
             success: false,
             error: invalidQr
               ? INVALID_QR_PAYLOAD_USER_MESSAGE
               : formatVerifyInvokeFailure(backendMsg, parsed, httpStatus),
             status: invalidQr ? 'invalid_qr_payload' : undefined,
-            debugDetail: diag,
           });
           return;
         }
@@ -793,25 +694,16 @@ const QRScanner: React.FC<QRScannerProps> = ({
         await proceedAfterPassValidForRedeem(normalizedQr, v);
       }
     } catch (err: any) {
-      const diag = safeJson({
-        phase: 'handleQRData catch',
-        message: err?.message,
-        stack: err?.stack,
-        name: err?.name,
-      });
-      setQrDiagnosticDump(diag);
-      console.error('[QRScanner][TEMP_DEBUG_QR_SCAN] handleQRData catch', err);
+      console.error('[QRScanner] handleQRData', err);
       if (scanPurpose === 'check') {
         setValidityResult({
           success: false,
           error: err.message || 'Verification failed.',
-          debugDetail: diag,
         } as ValidityResult);
       } else {
         setResult({
           success: false,
           error: err.message || 'Verification failed. Please try again.',
-          debugDetail: diag,
         });
       }
     } finally {
@@ -830,7 +722,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const handleReset = () => {
     setResult(null);
     setValidityResult(null);
-    setQrDiagnosticDump(null);
     setManualCode('');
     setVerifying(false);
     setVerifyStep(0);
@@ -864,17 +755,10 @@ const QRScanner: React.FC<QRScannerProps> = ({
         try {
           await proceedAfterPassValidForRedeem(savedData, savedValidity);
         } catch (e: any) {
-          const diag = safeJson({
-            phase: 'handleProceedToRedeem catch',
-            message: e?.message,
-            stack: e?.stack,
-          });
-          setQrDiagnosticDump(diag);
-          console.error('[QRScanner][TEMP_DEBUG_QR_SCAN] handleProceedToRedeem', e);
+          console.error('[QRScanner] handleProceedToRedeem', e);
           setResult({
             success: false,
             error: e?.message || 'Redemption failed.',
-            debugDetail: diag,
           });
         } finally {
           setVerifying(false);
@@ -899,29 +783,11 @@ const QRScanner: React.FC<QRScannerProps> = ({
     try {
       await executeRedeemForListing(raw, listing, party);
     } catch (e: any) {
-      const diag = safeJson({ phase: 'confirmSelectedOffer catch', message: e?.message, stack: e?.stack });
-      setQrDiagnosticDump(diag);
-      console.error('[QRScanner][TEMP_DEBUG_QR_SCAN] confirmSelectedOffer', e);
-      setResult({ success: false, error: e?.message || 'Redemption failed.', debugDetail: diag });
+      console.error('[QRScanner] confirmSelectedOffer', e);
+      setResult({ success: false, error: e?.message || 'Redemption failed.' });
     } finally {
       setVerifying(false);
     }
-  };
-
-  /** TEMP_DEBUG_QR_SCAN — on-screen raw diagnostics */
-  const renderQrDiagnosticPanel = () => {
-    const text = qrDiagnosticDump || result?.debugDetail || (validityResult as ValidityResult | null)?.debugDetail;
-    if (!text) return null;
-    return (
-      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-left">
-        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-900 mb-1">
-          Technical details (temporary debug)
-        </p>
-        <pre className="text-[10px] leading-snug text-amber-950 whitespace-pre-wrap break-all max-h-48 overflow-y-auto font-mono">
-          {text}
-        </pre>
-      </div>
-    );
   };
 
   const hasBarcodeDetector = 'BarcodeDetector' in window;
@@ -1296,7 +1162,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
                 <div className="flex-1">
                   <h4 className="text-base font-extrabold text-gray-900 mb-1">{failConfig.title}</h4>
                   <p className="text-sm text-gray-600 leading-relaxed">{result.error}</p>
-                  {renderQrDiagnosticPanel()}
                 </div>
               </div>
 
@@ -1505,7 +1370,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
               <div>
                 <h4 className="text-sm font-bold text-red-800 mb-1">Error Details</h4>
                 <p className="text-sm text-red-700 leading-relaxed">{validityResult.error}</p>
-                {renderQrDiagnosticPanel()}
               </div>
             </div>
             <div className="mt-4 p-3 rounded-xl bg-blue-50 border border-blue-100">

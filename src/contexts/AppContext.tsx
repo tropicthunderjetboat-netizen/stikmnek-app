@@ -666,14 +666,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const approxRestUrl =
           `${ENDPOINTS.rest}/user_profiles?select=${encodeURIComponent(PROFILE_ROLE_COLUMNS)}` +
           `&user_id=eq.${encodeURIComponent(userId)}`;
-        console.log('[resolveRole][TEMP_DEBUG_QUERY] Querying user_profiles:', {
-          userId,
-          profileColumns: PROFILE_ROLE_COLUMNS,
-          supabaseRestBase: ENDPOINTS.rest,
-          table: 'user_profiles',
-          filter: { column: 'user_id', op: 'eq', value: userId },
-          approxGetUrl: approxRestUrl,
-        });
         const startedAt = Date.now();
         const fetchPromise = supabase
           .from('user_profiles')
@@ -708,11 +700,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             hint: err.hint ?? null,
             httpStatus: err.status ?? err.statusCode ?? null,
           };
-          console.error('[resolveRole][TEMP_DEBUG_QUERY] DB query error:', errorPayload);
-          console.error(
-            '[resolveRole][TEMP_DEBUG_QUERY] DB query error (JSON):',
-            JSON.stringify(errorPayload),
-          );
+          console.error('[resolveRole] user_profiles query failed:', errorPayload);
         } else if (data) {
           profile = data as UserProfile;
           dbQuerySucceeded = true;
