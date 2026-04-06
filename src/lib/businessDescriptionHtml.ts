@@ -48,3 +48,27 @@ export function hasMeaningfulDescriptionContent(html: string): boolean {
 export function looksLikeRichDescriptionHtml(s: string): boolean {
   return /<\/?[a-z][\s\S]*?>/i.test((s || '').trim());
 }
+
+/**
+ * Detects SQL / migration dumps accidentally pasted into `description` (plain or HTML-wrapped).
+ * Never render these on dashboards or public pages.
+ */
+export function looksLikeSqlOrTechnicalDump(s: string): boolean {
+  const raw = (s || '').trim();
+  if (raw.length < 24) return false;
+  const t = plainTextFromHtml(raw) || raw;
+  if (t.length < 24) return false;
+  const u = t.toUpperCase();
+  let score = 0;
+  if (u.includes('ALTER TABLE')) score += 2;
+  if (u.includes('CREATE POLICY')) score += 2;
+  if (u.includes('ROW LEVEL SECURITY')) score += 2;
+  if (u.includes('GRANT SELECT')) score += 2;
+  if (u.includes('ENABLE ROW')) score += 1;
+  if (u.includes('DROP POLICY')) score += 2;
+  if (u.includes('CREATE TABLE')) score += 1;
+  if (u.includes('REFERENCES PUBLIC.')) score += 1;
+  if (u.includes('USING (') && u.includes('SELECT')) score += 1;
+  if (/--\s*(BUSINESS_|PUBLIC\.|ENSURE)/i.test(t)) score += 1;
+  return score >= 3;
+}

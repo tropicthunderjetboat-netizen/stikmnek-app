@@ -11,8 +11,15 @@ import {
 } from 'lucide-react';
 import {
   looksLikeRichDescriptionHtml,
+  looksLikeSqlOrTechnicalDump,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
+import { formatVT } from '@/lib/utils';
+import {
+  customerFacingListPrice,
+  effectiveListingOriginalPrice,
+  listingHasActiveDiscount,
+} from '@/data/businesses';
 
 
 interface DashboardOverviewProps {
@@ -46,8 +53,11 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   const ratingScore = (selectedBusiness.rating / 5) * 25;
   const reviewScore = Math.min(selectedBusiness.reviewCount / 100, 1) * 25;
   const redemptionScore = Math.min(totalRedemptions / 200, 1) * 25;
+  const descriptionIsUsable =
+    Boolean(selectedBusiness.description?.trim()) &&
+    !looksLikeSqlOrTechnicalDump(selectedBusiness.description || '');
   const completenessScore = [
-    selectedBusiness.description,
+    descriptionIsUsable ? selectedBusiness.description : '',
     selectedBusiness.phone,
     selectedBusiness.hours,
     selectedBusiness.image,
@@ -165,23 +175,24 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <span className="text-xs font-semibold text-green-600">Online</span>
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
           {quickActions.map((action, index) => (
             <button
               key={index}
+              type="button"
               onClick={action.onClick}
-              className={`group relative flex flex-col items-center gap-3 p-5 sm:p-6 rounded-2xl bg-white border-2 border-gray-100 hover:border-transparent transition-all duration-300 hover:-translate-y-1 shadow-sm hover:shadow-xl ${action.bgHover}`}
+              className={`group relative flex min-h-[5.5rem] flex-row items-center gap-4 p-4 sm:flex-col sm:items-center sm:gap-3 sm:p-6 rounded-2xl bg-white border-2 border-gray-100 hover:border-transparent transition-all duration-300 active:scale-[0.99] shadow-sm hover:shadow-xl sm:hover:-translate-y-1 ${action.bgHover}`}
             >
               {/* Icon Container */}
-              <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${action.gradient} flex items-center justify-center text-white shadow-lg ${action.shadowColor} group-hover:scale-110 transition-transform duration-300`}>
+              <div className={`w-14 h-14 shrink-0 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br ${action.gradient} flex items-center justify-center text-white shadow-lg ${action.shadowColor} sm:group-hover:scale-110 transition-transform duration-300`}>
                 {action.icon}
               </div>
               {/* Label */}
-              <div className="text-center">
-                <p className="text-sm sm:text-base font-bold text-gray-900 group-hover:text-gray-800">
+              <div className="min-w-0 flex-1 text-left sm:flex-none sm:text-center">
+                <p className="text-base font-bold text-gray-900 group-hover:text-gray-800">
                   {action.label}
                 </p>
-                <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5 hidden sm:block">
+                <p className="text-xs text-gray-500 mt-0.5 sm:text-gray-400">
                   {action.description}
                 </p>
               </div>
@@ -193,8 +204,8 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       </div>
 
       {/* Top Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow min-h-[8.5rem]">
           <div className="flex items-center justify-between mb-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200/50">
               <Users className="w-5 h-5 text-white" />
@@ -214,7 +225,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow min-h-[8.5rem]">
           <div className="flex items-center justify-between mb-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-lg shadow-emerald-200/50">
               <DollarSign className="w-5 h-5 text-white" />
@@ -223,15 +234,15 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               <ArrowUpRight className="w-3 h-3" />+12%
             </div>
           </div>
-          <p className="text-2xl font-extrabold text-gray-900">${totalRevenue.toLocaleString()}</p>
-          <p className="text-xs text-gray-400 mt-0.5">Revenue Impact</p>
+          <p className="text-2xl font-extrabold text-gray-900">{formatVT(totalRevenue)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Revenue Impact (VT)</p>
           <div className="mt-3 h-1.5 bg-emerald-100 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-emerald-500 to-green-400 rounded-full" style={{ width: '72%' }} />
           </div>
           <p className="text-[10px] text-gray-400 mt-1">72% of monthly target</p>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow min-h-[8.5rem]">
           <div className="flex items-center justify-between mb-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-200/50">
               <Star className="w-5 h-5 text-white" />
@@ -249,7 +260,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow min-h-[8.5rem]">
           <div className="flex items-center justify-between mb-3">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-200/50">
               <Eye className="w-5 h-5 text-white" />
@@ -301,27 +312,51 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               </div>
             </div>
 
-            <div className="p-5">
-              {looksLikeRichDescriptionHtml(selectedBusiness.description || '') ? (
+            <div className="p-4 sm:p-5">
+              {looksLikeSqlOrTechnicalDump(selectedBusiness.description || '') ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="text-sm font-bold text-amber-900">Description needs an update</p>
+                  <p className="text-xs text-amber-800/90 mt-2 leading-relaxed">
+                    This listing’s description field contains database or technical text (not shown here for safety).
+                    Open <strong>Edit Listing</strong> and replace it with a short customer-facing description of your business.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onSwitchTab('edit')}
+                    className="mt-3 w-full rounded-xl bg-amber-700 px-4 py-3 text-sm font-bold text-white hover:bg-amber-800 sm:w-auto"
+                  >
+                    Go to Edit Listing
+                  </button>
+                </div>
+              ) : looksLikeRichDescriptionHtml(selectedBusiness.description || '') ? (
                 <div
-                  className="prose prose-sm max-w-none text-gray-600 leading-relaxed"
+                  className="prose prose-sm max-w-none max-h-64 overflow-y-auto text-gray-600 leading-relaxed sm:max-h-none"
                   dangerouslySetInnerHTML={{
                     __html: sanitizeBusinessDescriptionHtml(selectedBusiness.description || ''),
                   }}
                 />
               ) : (
-                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
+                <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto sm:max-h-none">
                   {selectedBusiness.description}
                 </p>
               )}
 
               <div className="flex flex-wrap items-center gap-3 mt-4">
-                <span className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 text-orange-700 text-sm font-bold">
-                  {selectedBusiness.discount}
-                </span>
+                {listingHasActiveDiscount(selectedBusiness) && (
+                  <span className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 text-orange-700 text-sm font-bold">
+                    {selectedBusiness.discount?.trim() ||
+                      `${Math.round((1 - effectiveListingDealPrice(selectedBusiness) / effectiveListingOriginalPrice(selectedBusiness)) * 100)}% OFF`}
+                  </span>
+                )}
                 <span className="text-sm text-gray-500">
-                  <span className="line-through text-gray-400">${selectedBusiness.originalPrice}</span>
-                  <span className="font-bold text-gray-900 ml-2">${selectedBusiness.dealPrice}</span>
+                  {listingHasActiveDiscount(selectedBusiness) ? (
+                    <>
+                      <span className="line-through text-gray-400">{formatVT(effectiveListingOriginalPrice(selectedBusiness))}</span>
+                      <span className="font-bold text-gray-900 ml-2">{formatVT(effectiveListingDealPrice(selectedBusiness))}</span>
+                    </>
+                  ) : (
+                    <span className="font-bold text-gray-900">{formatVT(customerFacingListPrice(selectedBusiness))}</span>
+                  )}
                 </span>
                 <span className="flex items-center gap-1 text-sm text-gray-500">
                   <Clock className="w-3.5 h-3.5" />{selectedBusiness.hours}

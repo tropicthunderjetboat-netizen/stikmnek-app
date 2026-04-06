@@ -19,6 +19,7 @@ import {
 } from '@/lib/urlHelpers';
 import {
   looksLikeRichDescriptionHtml,
+  looksLikeSqlOrTechnicalDump,
   plainTextFromHtml,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
@@ -467,7 +468,15 @@ const BusinessDetail: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              {looksLikeRichDescriptionHtml(desc || '') ? (
+              {looksLikeSqlOrTechnicalDump(desc || '') ? (
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {language === 'en'
+                    ? 'Full description for this listing is not available. Please use Request booking or WhatsApp to reach the business.'
+                    : language === 'fr'
+                      ? 'La description complète n’est pas disponible. Contactez l’établissement via la réservation ou WhatsApp.'
+                      : 'Ful diskripsen i no save. Yusum Askem bukin o WhatsApp blong toktok wetem bisnis.'}
+                </p>
+              ) : looksLikeRichDescriptionHtml(desc || '') ? (
                 <div
                   className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
                   dangerouslySetInnerHTML={{ __html: sanitizeBusinessDescriptionHtml(desc || '') }}

@@ -1603,10 +1603,10 @@ const BusinessOwnerDashboard: React.FC = () => {
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 shadow-sm">
         <div className="flex items-center justify-between px-4 h-16">
           <div className="flex items-center gap-3">
-            <button onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)} className="p-2 rounded-xl hover:bg-gray-100 transition-colors"><Menu className="w-5 h-5 text-gray-700" /></button>
+            <button type="button" onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)} className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors" aria-label="Open menu"><Menu className="w-5 h-5 text-gray-700" /></button>
             <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center"><Store className="w-4 h-4 text-white" /></div><span className="font-bold text-gray-900 text-sm">Dashboard</span></div>
           </div>
-          <button onClick={() => setCurrentView('home')} className="p-2 rounded-xl hover:bg-gray-100 transition-colors"><ArrowLeft className="w-5 h-5 text-gray-500" /></button>
+          <button type="button" onClick={() => setCurrentView('home')} className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors" aria-label="Back to site"><ArrowLeft className="w-5 h-5 text-gray-500" /></button>
         </div>
       </div>
 
@@ -1625,35 +1625,25 @@ const BusinessOwnerDashboard: React.FC = () => {
         {/* Main Content */}
         <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
           <div className="pt-20 lg:pt-8 pb-28 lg:pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-            {/* Mobile: horizontal section chips — same destinations as sidebar, no menu hunt */}
-            <div className="lg:hidden sticky top-16 z-20 -mx-4 mb-4 border-b border-gray-200/90 bg-gray-50/95 py-2.5 pl-3 pr-2 backdrop-blur-md">
-              <div
-                className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                style={{ WebkitOverflowScrolling: 'touch' }}
+            {/* Mobile: native picker — large touch target, no tiny horizontal chips */}
+            <div className="lg:hidden sticky top-16 z-20 -mx-4 mb-4 border-b border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <label htmlFor="mobile-business-dash-section" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Section
+              </label>
+              <select
+                id="mobile-business-dash-section"
+                value={activeTab}
+                onChange={(e) => handleNavClick(e.target.value as DashboardTab)}
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-3.5 pl-4 pr-10 text-base font-semibold text-gray-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/25"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1.25rem' }}
               >
                 {navItems.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => handleNavClick(item.key)}
-                    className={`min-h-11 shrink-0 snap-start rounded-xl px-3.5 py-2.5 text-left text-xs font-bold transition-all active:scale-[0.98] ${
-                      activeTab === item.key
-                        ? 'bg-teal-600 text-white shadow-md shadow-teal-200'
-                        : 'bg-white text-gray-700 shadow-sm ring-1 ring-gray-100'
-                    }`}
-                  >
-                    <span className="flex items-center gap-1.5 whitespace-nowrap">
-                      <span className={activeTab === item.key ? 'text-white' : 'text-teal-600'}>{item.icon}</span>
-                      {item.label}
-                    </span>
-                    {item.badge && (
-                      <span className="mt-1 inline-block rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-extrabold text-orange-700">
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
+                  <option key={item.key} value={item.key}>
+                    {item.label}
+                    {item.badge ? ` (${item.badge})` : ''}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
             {/* Desktop Header */}
             <div className="hidden lg:flex items-center justify-between mb-8">
