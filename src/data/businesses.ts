@@ -108,6 +108,22 @@ export function effectiveListingOriginalPrice(b: Business): number {
   return Number.isFinite(d) ? d : 0;
 }
 
+/** True when there is a real StikmNek deal (deal strictly below standard list price). */
+export function listingHasActiveDiscount(b: Business): boolean {
+  const deal = effectiveListingDealPrice(b);
+  const orig = effectiveListingOriginalPrice(b);
+  return orig > 0 && deal > 0 && deal < orig;
+}
+
+/** Headline price for cards and detail (discounted price, or list price when no deal). */
+export function customerFacingListPrice(b: Business): number {
+  const deal = effectiveListingDealPrice(b);
+  const orig = effectiveListingOriginalPrice(b);
+  if (listingHasActiveDiscount(b)) return deal;
+  if (orig > 0) return orig;
+  return deal;
+}
+
 export function effectiveListingDescriptionPlain(b: Business): string {
   const fromFlat = (b.description || '').trim();
   if (fromFlat) return fromFlat;

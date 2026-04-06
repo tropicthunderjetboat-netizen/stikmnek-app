@@ -25,6 +25,32 @@ function asCategory(raw: unknown): Category {
 }
 
 /**
+ * When `deal_price` is missing, zero, or not below `original_price`, treat as "no discount"
+ * so UI never shows 0 VT vs full price (looks like 100% off).
+ */
+function normalizedListPrices(originalRaw: unknown, dealRaw: unknown): { originalPrice: number; dealPrice: number } {
+  const orig = Number(originalRaw);
+  const origN = Number.isFinite(orig) && orig >= 0 ? orig : 0;
+  if (dealRaw == null || dealRaw === '') {
+    return { originalPrice: origN, dealPrice: origN };
+  }
+  const deal = Number(dealRaw);
+  if (!Number.isFinite(deal) || deal < 0) {
+    return { originalPrice: origN, dealPrice: origN };
+  }
+  if (origN > 0 && deal === 0) {
+    return { originalPrice: origN, dealPrice: origN };
+  }
+  if (origN > 0 && deal >= origN) {
+    return { originalPrice: origN, dealPrice: origN };
+  }
+  if (origN === 0 && deal > 0) {
+    return { originalPrice: 0, dealPrice: deal };
+  }
+  return { originalPrice: origN, dealPrice: deal };
+}
+
+/**
  * Maps a `business_offerings` row + embedded `businesses` profile to the app's `Business` shape.
  * `id` is the offering id (per-deal). `profileBusinessId` is `businesses.id` for reviews, favorites, photos, redemptions.
  */
@@ -37,6 +63,7 @@ export function mapJoinedOfferingToBusiness(
   const cat = asCategory(b.category);
   const img = offeringPrimaryImage(o);
   const oContact = (o.contact_email as string) || (o.contactEmail as string) || '';
+  const { originalPrice, dealPrice } = normalizedListPrices(o.original_price, o.deal_price);
   return {
     id: String(o.id),
     profileBusinessId: String(b.id),
@@ -49,8 +76,8 @@ export function mapJoinedOfferingToBusiness(
     rating: Number(b.rating) || 0,
     reviewCount: Number(b.review_count) || 0,
     discount: String(o.discount ?? ''),
-    originalPrice: Number(o.original_price) || 0,
-    dealPrice: Number(o.deal_price) || 0,
+    originalPrice,
+    dealPrice,
     location: String(b.location ?? ''),
     lat: Number(b.lat) || 0,
     lng: Number(b.lng) || 0,

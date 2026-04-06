@@ -1,6 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { businesses as localBusinesses, publicListingBusinesses } from '@/data/businesses';
+import {
+  businesses as localBusinesses,
+  publicListingBusinesses,
+  effectiveListingDealPrice,
+  effectiveListingOriginalPrice,
+  listingHasActiveDiscount,
+  customerFacingListPrice,
+} from '@/data/businesses';
 import { pickRepresentativeOfferingsPerProfile, profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { Star, TrendingUp, Award, Crown, Sparkles, ArrowRight, ChevronDown, ChevronUp, Flame, Eye, Info, Trophy, Medal } from 'lucide-react';
 import { formatVT } from '@/lib/utils';
@@ -67,10 +74,11 @@ const FeaturedLeaderboard: React.FC = () => {
       );
       const superStarScore = maxSuperStars > 0 ? Math.min(superStarCount / maxSuperStars, 1) : 0;
 
-      // 4. Deal value score (0-1): discount percentage
-      const discountPct = business.originalPrice > 0
-        ? (business.originalPrice - business.dealPrice) / business.originalPrice
-        : 0;
+      // 4. Deal value score (0-1): discount percentage (ignore missing/zero deal_price)
+      const oOrig = effectiveListingOriginalPrice(business);
+      const oDeal = effectiveListingDealPrice(business);
+      const discountPct =
+        oOrig > 0 && oDeal > 0 && oDeal < oOrig ? (oOrig - oDeal) / oOrig : 0;
       const dealScore = Math.min(discountPct * 2, 1); // 50% discount = max score
 
       // 5. Engagement score (0-1): recent reviews + redemptions
@@ -214,10 +222,15 @@ const FeaturedLeaderboard: React.FC = () => {
         <div className="space-y-3">
           {topDeals.map((item, idx) => {
             const { business, score, rank, breakdown } = item;
-            const savings = business.originalPrice - business.dealPrice;
-            const discountPct = business.originalPrice > 0
-              ? Math.round(((business.originalPrice - business.dealPrice) / business.originalPrice) * 100)
-              : 0;
+            const oOrig = effectiveListingOriginalPrice(business);
+            const oDeal = effectiveListingDealPrice(business);
+            const hasDisc = listingHasActiveDiscount(business);
+            const lbDiscountBadge =
+              hasDisc && String(business.discount ?? '').trim()
+                ? String(business.discount).trim()
+                : hasDisc && oOrig > 0
+                  ? `${Math.round((1 - oDeal / oOrig) * 100)}% OFF`
+                  : null;
             const superStarCount = Math.max(
               business.superStarCount || 0,
               dbReviews.filter(r => r.business_id === profileBusinessIdFor(business) && r.has_super_star).length
@@ -257,10 +270,9 @@ const FeaturedLeaderboard: React.FC = () => {
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/20 sm:bg-gradient-to-l" />
-                    {/* Discount Badge */}
-                    {business.discount && (
+                    {lbDiscountBadge && (
                       <div className="absolute top-3 right-3 sm:bottom-3 sm:left-3 sm:top-auto sm:right-auto px-2.5 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold shadow-lg">
-                        {business.discount}
+                        {lbDiscountBadge}
                       </div>
                     )}
                   </div>
@@ -319,10 +331,10 @@ const FeaturedLeaderboard: React.FC = () => {
 
                         {/* Price */}
                         <div className="flex items-baseline gap-1.5 justify-end">
-                          <span className="text-lg font-bold text-teal-700">{formatVT(business.dealPrice)}</span>
+                          <span className="text-lg font-bold text-teal-700">{formatVT(customerFacingListPrice(business))}</span>
                         </div>
-                        {savings > 0 && (
-                          <div className="text-xs text-gray-400 line-through">{formatVT(business.originalPrice)}</div>
+                        {hasDisc && (
+                          <div className="text-xs text-gray-400 line-through">{formatVT(oOrig)}</div>
                         )}
                       </div>
                     </div>

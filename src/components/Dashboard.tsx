@@ -124,29 +124,39 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm border border-gray-100 mb-8 w-fit overflow-x-auto">
+        {/* Tab Navigation — full-width on small screens for reliable touch + clear state */}
+        <div
+          className="relative z-10 mb-8 grid grid-cols-2 gap-1 rounded-xl border border-gray-100 bg-white p-1 shadow-sm sm:flex sm:w-fit sm:grid-cols-none touch-manipulation"
+          role="tablist"
+          aria-label={language === 'en' ? 'Dashboard sections' : 'Sections du tableau de bord'}
+        >
           <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'overview'}
             onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
+            className={`flex min-h-[48px] items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-all sm:px-5 sm:py-2.5 ${
               activeTab === 'overview'
                 ? 'bg-teal-600 text-white shadow-md shadow-teal-200'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
             }`}
           >
-            <LayoutDashboard className="w-4 h-4" />
-            {tabLabels.overview[language]}
+            <LayoutDashboard className="h-4 w-4 shrink-0" />
+            <span className="text-center leading-tight">{tabLabels.overview[language]}</span>
           </button>
           <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'analytics'}
             onClick={() => setActiveTab('analytics')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all whitespace-nowrap ${
+            className={`flex min-h-[48px] items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-all sm:px-5 sm:py-2.5 ${
               activeTab === 'analytics'
                 ? 'bg-teal-600 text-white shadow-md shadow-teal-200'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
             }`}
           >
-            <BarChart3 className="w-4 h-4" />
-            {tabLabels.analytics[language]}
+            <BarChart3 className="h-4 w-4 shrink-0" />
+            <span className="text-center leading-tight">{tabLabels.analytics[language]}</span>
           </button>
         </div>
 

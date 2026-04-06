@@ -5,6 +5,8 @@ import {
   Business,
   effectiveListingDealPrice,
   effectiveListingOriginalPrice,
+  listingHasActiveDiscount,
+  customerFacingListPrice,
   primaryEmbeddedOffering,
 } from '@/data/businesses';
 import { Star, Heart, MapPin, Clock, Share2, Sparkles } from 'lucide-react';
@@ -46,6 +48,15 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
   const embed = primaryEmbeddedOffering(business);
   const dealPrice = effectiveListingDealPrice(business);
   const originalPrice = effectiveListingOriginalPrice(business);
+  const hasDiscount = listingHasActiveDiscount(business);
+  const displayPrice = customerFacingListPrice(business);
+  const savings = hasDiscount ? Math.max(0, originalPrice - dealPrice) : 0;
+  const discountBadgeText =
+    hasDiscount && business.discount.trim()
+      ? business.discount.trim()
+      : hasDiscount && originalPrice > 0
+        ? `${Math.round((1 - dealPrice / originalPrice) * 100)}% OFF`
+        : null;
   const cardImage =
     (business.image && business.image.trim()) ||
     String(embed?.banner_url || embed?.image || '').trim() ||
@@ -85,7 +96,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
       adults: 1,
       children: 0,
       infants: 0,
-      estimatedPriceWithDiscount: formatVT(dealPrice),
+      estimatedPriceWithDiscount: formatVT(displayPrice),
       userName: user?.name?.trim() || 'Guest',
     });
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
@@ -93,9 +104,10 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
 
   const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    const dealBit = discountBadgeText ? ` — ${discountBadgeText}` : '';
     const shareData = {
-      title: `${business.name} - ${business.discount}`,
-      text: `Check out this deal: ${business.name} - ${business.discount} on StikmNek!`,
+      title: `${business.name}${dealBit}`,
+      text: `Check out ${business.name}${dealBit} on StikmNek!`,
       url: window.location.origin,
     };
     try {
@@ -125,7 +137,6 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
             String(embed?.description_bi ?? embed?.description_html ?? embed?.description ?? ''))
         : (business.description ||
             String(embed?.description_html ?? embed?.description ?? ''));
-  const savings = originalPrice - dealPrice;
 
   const shareLabel = `Share ${business.name}`;
   const favoriteLabel = isFav ? `Remove ${business.name} from favorites` : `Add ${business.name} to favorites`;
@@ -142,9 +153,11 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
             className="relative w-full sm:w-56 h-40 sm:min-h-[11rem] overflow-hidden flex-shrink-0 p-0 border-0 bg-transparent text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-inset sm:focus-visible:ring-offset-0"
           >
             <img src={cardImage} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
-            <div className="absolute top-3 left-3 px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold shadow-lg pointer-events-none">
-              {business.discount}
-            </div>
+            {discountBadgeText && (
+              <div className="absolute top-3 left-3 px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold shadow-lg pointer-events-none">
+                {discountBadgeText}
+              </div>
+            )}
             {business.featured && (
               <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded-md bg-teal-600/90 text-white text-[10px] font-semibold uppercase tracking-wider pointer-events-none">
                 Featured
@@ -228,8 +241,10 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
             </div>
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-baseline gap-2 flex-wrap">
-                <span className="text-xl font-bold text-teal-700">{formatVT(dealPrice)}</span>
-                <span className="text-sm text-gray-400 line-through">{formatVT(originalPrice)}</span>
+                <span className="text-xl font-bold text-teal-700">{formatVT(displayPrice)}</span>
+                {hasDiscount && (
+                  <span className="text-sm text-gray-400 line-through">{formatVT(originalPrice)}</span>
+                )}
                 {savings > 0 && (
                   <span className="px-2 py-0.5 rounded-md bg-green-50 text-green-700 text-xs font-bold">
                     Save {formatVT(savings)}
@@ -268,10 +283,11 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
         />
         <div className="pointer-events-none absolute inset-0 z-[2] bg-gradient-to-t from-black/40 to-transparent" />
 
-        {/* Discount Badge */}
-        <div className="pointer-events-none absolute top-3 left-3 z-[2] px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold shadow-lg">
-          {business.discount}
-        </div>
+        {discountBadgeText && (
+          <div className="pointer-events-none absolute top-3 left-3 z-[2] px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold shadow-lg">
+            {discountBadgeText}
+          </div>
+        )}
 
         {/* Action Buttons — always visible; ≥44px targets */}
         <div className="absolute top-3 right-3 z-[3] flex items-center gap-1.5">
@@ -379,8 +395,10 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
 
         <div className="flex items-center justify-between gap-3 pt-3 border-t border-gray-100 flex-wrap">
           <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-            <span className="text-lg font-bold text-teal-700">{formatVT(dealPrice)}</span>
-            <span className="text-sm text-gray-400 line-through">{formatVT(originalPrice)}</span>
+            <span className="text-lg font-bold text-teal-700">{formatVT(displayPrice)}</span>
+            {hasDiscount && (
+              <span className="text-sm text-gray-400 line-through">{formatVT(originalPrice)}</span>
+            )}
             <span className="text-xs text-gray-400">{t('general.per_person', language)}</span>
           </div>
 

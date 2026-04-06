@@ -55,9 +55,8 @@ function computeLeaderboardScore(
   const superStarScore = maxSuperStars > 0 ? Math.min(superStarCount / maxSuperStars, 1) : 0;
   const oDeal = effectiveListingDealPrice(biz);
   const oOrig = effectiveListingOriginalPrice(biz);
-  const discountPct = oOrig > 0
-    ? (oOrig - oDeal) / oOrig
-    : 0;
+  const discountPct =
+    oOrig > 0 && oDeal > 0 && oDeal < oOrig ? (oOrig - oDeal) / oOrig : 0;
   const dealScore = Math.min(discountPct * 2, 1);
   const recentReviews = dbReviews.filter(r => {
     if (r.business_id !== profileId) return false;

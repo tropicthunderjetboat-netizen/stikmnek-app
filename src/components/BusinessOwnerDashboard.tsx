@@ -1294,7 +1294,7 @@ const BusinessOwnerDashboard: React.FC = () => {
         <nav className="flex-1 overflow-y-auto py-3 px-3">
           <div className="space-y-1">
             {navItems.map(item => (
-              <button key={item.key} onClick={() => handleNavClick(item.key)} className={`w-full flex items-center gap-3 rounded-xl transition-all relative ${sidebarCollapsed && !isMobile ? 'justify-center px-3 py-3' : 'px-3.5 py-2.5'} ${activeTab === item.key ? 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 font-semibold shadow-sm border border-teal-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`} title={sidebarCollapsed && !isMobile ? item.label : undefined}>
+              <button key={item.key} type="button" onClick={() => handleNavClick(item.key)} className={`w-full flex min-h-11 items-center gap-3 rounded-xl transition-all relative ${sidebarCollapsed && !isMobile ? 'justify-center px-3 py-3' : 'px-3.5 py-2.5'} ${activeTab === item.key ? 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 font-semibold shadow-sm border border-teal-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`} title={sidebarCollapsed && !isMobile ? item.label : undefined}>
                 <span className={activeTab === item.key ? 'text-teal-600' : 'text-gray-400'}>{item.icon}</span>
                 {(!sidebarCollapsed || isMobile) && <span className="text-sm flex-1 text-left">{item.label}</span>}
                 {item.badge && (!sidebarCollapsed || isMobile) && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeTab === item.key ? 'bg-teal-200 text-teal-800' : 'bg-orange-100 text-orange-600'}`}>{item.badge}</span>}
@@ -1624,7 +1624,37 @@ const BusinessOwnerDashboard: React.FC = () => {
 
         {/* Main Content */}
         <div className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
-          <div className="pt-20 lg:pt-8 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <div className="pt-20 lg:pt-8 pb-28 lg:pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+            {/* Mobile: horizontal section chips — same destinations as sidebar, no menu hunt */}
+            <div className="lg:hidden sticky top-16 z-20 -mx-4 mb-4 border-b border-gray-200/90 bg-gray-50/95 py-2.5 pl-3 pr-2 backdrop-blur-md">
+              <div
+                className="flex gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
+                {navItems.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => handleNavClick(item.key)}
+                    className={`min-h-11 shrink-0 snap-start rounded-xl px-3.5 py-2.5 text-left text-xs font-bold transition-all active:scale-[0.98] ${
+                      activeTab === item.key
+                        ? 'bg-teal-600 text-white shadow-md shadow-teal-200'
+                        : 'bg-white text-gray-700 shadow-sm ring-1 ring-gray-100'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
+                      <span className={activeTab === item.key ? 'text-white' : 'text-teal-600'}>{item.icon}</span>
+                      {item.label}
+                    </span>
+                    {item.badge && (
+                      <span className="mt-1 inline-block rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-extrabold text-orange-700">
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
             {/* Desktop Header */}
             <div className="hidden lg:flex items-center justify-between mb-8">
               <div>

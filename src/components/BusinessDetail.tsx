@@ -30,6 +30,9 @@ import {
 import type { Business } from '@/data/businesses';
 import {
   effectiveListingDealPrice,
+  effectiveListingOriginalPrice,
+  listingHasActiveDiscount,
+  customerFacingListPrice,
   primaryEmbeddedOffering,
   primaryOfferingDescriptionHtml,
 } from '@/data/businesses';
@@ -280,6 +283,16 @@ const BusinessDetail: React.FC = () => {
   if (!selectedBusiness || !effectiveBiz) return null;
 
   const biz = effectiveBiz;
+  const dealPx = effectiveListingDealPrice(biz);
+  const origPx = effectiveListingOriginalPrice(biz);
+  const hasActiveDiscount = listingHasActiveDiscount(biz);
+  const displayListPx = customerFacingListPrice(biz);
+  const detailDiscountBadge =
+    hasActiveDiscount && String(biz.discount ?? '').trim()
+      ? String(biz.discount).trim()
+      : hasActiveDiscount && origPx > 0
+        ? `${Math.round((1 - dealPx / origPx) * 100)}% OFF`
+        : null;
   const isListingOwner = Boolean(user?.id && biz.ownerId && user.id === biz.ownerId);
   const isFav = favorites.includes(profileId);
 
@@ -423,7 +436,11 @@ const BusinessDetail: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           <div className="absolute bottom-4 left-4 right-4">
             <div className="flex items-center gap-2 mb-2">
-              <span className="px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-bold">{biz.discount}</span>
+              {detailDiscountBadge && (
+                <span className="px-3 py-1 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 text-white text-sm font-bold">
+                  {detailDiscountBadge}
+                </span>
+              )}
               <span className="px-2 py-0.5 rounded-md bg-white/20 backdrop-blur-sm text-white text-xs capitalize">{biz.category}</span>
               {hasWhatsApp && (
                 <button
@@ -760,9 +777,11 @@ const BusinessDetail: React.FC = () => {
                   </p>
                 </div>
               ) : (
-                <div className="flex items-baseline gap-2 mb-4">
-                  <span className="text-3xl font-extrabold text-teal-700">{formatVT(biz.dealPrice)}</span>
-                  <span className="text-lg text-gray-400 line-through">{formatVT(biz.originalPrice)}</span>
+                <div className="flex items-baseline gap-2 mb-4 flex-wrap">
+                  <span className="text-3xl font-extrabold text-teal-700">{formatVT(displayListPx)}</span>
+                  {hasActiveDiscount && (
+                    <span className="text-lg text-gray-400 line-through">{formatVT(origPx)}</span>
+                  )}
                 </div>
               )}
 
