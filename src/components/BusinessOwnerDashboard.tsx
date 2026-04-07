@@ -135,6 +135,8 @@ interface UnifiedBusiness {
   _createdAt?: string;
   /** `public.businesses.id` when this row is a `business_offerings` listing */
   _profileBusinessId?: string;
+  /** From `business_offerings.pricing_tiers` (or profile fallback); drives edit-listing tier editor. */
+  pricingTiers?: unknown;
 }
 
 function mapOfferingRowToUnified(
@@ -166,6 +168,7 @@ function mapOfferingRowToUnified(
     tags: Array.isArray(o.tags) ? (o.tags as string[]) : Array.isArray(profile.tags) ? (profile.tags as string[]) : [],
     featured: Boolean(o.featured) || Boolean(profile.featured),
     ownerId: (profile.owner_id as string) || null,
+    pricingTiers: o.pricing_tiers ?? null,
     _source: 'approved',
     _status: 'approved',
     _createdAt: (o.created_at as string) || (profile.created_at as string),
@@ -195,6 +198,7 @@ function mapProfileRowToUnified(b: Record<string, unknown>): UnifiedBusiness {
     tags: Array.isArray(b.tags) ? (b.tags as string[]) : [],
     featured: Boolean(b.featured),
     ownerId: (b.owner_id as string) || null,
+    pricingTiers: b.pricing_tiers ?? null,
     _source: 'approved',
     _status: 'approved',
     _createdAt: b.created_at as string | undefined,

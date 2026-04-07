@@ -175,7 +175,11 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
       };
       setForm(data);
       setOriginal(data);
-      const tiers = pricingTiersFromDb(selectedBusiness.pricingTiers ?? null);
+      const rawTiers =
+        selectedBusiness.pricingTiers ??
+        (selectedBusiness as { pricing_tiers?: unknown }).pricing_tiers ??
+        null;
+      const tiers = pricingTiersFromDb(rawTiers);
       setPricingTiers(tiers.map((t) => ({ ...t })));
       setOriginalPricingTiers(tiers.map((t) => ({ ...t })));
     }
