@@ -16,6 +16,7 @@ import {
 import { formatVT } from '@/lib/utils';
 import {
   customerFacingListPrice,
+  effectiveListingDealPrice,
   effectiveListingOriginalPrice,
   listingHasActiveDiscount,
 } from '@/data/businesses';
