@@ -60,69 +60,93 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
 
   const businessGuide: { title: string; content: string; steps?: string[] }[] = [
     {
-      title: '1. Creating Your Account',
-      content: 'Sign up for a StikmNek business account to get started.',
+      title: '1. Create your business account',
+      content:
+        'You need an account so StikmNek knows who owns your listing and so you can open your Business Hub.',
       steps: [
-        'Click "Sign In" in the top navigation bar',
-        'Select "Sign Up" and choose "Business" as your account type',
-        'Enter your name, email, and create a password',
-        'Verify your email address via the confirmation link',
+        'Tap or click Sign In at the top of the website.',
+        'Choose Sign Up, then pick Business (not Tourist).',
+        'Enter your name, email, and a password you can remember.',
+        'Check your email and confirm your account if asked — otherwise you may not be able to sign in.',
+        'Sign in again. As a business user you are taken to your Business Hub (you can also use My Business in the top menu anytime).',
       ],
     },
     {
-      title: '2. Submitting Your Business Listing',
-      content: 'Submit your business for review by our admin team.',
+      title: '2. Business Hub — where everything lives',
+      content:
+        'After you sign in, your Business Hub is the sidebar area titled “Business Hub”. The menu names below are the exact labels you will see.',
       steps: [
-        'Go to "My Business" in the navigation menu',
-        'Click "New Listing" in the sidebar',
-        'Fill in all required fields: business name, category, description, and discount offer',
-        'Upload high-quality photos of your business (first photo becomes the main image)',
-        'Set your original price and discounted price',
-        'Add your location, phone number, and operating hours',
-        'Click "Submit for Approval" - your listing will be reviewed within 24 hours',
+        'Overview — Summary of your listing, quick actions, and a way to open the QR scanner.',
+        'My Submissions — See listings waiting for approval or returned for changes.',
+        'New Listing — Form to submit another business or deal.',
+        'Edit Listing — Change description, prices, contact, WhatsApp, etc. (only after that listing is approved).',
+        'Analytics, Reviews, Photos, Emails — Tabs for those tasks.',
+        'If you have more than one listing, use “Your Businesses” in the sidebar to switch between them.',
       ],
     },
     {
-      title: '3. Managing Your Listing',
-      content: 'Once approved, manage your listing from the Business Dashboard.',
+      title: '3. Submit a listing and follow approval',
+      content:
+        'New listings are checked by the StikmNek team before tourists see them. This keeps quality high for everyone.',
       steps: [
-        'Overview tab: See key metrics, recent activity, and quick actions',
-        'Edit Listing tab: Update description, hours, phone, pricing, and discount offers',
-        'All edits are submitted for admin review before going live',
-        'Photos tab: Upload, delete, and set main photos for your gallery',
-        'Reviews tab: Read customer reviews and post responses',
+        'Open New Listing in the sidebar.',
+        'Fill in name, category, description, discount wording, prices, location, phone, hours, and optional WhatsApp.',
+        'If you are a tour or activity, you can add tiered pricing (e.g. adult / child) in the pricing section.',
+        'Upload clear photos (good light, show what you sell).',
+        'Submit for approval.',
+        'Watch My Submissions for status (pending / approved / needs changes). When approved, your deal can appear on the public site.',
       ],
     },
     {
-      title: '4. Understanding Analytics',
-      content: 'Track your business performance with detailed analytics.',
+      title: '4. QR Scanner — how to check a tourist’s pass',
+      content:
+        'When someone wants your StikmNek discount, they show a QR code from their pass on their phone. You scan it inside StikmNek (Business Hub) — you do not need a separate scanner app.',
       steps: [
-        'View total redemptions, revenue generated, and customer engagement',
-        'See weekly trends and peak days for redemptions',
-        'Monitor your average rating and review sentiment',
-        'Track how many tourists have viewed your listing',
+        'In the Business Hub, open Overview, or use the floating Scan button on the edge of the screen when you see it.',
+        'Allow the browser to use the camera when asked — scanning needs camera access.',
+        'Ask the guest to brighten their screen and hold the QR code steady.',
+        'Point the camera at their QR code. The app will read the pass and show who they are and whether the pass is valid.',
+        'If you have several listings under one business, pick the correct listing when the app asks — the discount must match where they are redeeming.',
+        'Confirm the redemption when prompted. That records the visit and applies your deal rules (including tiered prices for tours/activities, if you use them).',
+        'If scanning fails, try a brighter screen, wipe the camera lens, or use manual code entry if the scanner screen offers it.',
       ],
     },
     {
-      title: '5. Responding to Reviews',
-      content: 'Engage with customers by responding to their reviews.',
+      title: '5. After approval — listing on/off and daily use',
+      content:
+        'Once a listing is approved, you control whether tourists still see it on the map and deals list.',
       steps: [
-        'Go to the Reviews tab in your dashboard',
-        'Read each review and its star rating',
-        'Type a professional response in the reply field',
-        'Click "Reply" to post your response publicly',
-        'Tip: Respond to both positive and negative reviews to show you care',
+        'Use Overview for a snapshot: redemptions, revenue-style summaries, and shortcuts.',
+        'Active / Inactive (under Edit Listing) hides or shows your listing to tourists immediately — no need to wait for admin.',
+        'Changes to text, prices, and photos in Edit Listing (except that on/off switch) usually go through admin review before they appear publicly.',
       ],
     },
     {
-      title: '6. Email Notifications',
-      content: 'Stay informed with email notifications.',
+      title: '6. Edit Listing (what changes and what waits for review)',
+      content:
+        'Keeping information accurate helps tourists trust your business.',
       steps: [
-        'Receive email when your listing is approved or needs changes',
-        'Get notified when customers leave new reviews',
-        'Manage your email preferences in the Emails tab',
-        'View sent email history and resend if needed',
+        'Open Edit Listing. Use the tabs: Basic Info, Pricing, Contact, Preview.',
+        'Update description, tags, location, discount label, prices, phone, hours, WhatsApp, and tiered prices (tours/activities) as needed.',
+        'Submit changes for review. You may see a pending edit notice until an admin approves.',
+        'Use Discard all or Reset section if you change your mind before submitting.',
       ],
+    },
+    {
+      title: '7. Photos, reviews, emails, and analytics',
+      content:
+        'These tabs help you look professional and stay informed.',
+      steps: [
+        'Photos — Add gallery images; follow any moderation rules shown in the hub.',
+        'Reviews — Read feedback and reply politely where the app allows.',
+        'Emails — See messages StikmNek sent you (e.g. listing live, reminders).',
+        'Analytics — Trends such as redemptions over time (available for approved listings).',
+      ],
+    },
+    {
+      title: '8. Need help?',
+      content:
+        `If something is confusing or broken, email ${SUPPORT_EMAIL} with your business name and a screenshot if possible. We aim to reply within one business day.`,
     },
   ];
 
@@ -174,6 +198,24 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
   ];
 
   const troubleshooting: FAQItem[] = [
+    {
+      question: 'I am a business: the scanner will not open or the camera is blocked',
+      answer:
+        'Use Chrome or Safari on your phone, open StikmNek, go to My Business (Business Hub), then Overview or the Scan button. When the browser asks for camera permission, tap Allow. If you denied it earlier, open the site settings for StikmNek and turn the camera back on. Good lighting on the guest’s phone helps.',
+      icon: <QrCode className="w-4 h-4" />,
+    },
+    {
+      question: 'I am a business: my listing edits are not showing on the public site',
+      answer:
+        'Most changes in Edit Listing are sent for admin review first — check for a “pending edit” message in the hub. Turning the listing Active or Inactive is different: that updates immediately. If you only just submitted changes, wait for approval.',
+      icon: <Store className="w-4 h-4" />,
+    },
+    {
+      question: 'I am a business: I cannot find Edit Listing or Analytics',
+      answer:
+        'Those tabs are available after your listing is approved. Until then, use My Submissions and New Listing. Pick your approved listing under “Your Businesses” in the sidebar if you have more than one.',
+      icon: <AlertCircle className="w-4 h-4" />,
+    },
     { question: 'My QR code is not scanning', answer: 'Ensure your screen brightness is at maximum. Try zooming in on the QR code. If the issue persists, take a screenshot and show it to the business. You can also try refreshing the page to regenerate the QR code.' },
     { question: 'Payment failed or was declined', answer: 'Check your PayPal account has sufficient funds. Ensure your PayPal account is verified. Try a different payment method within PayPal. If the issue persists, contact PayPal support or try again later.' },
     { question: 'I cannot see my purchased pass', answer: 'Go to your Dashboard and check the "My Pass" section. If your pass does not appear, try signing out and signing back in. Ensure the pass start date has arrived - passes activate on the selected date.' },
@@ -406,7 +448,18 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
             {activeSection === 'business-guide' && (
               <div>
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Business Owner Guide</h2>
-                <p className="text-sm text-gray-500 mb-6">Complete guide to listing and managing your business on StikmNek</p>
+                <p className="text-sm text-gray-500 mb-4">
+                  Plain-language steps for signing up, using your Business Hub, and scanning tourist passes. Menu names match what you see after you sign in.
+                </p>
+                <div className="mb-6 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50/80 p-5 sm:p-6">
+                  <h3 className="text-sm font-bold text-emerald-900 mb-2 flex items-center gap-2">
+                    <Store className="w-4 h-4 text-emerald-600" />
+                    In simple terms
+                  </h3>
+                  <p className="text-sm text-emerald-900/90 leading-relaxed">
+                    You sign up as a business, submit your deal, and wait for approval. Then tourists with a StikmNek pass show you a QR code on their phone — you open the scanner inside StikmNek (from your Business Hub), verify the pass, and confirm. Most text and price changes you make later are checked again before they go live; turning your listing off or on is immediate.
+                  </p>
+                </div>
                 {renderGuide(businessGuide)}
               </div>
             )}
@@ -439,33 +492,38 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
                     {[
                       {
                         step: 1,
-                        title: 'Sign Up for a Business Account',
+                        title: 'Sign up for a business account',
                         time: '2 min',
-                        details: 'Visit stikm.nek and click "Sign In" then "Sign Up". Choose "Business" as your account type. Use your business email for verification.',
+                        details:
+                          'Open StikmNek in your browser, tap Sign In, then Sign Up. Choose Business (not Tourist). Use an email you check often. Confirm your email if the system sends a link.',
                       },
                       {
                         step: 2,
-                        title: 'Prepare Your Business Information',
+                        title: 'Prepare your business information',
                         time: '3 min',
-                        details: 'Gather: business name, category (dining/tours/activities/shopping/spa/accommodation), a compelling description (2-3 sentences), your discount offer (e.g., "20% OFF"), original and discounted prices, address, phone number, and operating hours.',
+                        details:
+                          'Gather: business name, category (dining, tours, activities, shopping, spa, accommodation), a short clear description, discount wording (e.g. 20% OFF), standard and StikmNek prices, address, phone, hours, and optional WhatsApp. Tours/activities can add tiered per-person prices in the form.',
                       },
                       {
                         step: 3,
-                        title: 'Take Great Photos',
+                        title: 'Take great photos',
                         time: '5 min',
-                        details: 'Take 3-5 high-quality photos of your business. Include: exterior shot, interior/ambiance, your best product/service, and any unique features. Photos should be well-lit and in landscape orientation. Max 5MB per photo.',
+                        details:
+                          'Take 3–5 clear, well-lit photos: outside, inside, and what you sell. Keep files under the size limit shown in the form (typically a few MB each).',
                       },
                       {
                         step: 4,
-                        title: 'Submit Your Listing',
+                        title: 'Submit your listing',
                         time: '3 min',
-                        details: 'Go to "My Business" > "New Listing". Fill in all fields, upload your photos, and click "Submit for Approval". Our team reviews submissions within 24 hours.',
+                        details:
+                          'Sign in, open My Business in the top menu to enter the Business Hub, then New Listing in the sidebar. Complete the form, upload photos, and submit for approval. Track progress under My Submissions.',
                       },
                       {
                         step: 5,
-                        title: 'Set Up QR Code Scanning',
+                        title: 'Use the QR scanner when you are approved',
                         time: '2 min',
-                        details: 'Once approved, tourists will show you their QR code. Simply use any QR scanner app or the StikmNek admin scanner to verify their pass. The discount is confirmed instantly.',
+                        details:
+                          'After approval, open the Business Hub → Overview (or the floating Scan button). Allow camera access. When a guest shows their pass QR code on their phone, scan it in StikmNek, choose the right listing if asked, and confirm redemption. No separate scanner app is required.',
                       },
                     ].map((item) => (
                       <div key={item.step} className="flex gap-4">
