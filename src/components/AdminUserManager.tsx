@@ -221,6 +221,18 @@ const AdminUserManager: React.FC = () => {
       }
     }
 
+    // Remove approved business profiles owned by this user (cascades to business_offerings, etc.)
+    try {
+      const { error } = await supabase.from('businesses').delete().eq('owner_id', userId);
+      if (error) {
+        addLog(`  [WARN] businesses (owner listings): ${error.message}`);
+      } else {
+        addLog(`  [OK] Removed businesses owned by this user`);
+      }
+    } catch (err: any) {
+      addLog(`  [SKIP] businesses: ${err.message}`);
+    }
+
     // Delete from user_profiles
     try {
       const { error } = await supabase

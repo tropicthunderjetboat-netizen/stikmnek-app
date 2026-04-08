@@ -1025,15 +1025,19 @@ Deno.serve(async (req) => {
         return errorResponse(req, purge.error, 500);
       }
 
-      const { error: delErr } = await supabase
+      const { data: deletedOwn, error: delErr } = await supabase
         .from('businesses')
         .delete()
         .eq('id', businessId)
-        .eq('owner_id', authUser.id);
+        .eq('owner_id', authUser.id)
+        .select('id');
 
       if (delErr) {
         console.error('[manage-business] delete_own_business:', delErr);
         return errorResponse(req, delErr.message || 'Failed to delete listing', 500);
+      }
+      if (!deletedOwn?.length) {
+        return errorResponse(req, 'Could not delete listing (no rows removed)', 500);
       }
 
       console.log('[manage-business] delete_own_business OK:', businessId, bizRow.name);
@@ -1053,8 +1057,19 @@ Deno.serve(async (req) => {
         return errorResponse(req, purge.error, 500);
       }
 
-      const { error } = await supabase.from('businesses').delete().eq('id', businessId);
+      const { data: deletedAdmin, error } = await supabase
+        .from('businesses')
+        .delete()
+        .eq('id', businessId)
+        .select('id');
       if (error) return errorResponse(req, error.message, 500);
+      if (!deletedAdmin?.length) {
+        return errorResponse(
+          req,
+          'No matching business profile to delete. Use the profile id (not the deal/listing row id).',
+          404,
+        );
+      }
       return jsonResponse(req, { success: true });
     }
 
@@ -1396,6 +1411,13 @@ Deno.serve(async (req) => {
       // Prevent deleting self
       if (targetUserId === authUser.id) {
         return errorResponse(req, 'Cannot delete your own account', 400);
+      }
+
+      // Remove listings so deals page does not keep orphaned profiles (service role bypasses RLS)
+      const { error: bizDelErr } = await supabase.from('businesses').delete().eq('owner_id', targetUserId);
+      if (bizDelErr) {
+        console.error('[manage-business] admin_delete_user businesses:', bizDelErr);
+        return errorResponse(req, 'Could not remove user listings: ' + bizDelErr.message, 500);
       }
 
       // Delete from auth.users via Admin API

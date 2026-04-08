@@ -25,6 +25,7 @@ import {
 } from '@/lib/businessDescriptionHtml';
 import PricingDiscountFields from './PricingDiscountFields';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 
 import EmailReceiptManager from './EmailReceiptManager';
 import EmailNotificationCenter from './EmailNotificationCenter';
@@ -452,21 +453,24 @@ const AdminPanel: React.FC = () => {
     try { await refreshBusinesses(); } finally { setLoadingBusinesses(false); }
   }, [refreshBusinesses]);
 
-  const handleDeleteBusiness = async (businessId: string) => {
-    const biz = allBusinesses.find(b => b.id === businessId);
-    const isFromDb = dbBusinesses.some(db => db.id === businessId);
+  const handleDeleteBusiness = async (listingId: string) => {
+    const biz = allBusinesses.find(b => b.id === listingId);
+    const isFromDb = dbBusinesses.some(db => db.id === listingId);
     if (!isFromDb) { toast.error('Sample businesses cannot be deleted.'); setConfirmDeleteId(null); return; }
-    setDeletingId(businessId);
+    if (!biz) { setConfirmDeleteId(null); return; }
+    /** `public.businesses.id` — delete APIs key the master profile, not `business_offerings.id` (listing row). */
+    const profileId = profileBusinessIdFor(biz);
+    setDeletingId(listingId);
     try {
       // Strategy 1: Try edge function with retry (handles rate limiting + transient errors)
       const { data, error } = await invokeWithRetry(
         'manage-business',
-        { action: 'admin_delete_business', userId: user?.id, businessId },
+        { action: 'admin_delete_business', userId: user?.id, businessId: profileId },
         2,
         'delete_business'
       );
 
-      if (data && !data.error) {
+      if (data && !data.error && data.success !== false) {
         toast.success('"' + (biz?.name || 'Business') + '" has been permanently deleted.');
         await refreshBusinesses();
         return;
@@ -484,23 +488,27 @@ const AdminPanel: React.FC = () => {
 
       // Strategy 2: Direct database deletion fallback
       try {
-        // Delete related data first (photos, reviews, favorites, redemptions)
+        // Delete related data first (photos, reviews, favorites, redemptions) — keyed by profile id
         const tables = ['business_photos', 'reviews', 'favorites', 'redemptions'];
         for (const table of tables) {
           try {
-            await supabase.from(table).delete().eq('business_id', businessId);
+            await supabase.from(table).delete().eq('business_id', profileId);
           } catch (tableErr) {
             console.warn('[Admin] Could not clean ' + table + ':', tableErr);
           }
         }
 
         // Delete the business itself
-        const { error: deleteError } = await supabase
+        const { data: deletedRows, error: deleteError } = await supabase
           .from('businesses')
           .delete()
-          .eq('id', businessId);
+          .eq('id', profileId)
+          .select('id');
 
         if (deleteError) throw deleteError;
+        if (!deletedRows?.length) {
+          throw new Error('No matching business profile was removed (check listing id).');
+        }
 
         toast.success('"' + (biz?.name || 'Business') + '" has been permanently deleted (direct).');
         await refreshBusinesses();
@@ -601,7 +609,7 @@ const AdminPanel: React.FC = () => {
       website: (biz as any).website || '',
       discountValidFrom: new Date().toISOString().split('T')[0], listingDuration: '1_month',
     });
-    setEditBusinessId(bizId);
+    setEditBusinessId(profileBusinessIdFor(biz));
   };
 
   // ─── Save Edit (admin direct) ───
