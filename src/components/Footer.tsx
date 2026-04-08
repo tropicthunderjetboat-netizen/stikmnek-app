@@ -260,6 +260,17 @@ const Footer: React.FC = () => {
               </li>
               <li>
                 <Link
+                  to="/legal/business-partner"
+                  className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
+                >
+                  <span className="text-gray-500">
+                    <FileText className="w-3.5 h-3.5" />
+                  </span>
+                  {t('footer.business_partner', language)}
+                </Link>
+              </li>
+              <li>
+                <Link
                   to="/legal/gdpr"
                   className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
                 >

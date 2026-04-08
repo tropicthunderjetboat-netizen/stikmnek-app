@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 const VALID_SLUGS = new Set([
   'privacy',
   'terms',
+  'business-partner',
   'gdpr',
   'cookies',
   'data-protection',
@@ -23,6 +24,11 @@ const TITLES: Record<string, Record<Lang, string>> = {
     en: 'Terms of Service',
     fr: 'Conditions d’utilisation',
     bi: 'Taem blong Yusim',
+  },
+  'business-partner': {
+    en: 'Business partner & listing terms',
+    fr: 'Partenaires commerciaux et conditions d’inscription',
+    bi: 'Bisnis patna mo listem taem',
   },
   gdpr: {
     en: 'GDPR Compliance',
@@ -77,16 +83,50 @@ function bodyFor(slug: string, lang: Lang): React.ReactNode {
           'By using StikmNek you agree to these Terms of Service. StikmNek provides a platform for discovering deals and purchasing tourist passes in Vanuatu; individual businesses are responsible for their offers and in-venue service.',
           'Passes and Super Star purchases are subject to the conditions shown at checkout. Misuse of the platform, fraud, or abusive behaviour may result in suspension of your account.',
           'The platform is provided “as is”. To the extent permitted by law, we limit liability for indirect losses. Disputes should first be raised with our support team at stikmnek@gmail.com.',
+          'If you operate a business listing or deal on StikmNek, you must also comply with our Business partner & listing terms (including insurance, permits, and honoring pass discounts).',
         ],
-        fr: [
+      fr: [
           'En utilisant StikmNek, vous acceptez ces conditions d’utilisation. StikmNek propose une plateforme pour découvrir des offres et acheter des pass touristiques au Vanuatu ; chaque établissement reste responsable de ses offres et de son service sur place.',
           'Les pass et achats Super Star sont soumis aux conditions affichées au paiement. Fraude ou abus peut entraîner la suspension du compte.',
           'La plateforme est fournie « en l’état ». Dans les limites légales, notre responsabilité pour les pertes indirectes est limitée. Contact : stikmnek@gmail.com.',
+          'Si vous exploitez une fiche ou une offre sur StikmNek, vous devez également respecter nos conditions Partenaires commerciaux et inscription (assurances, autorisations, honneur des remises pass).',
         ],
         bi: [
           'Taem yu yusum StikmNek yu agri long ol taem ia. StikmNek i givim platform blong faenem dils mo bae pas long Vanuatu. Evri bisinis i stap ansa blong ol ofa blong olgeta.',
           'Pas mo Super Star i aninit long kondisen long taem yu pei. Rong yus o abius i save lisim akaont blong yu.',
           'Platform i kam «olsem hemi stap». Lus we i nid, mifala i limitim liability. Help: stikmnek@gmail.com.',
+          'Sapos yu ronem bisinis long StikmNek, yu mas folem tu Business partner & listing terms (insurance, pemit, mo diskon pas).',
+        ],
+      });
+    case 'business-partner':
+      return p({
+        en: [
+          'These terms apply when you submit or maintain a business listing on StikmNek. By ticking the agreement box on the listing form, you confirm that you have read and accept them.',
+          'You represent and warrant that you maintain appropriate insurance for your operations as required by law and good practice in Vanuatu (including public liability, vehicle, or activity cover where relevant to your business).',
+          'You hold valid tourism permits, business licences, and any other authorisations required for your activities under Vanuatu law and local regulations. You are responsible for keeping these current.',
+          'You will conduct business honestly, professionally, and in compliance with applicable law. You will not mislead tourists about prices, services, or what is included in your StikmNek offer.',
+          'You will honour all valid StikmNek passes at the discounted rates and terms shown on your approved listing (or as otherwise agreed in writing with StikmNek). You will not refuse a valid redemption without a lawful reason, or charge extra to circumvent the published deal.',
+          'StikmNek provides a platform to connect tourists with businesses. We aim to list reputable operators and review submissions, but we do not control safety, quality, conduct, or disputes that occur outside the platform (for example on your premises or during a tour). We are not liable for loss, injury, or damage arising from services you provide. User reviews are an important part of community accountability; we encourage truthful feedback to help keep standards high.',
+          'If you breach these obligations, we may remove or suspend your listing, restrict your account, or take other steps permitted by law or our general Terms of Service.',
+          'Questions: stikmnek@gmail.com.',
+        ],
+        fr: [
+          'Ces conditions s’appliquent lorsque vous soumettez ou maintenez une fiche entreprise sur StikmNek. En cochant la case sur le formulaire, vous confirmez les avoir lues et acceptées.',
+          'Vous déclarez et garantissez disposer d’assurances adaptées à votre activité conformément à la loi et aux bonnes pratiques au Vanuatu (responsabilité civile, véhicule, activités, selon le cas).',
+          'Vous détenez les permis touristiques, licences commerciales et autorisations requis pour votre activité. Vous devez les maintenir à jour.',
+          'Vous exercez votre activité de manière honnête et professionnelle, conformément à la loi. Vous ne trompez pas les touristes sur les prix, services ou contenu de l’offre StikmNek.',
+          'Vous honorez les pass StikmNek valides aux tarifs réduits et conditions figurant sur votre fiche approuvée (ou convenues par écrit avec StikmNek). Vous ne refusez pas un passage valide sans motif légitime, ni ne facturez de suppléments pour contourner l’offre publiée.',
+          'StikmNek met en relation touristes et entreprises. Nous cherchons à référencer des opérateurs sérieux et examinons les dossiers, mais nous ne contrôlons pas la sécurité, la qualité ou les litiges hors plateforme (sur place, pendant une visite, etc.). Nous déclinons toute responsabilité pour les préjudices liés à vos prestations. Les avis utilisateurs contribuent à la transparence ; nous encourageons des retours sincères.',
+          'En cas de manquement, nous pouvons retirer ou suspendre votre fiche, restreindre votre compte ou prendre d’autres mesures. Contact : stikmnek@gmail.com.',
+        ],
+        bi: [
+          'Ol taem ia i aplae taem yu submit o hol listing long StikmNek. Taem yu teka boks long form, yu se hem i ridim mo agri long ol taem ia.',
+          'Yu gat insuren we i stret long wok blong yu (pablik liability, kar, o aktiviti) olsem we loa i askem long Vanuatu.',
+          'Yu gat pemit blong tourism, laisens bisnis, mo otorisasyon we i nid long aktiviti blong yu. Yu mas kepem olgeta.',
+          'Yu wok honest, professional, mo folem loa. Yu no lusim tourist long praes o sevis.',
+          'Yu bae honor ol valid StikmNek pas long diskon mo taem long listing blong yu we i approve. Yu no refus valid redemption mo yu no faetem ekstra blong brekem deal.',
+          'StikmNek i platform blong konnektem tourist mo bisinis. Mifala trae long listem gud bisinis tasol mifala no kontrolim sefti o sabis longwe long websaet. Riviu blong ol yusa i helpem long honesty. Mifala no stap ansa blong loss o injuri long sabis blong yu.',
+          'Sapos yu brekem ol taem ia, mifala save tekaot listing, lisim akaont, o oda. Help: stikmnek@gmail.com.',
         ],
       });
     case 'gdpr':

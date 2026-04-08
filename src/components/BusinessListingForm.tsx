@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, AlertTriangle, Globe, Info } from 'lucide-react';
@@ -107,6 +108,7 @@ const BusinessListingForm: React.FC = () => {
     photos?: string;
     pricing?: string;
   }>({});
+  const [agreedPartnerTerms, setAgreedPartnerTerms] = useState(false);
   const [form, setForm] = useState({
     name: '', category: 'dining', description: '', discount: '',
     originalPrice: '', discountPercent: '', dealPrice: '',
@@ -247,6 +249,17 @@ const BusinessListingForm: React.FC = () => {
       );
       setAuthMode('signin');
       setShowAuth(true);
+      return;
+    }
+
+    if (!agreedPartnerTerms) {
+      toast.error(
+        language === 'en'
+          ? 'Please read and accept the Business partner & listing terms to continue.'
+          : language === 'fr'
+            ? 'Veuillez lire et accepter les conditions Partenaires commerciaux pour continuer.'
+            : 'Plis ridim mo agri long Business partner & listing terms bifo yu submit.',
+      );
       return;
     }
 
@@ -1131,8 +1144,67 @@ const BusinessListingForm: React.FC = () => {
             )}
           </div>
 
+          {/* Partner terms agreement */}
+          <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                id="listing-partner-terms"
+                checked={agreedPartnerTerms}
+                onChange={(e) => setAgreedPartnerTerms(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              />
+              <span className="text-sm text-gray-700 leading-snug">
+                {language === 'en' ? (
+                  <>
+                    I have read and agree to the{' '}
+                    <Link
+                      to="/legal/business-partner"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-teal-600 font-semibold hover:underline"
+                    >
+                      Business partner &amp; listing terms
+                    </Link>
+                    , including maintaining appropriate insurance and permits, conducting business honestly, and honouring StikmNek passes at the agreed discounted rates.
+                  </>
+                ) : language === 'fr' ? (
+                  <>
+                    J’ai lu et j’accepte les{' '}
+                    <Link
+                      to="/legal/business-partner"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-teal-600 font-semibold hover:underline"
+                    >
+                      conditions Partenaires commerciaux et d’inscription
+                    </Link>
+                    , y compris l’assurance et les autorisations appropriées, une activité honnête, et le respect des pass StikmNek aux tarifs réduits convenus.
+                  </>
+                ) : (
+                  <>
+                    Mi bin ridim mo mi agri long{' '}
+                    <Link
+                      to="/legal/business-partner"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-teal-600 font-semibold hover:underline"
+                    >
+                      Business partner &amp; listing terms
+                    </Link>
+                    : insuren mo pemit we i stret, wok honest mo professional, mo honor ol StikmNek pas long diskon we i stap long listing.
+                  </>
+                )}
+              </span>
+            </label>
+          </div>
+
           {/* Submit */}
-          <button type="submit" disabled={submitting} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-sm hover:from-teal-700 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg">
+          <button
+            type="submit"
+            disabled={submitting || !agreedPartnerTerms}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-sm hover:from-teal-700 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+          >
             {submitting ? (<><Loader2 className="w-5 h-5 animate-spin" />{language === 'en' ? 'Submitting...' : 'Soumission en cours...'}</>) : (<><Store className="w-5 h-5" />{language === 'en' ? 'Submit for Review (Free)' : 'Soumettre pour examen (Gratuit)'}</>)}
           </button>
 

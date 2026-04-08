@@ -113,6 +113,11 @@ export const translations: Record<string, Record<Language, string>> = {
   'footer.legal': { en: 'Legal', fr: 'Légal', bi: 'Ligo' },
   'footer.privacy': { en: 'Privacy Policy', fr: 'Politique de confidentialité', bi: 'Praevesi Polisi' },
   'footer.terms': { en: 'Terms of Service', fr: 'Conditions d\'utilisation', bi: 'Tems blong Sevis' },
+  'footer.business_partner': {
+    en: 'Business partner & listing terms',
+    fr: 'Partenaires & conditions d’inscription',
+    bi: 'Bisnis patna mo listem taem',
+  },
   'footer.gdpr': { en: 'GDPR Compliance', fr: 'Conformité RGPD', bi: 'GDPR Komplaens' },
   'footer.contact': { en: 'Contact Us', fr: 'Contactez-nous', bi: 'Kontaktem Mifala' },
   'footer.faq': { en: 'FAQ', fr: 'FAQ', bi: 'FAQ' },
