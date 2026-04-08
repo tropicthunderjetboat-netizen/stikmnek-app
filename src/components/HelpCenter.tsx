@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import { PASS_PRODUCTS_IN_ORDER } from '@/data/pricing';
 import {
   HelpCircle, Book, Store, Shield, Users, ChevronDown, ChevronRight,
   Search, ArrowLeft, MapPin, CreditCard, QrCode, Star, Camera,
@@ -34,6 +35,92 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
     }
   }, [initialSection]);
 
+  /** Keeps Help Center copy aligned with `PASS_PRODUCTS` / PassCards checkout. */
+  const passProductSummary = useMemo(
+    () => PASS_PRODUCTS_IN_ORDER.map((p) => `${p.title} ($${p.priceAUD} AUD)`).join('; '),
+    [],
+  );
+
+  const howItWorksSteps = useMemo(() => {
+    const min = PASS_PRODUCTS_IN_ORDER[0]?.priceAUD ?? 15;
+    const max = PASS_PRODUCTS_IN_ORDER[PASS_PRODUCTS_IN_ORDER.length - 1]?.priceAUD ?? 199;
+    return [
+      { step: '1', title: 'Create an Account', desc: 'Sign up as a tourist or business owner' },
+      {
+        step: '2',
+        title: 'Choose Your Pass',
+        desc: `Open Passes, pick a pass that fits your group and trip (four options from $${min} to $${max} AUD), choose a start date, and pay with PayPal.`,
+      },
+      { step: '3', title: 'Browse Deals', desc: 'Explore dining, tours, activities, spa, shopping, and accommodation on Deals and Map' },
+      { step: '4', title: 'Show Your QR Code', desc: 'Present your pass QR code at a partner business; staff scan it in StikmNek' },
+      { step: '5', title: 'Save Money', desc: 'Discounts follow each listing (deal price vs standard price)' },
+    ];
+  }, []);
+
+  const touristFAQ: FAQItem[] = useMemo(
+    () => [
+      {
+        question: 'What is StikmNek?',
+        answer: `StikmNek is a tourist discount platform for Vanuatu. You buy a digital pass (prices in Australian dollars), then show your pass QR code at partner restaurants, tours, activities, spas, and accommodation. Current pass types: ${passProductSummary}.`,
+        icon: <HelpCircle className="w-4 h-4" />,
+      },
+      {
+        question: 'How do I purchase a pass?',
+        answer: `Open Passes in the top menu, choose the pass that fits your group and trip (${passProductSummary}), pick a start date, and complete payment through PayPal. Your pass coverage follows the dates shown for that product. Prices are in AUD.`,
+        icon: <CreditCard className="w-4 h-4" />,
+      },
+      {
+        question: 'How do I redeem a deal?',
+        answer:
+          'Visit a partner business while your pass is valid, open your pass QR code in the app, and staff scan it with their StikmNek scanner. The savings shown for that listing are applied as part of the redemption.',
+        icon: <QrCode className="w-4 h-4" />,
+      },
+      {
+        question: 'Can I use my pass at multiple businesses?',
+        answer:
+          'Yes. You can visit different partner businesses while your pass is active. You may redeem once per business per calendar day (you cannot scan twice at the same venue on the same day). Across your trip you can use many businesses.',
+        icon: <Store className="w-4 h-4" />,
+      },
+      {
+        question: 'What if a business is closed?',
+        answer:
+          'Check the hours on the deal card and business detail page. Use Map to browse by area; when you allow location, the map can help with distance.',
+        icon: <Clock className="w-4 h-4" />,
+      },
+      {
+        question: 'Can I get a refund?',
+        answer:
+          'Passes are non-refundable once activated or as set out in our terms. If something went wrong with payment or access, email support and we will help where we can.',
+        icon: <CreditCard className="w-4 h-4" />,
+      },
+      {
+        question: 'How do I leave a review?',
+        answer:
+          'Open the business from Deals or Map, go to the reviews section. You can submit a review within 30 days of a StikmNek redemption at that business (the app checks this). Rate 1–5 stars and add a short comment.',
+        icon: <Star className="w-4 h-4" />,
+      },
+      {
+        question: 'Is my payment secure?',
+        answer:
+          "Yes. Checkout runs through PayPal's secure flow. We do not store your card number on StikmNek servers.",
+        icon: <Shield className="w-4 h-4" />,
+      },
+      {
+        question: 'Can I use StikmNek offline?',
+        answer:
+          'You need the internet to buy a pass and browse deals. For redemption, keep your phone charged; a screenshot of your QR can help if signal is weak, but the latest pass screen in the app is best.',
+        icon: <Globe className="w-4 h-4" />,
+      },
+      {
+        question: 'How do I find deals near me?',
+        answer:
+          'Use Map and allow location if you want to centre the map on you and filter by distance. You can also browse Deals by category and favourites without turning location on.',
+        icon: <MapPin className="w-4 h-4" />,
+      },
+    ],
+    [passProductSummary],
+  );
+
   const sections: { key: HelpSection; label: string; icon: React.ReactNode; description: string }[] = [
     { key: 'overview', label: 'Getting Started', icon: <Zap className="w-5 h-5" />, description: 'Learn the basics of StikmNek' },
     { key: 'tourist-faq', label: 'Tourist FAQ', icon: <Users className="w-5 h-5" />, description: 'Common questions from travelers' },
@@ -41,21 +128,6 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
     { key: 'admin-manual', label: 'Admin Operations', icon: <Shield className="w-5 h-5" />, description: 'Admin panel operations manual' },
     { key: 'quick-start', label: 'Quick Start Guide', icon: <Lightbulb className="w-5 h-5" />, description: 'For new beta businesses' },
     { key: 'troubleshooting', label: 'Troubleshooting', icon: <AlertCircle className="w-5 h-5" />, description: 'Fix common issues' },
-  ];
-
-  const touristFAQ: FAQItem[] = [
-    { question: 'What is StikmNek?', answer: 'StikmNek is a tourist discount platform for Vanuatu. Purchase a pass (Daily, Weekly, or Monthly) and unlock exclusive deals at restaurants, tours, activities, spas, and accommodation across all locations in Vanuatu.', icon: <HelpCircle className="w-4 h-4" /> },
-
-    { question: 'How do I purchase a pass?', answer: 'Navigate to the "Passes" section, choose your preferred pass (Family Explorer $15, Extended Group Adventure $45, or Ultimate Crew Experience $99), select your start date, and complete payment via PayPal. Your pass activates on the selected date.', icon: <CreditCard className="w-4 h-4" /> },
-
-    { question: 'How do I redeem a deal?', answer: 'Visit any partner business, show your digital pass QR code on your phone, and the business will scan it to verify your pass. The discount is applied immediately to your purchase.', icon: <QrCode className="w-4 h-4" /> },
-    { question: 'Can I use my pass at multiple businesses?', answer: 'Yes! Your pass works at ALL partner businesses during its validity period. There is no limit on how many deals you can redeem per day.', icon: <Store className="w-4 h-4" /> },
-    { question: 'What if a business is closed?', answer: 'Check the business hours listed on each deal card. You can also use the Map view to see which businesses are near you and their operating hours.', icon: <Clock className="w-4 h-4" /> },
-    { question: 'Can I get a refund?', answer: 'Passes are non-refundable once activated. However, if you experience issues, please contact our support team and we will work to resolve the situation.', icon: <CreditCard className="w-4 h-4" /> },
-    { question: 'How do I leave a review?', answer: 'After visiting a business, go to the business detail page and scroll to the reviews section. You can rate from 1-5 stars and leave a comment about your experience.', icon: <Star className="w-4 h-4" /> },
-    { question: 'Is my payment secure?', answer: 'Yes. All payments are processed through PayPal\'s secure payment system. We never store your credit card details on our servers.', icon: <Shield className="w-4 h-4" /> },
-    { question: 'Can I use StikmNek offline?', answer: 'You need an internet connection to purchase passes and view deals. However, your QR code can be screenshotted for offline use at businesses.', icon: <Globe className="w-4 h-4" /> },
-    { question: 'How do I find deals near me?', answer: 'Enable location services and use the Map view to see deals sorted by distance. You can also enable proximity alerts to get notified when you are near a partner business.', icon: <MapPin className="w-4 h-4" /> },
   ];
 
   const businessGuide: { title: string; content: string; steps?: string[] }[] = [
@@ -214,6 +286,12 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       question: 'I am a business: I cannot find Edit Listing or Analytics',
       answer:
         'Those tabs are available after your listing is approved. Until then, use My Submissions and New Listing. Pick your approved listing under “Your Businesses” in the sidebar if you have more than one.',
+      icon: <AlertCircle className="w-4 h-4" />,
+    },
+    {
+      question: 'It says I already redeemed at this business today',
+      answer:
+        'StikmNek allows one redemption per business per calendar day for your pass. If you already scanned at that venue today, try again tomorrow or visit a different partner. If you think this is a mistake, contact support with your account email.',
       icon: <AlertCircle className="w-4 h-4" />,
     },
     { question: 'My QR code is not scanning', answer: 'Ensure your screen brightness is at maximum. Try zooming in on the QR code. If the issue persists, take a screenshot and show it to the business. You can also try refreshing the page to regenerate the QR code.' },
@@ -394,7 +472,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {[
-                      { icon: <Ticket className="w-6 h-6" />, title: 'For Tourists', desc: 'Buy a pass and save up to 35% at partner businesses', color: 'bg-blue-50 text-blue-600' },
+                      { icon: <Ticket className="w-6 h-6" />, title: 'For Tourists', desc: 'Buy a pass (AUD) and unlock member deals across partner businesses', color: 'bg-blue-50 text-blue-600' },
                       { icon: <Store className="w-6 h-6" />, title: 'For Businesses', desc: 'List your business and reach thousands of tourists', color: 'bg-emerald-50 text-emerald-600' },
                       { icon: <Shield className="w-6 h-6" />, title: 'For Admins', desc: 'Manage listings, reviews, and platform operations', color: 'bg-purple-50 text-purple-600' },
                     ].map((card, i) => (
@@ -412,14 +490,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
                 <div className="bg-white rounded-2xl border border-gray-200 p-6">
                   <h3 className="text-lg font-bold text-gray-900 mb-4">How It Works</h3>
                   <div className="space-y-4">
-                    {[
-                      { step: '1', title: 'Create an Account', desc: 'Sign up as a tourist or business owner' },
-                      { step: '2', title: 'Choose Your Pass', desc: 'Select Daily ($15), Weekly ($45), or Monthly ($99)' },
-                      { step: '3', title: 'Browse Deals', desc: 'Explore dining, tours, activities, spa, and more' },
-                      { step: '4', title: 'Show Your QR Code', desc: 'Present your digital pass at any partner business' },
-                      { step: '5', title: 'Save Money', desc: 'Enjoy instant discounts of up to 35% off' },
-
-                    ].map((item, i) => (
+                    {howItWorksSteps.map((item, i) => (
                       <div key={i} className="flex items-start gap-4">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-emerald-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
                           {item.step}
