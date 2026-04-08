@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="StikmNek Business Owner Guide — printable reference for partner businesses in Vanuatu." />
+  <title>StikmNek — Business Owner Guide (Printable)</title>
+  <!-- Content aligned with src/components/HelpCenter.tsx → businessGuide. Update both when changing copy. -->
+  <style>
+    :root {
+      --teal-700: #0f766e;
+      --teal-600: #0d9488;
+      --emerald-600: #059669;
+      --ink: #0f172a;
+      --muted: #475569;
+      --paper: #ffffff;
+      --soft: #f0fdfa;
+      --border: #99f6e4;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: var(--ink);
+      background: #e2e8f0;
+    }
+
+    .wrap {
+      max-width: 210mm;
+      margin: 0 auto;
+      background: var(--paper);
+      min-height: 100vh;
+      box-shadow: 0 4px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    .no-print {
+      padding: 1rem 1.25rem;
+      background: #1e293b;
+      color: #e2e8f0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+      justify-content: space-between;
+    }
+    .no-print button {
+      background: linear-gradient(135deg, var(--teal-600), var(--emerald-600));
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1.25rem;
+      border-radius: 0.75rem;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .no-print button:hover { filter: brightness(1.05); }
+    .no-print a { color: #5eead4; }
+
+    .cover {
+      background: linear-gradient(145deg, #0d9488 0%, #059669 45%, #0f766e 100%);
+      color: #fff;
+      padding: 2.5rem 2rem 2rem;
+      text-align: center;
+    }
+    .cover .brand {
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      opacity: 0.9;
+      margin-bottom: 0.5rem;
+    }
+    .cover h1 {
+      margin: 0;
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+    .cover .subtitle {
+      margin: 0.75rem 0 0;
+      font-size: 1rem;
+      font-weight: 600;
+      opacity: 0.95;
+    }
+    .cover .meta {
+      margin-top: 1.25rem;
+      font-size: 0.8rem;
+      opacity: 0.85;
+    }
+
+    .content { padding: 1.75rem 1.75rem 2.5rem; }
+
+    .callout {
+      border: 1px solid var(--border);
+      background: var(--soft);
+      border-radius: 0.75rem;
+      padding: 1rem 1.15rem;
+      margin-bottom: 1.5rem;
+    }
+    .callout h2 {
+      margin: 0 0 0.5rem;
+      font-size: 0.95rem;
+      color: var(--teal-700);
+    }
+    .callout p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+
+    section {
+      margin-bottom: 1.35rem;
+      page-break-inside: avoid;
+    }
+    section h3 {
+      margin: 0 0 0.4rem;
+      font-size: 1.05rem;
+      color: var(--teal-700);
+      border-bottom: 2px solid #ccfbf1;
+      padding-bottom: 0.25rem;
+    }
+    section > p.intro {
+      margin: 0 0 0.65rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    ol.steps {
+      margin: 0;
+      padding-left: 1.35rem;
+    }
+    ol.steps li { margin-bottom: 0.35rem; padding-left: 0.25rem; }
+    ol.steps li::marker { color: var(--teal-600); font-weight: 700; }
+
+    .footer-strip {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #e2e8f0;
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .notes {
+      margin-top: 2rem;
+      padding: 1rem;
+      border: 1px dashed #cbd5e1;
+      border-radius: 0.5rem;
+      page-break-inside: avoid;
+    }
+    .notes h3 { margin-top: 0; font-size: 0.95rem; color: var(--muted); }
+    .notes .lines {
+      margin-top: 0.75rem;
+      border-bottom: 1px solid #e2e8f0;
+      height: 1.5rem;
+    }
+
+    @page {
+      size: A4;
+      margin: 14mm 16mm;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .wrap { box-shadow: none; max-width: none; }
+      .no-print { display: none !important; }
+      section { page-break-inside: avoid; }
+      a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 0.85em; color: #64748b; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="no-print">
+      <span>Open this page in Chrome or Edge → <strong>Print</strong> → choose <strong>Save as PDF</strong> (or print on paper).</span>
+      <div>
+        <button type="button" onclick="window.print()">Print or save as PDF</button>
+      </div>
+    </div>
+
+    <header class="cover">
+      <div class="brand">Vanuatu tourist deals</div>
+      <h1>Business Owner Guide</h1>
+      <p class="subtitle">Sign up · List your deal · Scan tourist passes</p>
+      <p class="meta">StikmNek &nbsp;·&nbsp; stikmnek.com &nbsp;·&nbsp; Online help: <a href="https://stikmnek.com/business-guide" style="color:#ecfdf5;">stikmnek.com/business-guide</a></p>
+    </header>
+
+    <main class="content">
+      <div class="callout">
+        <h2>In simple terms</h2>
+        <p>
+          You sign up as a business, submit your deal, and wait for approval. Then tourists with a StikmNek pass show you a QR code on their phone — you open the scanner inside StikmNek (from your Business Hub), verify the pass, and confirm. Most text and price changes you make later are checked again before they go live; turning your listing off or on is immediate.
+        </p>
+      </div>
+
+      <section>
+        <h3>1. Create your business account</h3>
+        <p class="intro">You need an account so StikmNek knows who owns your listing and so you can open your Business Hub.</p>
+        <ol class="steps">
+          <li>Tap or click <strong>Sign In</strong> at the top of the website.</li>
+          <li>Choose <strong>Sign Up</strong>, then pick <strong>Business</strong> (not Tourist).</li>
+          <li>Enter your name, email, and a password you can remember.</li>
+          <li>Check your email and confirm your account if asked — otherwise you may not be able to sign in.</li>
+          <li>Sign in again. As a business user you are taken to your <strong>Business Hub</strong> (you can also use <strong>My Business</strong> in the top menu anytime).</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3>2. Business Hub — where everything lives</h3>
+        <p class="intro">After you sign in, your Business Hub is the sidebar area titled “Business Hub”. The menu names below are the exact labels you will see.</p>
+        <ol class="steps">
+          <li><strong>Overview</strong> — Summary of your listing, quick actions, and a way to open the QR scanner.</li>
+          <li><strong>My Submissions</strong> — See listings waiting for approval or returned for changes.</li>
+          <li><strong>New Listing</strong> — Form to submit another business or deal.</li>
+          <li><strong>Edit Listing</strong> — Change description, prices, contact, WhatsApp, etc. (only after that listing is approved).</li>
+          <li><strong>Analytics, Reviews, Photos, Emails</strong> — Tabs for those tasks.</li>
+          <li>If you have more than one listing, use <strong>Your Businesses</strong> in the sidebar to switch between them.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3>3. Submit a listing and follow approval</h3>
+        <p class="intro">New listings are checked by the StikmNek team before tourists see them. This keeps quality high for everyone.</p>
+        <ol class="steps">
+          <li>Open <strong>New Listing</strong> in the sidebar.</li>
+          <li>Fill in name, category, description, discount wording, prices, location, phone, hours, and optional WhatsApp.</li>
+          <li>If you are a <strong>tour</strong> or <strong>activity</strong>, you can add <strong>tiered pricing</strong> (e.g. adult / child) in the pricing section.</li>
+          <li>Upload clear photos (good light, show what you sell).</li>
+          <li>Submit for approval.</li>
+          <li>Watch <strong>My Submissions</strong> for status (pending / approved / needs changes). When approved, your deal can appear on the public site.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3>4. QR Scanner — how to check a tourist’s pass</h3>
+        <p class="intro">When someone wants your StikmNek discount, they show a QR code from their pass on their phone. You scan it inside StikmNek (Business Hub) — you do not need a separate scanner app.</p>
+        <ol class="steps">
+          <li>In the Business Hub, open <strong>Overview</strong>, or use the <strong>floating Scan</strong> button on the edge of the screen when you see it.</li>
+          <li>Allow the browser to use the <strong>camera</strong> when asked — scanning needs camera access.</li>
+          <li>Ask the guest to <strong>brighten their screen</strong> and hold the QR code steady.</li>
+          <li>Point the camera at their QR code. The app will read the pass and show who they are and whether the pass is valid.</li>
+          <li>If you have several listings under one business, pick the <strong>correct listing</strong> when the app asks — the discount must match where they are redeeming.</li>
+          <li><strong>Confirm</strong> the redemption when prompted. That records the visit and applies your deal rules (including tiered prices for tours/activities, if you use them).</li>
+          <li>If scanning fails, try a brighter screen, wipe the camera lens, or use <strong>manual code entry</strong> if the scanner screen offers it.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3>5. After approval — listing on/off and daily use</h3>
+        <p class="intro">Once a listing is approved, you control whether tourists still see it on the map and deals list.</p>
+        <ol class="steps">
+          <li>Use <strong>Overview</strong> for a snapshot: redemptions, revenue-style summaries, and shortcuts.</li>
+          <li><strong>Active / Inactive</strong> (under Edit Listing) hides or shows your listing to tourists <strong>immediately</strong> — no need to wait for admin.</li>
+          <li>Changes to text, prices, and photos in <strong>Edit Listing</strong> (except that on/off switch) usually go through <strong>admin review</strong> before they appear publicly.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3>6. Edit Listing (what changes and what waits for review)</h3>
+        <p class="intro">Keeping information accurate helps tourists trust your business.</p>
+        <ol class="steps">
+          <li>Open <strong>Edit Listing</strong>. Use the tabs: <strong>Basic Info</strong>, <strong>Pricing</strong>, <strong>Contact</strong>, <strong>Preview</strong>.</li>
+          <li>Update description, tags, location, discount label, prices, phone, hours, WhatsApp, and tiered prices (tours/activities) as needed.</li>
+          <li>Submit changes for review. You may see a <strong>pending edit</strong> notice until an admin approves.</li>
+          <li>Use <strong>Discard all</strong> or <strong>Reset section</strong> if you change your mind before submitting.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3>7. Photos, reviews, emails, and analytics</h3>
+        <p class="intro">These tabs help you look professional and stay informed.</p>
+        <ol class="steps">
+          <li><strong>Photos</strong> — Add gallery images; follow any moderation rules shown in the hub.</li>
+          <li><strong>Reviews</strong> — Read feedback and reply politely where the app allows.</li>
+          <li><strong>Emails</strong> — See messages StikmNek sent you (e.g. listing live, reminders).</li>
+          <li><strong>Analytics</strong> — Trends such as redemptions over time (available for approved listings).</li>
+        </ol>
+      </section>
+
+      <section>
+        <h3>8. Need help?</h3>
+        <p class="intro">If something is confusing or broken, email <strong><a href="mailto:stikmnek@gmail.com">stikmnek@gmail.com</a></strong> with your business name and a screenshot if possible. We aim to reply within one business day.</p>
+      </section>
+
+      <div class="notes">
+        <h3>Notes (for training sessions)</h3>
+        <div class="lines"></div>
+        <div class="lines"></div>
+        <div class="lines"></div>
+        <div class="lines"></div>
+        <div class="lines"></div>
+      </div>
+
+      <div class="footer-strip">
+        StikmNek v3 · Partner reference · March 2026<br />
+        Save paper: share <a href="https://stikmnek.com/business-owner-guide-print.html">stikmnek.com/business-owner-guide-print.html</a>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

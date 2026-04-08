@@ -448,8 +448,19 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
             {activeSection === 'business-guide' && (
               <div>
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Business Owner Guide</h2>
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-sm text-gray-500 mb-2">
                   Plain-language steps for signing up, using your Business Hub, and scanning tourist passes. Menu names match what you see after you sign in.
+                </p>
+                <p className="text-sm mb-4">
+                  <a
+                    href="/business-owner-guide-print.html"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 font-medium text-teal-600 hover:text-teal-700 hover:underline"
+                  >
+                    <ExternalLink className="w-4 h-4 flex-shrink-0" />
+                    Open printable version (save as PDF or print)
+                  </a>
                 </p>
                 <div className="mb-6 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50/80 p-5 sm:p-6">
                   <h3 className="text-sm font-bold text-emerald-900 mb-2 flex items-center gap-2">
