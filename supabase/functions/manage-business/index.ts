@@ -1413,11 +1413,18 @@ Deno.serve(async (req) => {
         return errorResponse(req, 'Cannot delete your own account', 400);
       }
 
-      // Remove listings so deals page does not keep orphaned profiles (service role bypasses RLS)
-      const { error: bizDelErr } = await supabase.from('businesses').delete().eq('owner_id', targetUserId);
-      if (bizDelErr) {
-        console.error('[manage-business] admin_delete_user businesses:', bizDelErr);
-        return errorResponse(req, 'Could not remove user listings: ' + bizDelErr.message, 500);
+      // Remove every public row referencing this user so Auth delete is not blocked by FKs
+      // (Supabase UI "Database error deleting user" when e.g. user_profiles/reviews remain).
+      const { error: purgeErr } = await supabase.rpc('delete_public_app_data_for_user', {
+        p_user_id: targetUserId,
+      });
+      if (purgeErr) {
+        console.error('[manage-business] admin_delete_user purge RPC:', purgeErr);
+        return errorResponse(
+          req,
+          'Could not remove user data (apply migration delete_public_app_data_for_user): ' + purgeErr.message,
+          500,
+        );
       }
 
       // Delete from auth.users via Admin API
