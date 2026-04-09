@@ -20,10 +20,10 @@ interface UserProfile {
 const USER_DEPENDENT_TABLES = [
   { table: 'favorites', column: 'user_id' },
   { table: 'pass_purchases', column: 'user_id' },
+  { table: 'payment_sessions', column: 'user_id' },
   { table: 'passes', column: 'user_id' },
   { table: 'redemptions', column: 'user_id' },
   { table: 'search_history', column: 'user_id' },
-  { table: 'support_tickets', column: 'user_id' },
   { table: 'notifications', column: 'user_id' },
   { table: 'feedback', column: 'user_id' },
   { table: 'error_logs', column: 'user_id' },
@@ -32,9 +32,33 @@ const USER_DEPENDENT_TABLES = [
   { table: 'business_photos', column: 'uploaded_by' },
   { table: 'pending_businesses', column: 'owner_id' },
   { table: 'pending_edits', column: 'owner_id' },
+  { table: 'social_activity', column: 'user_id' },
 ];
 
 const ADMIN_EMAIL = 'admin@stikmnek.com';
+
+function getInvokeHttpStatus(error: unknown): number | null {
+  try {
+    const ctx = (error as { context?: Response })?.context;
+    if (ctx && typeof ctx.status === 'number') return ctx.status;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+async function getInvokeErrorJson(error: unknown): Promise<Record<string, unknown> | null> {
+  try {
+    const res = (error as { context?: Response })?.context;
+    if (res && typeof res.clone === 'function') {
+      const body = await res.clone().json();
+      return body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 
 // ═══════════════════════════════════════════════════════════
 // FAULT-TOLERANT SQL - each DELETE wrapped in its own block
@@ -229,6 +253,33 @@ const AdminUserManager: React.FC = () => {
       }
     }
 
+    // referrals: referrer_id OR referred_user_id (not a single-column eq)
+    try {
+      const { error } = await supabase
+        .from('referrals')
+        .delete()
+        .or(`referrer_id.eq.${userId},referred_user_id.eq.${userId}`);
+      if (error) addLog(`  [WARN] referrals: ${error.message}`);
+      else addLog(`  [OK] Cleaned referrals`);
+    } catch (err: any) {
+      addLog(`  [SKIP] referrals: ${err.message}`);
+    }
+
+    // support tickets: responses first (FK), then tickets
+    try {
+      await supabase.from('ticket_responses').delete().eq('responder_id', userId);
+      const { data: ticketIds } = await supabase.from('support_tickets').select('id').eq('user_id', userId);
+      const ids = (ticketIds || []).map((r: { id: string }) => r.id).filter(Boolean);
+      if (ids.length > 0) {
+        await supabase.from('ticket_responses').delete().in('ticket_id', ids);
+      }
+      const { error: stErr } = await supabase.from('support_tickets').delete().eq('user_id', userId);
+      if (stErr) addLog(`  [WARN] support_tickets: ${stErr.message}`);
+      else addLog(`  [OK] Cleaned support_tickets / ticket_responses`);
+    } catch (err: any) {
+      addLog(`  [SKIP] support_tickets: ${err.message}`);
+    }
+
     // Remove approved business profiles owned by this user (cascades to business_offerings, etc.)
     try {
       const { error } = await supabase.from('businesses').delete().eq('owner_id', userId);
@@ -273,12 +324,40 @@ const AdminUserManager: React.FC = () => {
           },
           headers,
         });
-        const msg =
-          (data as { error?: string } | null)?.error ||
-          (error as { message?: string } | null)?.message ||
+        const status = getInvokeHttpStatus(error);
+        const errJson = error ? await getInvokeErrorJson(error) : null;
+        const serverError =
+          (typeof errJson?.error === 'string' && errJson.error) ||
+          (typeof (data as { error?: string } | null)?.error === 'string' && (data as { error: string }).error) ||
           '';
+        const msg = serverError || (error as { message?: string } | null)?.message || '';
+
+        // #region agent log
+        fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
+          body: JSON.stringify({
+            sessionId: '7b96fa',
+            location: 'AdminUserManager.tsx:admin_delete_user',
+            message: 'manage-business admin_delete_user invoke result',
+            data: {
+              hypothesisId: 'H1-H5',
+              httpStatus: status,
+              hasError: Boolean(error),
+              dataSuccess: (data as { success?: boolean } | null)?.success === true,
+              serverErrorSnippet: serverError ? serverError.slice(0, 240) : null,
+              errorCode: errJson?.errorCode ?? null,
+              targetUserIdLen: typeof userId === 'string' ? userId.length : null,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+
         if (error || (data as { error?: string } | null)?.error) {
-          addLog(`  [ERROR] auth.users: ${msg || 'Edge function failed'} — open Supabase Dashboard → Authentication → Users and delete this user by email`);
+          addLog(
+            `  [ERROR] auth.users (HTTP ${status ?? '?'})${serverError ? `: ${serverError}` : `: ${msg || 'Edge function failed'}`} — if this persists, delete in Dashboard → Authentication → Users`,
+          );
         } else if ((data as { success?: boolean } | null)?.success === true) {
           authDeleted = true;
           addLog(`  [OK] Deleted from auth.users (email can be reused)`);
