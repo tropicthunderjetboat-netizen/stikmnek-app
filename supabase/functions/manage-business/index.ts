@@ -65,7 +65,7 @@ async function isAdminUser(supabase: SupabaseServiceClient, userId: string): Pro
     .select('role')
     .eq('user_id', userId)
     .maybeSingle();
-  return data?.role === 'admin';
+  return Boolean(data && data.role === 'admin');
 }
 
 /** Returns a 403 Response if the user is not an admin; otherwise null. */
@@ -164,8 +164,11 @@ async function purgePublicDataForAuthUser(
     if (err?.message) console.warn(`[manage-business] purge ${label}:`, err.message);
   };
 
-  const run = async (label: string, promise: Promise<{ error: { message?: string } | null }>) => {
-    const { error } = await promise;
+  const run = async (
+    label: string,
+    op: PromiseLike<{ error: { message?: string } | null }>,
+  ) => {
+    const { error } = await op;
     if (error) logSkip(label, error);
   };
 
