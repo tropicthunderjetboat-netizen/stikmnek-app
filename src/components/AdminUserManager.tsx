@@ -19,6 +19,7 @@ interface UserProfile {
 // All public tables that may reference user_id
 const USER_DEPENDENT_TABLES = [
   { table: 'favorites', column: 'user_id' },
+  { table: 'pass_purchases', column: 'user_id' },
   { table: 'passes', column: 'user_id' },
   { table: 'redemptions', column: 'user_id' },
   { table: 'search_history', column: 'user_id' },
@@ -60,6 +61,8 @@ BEGIN
 
   -- Step 2: Clean each public table (skip if table doesn't exist)
   BEGIN DELETE FROM favorites WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'favorites: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: favorites table not found'; WHEN undefined_column THEN RAISE NOTICE 'SKIP: favorites column mismatch'; WHEN OTHERS THEN RAISE NOTICE 'SKIP favorites: %', SQLERRM; END;
+
+  BEGIN DELETE FROM pass_purchases WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'pass_purchases: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: pass_purchases table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP pass_purchases: %', SQLERRM; END;
 
   BEGIN DELETE FROM passes WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'passes: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: passes table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP passes: %', SQLERRM; END;
 
@@ -140,6 +143,7 @@ END $$;`;
 // ═══════════════════════════════════════════════════════════
 const STEP_BY_STEP_QUERIES = [
   `DELETE FROM favorites WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
+  `DELETE FROM pass_purchases WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
   `DELETE FROM passes WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
   `DELETE FROM redemptions WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
   `DELETE FROM search_history WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
