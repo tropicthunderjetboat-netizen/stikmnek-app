@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   Users, Trash2, Loader2, RefreshCw, AlertTriangle, Shield,
@@ -200,9 +200,13 @@ const AdminUserManager: React.FC = () => {
     setDeletionLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
   };
 
-  // Delete all data from dependent tables for a specific user
-  const cleanUserData = async (userId: string, displayName: string): Promise<boolean> => {
-    let allSuccess = true;
+  /** Clears app tables; `authDeleted` is true only when the edge function removed `auth.users`. */
+  const cleanUserData = async (
+    userId: string,
+    displayName: string,
+  ): Promise<{ profilesOk: boolean; authDeleted: boolean }> => {
+    let profilesOk = true;
+    let authDeleted = false;
 
     for (const { table, column } of USER_DEPENDENT_TABLES) {
       try {
@@ -242,34 +246,48 @@ const AdminUserManager: React.FC = () => {
 
       if (error) {
         addLog(`  [ERROR] user_profiles: ${error.message}`);
-        allSuccess = false;
+        profilesOk = false;
       } else {
         addLog(`  [OK] Deleted user_profiles record`);
       }
     } catch (err: any) {
       addLog(`  [ERROR] user_profiles: ${err.message}`);
-      allSuccess = false;
+      profilesOk = false;
     }
 
-    // Try to delete from auth.users via edge function
+    // Remove auth user — required or the email stays reserved and sign-up says "already exists"
     try {
-      const { data, error } = await supabase.functions.invoke('manage-business', {
-        body: {
-          action: 'admin_delete_user',
-          userId: userId,
-          targetUserId: userId,
-        },
-      });
-      if (error || data?.error) {
-        addLog(`  [INFO] auth.users: Edge function unavailable - use SQL Editor or Dashboard`);
+      const headers = await getEdgeAuthHeaders();
+      if (!headers.Authorization) {
+        addLog(`  [ERROR] auth.users: No admin session — sign in again, then retry delete, or remove user in Supabase Dashboard → Authentication`);
       } else {
-        addLog(`  [OK] Deleted from auth.users`);
+        const { data, error } = await supabase.functions.invoke('manage-business', {
+          body: {
+            action: 'admin_delete_user',
+            userId: userId,
+            targetUserId: userId,
+          },
+          headers,
+        });
+        const msg =
+          (data as { error?: string } | null)?.error ||
+          (error as { message?: string } | null)?.message ||
+          '';
+        if (error || (data as { error?: string } | null)?.error) {
+          addLog(`  [ERROR] auth.users: ${msg || 'Edge function failed'} — open Supabase Dashboard → Authentication → Users and delete this user by email`);
+        } else if ((data as { success?: boolean } | null)?.success === true) {
+          authDeleted = true;
+          addLog(`  [OK] Deleted from auth.users (email can be reused)`);
+        } else {
+          addLog(`  [ERROR] auth.users: Unexpected response — delete manually in Supabase Dashboard → Authentication`);
+        }
       }
-    } catch (_) {
-      addLog(`  [INFO] auth.users: Delete manually from Supabase Dashboard > Authentication > Users`);
+    } catch (e: unknown) {
+      const m = e instanceof Error ? e.message : String(e);
+      addLog(`  [ERROR] auth.users: ${m} — delete manually in Supabase Dashboard → Authentication`);
     }
 
-    return allSuccess;
+    return { profilesOk, authDeleted };
   };
 
   // Delete a single user
@@ -288,10 +306,27 @@ const AdminUserManager: React.FC = () => {
     addLog(`Deleting user: ${userProfile.display_name || userProfile.email || userId}`);
 
     try {
-      await cleanUserData(userId, userProfile.display_name || 'Unknown');
-      setUsers(prev => prev.filter(u => u.user_id !== userId));
-      toast.success(`User "${userProfile.display_name || 'Unknown'}" deleted from all tables`);
-      addLog(`Done! User data removed from all public tables.`);
+      const { profilesOk, authDeleted } = await cleanUserData(
+        userId,
+        userProfile.display_name || 'Unknown',
+      );
+      if (profilesOk) {
+        setUsers(prev => prev.filter(u => u.user_id !== userId));
+      }
+      if (profilesOk && authDeleted) {
+        toast.success(`User "${userProfile.display_name || 'Unknown'}" fully removed (profile + login).`);
+        addLog(`Done! Profile and Authentication user removed — email can sign up again.`);
+      } else if (profilesOk && !authDeleted) {
+        toast.error('Profile removed, but login still exists in Supabase Auth', {
+          description:
+            'That email cannot register again until you delete the user in Supabase Dashboard → Authentication → Users (search by email).',
+          duration: 12000,
+        });
+        addLog(`Done with warning: remove ${userProfile.email || 'this user'} from Authentication manually.`);
+      } else {
+        toast.error('Could not fully delete user — check the log for details.');
+        addLog(`Done with errors — review log above.`);
+      }
     } catch (err: any) {
       toast.error('Failed to delete user: ' + (err.message || 'Unknown error'));
       addLog(`ERROR: ${err.message}`);
@@ -318,14 +353,19 @@ const AdminUserManager: React.FC = () => {
 
     let deletedCount = 0;
     let failedCount = 0;
+    let authMissCount = 0;
 
     for (const userProfile of nonAdminUsers) {
       addLog(`\nProcessing: ${userProfile.display_name || userProfile.email || userProfile.user_id} (${userProfile.role})`);
 
       try {
-        const success = await cleanUserData(userProfile.user_id, userProfile.display_name || 'Unknown');
-        if (success) {
+        const { profilesOk, authDeleted } = await cleanUserData(
+          userProfile.user_id,
+          userProfile.display_name || 'Unknown',
+        );
+        if (profilesOk) {
           deletedCount++;
+          if (!authDeleted) authMissCount++;
         } else {
           failedCount++;
         }
@@ -339,16 +379,22 @@ const AdminUserManager: React.FC = () => {
 
     addLog('─'.repeat(50));
     addLog(`\nBulk deletion complete!`);
-    addLog(`  Deleted: ${deletedCount} users`);
-    if (failedCount > 0) addLog(`  Failed: ${failedCount} users`);
-    addLog(`\nIMPORTANT: Go to Supabase Dashboard > Authentication > Users`);
-    addLog(`to delete the auth records. The public table data is already cleaned.`);
+    addLog(`  Profiles cleared: ${deletedCount} user(s)`);
+    if (failedCount > 0) addLog(`  Profile errors: ${failedCount}`);
+    if (authMissCount > 0) {
+      addLog(`  Auth not removed for ${authMissCount} user(s) — Dashboard → Authentication → Users`);
+    }
 
     await loadUsers();
 
-    toast.success(`Deleted ${deletedCount} user(s) from public tables`, {
-      description: failedCount > 0 ? `${failedCount} failed - check log` : 'All public table data cleaned',
-      duration: 8000,
+    toast.success(`Processed ${deletedCount} user(s)`, {
+      description:
+        failedCount > 0
+          ? `${failedCount} profile error(s). ${authMissCount > 0 ? `${authMissCount} still need Auth cleanup in Dashboard.` : ''}`
+          : authMissCount > 0
+            ? `${authMissCount} login(s) still in Authentication — remove in Supabase Dashboard if emails must be reused.`
+            : 'Public data and Auth users removed where the edge function succeeded.',
+      duration: 10000,
     });
 
     setBulkDeleting(false);
