@@ -16,25 +16,6 @@ interface UserProfile {
   updated_at?: string;
 }
 
-// All public tables that may reference user_id
-const USER_DEPENDENT_TABLES = [
-  { table: 'favorites', column: 'user_id' },
-  { table: 'pass_purchases', column: 'user_id' },
-  { table: 'payment_sessions', column: 'user_id' },
-  { table: 'passes', column: 'user_id' },
-  { table: 'redemptions', column: 'user_id' },
-  { table: 'search_history', column: 'user_id' },
-  { table: 'notifications', column: 'user_id' },
-  { table: 'feedback', column: 'user_id' },
-  { table: 'error_logs', column: 'user_id' },
-  { table: 'reviews', column: 'user_id' },
-  { table: 'review_responses', column: 'user_id' },
-  { table: 'business_photos', column: 'uploaded_by' },
-  { table: 'pending_businesses', column: 'owner_id' },
-  { table: 'pending_edits', column: 'owner_id' },
-  { table: 'social_activity', column: 'user_id' },
-];
-
 const ADMIN_EMAIL = 'admin@stikmnek.com';
 
 function getInvokeHttpStatus(error: unknown): number | null {
@@ -193,6 +174,8 @@ const AdminUserManager: React.FC = () => {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
   const [showSingleConfirm, setShowSingleConfirm] = useState<string | null>(null);
+  const [deleteAcknowledged, setDeleteAcknowledged] = useState(false);
+  const [bulkDeleteAcknowledged, setBulkDeleteAcknowledged] = useState(false);
   const [deletionLog, setDeletionLog] = useState<string[]>([]);
   const [showLog, setShowLog] = useState(false);
 
@@ -228,149 +211,42 @@ const AdminUserManager: React.FC = () => {
     setDeletionLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
   };
 
-  /** Clears app tables; `authDeleted` is true only when the edge function removed `auth.users`. */
-  const cleanUserData = async (
+  /** Server-side purge + `auth.admin.deleteUser` via `manage-business` (service role). */
+  const invokeAdminDeleteUser = async (
     userId: string,
-    displayName: string,
-  ): Promise<{ profilesOk: boolean; authDeleted: boolean }> => {
-    let profilesOk = true;
-    let authDeleted = false;
-
-    for (const { table, column } of USER_DEPENDENT_TABLES) {
-      try {
-        const { error } = await supabase
-          .from(table)
-          .delete()
-          .eq(column, userId);
-
-        if (error) {
-          addLog(`  [WARN] ${table}: ${error.message}`);
-        } else {
-          addLog(`  [OK] Cleaned ${table}`);
-        }
-      } catch (err: any) {
-        addLog(`  [SKIP] ${table}: ${err.message}`);
-      }
+    logLine: (msg: string) => void,
+  ): Promise<{ ok: boolean; message: string }> => {
+    const headers = await getEdgeAuthHeaders();
+    if (!headers.Authorization) {
+      return { ok: false, message: 'No admin session. Sign in again and retry.' };
     }
-
-    // referrals: referrer_id OR referred_user_id (not a single-column eq)
-    try {
-      const { error } = await supabase
-        .from('referrals')
-        .delete()
-        .or(`referrer_id.eq.${userId},referred_user_id.eq.${userId}`);
-      if (error) addLog(`  [WARN] referrals: ${error.message}`);
-      else addLog(`  [OK] Cleaned referrals`);
-    } catch (err: any) {
-      addLog(`  [SKIP] referrals: ${err.message}`);
+    const { data, error } = await supabase.functions.invoke('manage-business', {
+      body: {
+        action: 'admin_delete_user',
+        userId,
+        targetUserId: userId,
+      },
+      headers,
+    });
+    const errJson = error ? await getInvokeErrorJson(error) : null;
+    const serverError =
+      (typeof errJson?.error === 'string' && errJson.error) ||
+      (typeof (data as { error?: string } | null)?.error === 'string' && (data as { error: string }).error) ||
+      '';
+    const msg = serverError || (error as { message?: string } | null)?.message || '';
+    if (error || (data as { error?: string } | null)?.error) {
+      const status = getInvokeHttpStatus(error);
+      logLine(
+        `  [ERROR] ${msg || 'Edge function failed'}${status != null ? ` (HTTP ${status})` : ''}`,
+      );
+      return { ok: false, message: msg || 'Could not delete user. Check the log or server logs.' };
     }
-
-    // support tickets: responses first (FK), then tickets
-    try {
-      await supabase.from('ticket_responses').delete().eq('responder_id', userId);
-      const { data: ticketIds } = await supabase.from('support_tickets').select('id').eq('user_id', userId);
-      const ids = (ticketIds || []).map((r: { id: string }) => r.id).filter(Boolean);
-      if (ids.length > 0) {
-        await supabase.from('ticket_responses').delete().in('ticket_id', ids);
-      }
-      const { error: stErr } = await supabase.from('support_tickets').delete().eq('user_id', userId);
-      if (stErr) addLog(`  [WARN] support_tickets: ${stErr.message}`);
-      else addLog(`  [OK] Cleaned support_tickets / ticket_responses`);
-    } catch (err: any) {
-      addLog(`  [SKIP] support_tickets: ${err.message}`);
+    if ((data as { success?: boolean } | null)?.success === true) {
+      logLine('  [OK] Public data cleared and auth user removed.');
+      return { ok: true, message: '' };
     }
-
-    // Remove approved business profiles owned by this user (cascades to business_offerings, etc.)
-    try {
-      const { error } = await supabase.from('businesses').delete().eq('owner_id', userId);
-      if (error) {
-        addLog(`  [WARN] businesses (owner listings): ${error.message}`);
-      } else {
-        addLog(`  [OK] Removed businesses owned by this user`);
-      }
-    } catch (err: any) {
-      addLog(`  [SKIP] businesses: ${err.message}`);
-    }
-
-    // Delete from user_profiles
-    try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .delete()
-        .eq('user_id', userId);
-
-      if (error) {
-        addLog(`  [ERROR] user_profiles: ${error.message}`);
-        profilesOk = false;
-      } else {
-        addLog(`  [OK] Deleted user_profiles record`);
-      }
-    } catch (err: any) {
-      addLog(`  [ERROR] user_profiles: ${err.message}`);
-      profilesOk = false;
-    }
-
-    // Remove auth user — required or the email stays reserved and sign-up says "already exists"
-    try {
-      const headers = await getEdgeAuthHeaders();
-      if (!headers.Authorization) {
-        addLog(`  [ERROR] auth.users: No admin session — sign in again, then retry delete, or remove user in Supabase Dashboard → Authentication`);
-      } else {
-        const { data, error } = await supabase.functions.invoke('manage-business', {
-          body: {
-            action: 'admin_delete_user',
-            userId: userId,
-            targetUserId: userId,
-          },
-          headers,
-        });
-        const status = getInvokeHttpStatus(error);
-        const errJson = error ? await getInvokeErrorJson(error) : null;
-        const serverError =
-          (typeof errJson?.error === 'string' && errJson.error) ||
-          (typeof (data as { error?: string } | null)?.error === 'string' && (data as { error: string }).error) ||
-          '';
-        const msg = serverError || (error as { message?: string } | null)?.message || '';
-
-        // #region agent log
-        fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
-          body: JSON.stringify({
-            sessionId: '7b96fa',
-            location: 'AdminUserManager.tsx:admin_delete_user',
-            message: 'manage-business admin_delete_user invoke result',
-            data: {
-              hypothesisId: 'H1-H5',
-              httpStatus: status,
-              hasError: Boolean(error),
-              dataSuccess: (data as { success?: boolean } | null)?.success === true,
-              serverErrorSnippet: serverError ? serverError.slice(0, 240) : null,
-              errorCode: errJson?.errorCode ?? null,
-              targetUserIdLen: typeof userId === 'string' ? userId.length : null,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-
-        if (error || (data as { error?: string } | null)?.error) {
-          addLog(
-            `  [ERROR] auth.users (HTTP ${status ?? '?'})${serverError ? `: ${serverError}` : `: ${msg || 'Edge function failed'}`} — if this persists, delete in Dashboard → Authentication → Users`,
-          );
-        } else if ((data as { success?: boolean } | null)?.success === true) {
-          authDeleted = true;
-          addLog(`  [OK] Deleted from auth.users (email can be reused)`);
-        } else {
-          addLog(`  [ERROR] auth.users: Unexpected response — delete manually in Supabase Dashboard → Authentication`);
-        }
-      }
-    } catch (e: unknown) {
-      const m = e instanceof Error ? e.message : String(e);
-      addLog(`  [ERROR] auth.users: ${m} — delete manually in Supabase Dashboard → Authentication`);
-    }
-
-    return { profilesOk, authDeleted };
+    logLine('  [ERROR] Unexpected response from server.');
+    return { ok: false, message: 'Unexpected response from server.' };
   };
 
   // Delete a single user
@@ -389,32 +265,23 @@ const AdminUserManager: React.FC = () => {
     addLog(`Deleting user: ${userProfile.display_name || userProfile.email || userId}`);
 
     try {
-      const { profilesOk, authDeleted } = await cleanUserData(
-        userId,
-        userProfile.display_name || 'Unknown',
-      );
-      if (profilesOk) {
+      const { ok, message } = await invokeAdminDeleteUser(userId, addLog);
+      if (ok) {
         setUsers(prev => prev.filter(u => u.user_id !== userId));
-      }
-      if (profilesOk && authDeleted) {
-        toast.success(`User "${userProfile.display_name || 'Unknown'}" fully removed (profile + login).`);
-        addLog(`Done! Profile and Authentication user removed — email can sign up again.`);
-      } else if (profilesOk && !authDeleted) {
-        toast.error('Profile removed, but login still exists in Supabase Auth', {
-          description:
-            'That email cannot register again until you delete the user in Supabase Dashboard → Authentication → Users (search by email).',
-          duration: 12000,
-        });
-        addLog(`Done with warning: remove ${userProfile.email || 'this user'} from Authentication manually.`);
+        toast.success(
+          `User "${userProfile.display_name || 'Unknown'}" removed (data + login).`,
+        );
+        addLog('Done. Email can be used for a new account.');
       } else {
-        toast.error('Could not fully delete user — check the log for details.');
-        addLog(`Done with errors — review log above.`);
+        toast.error(message);
+        addLog(`Failed: ${message}`);
       }
     } catch (err: any) {
       toast.error('Failed to delete user: ' + (err.message || 'Unknown error'));
       addLog(`ERROR: ${err.message}`);
     } finally {
       setDeletingUserId(null);
+      setDeleteAcknowledged(false);
       setShowSingleConfirm(null);
     }
   };
@@ -436,22 +303,14 @@ const AdminUserManager: React.FC = () => {
 
     let deletedCount = 0;
     let failedCount = 0;
-    let authMissCount = 0;
 
     for (const userProfile of nonAdminUsers) {
       addLog(`\nProcessing: ${userProfile.display_name || userProfile.email || userProfile.user_id} (${userProfile.role})`);
 
       try {
-        const { profilesOk, authDeleted } = await cleanUserData(
-          userProfile.user_id,
-          userProfile.display_name || 'Unknown',
-        );
-        if (profilesOk) {
-          deletedCount++;
-          if (!authDeleted) authMissCount++;
-        } else {
-          failedCount++;
-        }
+        const { ok } = await invokeAdminDeleteUser(userProfile.user_id, addLog);
+        if (ok) deletedCount++;
+        else failedCount++;
       } catch (err: any) {
         addLog(`  [ERROR] ${err.message}`);
         failedCount++;
@@ -462,25 +321,21 @@ const AdminUserManager: React.FC = () => {
 
     addLog('─'.repeat(50));
     addLog(`\nBulk deletion complete!`);
-    addLog(`  Profiles cleared: ${deletedCount} user(s)`);
-    if (failedCount > 0) addLog(`  Profile errors: ${failedCount}`);
-    if (authMissCount > 0) {
-      addLog(`  Auth not removed for ${authMissCount} user(s) — Dashboard → Authentication → Users`);
-    }
+    addLog(`  Removed: ${deletedCount} user(s)`);
+    if (failedCount > 0) addLog(`  Failed: ${failedCount}`);
 
     await loadUsers();
 
-    toast.success(`Processed ${deletedCount} user(s)`, {
+    toast.success(`Removed ${deletedCount} user(s)`, {
       description:
         failedCount > 0
-          ? `${failedCount} profile error(s). ${authMissCount > 0 ? `${authMissCount} still need Auth cleanup in Dashboard.` : ''}`
-          : authMissCount > 0
-            ? `${authMissCount} login(s) still in Authentication — remove in Supabase Dashboard if emails must be reused.`
-            : 'Public data and Auth users removed where the edge function succeeded.',
+          ? `${failedCount} could not be removed — see the log for details.`
+          : 'Each user was purged and deleted from authentication.',
       duration: 10000,
     });
 
     setBulkDeleting(false);
+    setBulkDeleteAcknowledged(false);
     setShowBulkConfirm(false);
   };
 
@@ -581,7 +436,10 @@ const AdminUserManager: React.FC = () => {
           </button>
           {nonAdminUsers.length > 0 && (
             <button
-              onClick={() => setShowBulkConfirm(true)}
+              onClick={() => {
+                setBulkDeleteAcknowledged(false);
+                setShowBulkConfirm(true);
+              }}
               disabled={bulkDeleting}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50 shadow-sm"
             >
@@ -675,7 +533,10 @@ const AdminUserManager: React.FC = () => {
                           </span>
                         ) : (
                           <button
-                            onClick={() => setShowSingleConfirm(userProfile.user_id)}
+                            onClick={() => {
+                            setDeleteAcknowledged(false);
+                            setShowSingleConfirm(userProfile.user_id);
+                          }}
                             disabled={deletingUserId === userProfile.user_id || bulkDeleting}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors disabled:opacity-50"
                           >
@@ -835,7 +696,15 @@ const AdminUserManager: React.FC = () => {
       {/* ═══ BULK DELETE CONFIRMATION MODAL ═══ */}
       {showBulkConfirm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !bulkDeleting && setShowBulkConfirm(false)} />
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => {
+              if (!bulkDeleting) {
+                setBulkDeleteAcknowledged(false);
+                setShowBulkConfirm(false);
+              }
+            }}
+          />
           <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
             <div className="bg-red-50 border-b border-red-100 px-6 py-4 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
@@ -882,10 +751,23 @@ const AdminUserManager: React.FC = () => {
                   </div>
                 ))}
               </div>
+              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-red-200 bg-red-50/80 p-3 text-sm text-red-900">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-red-300"
+                  checked={bulkDeleteAcknowledged}
+                  onChange={e => setBulkDeleteAcknowledged(e.target.checked)}
+                  disabled={bulkDeleting}
+                />
+                <span>I understand this permanently deletes these users and their data. This cannot be undone.</span>
+              </label>
             </div>
             <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
               <button
-                onClick={() => setShowBulkConfirm(false)}
+                onClick={() => {
+                  setBulkDeleteAcknowledged(false);
+                  setShowBulkConfirm(false);
+                }}
                 disabled={bulkDeleting}
                 className="px-5 py-2.5 rounded-xl bg-white border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
@@ -893,7 +775,7 @@ const AdminUserManager: React.FC = () => {
               </button>
               <button
                 onClick={handleBulkDelete}
-                disabled={bulkDeleting}
+                disabled={bulkDeleting || !bulkDeleteAcknowledged}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50 shadow-sm"
               >
                 {bulkDeleting ? (
@@ -919,7 +801,15 @@ const AdminUserManager: React.FC = () => {
         if (!userToDelete) return null;
         return (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !deletingUserId && setShowSingleConfirm(null)} />
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => {
+                if (!deletingUserId) {
+                  setDeleteAcknowledged(false);
+                  setShowSingleConfirm(null);
+                }
+              }}
+            />
             <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
               <div className="bg-red-50 border-b border-red-100 px-6 py-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
@@ -945,13 +835,26 @@ const AdminUserManager: React.FC = () => {
                     </span>
                   </div>
                 </div>
-                <p className="text-sm text-gray-600">
-                  Are you sure you want to delete this user and all their associated data?
+                <p className="text-sm text-gray-600 mb-3">
+                  This removes their profile, listings, passes, tickets, and login in one step.
                 </p>
+                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-red-200 bg-red-50/80 p-3 text-sm text-red-900">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-red-300"
+                    checked={deleteAcknowledged}
+                    onChange={e => setDeleteAcknowledged(e.target.checked)}
+                    disabled={!!deletingUserId}
+                  />
+                  <span>I understand this permanently deletes this user. This cannot be undone.</span>
+                </label>
               </div>
               <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
                 <button
-                  onClick={() => setShowSingleConfirm(null)}
+                  onClick={() => {
+                    setDeleteAcknowledged(false);
+                    setShowSingleConfirm(null);
+                  }}
                   disabled={!!deletingUserId}
                   className="px-5 py-2.5 rounded-xl bg-white border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
@@ -959,7 +862,7 @@ const AdminUserManager: React.FC = () => {
                 </button>
                 <button
                   onClick={() => handleDeleteUser(showSingleConfirm)}
-                  disabled={!!deletingUserId}
+                  disabled={!deleteAcknowledged || !!deletingUserId}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50 shadow-sm"
                 >
                   {deletingUserId === showSingleConfirm ? (
