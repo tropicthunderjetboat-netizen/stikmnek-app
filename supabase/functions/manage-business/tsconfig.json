@@ -4,5 +4,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["./index.ts", "../edge-runtime.d.ts", "../_shared/cors.ts"]
+  "include": ["./index.ts", "./purge-user.ts", "../edge-runtime.d.ts", "../_shared/cors.ts"]
 }
