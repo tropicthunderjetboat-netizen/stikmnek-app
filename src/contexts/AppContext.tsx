@@ -653,23 +653,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           length: typeof userId === 'string' ? userId.length : null,
         });
       } else {
-        // Avoid `select('*')` here: resolveRole is on the hot auth path, and the dashboard
-        // only needs a subset of profile fields to establish role + basic onboarding state.
-        // All listed columns must exist in public.user_profiles (see supabase migrations);
-        // unknown column names cause PostgREST 400.
-        const PROFILE_ROLE_COLUMNS =
-          'id,user_id,role,user_type,name,full_name,display_name,email,avatar_url,' +
-          'superstar_credits,share_bonus_unlocked,' +
-          'onboarding_complete,post_pass_profile_completed,' +
-          'num_adults,num_children,num_infants,expected_arrival_date,expected_departure_date,' +
-          'created_at,updated_at';
+        // Ensure JWT is on the client before RLS-protected reads (avoids anon/no-row races after refresh).
+        await supabase.auth.getSession();
+        // Use * so older DBs without newer columns never get PostgREST 400 from a long fixed column list.
         const approxRestUrl =
-          `${ENDPOINTS.rest}/user_profiles?select=${encodeURIComponent(PROFILE_ROLE_COLUMNS)}` +
-          `&user_id=eq.${encodeURIComponent(userId)}`;
+          `${ENDPOINTS.rest}/user_profiles?select=*&user_id=eq.${encodeURIComponent(userId)}`;
         const startedAt = Date.now();
         const fetchPromise = supabase
           .from('user_profiles')
-          .select(PROFILE_ROLE_COLUMNS)
+          .select('*')
           .eq('user_id', userId)
           .maybeSingle();
 
@@ -691,7 +683,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
           const errorPayload = {
             userId,
-            profileColumns: PROFILE_ROLE_COLUMNS,
+            profileSelect: '*',
             approxGetUrl: approxRestUrl,
             elapsedMs,
             message: err.message ?? null,
@@ -844,6 +836,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     authProcessingRef.current = true;
 
+    // Sync session onto the Supabase client before any RLS-backed user_profiles calls.
+    await supabase.auth.getSession();
+
     if (profileBannerTimerRef.current) {
       clearTimeout(profileBannerTimerRef.current);
       profileBannerTimerRef.current = null;
@@ -918,7 +913,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const profileReady = !!profile;
       const profileBannerMessage =
         'Failed to load your profile. Please check your connection and try again, or contact support if this continues.';
-      if (!profileReady && !profileRowFetchOk) {
+      const isListedAdmin = ADMIN_EMAILS.includes((authUser.email || '').toLowerCase());
+      if (!profileReady && !profileRowFetchOk && !isListedAdmin) {
         if (profileBannerTimerRef.current) {
           clearTimeout(profileBannerTimerRef.current);
           profileBannerTimerRef.current = null;
