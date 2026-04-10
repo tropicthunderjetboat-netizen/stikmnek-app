@@ -160,6 +160,20 @@ async function purgePublicDataForAuthUser(
   userId: string,
 ): Promise<void> {
   const uid = String(userId);
+
+  // Prefer SECURITY DEFINER SQL: deletes storage.objects + all public FKs in one place
+  // (PostgREST cannot always reach storage.objects; silent JS failures caused Auth delete to fail).
+  const { error: rpcErr } = await supabase.rpc('delete_public_app_data_for_user', {
+    p_user_id: uid,
+  });
+  if (!rpcErr) {
+    return;
+  }
+  console.warn(
+    '[manage-business] delete_public_app_data_for_user RPC failed; using Rest fallback:',
+    rpcErr.message,
+  );
+
   const logSkip = (label: string, err: { message?: string } | null) => {
     if (err?.message) console.warn(`[manage-business] purge ${label}:`, err.message);
   };
