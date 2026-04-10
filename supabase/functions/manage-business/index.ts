@@ -847,46 +847,20 @@ Deno.serve(async (req) => {
           );
         }
 
-        const { data: primaryRows, error: offSelErr } = await supabase
-          .from('business_offerings')
-          .select('id')
-          .eq('business_id', existingProfileId)
-          .order('created_at', { ascending: true })
-          .limit(1);
-
-        if (offSelErr) {
-          console.error('[manage-business] offering lookup:', offSelErr);
-          return errorResponse(req, offSelErr.message, 500);
-        }
-
-        const primaryId = primaryRows?.[0]?.id as string | undefined;
-        if (primaryId) {
-          const { error: offUpdErr } = await supabase
-            .from('business_offerings')
-            .update(offeringFields)
-            .eq('id', primaryId);
-          if (offUpdErr) {
-            console.error('[manage-business] Failed to update business_offerings:', offUpdErr);
-            return errorResponse(
-              req,
-              'Approved but failed to update live offering: ' + offUpdErr.message,
-              500,
-            );
-          }
-        } else {
-          const { error: offInsErr } = await supabase.from('business_offerings').insert({
-            business_id: existingProfileId,
-            ...offeringFields,
-            featured: false,
-          });
-          if (offInsErr) {
-            console.error('[manage-business] Failed to insert business_offerings:', offInsErr);
-            return errorResponse(
-              req,
-              'Approved but failed to create live offering: ' + offInsErr.message,
-              500,
-            );
-          }
+        // New listing on an existing profile: always INSERT a row. Updating the "primary"
+        // offering overwrote the owner's previous approved deals (only the last one appeared).
+        const { error: offInsErr } = await supabase.from('business_offerings').insert({
+          business_id: existingProfileId,
+          ...offeringFields,
+          featured: false,
+        });
+        if (offInsErr) {
+          console.error('[manage-business] Failed to insert business_offerings (existing profile):', offInsErr);
+          return errorResponse(
+            req,
+            'Approved but failed to create live offering: ' + offInsErr.message,
+            500,
+          );
         }
 
         liveBusinessId = existingProfileId;
