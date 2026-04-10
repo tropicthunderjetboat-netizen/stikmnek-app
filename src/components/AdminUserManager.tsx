@@ -32,13 +32,44 @@ async function getInvokeErrorJson(error: unknown): Promise<Record<string, unknow
   try {
     const res = (error as { context?: Response })?.context;
     if (res && typeof res.clone === 'function') {
-      const body = await res.clone().json();
-      return body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
+      const clone = res.clone();
+      const ct = clone.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        const body = await clone.json();
+        return body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
+      }
+      const text = await clone.text();
+      if (text && text.trim().startsWith('{')) {
+        const body = JSON.parse(text) as Record<string, unknown>;
+        return body && typeof body === 'object' ? body : null;
+      }
     }
   } catch {
     /* ignore */
   }
   return null;
+}
+
+/** Real message from edge JSON body — often in `data` even when invoke sets a generic `error`. */
+function getEdgeFunctionErrorMessage(
+  data: unknown,
+  errJson: Record<string, unknown> | null,
+  invokeError: unknown,
+): string {
+  const fromObj = (o: unknown): string => {
+    if (!o || typeof o !== 'object') return '';
+    const r = o as Record<string, unknown>;
+    if (typeof r.error === 'string' && r.error.trim()) return r.error.trim();
+    if (typeof r.message === 'string' && r.message.trim()) return r.message.trim();
+    return '';
+  };
+  return (
+    fromObj(data) ||
+    (errJson && (typeof errJson.error === 'string' ? errJson.error.trim() : '')) ||
+    (errJson && (typeof errJson.message === 'string' ? errJson.message.trim() : '')) ||
+    (invokeError as { message?: string } | null)?.message?.trim() ||
+    ''
+  );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -229,17 +260,23 @@ const AdminUserManager: React.FC = () => {
       headers,
     });
     const errJson = error ? await getInvokeErrorJson(error) : null;
-    const serverError =
-      (typeof errJson?.error === 'string' && errJson.error) ||
-      (typeof (data as { error?: string } | null)?.error === 'string' && (data as { error: string }).error) ||
-      '';
-    const msg = serverError || (error as { message?: string } | null)?.message || '';
-    if (error || (data as { error?: string } | null)?.error) {
+    const msg = getEdgeFunctionErrorMessage(data, errJson, error);
+    const payload = data && typeof data === 'object' ? (data as Record<string, unknown>) : null;
+    const failed =
+      Boolean(error) ||
+      payload?.success === false ||
+      (typeof payload?.error === 'string' && payload.error.length > 0);
+    if (failed) {
       const status = getInvokeHttpStatus(error);
-      logLine(
-        `  [ERROR] ${msg || 'Edge function failed'}${status != null ? ` (HTTP ${status})` : ''}`,
-      );
-      return { ok: false, message: msg || 'Could not delete user. Check the log or server logs.' };
+      const generic = msg === 'Edge Function returned a non-2xx status code' || !msg;
+      const detail = generic ? 'Edge function request failed' : msg;
+      logLine(`  [ERROR] ${detail}${status != null ? ` (HTTP ${status})` : ''}`);
+      return {
+        ok: false,
+        message: generic
+          ? 'Could not delete user. If this persists: redeploy manage-business (see config verify_jwt), then check Edge Function logs in Supabase.'
+          : msg,
+      };
     }
     if ((data as { success?: boolean } | null)?.success === true) {
       logLine('  [OK] Public data cleared and auth user removed.');

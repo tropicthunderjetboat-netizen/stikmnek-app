@@ -8,6 +8,9 @@ project_id = "hbaflbmfptobyfqbudrt"
 
 # Kong JWT verification off: these handlers call auth.getUser() themselves.
 # Prevents "Invalid JWT" at the gateway when the header must match the session exactly.
+[functions.manage-business]
+verify_jwt = false
+
 [functions.process-card-payment]
 verify_jwt = false
 
