@@ -11,6 +11,9 @@ project_id = "hbaflbmfptobyfqbudrt"
 [functions.manage-business]
 verify_jwt = false
 
+[functions.upload-photo]
+verify_jwt = false
+
 [functions.process-card-payment]
 verify_jwt = false
 

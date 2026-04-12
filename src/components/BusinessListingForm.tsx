@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, getEdgeAuthHeaders } from '@/lib/supabase';
 import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, AlertTriangle, Globe, Info } from 'lucide-react';
 
 import { formatVT } from '@/lib/utils';
@@ -25,6 +25,9 @@ import {
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 
+/** Per-invoke ceiling so cold starts / large payloads cannot hang the form forever */
+const EDGE_INVOKE_TIMEOUT_MS = 120_000;
+
 // ─── Retry helper for edge function calls ───
 async function invokeWithRetry(
   fnName: string,
@@ -42,7 +45,20 @@ async function invokeWithRetry(
         await new Promise(r => setTimeout(r, delay));
       }
       const startMs = Date.now();
-      const result = await supabase.functions.invoke(fnName, { body });
+      const headers = await getEdgeAuthHeaders();
+      const invokePromise = supabase.functions.invoke(fnName, { body, headers });
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `${label || fnName}: timed out after ${Math.round(EDGE_INVOKE_TIMEOUT_MS / 1000)}s`,
+              ),
+            ),
+          EDGE_INVOKE_TIMEOUT_MS,
+        ),
+      );
+      const result = await Promise.race([invokePromise, timeoutPromise]);
       const elapsed = Date.now() - startMs;
       console.log(`[BusinessForm] ${label} ${fnName} attempt ${attempt}: ${elapsed}ms`, {
         hasData: !!result.data,

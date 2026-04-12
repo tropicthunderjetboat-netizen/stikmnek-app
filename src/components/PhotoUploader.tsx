@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getEdgeAuthHeaders } from '@/lib/supabase';
 import { Upload, X, Image as ImageIcon, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -370,19 +370,34 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       const filePath = `${effectiveUserId}/${crypto.randomUUID()}.${safeExt}`;
       const blob = new Blob([binary], { type: file.type || 'image/jpeg' });
 
+      const DIRECT_STORAGE_TIMEOUT_MS = 45_000;
       try {
         const startMs = Date.now();
-        const { error: storageErr } = await supabase.storage
+        const uploadPromise = supabase.storage
           .from('business-photos')
           .upload(filePath, blob, { contentType: file.type || 'image/jpeg', upsert: false });
+        const raced = await Promise.race([
+          uploadPromise.then((r) => ({ done: true as const, r })),
+          new Promise<{ done: false }>((resolve) =>
+            setTimeout(() => resolve({ done: false }), DIRECT_STORAGE_TIMEOUT_MS),
+          ),
+        ]);
         const elapsed = Date.now() - startMs;
-        if (!storageErr) {
-          const { data: urlData } = supabase.storage.from('business-photos').getPublicUrl(filePath);
-          uploadData = { url: urlData.publicUrl, filePath, success: true };
-          console.log(`[${file.name}] Direct storage upload succeeded (${elapsed}ms)`);
+        if (!raced.done) {
+          uploadError = { message: 'Direct storage timed out' };
+          console.warn(
+            `[${file.name}] Direct storage no response after ${DIRECT_STORAGE_TIMEOUT_MS}ms — trying Edge Function`,
+          );
         } else {
-          uploadError = { message: storageErr.message };
-          console.warn(`[${file.name}] Direct storage failed:`, storageErr.message);
+          const { error: storageErr } = raced.r;
+          if (!storageErr) {
+            const { data: urlData } = supabase.storage.from('business-photos').getPublicUrl(filePath);
+            uploadData = { url: urlData.publicUrl, filePath, success: true };
+            console.log(`[${file.name}] Direct storage upload succeeded (${elapsed}ms)`);
+          } else {
+            uploadError = { message: storageErr.message };
+            console.warn(`[${file.name}] Direct storage failed:`, storageErr.message);
+          }
         }
       } catch (directErr: any) {
         uploadError = directErr;
@@ -394,6 +409,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
         console.warn(`[${file.name}] Trying upload-photo Edge Function...`);
         const UPLOAD_TIMEOUT_MS = 45000; // 45s max to avoid indefinite hang
         try {
+          const headers = await getEdgeAuthHeaders();
           const invokePromise = supabase.functions.invoke('upload-photo', {
             body: {
               fileBase64: finalBase64,
@@ -401,6 +417,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               contentType: file.type || 'image/jpeg',
               userId: effectiveUserId,
             },
+            headers,
           });
           const timeoutPromise = new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Upload timed out after 45 seconds')), UPLOAD_TIMEOUT_MS)
