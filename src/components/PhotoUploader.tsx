@@ -392,24 +392,6 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           uploadError = { message: storageErr.message };
           console.warn(`[${file.name}] Direct storage failed:`, storageErr.message);
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
-          body: JSON.stringify({
-            sessionId: '7b96fa',
-            location: 'PhotoUploader.tsx:direct-storage',
-            message: 'direct storage upload finished',
-            data: {
-              hypothesisId: 'H2-H5',
-              ok: !storageErr,
-              elapsedMs: elapsed,
-              errSnippet: storageErr?.message ? String(storageErr.message).slice(0, 120) : null,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
       } catch (directErr: any) {
         clearTimeout(storageTimer);
         const aborted =
@@ -425,24 +407,6 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           uploadError = directErr;
           console.warn(`[${file.name}] Direct storage threw:`, directErr?.message || directErr);
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
-          body: JSON.stringify({
-            sessionId: '7b96fa',
-            location: 'PhotoUploader.tsx:direct-storage-catch',
-            message: 'direct storage upload error',
-            data: {
-              hypothesisId: 'H2-H5',
-              aborted: Boolean(aborted),
-              errName: directErr?.name ?? null,
-              errSnippet: String(directErr?.message || directErr || '').slice(0, 160),
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
       }
 
       // Strategy B: Edge Function fallback (if direct storage fails, e.g. RLS not applied)
@@ -453,7 +417,6 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
         const edgeAborter = new AbortController();
         const edgeTimer = setTimeout(() => edgeAborter.abort(), UPLOAD_TIMEOUT_MS);
         try {
-          const headersStart = Date.now();
           const headers = await Promise.race([
             getEdgeAuthHeaders(),
             new Promise<Record<string, string>>((_, reject) =>
@@ -462,25 +425,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
                 EDGE_AUTH_HEADER_MS,
               ),
             ),
-          );
-          const headersMs = Date.now() - headersStart;
-          // #region agent log
-          fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
-            body: JSON.stringify({
-              sessionId: '7b96fa',
-              location: 'PhotoUploader.tsx:edge-headers',
-              message: 'getEdgeAuthHeaders completed',
-              data: {
-                hypothesisId: 'H1',
-                headersMs,
-                hasAuthHeader: Boolean(headers.Authorization),
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
+          ]);
 
           const result = await supabase.functions.invoke('upload-photo', {
             body: {
@@ -500,23 +445,6 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           } else {
             uploadError = result.error || { message: result.data?.error };
           }
-          // #region agent log
-          fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
-            body: JSON.stringify({
-              sessionId: '7b96fa',
-              location: 'PhotoUploader.tsx:edge-invoke',
-              message: 'upload-photo invoke settled',
-              data: {
-                hypothesisId: 'H3',
-                hasFnError: Boolean(result.error),
-                dataHasError: Boolean(result.data?.error),
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
         } catch (invokeErr: any) {
           clearTimeout(edgeTimer);
           const aborted = invokeErr?.name === 'AbortError' || edgeAborter.signal.aborted;
@@ -528,23 +456,6 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
             msg,
           );
           uploadError = { message: msg };
-          // #region agent log
-          fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
-            body: JSON.stringify({
-              sessionId: '7b96fa',
-              location: 'PhotoUploader.tsx:edge-invoke-catch',
-              message: 'upload-photo invoke failed',
-              data: {
-                hypothesisId: 'H1-H3',
-                aborted,
-                errSnippet: msg.slice(0, 200),
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
         }
       }
 
