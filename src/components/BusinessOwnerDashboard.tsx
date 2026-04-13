@@ -1122,6 +1122,7 @@ const BusinessOwnerDashboard: React.FC = () => {
           discountValidFrom: submitForm.discountValidFrom,
           discountValidUntil: discountValidUntil,
           pricingTiers: tiersPayload,
+          businessId: pBusinessIdForSubmit,
         } as Record<string, unknown>,
         { maxRetries: 2, label: 'submit_business', logPrefix: '[Dashboard]' },
       );

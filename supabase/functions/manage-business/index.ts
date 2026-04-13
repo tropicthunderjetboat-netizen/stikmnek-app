@@ -359,8 +359,32 @@ Deno.serve(async (req) => {
     if (action === 'submit_business') {
       const userId = authUser.id;
 
+      const rawBusinessId = body.businessId ?? body.business_id ?? null;
+      let linkedBusinessId: string | null = null;
+      if (rawBusinessId != null && String(rawBusinessId).trim()) {
+        const bid = String(rawBusinessId).trim();
+        const { data: owned, error: ownErr } = await supabase
+          .from('businesses')
+          .select('id')
+          .eq('id', bid)
+          .eq('owner_id', userId)
+          .maybeSingle();
+        if (ownErr || !owned?.id) {
+          console.error('[manage-business] submit_business invalid businessId for owner:', {
+            bid,
+            userId,
+            ownErr: ownErr?.message,
+          });
+          return errorResponse(req, 'business_id must belong to the authenticated owner', 400, {
+            reason: 'invalid_business_id',
+          });
+        }
+        linkedBusinessId = bid;
+      }
+
       const record = {
         owner_id: userId,
+        business_id: linkedBusinessId,
         name: body.name || '',
         category: body.category || 'dining',
         description: body.description || '',
@@ -373,11 +397,11 @@ Deno.serve(async (req) => {
         hours: body.hours || '',
         image: body.image || '',
         status: 'pending',
-        map_url: body.mapUrl || null,
+        map_url: body.mapUrl ?? body.map_url ?? null,
         website: body.website || null,
-        discount_valid_from: body.discountValidFrom || null,
-        discount_valid_until: body.discountValidUntil || null,
-        whatsapp_number: body.whatsappNumber || null,
+        discount_valid_from: body.discountValidFrom ?? body.discount_valid_from ?? null,
+        discount_valid_until: body.discountValidUntil ?? body.discount_valid_until ?? null,
+        whatsapp_number: body.whatsappNumber ?? body.whatsapp_number ?? null,
         pricing_tiers: body.pricingTiers ?? body.pricing_tiers ?? null,
       };
 
@@ -388,8 +412,16 @@ Deno.serve(async (req) => {
         .single();
 
       if (error) {
-        console.error('[manage-business] submit_business insert error:', error);
-        return errorResponse(req, error.message || 'Failed to submit business', 500);
+        console.error('[manage-business] submit_business insert error:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        return errorResponse(req, error.message || 'Failed to submit business', 500, {
+          reason: 'pending_businesses_insert',
+          code: error.code ?? null,
+        });
       }
 
       // Insert photos if provided
@@ -403,7 +435,16 @@ Deno.serve(async (req) => {
           is_main: p.isMain ?? i === 0,
           status: 'pending',
         }));
-        await supabase.from('business_photos').insert(photoRecords);
+        const { error: photosErr } = await supabase.from('business_photos').insert(photoRecords);
+        if (photosErr) {
+          console.error('[manage-business] submit_business business_photos insert:', photosErr);
+          return errorResponse(
+            req,
+            'Listing saved but photo rows failed: ' + photosErr.message,
+            500,
+            { reason: 'business_photos_insert', pendingId: pending.id },
+          );
+        }
       }
 
       return jsonResponse(req, {

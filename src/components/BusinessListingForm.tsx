@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
+import { FunctionsHttpError, FunctionsFetchError, PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
 import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, AlertTriangle, Globe, Info } from 'lucide-react';
@@ -53,6 +54,127 @@ function todayStr(): string {
 function isValidListingImageUrl(url: string): boolean {
   const u = url.trim();
   return u.length > 0 && /^https?:\/\//i.test(u);
+}
+
+function truncateForSubmissionLog(s: string, max: number): string {
+  if (!s || s.length <= max) return s;
+  return `${s.slice(0, max)}… (${s.length} chars)`;
+}
+
+/** Safe JSON for console (avoids multi‑MB data URLs / HTML in logs). */
+function submissionPayloadForLog(payload: Record<string, unknown>): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...payload };
+  if (typeof next.description === 'string') {
+    next.description = truncateForSubmissionLog(next.description, 500);
+  }
+  if (typeof next.image === 'string') {
+    next.image = truncateForSubmissionLog(next.image, 160);
+  }
+  if (Array.isArray(next.photos)) {
+    next.photos = (next.photos as Record<string, unknown>[]).map((ph) => ({
+      ...ph,
+      url: typeof ph.url === 'string' ? truncateForSubmissionLog(ph.url, 120) : ph.url,
+    }));
+  }
+  return next;
+}
+
+async function formatEdgeInvokeFailure(
+  rpcError: { message?: string } | null,
+  data: { error?: string } | null | undefined,
+  error: unknown,
+): Promise<string> {
+  if (data?.error && typeof data.error === 'string' && data.error.trim()) return data.error.trim();
+  if (rpcError?.message?.trim()) return rpcError.message.trim();
+  if (error instanceof FunctionsHttpError) {
+    const res = error.context;
+    let raw = '';
+    try {
+      raw = await res.clone().text();
+    } catch {
+      /* ignore */
+    }
+    try {
+      const j = JSON.parse(raw) as { error?: string; message?: string };
+      if (typeof j?.error === 'string' && j.error.trim()) return j.error.trim();
+      if (typeof j?.message === 'string' && j.message.trim()) return j.message.trim();
+    } catch {
+      /* use raw */
+    }
+    if (raw.trim()) return raw.trim();
+    return `Server error (${res.status})`;
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return 'Failed to submit listing.';
+}
+
+async function formatListingSubmitCatchError(
+  err: unknown,
+  language: string,
+): Promise<string> {
+  const fallback =
+    language === 'en' ? 'Submission failed. Please try again.' : 'Échec de la soumission. Réessayez.';
+
+  if (err instanceof FunctionsHttpError) {
+    const res = err.context;
+    let rawBody = '';
+    try {
+      rawBody = await res.clone().text();
+    } catch {
+      /* ignore */
+    }
+    let parsed: unknown = rawBody;
+    try {
+      parsed = rawBody ? JSON.parse(rawBody) : rawBody;
+    } catch {
+      /* keep text */
+    }
+    console.error('[BusinessForm] FunctionsHttpError (Edge non-2xx)', {
+      status: res.status,
+      statusText: res.statusText,
+      body: parsed,
+    });
+    if (parsed && typeof parsed === 'object' && parsed !== null) {
+      const o = parsed as Record<string, unknown>;
+      if (typeof o.error === 'string' && o.error.trim()) return o.error.trim();
+      if (typeof o.message === 'string' && o.message.trim()) return o.message.trim();
+    }
+    return rawBody?.trim() || `Server error (${res.status})`;
+  }
+
+  if (err instanceof FunctionsFetchError) {
+    const ctx = err.context as { name?: string; message?: string } | undefined;
+    console.error('[BusinessForm] FunctionsFetchError', {
+      message: err.message,
+      causeName: ctx?.name,
+      causeMessage: ctx?.message,
+    });
+    return ctx?.message || err.message || fallback;
+  }
+
+  if (err instanceof PostgrestError) {
+    console.error('[BusinessForm] PostgrestError', {
+      code: err.code,
+      message: err.message,
+      details: err.details,
+      hint: err.hint,
+    });
+    return err.message || fallback;
+  }
+
+  const o = err as Record<string, unknown> | null;
+  if (o && typeof o === 'object' && typeof o.message === 'string' && typeof o.code === 'string') {
+    console.error('[BusinessForm] Postgres/REST-shaped error', {
+      code: o.code,
+      message: o.message,
+      details: o.details,
+      hint: o.hint,
+    });
+    return String(o.message);
+  }
+
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
 }
 
 const BusinessListingForm: React.FC = () => {
@@ -383,47 +505,75 @@ const BusinessListingForm: React.FC = () => {
         discountValidFrom: form.discountValidFrom,
         discountValidUntil: discountValidUntil,
         pricingTiers: tiersPayload,
+        /** Links pending row to existing profile (same as RPC `p_business_id`); Edge path must mirror RPC. */
+        businessId: ownerProfileBusinessId,
       };
 
+      console.log(
+        'SUBMISSION_PAYLOAD:',
+        JSON.stringify(submissionPayloadForLog(submissionPayload as Record<string, unknown>), null, 2),
+      );
 
       console.log('[BusinessForm] Submitting business listing...', {
         name: form.name,
         category: form.category,
         photosCount: photoData.length,
         userId: user.id,
+        businessId: ownerProfileBusinessId,
       });
 
       // Strategy 1: RPC insert (SECURITY DEFINER, bypasses RLS — most reliable)
       const rpcAborter = new AbortController();
       const rpcTimer = setTimeout(() => rpcAborter.abort(), RPC_INSERT_PENDING_TIMEOUT_MS);
       let rpcId: string | null = null;
-      let rpcError: { message?: string; name?: string } | null = null;
+      let rpcError: { message?: string; name?: string; code?: string; details?: string; hint?: string } | null = null;
       try {
+        const rpcPayload = {
+          p_owner_id: user.id,
+          p_name: form.name,
+          p_category: form.category,
+          p_description: form.description,
+          p_discount: form.discount,
+          p_original_price: Number(form.originalPrice) || 0,
+          p_deal_price: Number(form.dealPrice) || 0,
+          p_location: form.address || 'Port Vila, Vanuatu',
+          p_phone: form.phone,
+          p_email: form.email || user.email,
+          p_hours: form.hours,
+          p_image: mainImageUrl,
+          p_map_url: form.mapUrl || null,
+          p_website: normalizedWebsite,
+          p_discount_valid_from: form.discountValidFrom || null,
+          p_discount_valid_until: discountValidUntil || null,
+          p_whatsapp_number: form.whatsappNumber || null,
+          p_pricing_tiers: tiersPayload,
+          p_business_id: ownerProfileBusinessId,
+        };
+        console.log(
+          'RPC_INSERT_PENDING_BUSINESS_PAYLOAD:',
+          JSON.stringify(
+            {
+              ...rpcPayload,
+              p_description: truncateForSubmissionLog(String(rpcPayload.p_description || ''), 400),
+              p_image: truncateForSubmissionLog(String(rpcPayload.p_image || ''), 120),
+            },
+            null,
+            2,
+          ),
+        );
         const rpcRes = await supabase
-          .rpc('insert_pending_business', {
-            p_owner_id: user.id,
-            p_name: form.name,
-            p_category: form.category,
-            p_description: form.description,
-            p_discount: form.discount,
-            p_original_price: Number(form.originalPrice) || 0,
-            p_deal_price: Number(form.dealPrice) || 0,
-            p_location: form.address || 'Port Vila, Vanuatu',
-            p_phone: form.phone,
-            p_email: form.email || user.email,
-            p_hours: form.hours,
-            p_image: mainImageUrl,
-            p_map_url: form.mapUrl || null,
-            p_website: normalizedWebsite,
-            p_discount_valid_from: form.discountValidFrom || null,
-            p_discount_valid_until: discountValidUntil || null,
-            p_whatsapp_number: form.whatsappNumber || null,
-            p_pricing_tiers: tiersPayload,
-            p_business_id: ownerProfileBusinessId,
-          })
+          .rpc('insert_pending_business', rpcPayload)
           .abortSignal(rpcAborter.signal);
         rpcId = rpcRes.data != null ? String(rpcRes.data) : null;
-        rpcError = rpcRes.error;
+        rpcError = rpcRes.error as typeof rpcError;
+        if (rpcError?.message || rpcError?.code) {
+          console.error('[BusinessForm] RPC insert_pending_business error:', {
+            code: rpcError.code,
+            message: rpcError.message,
+            details: rpcError.details,
+            hint: rpcError.hint,
+          });
+        }
       } catch (rpcEx: any) {
         const aborted =
           rpcEx?.name === 'AbortError' || String(rpcEx?.message || '').toLowerCase().includes('abort');
@@ -458,7 +608,7 @@ const BusinessListingForm: React.FC = () => {
               { maxRetries: 2, label: 'attach_pending_photos', logPrefix: '[BusinessForm]' },
             );
             if (attachErr || attachData?.error) {
-              throw new Error(attachData?.error || attachErr?.message || 'Failed to save photo rows');
+              throw new Error(await formatEdgeInvokeFailure(null, attachData, attachErr));
             }
           } catch (photoEx) {
             throw photoEx;
@@ -486,6 +636,10 @@ const BusinessListingForm: React.FC = () => {
 
       // Strategy 2: Edge function fallback (if RPC not deployed or fails)
       console.warn('[BusinessForm] RPC failed, trying manage-business Edge Function...', { rpcError: rpcError?.message });
+      console.log(
+        'SUBMISSION_PAYLOAD (edge invoke):',
+        JSON.stringify(submissionPayloadForLog(submissionPayload as Record<string, unknown>), null, 2),
+      );
       const { data, error } = await invokeEdgeFunctionWithRetry(
         'manage-business',
         submissionPayload as Record<string, unknown>,
@@ -514,25 +668,22 @@ const BusinessListingForm: React.FC = () => {
         return;
       }
 
+      const edgeDetail = await formatEdgeInvokeFailure(rpcError, data, error);
       throw new Error(
-        rpcError?.message || data?.error || error?.message ||
-        (language === 'en'
-          ? 'Failed to submit listing. Please ensure the database migration has been applied.'
-          : 'Échec de la soumission. Veuillez appliquer la migration de base de données.')
+        edgeDetail !== 'Failed to submit listing.'
+          ? edgeDetail
+          : language === 'en'
+            ? 'Failed to submit listing. Please ensure the database migration has been applied.'
+            : 'Échec de la soumission. Veuillez appliquer la migration de base de données.',
       );
         })(),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error(submitTimedOutMsg)), LISTING_SUBMIT_DEADLINE_MS),
         ),
       ]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[BusinessForm] Submit business FINAL error:', err);
-      toast.error(
-        err.message ||
-        (language === 'en'
-          ? 'Failed to submit listing. Please try again.'
-          : 'Échec de la soumission. Veuillez réessayer.')
-      );
+      void formatListingSubmitCatchError(err, language).then((msg) => toast.error(msg));
     } finally {
       setSubmitting(false);
     }
