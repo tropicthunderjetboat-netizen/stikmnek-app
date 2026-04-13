@@ -32,23 +32,8 @@ interface UploadingFile {
   errorMessage?: string;
 }
 
-/** Hard ceiling for storage + edge upload so stuck sockets do not block the UI for a minute. */
-const PHOTO_UPLOAD_NETWORK_TIMEOUT_MS = 15_000;
-const PHOTO_UPLOAD_EDGE_AUTH_HEADER_MS = 3_000;
-const PHOTO_UPLOAD_CONGESTED_MSG =
-  'Network is congested. Please try again in a minute.';
-
-function isLikelyUploadTimeout(err: unknown): boolean {
-  if (err == null) return false;
-  if (typeof err === 'object' && err !== null && 'name' in err && (err as Error).name === 'AbortError') {
-    return true;
-  }
-  const msg =
-    typeof err === 'object' && err !== null && 'message' in err
-      ? String((err as { message?: string }).message || '')
-      : String(err);
-  return /timed out|timeout|abort/i.test(msg) || msg.includes('Direct storage timed out');
-}
+/** Client-side ceiling for direct storage race + edge invoke `timeout` (generous; avoids hanging forever). */
+const PHOTO_UPLOAD_TIMEOUT_MS = 60_000;
 
 /** 
  * Immediately read a File as a data URL using FileReader.
@@ -421,14 +406,14 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
         const raced = await Promise.race([
           uploadPromise.then((r) => ({ kind: 'done' as const, r })),
           new Promise<{ kind: 'timeout' }>((resolve) =>
-            setTimeout(() => resolve({ kind: 'timeout' }), PHOTO_UPLOAD_NETWORK_TIMEOUT_MS),
+            setTimeout(() => resolve({ kind: 'timeout' }), PHOTO_UPLOAD_TIMEOUT_MS),
           ),
         ]);
         const elapsed = Date.now() - startMs;
         if (raced.kind === 'timeout') {
           uploadError = { message: 'Direct storage timed out' };
           console.warn(
-            `[${file.name}] Direct storage no response after ${PHOTO_UPLOAD_NETWORK_TIMEOUT_MS}ms — trying Edge Function`,
+            `[${file.name}] Direct storage no response after ${PHOTO_UPLOAD_TIMEOUT_MS}ms — trying Edge Function`,
           );
         } else {
           const { error: storageErr } = raced.r;
@@ -449,37 +434,18 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       // Strategy B: Edge Function fallback (if direct storage fails, e.g. RLS not applied)
       if (!uploadData && uploadError) {
         console.warn(`[${file.name}] Trying upload-photo Edge Function...`);
-        const edgeAborter = new AbortController();
-        const edgeTimer = setTimeout(() => edgeAborter.abort(), PHOTO_UPLOAD_NETWORK_TIMEOUT_MS);
         try {
-          let headers: Record<string, string>;
+          let headers: Record<string, string> = {};
           try {
-            headers = await Promise.race([
-              getEdgeAuthHeaders(),
-              new Promise<Record<string, string>>((_, reject) =>
-                setTimeout(
-                  () => reject(new Error('getEdgeAuthHeaders slow')),
-                  PHOTO_UPLOAD_EDGE_AUTH_HEADER_MS,
-                ),
-              ),
-            ]);
+            headers = await getEdgeAuthHeaders();
           } catch (authHdrErr: unknown) {
             const msg = authHdrErr instanceof Error ? authHdrErr.message : '';
             if (msg.includes('Session retrieval timed out')) {
               throw authHdrErr;
             }
-            try {
-              const sessRes = await Promise.race([
-                supabase.auth.getSession(),
-                new Promise<never>((_, rej) =>
-                  setTimeout(() => rej(new Error('getSession fallback slow')), 2_000),
-                ),
-              ]);
-              const t = sessRes.data?.session?.access_token;
-              headers = t ? { Authorization: `Bearer ${t}` } : {};
-            } catch {
-              headers = {};
-            }
+            const { data: sess } = await supabase.auth.getSession();
+            const t = sess?.session?.access_token;
+            if (t) headers = { Authorization: `Bearer ${t}` };
           }
 
           const result = await supabase.functions.invoke('upload-photo', {
@@ -490,9 +456,8 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               userId: effectiveUserId,
             },
             headers,
-            signal: edgeAborter.signal,
+            timeout: PHOTO_UPLOAD_TIMEOUT_MS,
           });
-          clearTimeout(edgeTimer);
           if (!result.error && !result.data?.error) {
             uploadData = result.data;
             uploadError = null;
@@ -500,17 +465,10 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           } else {
             uploadError = result.error || { message: result.data?.error };
           }
-        } catch (invokeErr: any) {
-          clearTimeout(edgeTimer);
-          const aborted = invokeErr?.name === 'AbortError' || edgeAborter.signal.aborted;
-          const detail = aborted
-            ? `aborted after ${Math.round(PHOTO_UPLOAD_NETWORK_TIMEOUT_MS / 1000)}s`
-            : invokeErr?.message || String(invokeErr);
-          console.warn(
-            `[${file.name}] Edge Function ${aborted ? 'aborted (timeout)' : 'failed'}:`,
-            detail,
-          );
-          uploadError = { message: aborted ? PHOTO_UPLOAD_CONGESTED_MSG : detail };
+        } catch (invokeErr: unknown) {
+          const detail = invokeErr instanceof Error ? invokeErr.message : String(invokeErr);
+          console.warn(`[${file.name}] Edge Function failed:`, detail);
+          uploadError = { message: detail };
         }
       }
 
@@ -518,9 +476,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
 
       if (uploadError && !uploadData) {
         console.error(`[${file.name}] Upload error:`, uploadError);
-        const userMsg = isLikelyUploadTimeout(uploadError)
-          ? PHOTO_UPLOAD_CONGESTED_MSG
-          : `Failed to upload "${file.name}". Please try again.`;
+        const userMsg = `Failed to upload "${file.name}". Please try again.`;
         setUploading(prev => prev.map(u =>
           u.id === fileId
             ? { ...u, status: 'error', progress: 0, errorMessage: userMsg }

@@ -364,7 +364,7 @@ Deno.serve(async (req) => {
     }
 
     // ─── SUBMIT_BUSINESS ───
-    // Always INSERT for a new listing. UPDATE only when `updatePendingId` is set (same row, status=pending).
+    // Always INSERT a new pending_businesses row (multiple listings per owner). No upsert / in-place update here.
     if (action === 'submit_business') {
       const userId = authUser.id;
 
@@ -413,10 +413,6 @@ Deno.serve(async (req) => {
         business_id: linkedBusinessId,
       };
 
-      const updatePendingRaw = body.updatePendingId ?? body.update_pending_id ?? null;
-      const updatePendingId =
-        updatePendingRaw != null && String(updatePendingRaw).trim() ? String(updatePendingRaw).trim() : null;
-
       const attachPhotosForPending = async (pendingRowId: string) => {
         const photos = body.photos || [];
         await supabase.from('business_photos').delete().eq('business_id', pendingRowId);
@@ -432,65 +428,6 @@ Deno.serve(async (req) => {
         const { error: photosErr } = await supabase.from('business_photos').insert(photoRecords);
         return photosErr;
       };
-
-      if (updatePendingId) {
-        const { data: existing, error: exErr } = await supabase
-          .from('pending_businesses')
-          .select('id, owner_id, status')
-          .eq('id', updatePendingId)
-          .maybeSingle();
-
-        if (exErr || !existing) {
-          return errorResponse(req, 'Submission not found', 404, { reason: 'update_pending_not_found' });
-        }
-        if (String(existing.owner_id) !== String(userId)) {
-          return errorResponse(req, 'Access denied', 403, { reason: 'update_pending_owner' });
-        }
-        if (existing.status !== 'pending') {
-          return errorResponse(
-            req,
-            'Only pending submissions can be updated in place. Use resubmit for rejected listings.',
-            400,
-            { reason: 'update_pending_status' },
-          );
-        }
-
-        const { data: pending, error } = await supabase
-          .from('pending_businesses')
-          .update(recordFields)
-          .eq('id', updatePendingId)
-          .select()
-          .single();
-
-        if (error) {
-          console.error('[manage-business] submit_business update error:', {
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          });
-          return errorResponse(req, error.message || 'Failed to update submission', 500, {
-            reason: 'pending_businesses_update',
-            code: error.code ?? null,
-          });
-        }
-
-        const photosErr = await attachPhotosForPending(updatePendingId);
-        if (photosErr) {
-          console.error('[manage-business] submit_business update business_photos:', photosErr);
-          return errorResponse(
-            req,
-            'Submission updated but photo rows failed: ' + photosErr.message,
-            500,
-            { reason: 'business_photos_insert', pendingId: updatePendingId },
-          );
-        }
-
-        return jsonResponse(req, {
-          success: true,
-          business: { id: pending!.id, ...pending },
-        });
-      }
 
       const record = {
         owner_id: userId,
