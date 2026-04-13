@@ -46,6 +46,9 @@ Use this file to sync with work already done in the repo. Paths are relative to 
 - Constants: **`RPC_INSERT_PENDING_TIMEOUT_MS = 90_000`**, **`EDGE_AUTH_HEADER_MS = 20_000`**, **`EDGE_INVOKE_TIMEOUT_MS = 120_000`** — exported from **`src/lib/edgeInvoke.ts`** (single source of truth).
 - RPC: **`AbortController`** + **`.abortSignal(controller.signal)`** on the RPC builder; catch abort and surface a clear timeout message; then existing Edge fallback still applies. **Both** the standalone listing form and the in-dashboard submit path use this.
 - **`invokeEdgeFunctionWithRetry`** (same module): race **`getEdgeAuthHeaders()`** with **`EDGE_AUTH_HEADER_MS`**; use **`AbortController`** + **`signal`** on **`supabase.functions.invoke`**. **`BusinessListingForm`** and **`BusinessOwnerDashboard`** import this helper so behavior cannot drift.
+- **Abort-like invoke errors** (`AbortError` / **`FunctionsFetchError.context`**) **do not retry** — avoids multi-minute “Submitting…” when each attempt hits the invoke timeout.
+- **`getEdgeAuthHeaders()`** in **`src/lib/supabase.ts`**: **`getSession()`** is raced with **~12s** so a stuck GoTrue client cannot block edge calls indefinitely (must stay under auth **`lockAcquireTimeout`**).
+- **Hard submit deadline (~4 min)** on listing submit (**`BusinessListingForm`**, dashboard submit): **`Promise.race`** so **`setSubmitting(false)`** / **`setLoading(false)`** always run even if some inner promise never settles.
 
 ---
 

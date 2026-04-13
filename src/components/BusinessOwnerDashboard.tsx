@@ -42,6 +42,8 @@ import {
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
 
+const DASHBOARD_LISTING_SUBMIT_DEADLINE_MS = 240_000;
+
 interface ReviewResponse {
   id: string;
   review_id: string;
@@ -931,7 +933,13 @@ const BusinessOwnerDashboard: React.FC = () => {
     }
 
     setLoading(true);
+    const submitDeadlineMsg =
+      language === 'en'
+        ? 'Submit timed out. Check your connection, sign out and back in, then try again.'
+        : 'Délai de soumission dépassé. Vérifiez la connexion ou reconnectez-vous.';
     try {
+      await Promise.race([
+        (async () => {
       const normalizedWebsite = normalizeWebsiteForStorage(submitForm.website) ?? null;
       const mainImageUrl = submitPhotos.length > 0 ? submitPhotos[0].url : submitForm.image;
 
@@ -1141,6 +1149,11 @@ const BusinessOwnerDashboard: React.FC = () => {
       throw new Error(
         rpcError?.message || data?.error || error?.message || 'Failed to submit business. Please ensure the database migration has been applied.'
       );
+        })(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(submitDeadlineMsg)), DASHBOARD_LISTING_SUBMIT_DEADLINE_MS),
+        ),
+      ]);
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit business');
     } finally {

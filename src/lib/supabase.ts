@@ -83,13 +83,26 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
   },
 });
 
+/** Cap so a stuck GoTrue / auth lock cannot block edge invokes forever (must be < lockAcquireTimeout). */
+const GET_SESSION_FOR_EDGE_MS = 12_000;
+
 export async function getEdgeAuthHeaders(): Promise<Record<string, string>> {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) {
-    console.warn('[getEdgeAuthHeaders] getSession error:', error.message);
+  try {
+    const { data, error } = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('getSession timed out')), GET_SESSION_FOR_EDGE_MS),
+      ),
+    ]);
+    if (error) {
+      console.warn('[getEdgeAuthHeaders] getSession error:', error.message);
+    }
+    const token = data?.session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch (e: unknown) {
+    console.warn('[getEdgeAuthHeaders] session read failed:', e);
+    return {};
   }
-  const token = data?.session?.access_token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 

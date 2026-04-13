@@ -1,5 +1,17 @@
 import { supabase, getEdgeAuthHeaders } from '@/lib/supabase';
 
+/** True when invoke failed due to AbortSignal (do not burn retries on user/network timeout). */
+export function isAbortLikeInvokeError(err: unknown): boolean {
+  if (err == null || typeof err !== 'object') return false;
+  const o = err as Record<string, unknown>;
+  if (o.name === 'AbortError') return true;
+  const ctx = o.context;
+  if (ctx != null && typeof ctx === 'object' && (ctx as Record<string, unknown>).name === 'AbortError') {
+    return true;
+  }
+  return false;
+}
+
 /** Cold starts / large payloads — bounded wait on functions.invoke (fetch respects signal) */
 export const EDGE_INVOKE_TIMEOUT_MS = 120_000;
 /** Avoid indefinite wait if auth lock / session read stalls */
@@ -76,6 +88,9 @@ export async function invokeEdgeFunctionWithRetry(
         lastError = result.error;
         lastData = result.data ?? lastData;
         console.warn(`${logPrefix} ${label} Edge function error:`, result.error.message || result.error);
+        if (isAbortLikeInvokeError(result.error)) {
+          return { data: lastData, error: lastError };
+        }
         continue;
       }
       if (result.data?.error) {
@@ -88,6 +103,9 @@ export async function invokeEdgeFunctionWithRetry(
     } catch (err: any) {
       lastError = err;
       console.warn(`${logPrefix} ${label} attempt ${attempt} threw:`, err?.message);
+      if (isAbortLikeInvokeError(err)) {
+        return { data: lastData, error: lastError };
+      }
     }
   }
   return { data: lastData, error: lastError };

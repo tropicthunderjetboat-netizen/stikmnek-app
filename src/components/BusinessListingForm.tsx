@@ -26,6 +26,9 @@ import {
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 
+/** Hard cap so the UI never stays on "Submitting..." if a promise never settles */
+const LISTING_SUBMIT_DEADLINE_MS = 240_000;
+
 const DURATION_OPTIONS = [
   { value: '1_day', label: '1 Day', labelFr: '1 Jour', days: 1 },
 
@@ -339,8 +342,14 @@ const BusinessListingForm: React.FC = () => {
 
     setSubmitting(true);
 
-    try {
+    const submitTimedOutMsg =
+      language === 'en'
+        ? 'Submit timed out. Check your connection, sign out and back in, then try again.'
+        : 'Délai de soumission dépassé. Vérifiez la connexion ou reconnectez-vous.';
 
+    try {
+      await Promise.race([
+        (async () => {
       // Prepare photo data to send to edge function (server-side insert bypasses RLS)
       const photoData = photos.map((photo, index) => ({
         url: photo.url,
@@ -511,6 +520,11 @@ const BusinessListingForm: React.FC = () => {
           ? 'Failed to submit listing. Please ensure the database migration has been applied.'
           : 'Échec de la soumission. Veuillez appliquer la migration de base de données.')
       );
+        })(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(submitTimedOutMsg)), LISTING_SUBMIT_DEADLINE_MS),
+        ),
+      ]);
     } catch (err: any) {
       console.error('[BusinessForm] Submit business FINAL error:', err);
       toast.error(
