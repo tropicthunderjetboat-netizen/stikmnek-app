@@ -542,7 +542,7 @@ Deno.serve(async (req) => {
 
       const { data: row, error: fetchErr } = await supabase
         .from('pending_businesses')
-        .select('id, owner_id, status')
+        .select('id, owner_id, status, business_id, name')
         .eq('id', pendingId)
         .maybeSingle();
 
@@ -553,6 +553,30 @@ Deno.serve(async (req) => {
         return errorResponse(req, 'Access denied', 403);
       }
       // Owner may remove any pending_businesses row (including status=approved) to clear stuck dashboard rows.
+
+      // Hide live deal: offerings use `title` (same as pending `name` on approve — see review_pending RPC).
+      const linkedBusinessId = row.business_id != null ? String(row.business_id).trim() : '';
+      if (linkedBusinessId) {
+        const titleMatch = String(row.name ?? '').trim() || 'Main offer';
+        const { error: deactivateErr } = await supabase
+          .from('business_offerings')
+          .update({ active: false, updated_at: new Date().toISOString() })
+          .eq('business_id', linkedBusinessId)
+          .eq('title', titleMatch);
+
+        if (deactivateErr) {
+          console.error(
+            '[manage-business] withdraw_pending_submission: deactivate business_offerings failed:',
+            deactivateErr,
+          );
+          return errorResponse(
+            req,
+            deactivateErr.message || 'Could not remove listing from public deals',
+            500,
+            { reason: 'deactivate_offering_failed' },
+          );
+        }
+      }
 
       await supabase.from('business_photos').delete().eq('business_id', String(pendingId));
       const { error: delErr } = await supabase
