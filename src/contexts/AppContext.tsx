@@ -31,13 +31,6 @@ function normalizeEmbeddedOfferings(raw: unknown): Record<string, unknown>[] {
 // ═══════════════════════════════════════════════════════════════
 const ADMIN_EMAILS = ['admin@stikmnek.com', 'testadmin@example.com', 'stikmnek@gmail.com'];
 
-/** Reject empty/non-UUID before `.eq('user_id', …)` — PostgREST returns 400 for invalid uuid filters. */
-function isAuthUserIdUuid(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
-  const s = value.trim();
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-}
-
 /** Active pass on the user; null if none. Canonical product id (not legacy DB strings). */
 export type PassType = PassProductId | null;
 
@@ -633,15 +626,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // ═══════════════════════════════════════════════════════════
-  // ROLE RESOLUTION — Fail-fast, single source of truth
+  // ROLE RESOLUTION — single source of truth
   // Priority: 1) Admin email  2) DB profile  3) Previously resolved
-  //           4) Auth metadata  5) Default tourist (never hang)
-  // DB fetch has 3s timeout. Admin DB update runs in background.
+  //           4) Auth metadata  5) Default tourist
   // ═══════════════════════════════════════════════════════════
-  /** Slightly generous for slow networks; pairs with handleAuthenticatedUser outer race. */
-  const ROLE_RESOLVE_TIMEOUT_MS = 8000;
-  /** Slim select for role resolution only (avoids wide rows + PostgREST overhead). */
-  const USER_PROFILE_ROLE_COLUMNS = 'id,user_id,email,role,user_type,name,avatar_url';
 
   const resolveRole = useCallback(
     async (
@@ -667,26 +655,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         let profile: UserProfile | null = null;
         let dbQuerySucceeded = false;
         try {
-          if (!isAuthUserIdUuid(userId)) {
-            console.warn('[resolveRole] skip user_profiles query: invalid or empty userId', {
-              typeofUserId: typeof userId,
-              length: typeof userId === 'string' ? userId.length : null,
-            });
-          } else {
-            const approxRestUrl =
-              `${ENDPOINTS.rest}/user_profiles?select=${encodeURIComponent(USER_PROFILE_ROLE_COLUMNS)}&user_id=eq.${encodeURIComponent(userId)}`;
+          if (userId) {
+            const approxRestUrl = `${ENDPOINTS.rest}/user_profiles?select=*&user_id=eq.${encodeURIComponent(userId)}`;
             const startedAt = Date.now();
-            const fetchPromise = supabase
+            const { data, error } = await supabase
               .from('user_profiles')
-              .select(USER_PROFILE_ROLE_COLUMNS)
+              .select('*')
               .eq('user_id', userId)
               .maybeSingle();
-
-            const timeoutPromise = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('resolveRole: DB query timeout')), ROLE_RESOLVE_TIMEOUT_MS),
-            );
-
-            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
             const elapsedMs = Date.now() - startedAt;
 
             if (error) {
@@ -700,7 +676,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               };
               const errorPayload = {
                 userId,
-                profileSelect: USER_PROFILE_ROLE_COLUMNS,
+                profileSelect: '*',
                 approxGetUrl: approxRestUrl,
                 elapsedMs,
                 message: err.message ?? null,
@@ -724,7 +700,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           }
         } catch (err) {
-          console.warn('[resolveRole] Exception or timeout:', (err as Error)?.message);
+          console.warn('[resolveRole] Exception:', (err as Error)?.message);
         }
 
         let finalRole: 'tourist' | 'business' | 'admin';
@@ -870,37 +846,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      // Fail-fast: resolveRole has internal timeout; wrap in extra safety.
-      // Retry a few times — navigator auth lock / slow PostgREST often recovers within ~1s.
       let role: 'tourist' | 'business' | 'admin';
       let profile: UserProfile | null;
       let profileRowFetchOk = false;
-      for (let attempt = 0; attempt < 3; attempt++) {
-        if (attempt > 0) {
-          await new Promise((r) => setTimeout(r, 450 * attempt));
-        }
-        try {
-          const result = await Promise.race([
-            resolveRole(authUser.id, authUser.email || '', authUser.user_metadata),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error('handleAuthenticatedUser: resolveRole timeout')), 12_000)
-            ),
-          ]);
-          role = result.role;
-          profile = result.profile;
-          profileRowFetchOk = result.profileRowFetchOk;
-          break;
-        } catch (resolveErr) {
-          console.warn(
-            `[handleAuthenticatedUser] resolveRole attempt ${attempt + 1}/3:`,
-            (resolveErr as Error)?.message,
-          );
-          if (attempt === 2) {
-            role = ADMIN_EMAILS.includes((authUser.email || '').toLowerCase()) ? 'admin' : 'tourist';
-            profile = null;
-            profileRowFetchOk = false;
-          }
-        }
+      try {
+        const result = await resolveRole(authUser.id, authUser.email || '', authUser.user_metadata);
+        role = result.role;
+        profile = result.profile;
+        profileRowFetchOk = result.profileRowFetchOk;
+      } catch (resolveErr) {
+        console.warn('[handleAuthenticatedUser] resolveRole failed:', (resolveErr as Error)?.message);
+        role = ADMIN_EMAILS.includes((authUser.email || '').toLowerCase()) ? 'admin' : 'tourist';
+        profile = null;
+        profileRowFetchOk = false;
       }
 
       // ─── FALLBACK: If no profile found, create one (with timeout, don't block) ───
@@ -1136,16 +1094,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }, 1500);
 
-    // SAFETY NET: Force authLoading off if role/profile work stalls (rare slow DB)
+    // SAFETY NET: last resort if auth never settles (should be rare after profile load completes)
     const safetyTimer = setTimeout(() => {
       setAuthLoading(prev => {
         if (prev) {
-          console.warn('[Safety] authLoading still true after 12s — forcing false');
+          console.warn('[Safety] authLoading still true after 60s — forcing false');
           return false;
         }
         return prev;
       });
-    }, 12_000);
+    }, 60_000);
 
     return () => {
       subscription.unsubscribe();

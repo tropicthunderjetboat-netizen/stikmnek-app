@@ -87,101 +87,13 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
 export const SESSION_TIMEOUT_MESSAGE =
   'Session retrieval timed out. Please refresh the page or sign in again.';
 
-/** Max wait per auth SDK call — avoids authSessionLock / refresh blocking Edge invokes for long periods. */
-const EDGE_AUTH_PER_OP_MS = 3_000;
-
-const AUTH_STORAGE_KEY = 'stikmnek-auth';
-
-function supabaseProjectRefFromUrl(url: string): string {
-  try {
-    const host = new URL(url).hostname;
-    return host.split('.')[0] || 'hbaflbmfptobyfqbudrt';
-  } catch {
-    return 'hbaflbmfptobyfqbudrt';
-  }
-}
-
-/** Default GoTrue storage key when `storageKey` is not customized. */
-function defaultSbAuthStorageKey(): string {
-  return `sb-${supabaseProjectRefFromUrl(supabaseUrl)}-auth-token`;
-}
-
-function raceWithTimeout<T>(promise: Promise<T>, ms: number): Promise<T | '__timeout__'> {
-  return Promise.race([
-    promise.then((v) => v as T),
-    new Promise<'__timeout__'>((resolve) => setTimeout(() => resolve('__timeout__'), ms)),
-  ]);
-}
-
-function parseAccessTokenFromStoredSessionJson(raw: string | null): string | null {
-  if (raw == null || raw === '') return null;
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const direct = parsed.access_token;
-    if (typeof direct === 'string' && direct.length > 30) return direct;
-    const nested = parsed.session as Record<string, unknown> | undefined;
-    const nestedAt = nested?.access_token;
-    if (typeof nestedAt === 'string' && nestedAt.length > 30) return nestedAt;
-  } catch {
-    /* ignore */
-  }
-  return null;
-}
-
-/**
- * Last-resort JWT when getSession/getUser are slow or contended (same keys GoTrue uses).
- */
-function readPersistedAccessTokenFromStorage(): string | null {
-  if (typeof window === 'undefined' || !window.localStorage) return null;
-  for (const key of [AUTH_STORAGE_KEY, defaultSbAuthStorageKey()]) {
-    const token = parseAccessTokenFromStoredSessionJson(window.localStorage.getItem(key));
-    if (token) return token;
-  }
-  return null;
-}
-
 /**
  * Returns `{ Authorization: Bearer <jwt> }` when a session exists, or `{}` when signed out.
- * Does not throw: each SDK step is capped at 3s, then reads persisted session from localStorage if needed.
  */
 export async function getEdgeAuthHeaders(): Promise<Record<string, string>> {
-  const trySessionToken = async (): Promise<string | null> => {
-    const raced = await raceWithTimeout(supabase.auth.getSession(), EDGE_AUTH_PER_OP_MS);
-    if (raced === '__timeout__') {
-      console.warn('[getEdgeAuthHeaders] getSession exceeded', EDGE_AUTH_PER_OP_MS, 'ms — trying next step');
-      return null;
-    }
-    const { data, error } = raced;
-    if (error) {
-      console.warn('[getEdgeAuthHeaders] getSession error:', error.message);
-    }
-    return data?.session?.access_token ?? null;
-  };
-
-  let token = await trySessionToken();
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
   if (token) return { Authorization: `Bearer ${token}` };
-
-  const racedUser = await raceWithTimeout(supabase.auth.getUser(), EDGE_AUTH_PER_OP_MS);
-  if (racedUser === '__timeout__') {
-    console.warn('[getEdgeAuthHeaders] getUser exceeded', EDGE_AUTH_PER_OP_MS, 'ms — retrying session / storage');
-  } else {
-    const { error: userErr } = racedUser;
-    if (userErr) {
-      console.warn('[getEdgeAuthHeaders] getUser error:', userErr.message);
-    }
-  }
-
-  token = await trySessionToken();
-  if (token) return { Authorization: `Bearer ${token}` };
-
-  const fromStorage = readPersistedAccessTokenFromStorage();
-  if (fromStorage) {
-    console.warn(
-      '[getEdgeAuthHeaders] using persisted access_token from localStorage (SDK path slow or empty)',
-    );
-    return { Authorization: `Bearer ${fromStorage}` };
-  }
-
   return {};
 }
 

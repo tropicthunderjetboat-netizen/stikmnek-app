@@ -179,9 +179,9 @@ const AuthModal: React.FC = () => {
         <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-3">
           {opts.icon}
         </div>
-        <DialogTitle id={ids.title} className="text-2xl font-bold text-white">
+        <h2 id={ids.title} className="text-2xl font-bold text-white">
           {opts.title}
-        </DialogTitle>
+        </h2>
         <p className="text-white/70 text-sm mt-1">{opts.subtitle}</p>
       </div>
     );
@@ -513,6 +513,13 @@ const AuthModal: React.FC = () => {
         aria-labelledby={ids.title}
         className="p-0 overflow-hidden max-h-[95vh] overflow-y-auto w-[calc(100vw-2rem)] sm:w-full"
       >
+        <DialogTitle className="sr-only">
+          {language === 'en'
+            ? 'Sign in or create a StikmNek account'
+            : language === 'fr'
+              ? 'Connexion ou création de compte StikmNek'
+              : 'Saen in o mekem akaont StikmNek'}
+        </DialogTitle>
         {isChooseType
           ? renderChooseType()
           : authMode === 'signin' && (forgotPasswordMode || forgotPasswordSent)
