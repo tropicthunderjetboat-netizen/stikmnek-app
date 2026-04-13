@@ -83,38 +83,74 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
   },
 });
 
-/**
- * Total wall-clock budget for edge auth headers. If exceeded → clear error (UI can prompt refresh).
- * Uses getSession first; if no token, getUser() may refresh the in-memory session, then getSession again.
- */
-const EDGE_AUTH_SESSION_TOTAL_MS = 10_000;
-
-const SESSION_TIMEOUT_MESSAGE =
+/** Used by edgeInvoke / PhotoUploader for retry behavior when auth truly stalls. */
+export const SESSION_TIMEOUT_MESSAGE =
   'Session retrieval timed out. Please refresh the page or sign in again.';
 
-function throwSessionTimeout(): never {
-  throw new Error(SESSION_TIMEOUT_MESSAGE);
+/** Max wait per auth SDK call — avoids authSessionLock / refresh blocking Edge invokes for long periods. */
+const EDGE_AUTH_PER_OP_MS = 3_000;
+
+const AUTH_STORAGE_KEY = 'stikmnek-auth';
+
+function supabaseProjectRefFromUrl(url: string): string {
+  try {
+    const host = new URL(url).hostname;
+    return host.split('.')[0] || 'hbaflbmfptobyfqbudrt';
+  } catch {
+    return 'hbaflbmfptobyfqbudrt';
+  }
 }
 
-function raceByDeadline<T>(promise: Promise<T>, deadlineAt: number): Promise<T | '__deadline__'> {
-  const ms = deadlineAt - Date.now();
-  if (ms <= 0) return Promise.resolve('__deadline__' as const);
+/** Default GoTrue storage key when `storageKey` is not customized. */
+function defaultSbAuthStorageKey(): string {
+  return `sb-${supabaseProjectRefFromUrl(supabaseUrl)}-auth-token`;
+}
+
+function raceWithTimeout<T>(promise: Promise<T>, ms: number): Promise<T | '__timeout__'> {
   return Promise.race([
     promise.then((v) => v as T),
-    new Promise<'__deadline__'>((resolve) => setTimeout(() => resolve('__deadline__'), ms)),
+    new Promise<'__timeout__'>((resolve) => setTimeout(() => resolve('__timeout__'), ms)),
   ]);
 }
 
+function parseAccessTokenFromStoredSessionJson(raw: string | null): string | null {
+  if (raw == null || raw === '') return null;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const direct = parsed.access_token;
+    if (typeof direct === 'string' && direct.length > 30) return direct;
+    const nested = parsed.session as Record<string, unknown> | undefined;
+    const nestedAt = nested?.access_token;
+    if (typeof nestedAt === 'string' && nestedAt.length > 30) return nestedAt;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
 /**
- * Returns `{ Authorization: Bearer <jwt> }` when a session exists, or `{}` when signed out (quick, in-budget).
- * Throws with `SESSION_TIMEOUT_MESSAGE` if the auth client/lock blocks until the budget is exhausted.
+ * Last-resort JWT when getSession/getUser are slow or contended (same keys GoTrue uses).
+ */
+function readPersistedAccessTokenFromStorage(): string | null {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  for (const key of [AUTH_STORAGE_KEY, defaultSbAuthStorageKey()]) {
+    const token = parseAccessTokenFromStoredSessionJson(window.localStorage.getItem(key));
+    if (token) return token;
+  }
+  return null;
+}
+
+/**
+ * Returns `{ Authorization: Bearer <jwt> }` when a session exists, or `{}` when signed out.
+ * Does not throw: each SDK step is capped at 3s, then reads persisted session from localStorage if needed.
  */
 export async function getEdgeAuthHeaders(): Promise<Record<string, string>> {
-  const deadlineAt = Date.now() + EDGE_AUTH_SESSION_TOTAL_MS;
-
-  const tryGetSessionToken = async (): Promise<string | null | '__deadline__'> => {
-    const raced = await raceByDeadline(supabase.auth.getSession(), deadlineAt);
-    if (raced === '__deadline__') return '__deadline__';
+  const trySessionToken = async (): Promise<string | null> => {
+    const raced = await raceWithTimeout(supabase.auth.getSession(), EDGE_AUTH_PER_OP_MS);
+    if (raced === '__timeout__') {
+      console.warn('[getEdgeAuthHeaders] getSession exceeded', EDGE_AUTH_PER_OP_MS, 'ms — trying next step');
+      return null;
+    }
     const { data, error } = raced;
     if (error) {
       console.warn('[getEdgeAuthHeaders] getSession error:', error.message);
@@ -122,22 +158,29 @@ export async function getEdgeAuthHeaders(): Promise<Record<string, string>> {
     return data?.session?.access_token ?? null;
   };
 
-  let token = await tryGetSessionToken();
-  if (token === '__deadline__') throwSessionTimeout();
+  let token = await trySessionToken();
   if (token) return { Authorization: `Bearer ${token}` };
 
-  const racedUser = await raceByDeadline(supabase.auth.getUser(), deadlineAt);
-  if (racedUser === '__deadline__') throwSessionTimeout();
-  const { data: userData, error: userErr } = racedUser;
-  if (userErr) {
-    console.warn('[getEdgeAuthHeaders] getUser error:', userErr.message);
-  } else if (userData?.user) {
-    console.warn('[getEdgeAuthHeaders] getSession had no token; getUser ok — retrying getSession');
+  const racedUser = await raceWithTimeout(supabase.auth.getUser(), EDGE_AUTH_PER_OP_MS);
+  if (racedUser === '__timeout__') {
+    console.warn('[getEdgeAuthHeaders] getUser exceeded', EDGE_AUTH_PER_OP_MS, 'ms — retrying session / storage');
+  } else {
+    const { error: userErr } = racedUser;
+    if (userErr) {
+      console.warn('[getEdgeAuthHeaders] getUser error:', userErr.message);
+    }
   }
 
-  token = await tryGetSessionToken();
-  if (token === '__deadline__') throwSessionTimeout();
+  token = await trySessionToken();
   if (token) return { Authorization: `Bearer ${token}` };
+
+  const fromStorage = readPersistedAccessTokenFromStorage();
+  if (fromStorage) {
+    console.warn(
+      '[getEdgeAuthHeaders] using persisted access_token from localStorage (SDK path slow or empty)',
+    );
+    return { Authorization: `Bearer ${fromStorage}` };
+  }
 
   return {};
 }

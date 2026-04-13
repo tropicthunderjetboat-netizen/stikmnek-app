@@ -336,6 +336,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ═══ ROLE PERSISTENCE GUARDS ═══
   const lastDbResolvedRoleRef = useRef<'tourist' | 'business' | 'admin' | null>(null);
+  /** Same userId: reuse one in-flight resolve to avoid stacked getSession + profile selects. */
+  const resolveRoleInflightRef = useRef(
+    new Map<
+      string,
+      Promise<{
+        role: 'tourist' | 'business' | 'admin';
+        profile: UserProfile | null;
+        fromDb: boolean;
+        profileRowFetchOk: boolean;
+      }>
+    >(),
+  );
   const signInCooldownRef = useRef<number>(0);
   const authProcessingRef = useRef<boolean>(false);
   /** Delays the red profile banner so transient timeouts / double auth events do not flash a false error. */
@@ -628,143 +640,156 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   /** Slightly generous for slow networks; pairs with handleAuthenticatedUser outer race. */
   const ROLE_RESOLVE_TIMEOUT_MS = 8000;
+  /** Slim select for role resolution only (avoids wide rows + PostgREST overhead). */
+  const USER_PROFILE_ROLE_COLUMNS = 'id,user_id,email,role,user_type,name,avatar_url';
 
-  const resolveRole = useCallback(async (
-    userId: string,
-    email: string,
-    metadata?: Record<string, any>
-  ): Promise<{
-    role: 'tourist' | 'business' | 'admin';
-    profile: UserProfile | null;
-    fromDb: boolean;
-    /** False if the user_profiles query errored, timed out, or threw — profile may be unknown. */
-    profileRowFetchOk: boolean;
-  }> => {
-    // Step 1: Admin email check (synchronous, never blocks)
-    const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+  const resolveRole = useCallback(
+    async (
+      userId: string,
+      email: string,
+      metadata?: Record<string, any>,
+    ): Promise<{
+      role: 'tourist' | 'business' | 'admin';
+      profile: UserProfile | null;
+      fromDb: boolean;
+      profileRowFetchOk: boolean;
+    }> => {
+      const inflightKey = userId || '__no_user__';
+      const existing = resolveRoleInflightRef.current.get(inflightKey);
+      if (existing) {
+        console.log('[resolveRole] dedupe: sharing inflight promise', { userId: inflightKey });
+        return existing;
+      }
 
-    // Step 2: Fetch profile with timeout — fail-fast
-    let profile: UserProfile | null = null;
-    let dbQuerySucceeded = false;
-    try {
-      if (!isAuthUserIdUuid(userId)) {
-        console.warn('[resolveRole] skip user_profiles query: invalid or empty userId', {
-          typeofUserId: typeof userId,
-          length: typeof userId === 'string' ? userId.length : null,
-        });
-      } else {
-        // Ensure JWT is on the client before RLS-protected reads (avoids anon/no-row races after refresh).
-        await supabase.auth.getSession();
-        // Use * so older DBs without newer columns never get PostgREST 400 from a long fixed column list.
-        const approxRestUrl =
-          `${ENDPOINTS.rest}/user_profiles?select=*&user_id=eq.${encodeURIComponent(userId)}`;
-        const startedAt = Date.now();
-        const fetchPromise = supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle();
+      const promise = (async () => {
+        const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
 
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('resolveRole: DB query timeout')), ROLE_RESOLVE_TIMEOUT_MS)
-        );
+        let profile: UserProfile | null = null;
+        let dbQuerySucceeded = false;
+        try {
+          if (!isAuthUserIdUuid(userId)) {
+            console.warn('[resolveRole] skip user_profiles query: invalid or empty userId', {
+              typeofUserId: typeof userId,
+              length: typeof userId === 'string' ? userId.length : null,
+            });
+          } else {
+            const approxRestUrl =
+              `${ENDPOINTS.rest}/user_profiles?select=${encodeURIComponent(USER_PROFILE_ROLE_COLUMNS)}&user_id=eq.${encodeURIComponent(userId)}`;
+            const startedAt = Date.now();
+            const fetchPromise = supabase
+              .from('user_profiles')
+              .select(USER_PROFILE_ROLE_COLUMNS)
+              .eq('user_id', userId)
+              .maybeSingle();
 
-        const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-        const elapsedMs = Date.now() - startedAt;
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('resolveRole: DB query timeout')), ROLE_RESOLVE_TIMEOUT_MS),
+            );
 
-        if (error) {
-          const err = error as {
-            message?: string;
-            code?: string;
-            details?: string;
-            hint?: string;
-            status?: number;
-            statusCode?: number;
-          };
-          const errorPayload = {
-            userId,
-            profileSelect: '*',
-            approxGetUrl: approxRestUrl,
-            elapsedMs,
-            message: err.message ?? null,
-            code: err.code ?? null,
-            details: err.details ?? null,
-            hint: err.hint ?? null,
-            httpStatus: err.status ?? err.statusCode ?? null,
-          };
-          console.error('[resolveRole] user_profiles query failed:', errorPayload);
-        } else if (data) {
-          profile = data as UserProfile;
-          dbQuerySucceeded = true;
-          if (elapsedMs > 2500) {
-            console.warn('[resolveRole] Slow profile fetch:', { elapsedMs });
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+            const elapsedMs = Date.now() - startedAt;
+
+            if (error) {
+              const err = error as {
+                message?: string;
+                code?: string;
+                details?: string;
+                hint?: string;
+                status?: number;
+                statusCode?: number;
+              };
+              const errorPayload = {
+                userId,
+                profileSelect: USER_PROFILE_ROLE_COLUMNS,
+                approxGetUrl: approxRestUrl,
+                elapsedMs,
+                message: err.message ?? null,
+                code: err.code ?? null,
+                details: err.details ?? null,
+                hint: err.hint ?? null,
+                httpStatus: err.status ?? err.statusCode ?? null,
+              };
+              console.error('[resolveRole] user_profiles query failed:', errorPayload);
+            } else if (data) {
+              profile = data as UserProfile;
+              dbQuerySucceeded = true;
+              if (elapsedMs > 2500) {
+                console.warn('[resolveRole] Slow profile fetch:', { elapsedMs });
+              }
+            } else {
+              dbQuerySucceeded = true;
+              if (elapsedMs > 2500) {
+                console.warn('[resolveRole] Slow profile fetch (no row):', { elapsedMs });
+              }
+            }
           }
-        } else {
-          dbQuerySucceeded = true;
-          if (elapsedMs > 2500) {
-            console.warn('[resolveRole] Slow profile fetch (no row):', { elapsedMs });
-          }
+        } catch (err) {
+          console.warn('[resolveRole] Exception or timeout:', (err as Error)?.message);
         }
-      }
-    } catch (err) {
-      console.warn('[resolveRole] Exception or timeout:', (err as Error)?.message);
-    }
 
-    // Step 3: Determine final role — never block, always resolve
-    let finalRole: 'tourist' | 'business' | 'admin';
-    let resolvedFromDb = false;
+        let finalRole: 'tourist' | 'business' | 'admin';
+        let resolvedFromDb = false;
 
-    if (isAdmin) {
-      finalRole = 'admin';
-      resolvedFromDb = true;
-      // Defer admin DB update to background — don't block auth flow
-      if (profile && extractRole(profile) !== 'admin') {
-        supabase
-          .from('user_profiles')
-          .update({ role: 'admin', user_type: 'admin', updated_at: new Date().toISOString() })
-          .eq('user_id', userId)
-          .then(() => {})
-          .catch((e) => console.warn('[resolveRole] Admin update failed:', e?.message));
-        profile = { ...profile, role: 'admin', user_type: 'admin' };
-      }
-    } else if (profile) {
-      let dbRole = extractRole(profile);
-      const metaType = metadata?.user_type;
-      // Sign-up race: SIGNED_IN can run before directProfileInsert() flips user_type to business.
-      if (metaType === 'business' && dbRole === 'tourist') {
-        dbRole = 'business';
-        profile = { ...profile, role: 'business', user_type: 'business' };
-        supabase
-          .from('user_profiles')
-          .update({
-            user_type: 'business',
-            role: 'business',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('user_id', userId)
-          .then(() => {})
-          .catch((e) => console.warn('[resolveRole] Business role sync failed:', e?.message));
-      }
-      finalRole = dbRole;
-      resolvedFromDb = true;
-    } else if (!dbQuerySucceeded && lastDbResolvedRoleRef.current) {
-      finalRole = lastDbResolvedRoleRef.current;
-    } else if (metadata?.user_type && ['tourist', 'business', 'admin'].includes(metadata.user_type)) {
-      finalRole = metadata.user_type as 'tourist' | 'business' | 'admin';
-    } else {
-      finalRole = 'tourist';
-    }
+        if (isAdmin) {
+          finalRole = 'admin';
+          resolvedFromDb = true;
+          if (profile && extractRole(profile) !== 'admin') {
+            supabase
+              .from('user_profiles')
+              .update({ role: 'admin', user_type: 'admin', updated_at: new Date().toISOString() })
+              .eq('user_id', userId)
+              .then(() => {})
+              .catch((e) => console.warn('[resolveRole] Admin update failed:', e?.message));
+            profile = { ...profile, role: 'admin', user_type: 'admin' };
+          }
+        } else if (profile) {
+          let dbRole = extractRole(profile);
+          const metaType = metadata?.user_type;
+          if (metaType === 'business' && dbRole === 'tourist') {
+            dbRole = 'business';
+            profile = { ...profile, role: 'business', user_type: 'business' };
+            supabase
+              .from('user_profiles')
+              .update({
+                user_type: 'business',
+                role: 'business',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('user_id', userId)
+              .then(() => {})
+              .catch((e) => console.warn('[resolveRole] Business role sync failed:', e?.message));
+          }
+          finalRole = dbRole;
+          resolvedFromDb = true;
+        } else if (!dbQuerySucceeded && lastDbResolvedRoleRef.current) {
+          finalRole = lastDbResolvedRoleRef.current;
+        } else if (metadata?.user_type && ['tourist', 'business', 'admin'].includes(metadata.user_type)) {
+          finalRole = metadata.user_type as 'tourist' | 'business' | 'admin';
+        } else {
+          finalRole = 'tourist';
+        }
 
-    if (resolvedFromDb) {
-      lastDbResolvedRoleRef.current = finalRole;
-    }
+        if (resolvedFromDb) {
+          lastDbResolvedRoleRef.current = finalRole;
+        }
 
-    if (profile) {
-      setUserProfile(profile);
-    }
+        if (profile) {
+          setUserProfile(profile);
+        }
 
-    return { role: finalRole, profile, fromDb: resolvedFromDb, profileRowFetchOk: dbQuerySucceeded };
-  }, []);
+        return { role: finalRole, profile, fromDb: resolvedFromDb, profileRowFetchOk: dbQuerySucceeded };
+      })();
+
+      resolveRoleInflightRef.current.set(inflightKey, promise);
+      promise.finally(() => {
+        if (resolveRoleInflightRef.current.get(inflightKey) === promise) {
+          resolveRoleInflightRef.current.delete(inflightKey);
+        }
+      });
+      return promise;
+    },
+    [],
+  );
 
 
   // ═══════════════════════════════════════════════════════════
