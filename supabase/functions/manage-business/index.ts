@@ -305,6 +305,7 @@ async function sendInitialListingLiveEmail(params: {
 }
 
 Deno.serve(async (req) => {
+  console.log('Manage Business Triggered:', req.method);
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: getSafeCorsHeaders(req) });
   }
