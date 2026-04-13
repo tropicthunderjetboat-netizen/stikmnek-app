@@ -35,6 +35,13 @@ function unauthorizedResponse(req: Request): Response {
 
 const BEARER_PREFIX = /^Bearer\s+/i;
 
+/** Keeps Edge/PostgREST JSON payloads bounded (TEXT columns are large; huge HTML still slows requests). */
+const PENDING_DESCRIPTION_MAX_CHARS = 120_000;
+function trimPendingDescription(input: unknown): string {
+  const s = String(input ?? '');
+  return s.length <= PENDING_DESCRIPTION_MAX_CHARS ? s : s.slice(0, PENDING_DESCRIPTION_MAX_CHARS);
+}
+
 /**
  * Resolve the authenticated user from the JWT in the request.
  * Never use `body.userId` for caller identity.
@@ -356,6 +363,7 @@ Deno.serve(async (req) => {
     }
 
     // ─── SUBMIT_BUSINESS ───
+    // Always INSERT for a new listing. UPDATE only when `updatePendingId` is set (same row, status=pending).
     if (action === 'submit_business') {
       const userId = authUser.id;
 
@@ -382,12 +390,11 @@ Deno.serve(async (req) => {
         linkedBusinessId = bid;
       }
 
-      const record = {
-        owner_id: userId,
-        business_id: linkedBusinessId,
-        name: body.name || '',
+      const description = trimPendingDescription(body.description);
+      const recordFields = {
+        name: String(body.name || '').trim() || 'Untitled',
         category: body.category || 'dining',
-        description: body.description || '',
+        description,
         discount: body.discount || '',
         original_price: Number(body.originalPrice) || 0,
         deal_price: Number(body.dealPrice) || 0,
@@ -395,14 +402,99 @@ Deno.serve(async (req) => {
         phone: body.phone || '',
         email: body.email || '',
         hours: body.hours || '',
-        image: body.image || '',
-        status: 'pending',
+        image: String(body.image || ''),
         map_url: body.mapUrl ?? body.map_url ?? null,
         website: body.website || null,
         discount_valid_from: body.discountValidFrom ?? body.discount_valid_from ?? null,
         discount_valid_until: body.discountValidUntil ?? body.discount_valid_until ?? null,
         whatsapp_number: body.whatsappNumber ?? body.whatsapp_number ?? null,
         pricing_tiers: body.pricingTiers ?? body.pricing_tiers ?? null,
+        business_id: linkedBusinessId,
+      };
+
+      const updatePendingRaw = body.updatePendingId ?? body.update_pending_id ?? null;
+      const updatePendingId =
+        updatePendingRaw != null && String(updatePendingRaw).trim() ? String(updatePendingRaw).trim() : null;
+
+      const attachPhotosForPending = async (pendingRowId: string) => {
+        const photos = body.photos || [];
+        await supabase.from('business_photos').delete().eq('business_id', pendingRowId);
+        if (photos.length === 0) return null;
+        const photoRecords = photos.map((p: any, i: number) => ({
+          business_id: pendingRowId,
+          url: p.url || '',
+          file_path: p.filePath || null,
+          uploaded_by: userId,
+          is_main: p.isMain ?? i === 0,
+          status: 'pending',
+        }));
+        const { error: photosErr } = await supabase.from('business_photos').insert(photoRecords);
+        return photosErr;
+      };
+
+      if (updatePendingId) {
+        const { data: existing, error: exErr } = await supabase
+          .from('pending_businesses')
+          .select('id, owner_id, status')
+          .eq('id', updatePendingId)
+          .maybeSingle();
+
+        if (exErr || !existing) {
+          return errorResponse(req, 'Submission not found', 404, { reason: 'update_pending_not_found' });
+        }
+        if (String(existing.owner_id) !== String(userId)) {
+          return errorResponse(req, 'Access denied', 403, { reason: 'update_pending_owner' });
+        }
+        if (existing.status !== 'pending') {
+          return errorResponse(
+            req,
+            'Only pending submissions can be updated in place. Use resubmit for rejected listings.',
+            400,
+            { reason: 'update_pending_status' },
+          );
+        }
+
+        const { data: pending, error } = await supabase
+          .from('pending_businesses')
+          .update(recordFields)
+          .eq('id', updatePendingId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[manage-business] submit_business update error:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          });
+          return errorResponse(req, error.message || 'Failed to update submission', 500, {
+            reason: 'pending_businesses_update',
+            code: error.code ?? null,
+          });
+        }
+
+        const photosErr = await attachPhotosForPending(updatePendingId);
+        if (photosErr) {
+          console.error('[manage-business] submit_business update business_photos:', photosErr);
+          return errorResponse(
+            req,
+            'Submission updated but photo rows failed: ' + photosErr.message,
+            500,
+            { reason: 'business_photos_insert', pendingId: updatePendingId },
+          );
+        }
+
+        return jsonResponse(req, {
+          success: true,
+          business: { id: pending!.id, ...pending },
+        });
+      }
+
+      const record = {
+        owner_id: userId,
+        ...recordFields,
+        status: 'pending' as const,
       };
 
       const { data: pending, error } = await supabase
@@ -424,33 +516,57 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Insert photos if provided
-      const photos = body.photos || [];
-      if (pending?.id && photos.length > 0) {
-        const photoRecords = photos.map((p: any, i: number) => ({
-          business_id: pending.id,
-          url: p.url || '',
-          file_path: p.filePath || null,
-          uploaded_by: userId,
-          is_main: p.isMain ?? i === 0,
-          status: 'pending',
-        }));
-        const { error: photosErr } = await supabase.from('business_photos').insert(photoRecords);
-        if (photosErr) {
-          console.error('[manage-business] submit_business business_photos insert:', photosErr);
-          return errorResponse(
-            req,
-            'Listing saved but photo rows failed: ' + photosErr.message,
-            500,
-            { reason: 'business_photos_insert', pendingId: pending.id },
-          );
-        }
+      const photosErr = pending?.id ? await attachPhotosForPending(pending.id) : null;
+      if (photosErr) {
+        console.error('[manage-business] submit_business business_photos insert:', photosErr);
+        return errorResponse(
+          req,
+          'Listing saved but photo rows failed: ' + photosErr.message,
+          500,
+          { reason: 'business_photos_insert', pendingId: pending?.id },
+        );
       }
 
       return jsonResponse(req, {
         success: true,
         business: { id: pending.id, ...pending },
       });
+    }
+
+    // ─── WITHDRAW_PENDING_SUBMISSION (owner: remove stuck / unwanted pending or rejected row) ───
+    if (action === 'withdraw_pending_submission') {
+      const pendingId = body.pendingId ?? body.pending_id;
+      if (!pendingId) return errorResponse(req, 'Missing pendingId', 400);
+
+      const { data: row, error: fetchErr } = await supabase
+        .from('pending_businesses')
+        .select('id, owner_id, status')
+        .eq('id', pendingId)
+        .maybeSingle();
+
+      if (fetchErr || !row) {
+        return errorResponse(req, 'Submission not found', 404);
+      }
+      if (String(row.owner_id) !== String(authUser.id)) {
+        return errorResponse(req, 'Access denied', 403);
+      }
+      if (row.status === 'approved') {
+        return errorResponse(req, 'Approved submissions cannot be withdrawn here', 400);
+      }
+
+      await supabase.from('business_photos').delete().eq('business_id', String(pendingId));
+      const { error: delErr } = await supabase
+        .from('pending_businesses')
+        .delete()
+        .eq('id', pendingId)
+        .eq('owner_id', authUser.id);
+
+      if (delErr) {
+        console.error('[manage-business] withdraw_pending_submission:', delErr);
+        return errorResponse(req, delErr.message || 'Failed to withdraw submission', 500);
+      }
+
+      return jsonResponse(req, { success: true });
     }
 
     // ─── RESUBMIT_PENDING_BUSINESS ───

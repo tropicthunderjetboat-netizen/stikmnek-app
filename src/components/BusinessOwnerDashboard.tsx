@@ -42,7 +42,7 @@ import {
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
 
-const DASHBOARD_LISTING_SUBMIT_DEADLINE_MS = 60_000;
+const DASHBOARD_LISTING_SUBMIT_DEADLINE_MS = 150_000;
 
 interface ReviewResponse {
   id: string;

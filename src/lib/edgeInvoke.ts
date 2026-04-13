@@ -16,8 +16,8 @@ export function isAbortLikeInvokeError(err: unknown): boolean {
 export const EDGE_INVOKE_TIMEOUT_MS = 120_000;
 /** Avoid indefinite wait if auth lock / session read stalls */
 export const EDGE_AUTH_HEADER_MS = 20_000;
-/** insert_pending_business RPC — PostgREST must not hang forever */
-export const RPC_INSERT_PENDING_TIMEOUT_MS = 90_000;
+/** insert_pending_business RPC — PostgREST must not hang forever (below form submit deadline) */
+export const RPC_INSERT_PENDING_TIMEOUT_MS = 85_000;
 
 export type InvokeEdgeOptions = {
   maxRetries?: number;

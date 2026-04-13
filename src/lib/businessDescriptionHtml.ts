@@ -48,3 +48,12 @@ export function hasMeaningfulDescriptionContent(html: string): boolean {
 export function looksLikeRichDescriptionHtml(s: string): boolean {
   return /<\/?[a-z][\s\S]*?>/i.test((s || '').trim());
 }
+
+/** Cap HTML length for RPC / Edge JSON payloads (Postgres TEXT is huge; huge strings still slow the API). */
+export const BUSINESS_DESCRIPTION_HTML_STORAGE_MAX = 120_000;
+
+export function trimBusinessDescriptionHtmlForStorage(html: string): string {
+  const s = html ?? '';
+  if (s.length <= BUSINESS_DESCRIPTION_HTML_STORAGE_MAX) return s;
+  return s.slice(0, BUSINESS_DESCRIPTION_HTML_STORAGE_MAX);
+}

@@ -23,12 +23,13 @@ import {
   plainTextFromHtml,
   BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX,
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
+  trimBusinessDescriptionHtmlForStorage,
 } from '@/lib/businessDescriptionHtml';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 
-/** Whole submit (RPC + edge + attach) — user feedback if connection is stuck */
-const LISTING_SUBMIT_DEADLINE_MS = 60_000;
+/** Whole submit (RPC + edge + attach) — allow RPC + edge cold starts without false “slow connection” */
+const LISTING_SUBMIT_DEADLINE_MS = 150_000;
 
 const DURATION_OPTIONS = [
   { value: '1_day', label: '1 Day', labelFr: '1 Jour', days: 1 },
@@ -482,13 +483,14 @@ const BusinessListingForm: React.FC = () => {
       const finalOriginalPrice = form.originalPrice ? Number(form.originalPrice) : 0;
       const finalDealPrice = form.dealPrice ? Number(form.dealPrice) : finalOriginalPrice;
       const normalizedWebsite = normalizeWebsiteForStorage(form.website) ?? null;
+      const descriptionForStorage = trimBusinessDescriptionHtmlForStorage(form.description);
 
       const submissionPayload = {
         action: 'submit_business',
         userId: user.id,
         name: form.name,
         category: form.category,
-        description: form.description,
+        description: descriptionForStorage,
         discount: form.discount || '',
         originalPrice: finalOriginalPrice,
         dealPrice: finalDealPrice,
@@ -532,7 +534,7 @@ const BusinessListingForm: React.FC = () => {
           p_owner_id: user.id,
           p_name: form.name,
           p_category: form.category,
-          p_description: form.description,
+          p_description: descriptionForStorage,
           p_discount: form.discount,
           p_original_price: Number(form.originalPrice) || 0,
           p_deal_price: Number(form.dealPrice) || 0,

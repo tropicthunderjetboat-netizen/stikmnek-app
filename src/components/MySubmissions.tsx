@@ -8,7 +8,7 @@ import {
   Clock, CheckCircle, XCircle, AlertCircle, FileText, RefreshCw,
   MapPin, Phone, Mail, Tag, DollarSign, Calendar, ChevronDown,
   ChevronUp, Store, Loader2, Bell, BellRing, Eye, MessageSquare,
-  ArrowRight, ExternalLink, Info, Sparkles, ShieldCheck, X
+  ArrowRight, ExternalLink, Info, Sparkles, ShieldCheck, X, Trash2,
 } from 'lucide-react';
 import {
   looksLikeRichDescriptionHtml,
@@ -84,8 +84,82 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [unseenChanges, setUnseenChanges] = useState<Set<string>>(new Set());
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
   const previousStatusesRef = useRef<Map<string, string>>(new Map());
   const initialLoadDone = useRef(false);
+
+  const handleWithdrawSubmission = useCallback(
+    async (submission: Submission) => {
+      if (!user?.id) return;
+      if (submission.status === 'approved') return;
+      const ok = window.confirm(
+        language === 'en'
+          ? `Remove "${submission.name}" from your submissions? This cannot be undone.`
+          : language === 'fr'
+            ? `Retirer « ${submission.name} » de vos soumissions ? Action irréversible.`
+            : `Raetem "${submission.name}" long ol sabmisen?`,
+      );
+      if (!ok) return;
+
+      setWithdrawingId(submission.id);
+      try {
+        const { data, error } = await supabase.functions.invoke('manage-business', {
+          body: {
+            action: 'withdraw_pending_submission',
+            pendingId: submission.id,
+          },
+        });
+        const payload = data as { success?: boolean; error?: string } | null | undefined;
+        let errMsg =
+          payload?.error || (error as { message?: string } | null)?.message;
+        if (!errMsg && error && typeof error === 'object' && 'context' in error) {
+          try {
+            const res = (error as { context?: Response }).context;
+            if (res && typeof res.clone === 'function') {
+              const t = await res.clone().text();
+              try {
+                errMsg = (JSON.parse(t) as { error?: string }).error;
+              } catch {
+                errMsg = t?.slice(0, 200);
+              }
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        if (!payload?.success) {
+          console.error('[MySubmissions] withdraw_pending_submission:', error, data);
+          toast.error(
+            errMsg ||
+              (language === 'en'
+                ? 'Could not remove submission. Try again or contact support.'
+                : 'Impossible de retirer la soumission.'),
+          );
+          return;
+        }
+        setSubmissions((prev) => prev.filter((s) => s.id !== submission.id));
+        setUnseenChanges((prev) => {
+          const next = new Set(prev);
+          next.delete(submission.id);
+          return next;
+        });
+        previousStatusesRef.current.delete(submission.id);
+        toast.success(
+          language === 'en'
+            ? 'Submission removed.'
+            : language === 'fr'
+              ? 'Soumission supprimée.'
+              : 'Sabmisen i raetem.',
+        );
+      } catch (e) {
+        console.error('[MySubmissions] withdraw:', e);
+        toast.error(language === 'en' ? 'Could not remove submission.' : 'Échec.');
+      } finally {
+        setWithdrawingId(null);
+      }
+    },
+    [user?.id, language],
+  );
 
   const handleViewLiveListing = useCallback(
     async (submission: Submission) => {
@@ -978,6 +1052,29 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
 
                     {/* Action buttons based on status */}
                     <div className="flex flex-wrap gap-2 mt-4">
+                      {(submission.status === 'pending' ||
+                        submission.status === 'rejected') && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleWithdrawSubmission(submission);
+                          }}
+                          disabled={withdrawingId === submission.id}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 transition-colors disabled:opacity-50"
+                        >
+                          {withdrawingId === submission.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                          {language === 'en'
+                            ? 'Delete submission'
+                            : language === 'fr'
+                              ? 'Supprimer la soumission'
+                              : 'Raetem sabmisen'}
+                        </button>
+                      )}
                       {submission.status === 'approved' && (
                         <button
                           type="button"
