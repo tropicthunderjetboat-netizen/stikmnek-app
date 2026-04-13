@@ -106,6 +106,9 @@ export async function invokeEdgeFunctionWithRetry(
       if (isAbortLikeInvokeError(err)) {
         return { data: lastData, error: lastError };
       }
+      if (typeof err?.message === 'string' && err.message.includes('Session retrieval timed out')) {
+        return { data: lastData, error: lastError };
+      }
     }
   }
   return { data: lastData, error: lastError };

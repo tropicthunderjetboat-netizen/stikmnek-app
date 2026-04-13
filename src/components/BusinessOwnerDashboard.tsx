@@ -42,7 +42,7 @@ import {
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
 
-const DASHBOARD_LISTING_SUBMIT_DEADLINE_MS = 240_000;
+const DASHBOARD_LISTING_SUBMIT_DEADLINE_MS = 60_000;
 
 interface ReviewResponse {
   id: string;
@@ -935,8 +935,8 @@ const BusinessOwnerDashboard: React.FC = () => {
     setLoading(true);
     const submitDeadlineMsg =
       language === 'en'
-        ? 'Submit timed out. Check your connection, sign out and back in, then try again.'
-        : 'Délai de soumission dépassé. Vérifiez la connexion ou reconnectez-vous.';
+        ? 'The connection is slow. Please check your internet and try again.'
+        : 'La connexion est lente. Vérifiez votre réseau et réessayez.';
     try {
       await Promise.race([
         (async () => {

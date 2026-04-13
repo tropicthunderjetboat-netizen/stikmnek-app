@@ -106,23 +106,28 @@ function readFileViaObjectUrl(file: File): Promise<string> {
   });
 }
 
+/** Target decoded size after base64 decode (listing photos — keeps Storage / Edge payloads small). */
+const MAX_COMPRESSED_IMAGE_BYTES = 800 * 1024;
+const JPEG_QUALITY_HIGH = 0.7;
+const JPEG_QUALITY_MED = 0.55;
+const JPEG_QUALITY_LOW = 0.45;
+const JPEG_QUALITY_MIN = 0.42;
+
 /**
- * Compress an image from a data URL using Canvas.
- * Takes a data URL string, loads it into an Image, draws on Canvas, returns compressed data URL.
+ * Encode as JPEG only (smaller than PNG for photos). Opaque white behind image so PNG alpha does not force PNG output.
  */
-function compressImageFromDataUrl(
+function compressImageToJpegDataUrl(
   dataUrl: string,
-  maxWidth = 1200,
-  maxHeight = 1200,
-  quality = 0.75
+  maxWidth: number,
+  maxHeight: number,
+  quality: number,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new window.Image();
-    
-    // Set a timeout - if image doesn't load in 10 seconds, fail
+
     const timeout = setTimeout(() => {
       reject(new Error('Image load timed out after 10 seconds'));
-    }, 10000);
+    }, 10_000);
 
     img.onload = () => {
       clearTimeout(timeout);
@@ -130,20 +135,17 @@ function compressImageFromDataUrl(
         let width = img.naturalWidth || img.width;
         let height = img.naturalHeight || img.height;
 
-        // Validate dimensions
         if (width === 0 || height === 0) {
           reject(new Error('Image has zero dimensions'));
           return;
         }
 
-        // Scale down if needed
         if (width > maxWidth || height > maxHeight) {
           const ratio = Math.min(maxWidth / width, maxHeight / height);
           width = Math.round(width * ratio);
           height = Math.round(height * ratio);
         }
 
-        // Ensure minimum dimensions
         width = Math.max(1, width);
         height = Math.max(1, height);
 
@@ -157,36 +159,55 @@ function compressImageFromDataUrl(
           return;
         }
 
-        // Draw the image onto the canvas
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Determine output format - always use JPEG for compression (smaller size)
-        const isTransparent = dataUrl.includes('image/png');
-        const outputType = isTransparent ? 'image/png' : 'image/jpeg';
-        const outputQuality = isTransparent ? undefined : quality;
-
-        const compressed = canvas.toDataURL(outputType, outputQuality);
+        const compressed = canvas.toDataURL('image/jpeg', quality);
 
         if (!compressed || compressed === 'data:,' || compressed.length < 100) {
           reject(new Error('Canvas produced empty or invalid output'));
           return;
         }
 
-        console.log(`Compressed: ${img.naturalWidth}x${img.naturalHeight} → ${width}x${height}, size: ${Math.round(compressed.length / 1024)}KB`);
+        const approxKb = Math.round(estimateBase64Size(compressed) / 1024);
+        console.log(
+          `JPEG ${quality}: ${img.naturalWidth}x${img.naturalHeight} → ${width}x${height}, ~${approxKb}KB decoded`,
+        );
         resolve(compressed);
-      } catch (err: any) {
-        reject(new Error(`Canvas error: ${err.message || 'unknown'}`));
+      } catch (err: unknown) {
+        const m = err instanceof Error ? err.message : 'unknown';
+        reject(new Error(`Canvas error: ${m}`));
       }
     };
 
-    img.onerror = (e) => {
+    img.onerror = () => {
       clearTimeout(timeout);
       reject(new Error('Failed to load image into Image element'));
     };
 
-    // Load the data URL into the image
     img.src = dataUrl;
   });
+}
+
+/**
+ * Iteratively shrink dimensions / quality until decoded size ≤ MAX_COMPRESSED_IMAGE_BYTES (best effort).
+ */
+async function compressImageForUpload(dataUrl: string): Promise<string> {
+  let maxSide = 1600;
+  const qualities = [JPEG_QUALITY_HIGH, JPEG_QUALITY_MED, JPEG_QUALITY_LOW];
+
+  while (maxSide >= 480) {
+    for (const q of qualities) {
+      const out = await compressImageToJpegDataUrl(dataUrl, maxSide, maxSide, q);
+      if (estimateBase64Size(out) <= MAX_COMPRESSED_IMAGE_BYTES) {
+        return out;
+      }
+    }
+    maxSide = Math.round(maxSide * 0.82);
+  }
+
+  return compressImageToJpegDataUrl(dataUrl, 480, 480, JPEG_QUALITY_MIN);
 }
 
 /**
@@ -324,23 +345,15 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       let finalBase64: string;
       
       try {
-        console.log(`[${file.name}] Compressing via canvas...`);
-        finalBase64 = await compressImageFromDataUrl(dataUrl, 1200, 1200, 0.75);
+        console.log(`[${file.name}] Compressing to JPEG (≤${MAX_COMPRESSED_IMAGE_BYTES / 1024}KB target)...`);
+        finalBase64 = await compressImageForUpload(dataUrl);
         console.log(`[${file.name}] Compression success, length: ${finalBase64.length}`);
-      } catch (compressErr: any) {
-        console.warn(`[${file.name}] Compression failed:`, compressErr.message);
-        
-        // Fallback: use the raw data URL without compression
-        // Check if it's not too large (< 5MB base64)
-        if (dataUrl.length < 7 * 1024 * 1024) {
-          console.log(`[${file.name}] Using uncompressed data URL (${Math.round(dataUrl.length / 1024)}KB)`);
-          finalBase64 = dataUrl;
-        } else {
-          throw new Error(
-            `Cannot compress "${file.name}" and it's too large to upload uncompressed. ` +
-            `Please try a smaller image or a different format (JPG recommended).`
-          );
-        }
+      } catch (compressErr: unknown) {
+        const cm = compressErr instanceof Error ? compressErr.message : String(compressErr);
+        console.warn(`[${file.name}] Compression failed:`, cm);
+        throw new Error(
+          `Could not compress "${file.name}". Try a smaller JPG/PNG photo (${cm})`,
+        );
       }
 
       const compressedSize = estimateBase64Size(finalBase64);
@@ -373,10 +386,8 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           `Could not read image data (${decodeErr?.message || 'invalid base64'}). Try JPG or PNG.`,
         );
       }
-      const ext = (file.name || 'image.jpg').split('.').pop() || 'jpg';
-      const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : 'jpg';
-      const filePath = `${effectiveUserId}/${crypto.randomUUID()}.${safeExt}`;
-      const blob = new Blob([binary], { type: file.type || 'image/jpeg' });
+      const filePath = `${effectiveUserId}/${crypto.randomUUID()}.jpg`;
+      const blob = new Blob([binary], { type: 'image/jpeg' });
 
       // NOTE: @supabase/storage-js upload() accepts `signal` but uploadOrUpdate does not pass it to
       // fetch — awaiting upload({ signal }) never cancels. Use Promise.race so we can fall back to
@@ -387,7 +398,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
         const uploadPromise = supabase.storage
           .from('business-photos')
           .upload(filePath, blob, {
-            contentType: file.type || 'image/jpeg',
+            contentType: 'image/jpeg',
             upsert: false,
           });
         const raced = await Promise.race([
@@ -437,17 +448,30 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
                 ),
               ),
             ]);
-          } catch {
-            const { data: sess } = await supabase.auth.getSession();
-            const t = sess?.session?.access_token;
-            headers = t ? { Authorization: `Bearer ${t}` } : {};
+          } catch (authHdrErr: unknown) {
+            const msg = authHdrErr instanceof Error ? authHdrErr.message : '';
+            if (msg.includes('Session retrieval timed out')) {
+              throw authHdrErr;
+            }
+            try {
+              const sessRes = await Promise.race([
+                supabase.auth.getSession(),
+                new Promise<never>((_, rej) =>
+                  setTimeout(() => rej(new Error('getSession fallback slow')), 8000),
+                ),
+              ]);
+              const t = sessRes.data?.session?.access_token;
+              headers = t ? { Authorization: `Bearer ${t}` } : {};
+            } catch {
+              headers = {};
+            }
           }
 
           const result = await supabase.functions.invoke('upload-photo', {
             body: {
               fileBase64: finalBase64,
-              fileName: file.name,
-              contentType: file.type || 'image/jpeg',
+              fileName: file.name.replace(/\.[^.]+$/, '') + '.jpg',
+              contentType: 'image/jpeg',
               userId: effectiveUserId,
             },
             headers,

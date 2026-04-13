@@ -83,26 +83,63 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
   },
 });
 
-/** Cap so a stuck GoTrue / auth lock cannot block edge invokes forever (must be < lockAcquireTimeout). */
-const GET_SESSION_FOR_EDGE_MS = 12_000;
+/**
+ * Total wall-clock budget for edge auth headers. If exceeded → clear error (UI can prompt refresh).
+ * Uses getSession first; if no token, getUser() may refresh the in-memory session, then getSession again.
+ */
+const EDGE_AUTH_SESSION_TOTAL_MS = 10_000;
 
+const SESSION_TIMEOUT_MESSAGE =
+  'Session retrieval timed out. Please refresh the page or sign in again.';
+
+function throwSessionTimeout(): never {
+  throw new Error(SESSION_TIMEOUT_MESSAGE);
+}
+
+function raceByDeadline<T>(promise: Promise<T>, deadlineAt: number): Promise<T | '__deadline__'> {
+  const ms = deadlineAt - Date.now();
+  if (ms <= 0) return Promise.resolve('__deadline__' as const);
+  return Promise.race([
+    promise.then((v) => v as T),
+    new Promise<'__deadline__'>((resolve) => setTimeout(() => resolve('__deadline__'), ms)),
+  ]);
+}
+
+/**
+ * Returns `{ Authorization: Bearer <jwt> }` when a session exists, or `{}` when signed out (quick, in-budget).
+ * Throws with `SESSION_TIMEOUT_MESSAGE` if the auth client/lock blocks until the budget is exhausted.
+ */
 export async function getEdgeAuthHeaders(): Promise<Record<string, string>> {
-  try {
-    const { data, error } = await Promise.race([
-      supabase.auth.getSession(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('getSession timed out')), GET_SESSION_FOR_EDGE_MS),
-      ),
-    ]);
+  const deadlineAt = Date.now() + EDGE_AUTH_SESSION_TOTAL_MS;
+
+  const tryGetSessionToken = async (): Promise<string | null | '__deadline__'> => {
+    const raced = await raceByDeadline(supabase.auth.getSession(), deadlineAt);
+    if (raced === '__deadline__') return '__deadline__';
+    const { data, error } = raced;
     if (error) {
       console.warn('[getEdgeAuthHeaders] getSession error:', error.message);
     }
-    const token = data?.session?.access_token;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  } catch (e: unknown) {
-    console.warn('[getEdgeAuthHeaders] session read failed:', e);
-    return {};
+    return data?.session?.access_token ?? null;
+  };
+
+  let token = await tryGetSessionToken();
+  if (token === '__deadline__') throwSessionTimeout();
+  if (token) return { Authorization: `Bearer ${token}` };
+
+  const racedUser = await raceByDeadline(supabase.auth.getUser(), deadlineAt);
+  if (racedUser === '__deadline__') throwSessionTimeout();
+  const { data: userData, error: userErr } = racedUser;
+  if (userErr) {
+    console.warn('[getEdgeAuthHeaders] getUser error:', userErr.message);
+  } else if (userData?.user) {
+    console.warn('[getEdgeAuthHeaders] getSession had no token; getUser ok — retrying getSession');
   }
+
+  token = await tryGetSessionToken();
+  if (token === '__deadline__') throwSessionTimeout();
+  if (token) return { Authorization: `Bearer ${token}` };
+
+  return {};
 }
 
 

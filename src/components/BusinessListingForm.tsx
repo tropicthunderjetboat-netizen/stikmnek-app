@@ -27,8 +27,8 @@ import {
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 
-/** Hard cap so the UI never stays on "Submitting..." if a promise never settles */
-const LISTING_SUBMIT_DEADLINE_MS = 240_000;
+/** Whole submit (RPC + edge + attach) — user feedback if connection is stuck */
+const LISTING_SUBMIT_DEADLINE_MS = 60_000;
 
 const DURATION_OPTIONS = [
   { value: '1_day', label: '1 Day', labelFr: '1 Jour', days: 1 },
@@ -466,8 +466,8 @@ const BusinessListingForm: React.FC = () => {
 
     const submitTimedOutMsg =
       language === 'en'
-        ? 'Submit timed out. Check your connection, sign out and back in, then try again.'
-        : 'Délai de soumission dépassé. Vérifiez la connexion ou reconnectez-vous.';
+        ? 'The connection is slow. Please check your internet and try again.'
+        : 'La connexion est lente. Vérifiez votre réseau et réessayez.';
 
     try {
       await Promise.race([
