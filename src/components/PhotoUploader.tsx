@@ -371,46 +371,118 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       const blob = new Blob([binary], { type: file.type || 'image/jpeg' });
 
       const DIRECT_STORAGE_TIMEOUT_MS = 45_000;
+      const storageAborter = new AbortController();
+      const storageTimer = setTimeout(() => storageAborter.abort(), DIRECT_STORAGE_TIMEOUT_MS);
       try {
         const startMs = Date.now();
-        const uploadPromise = supabase.storage
+        const { error: storageErr } = await supabase.storage
           .from('business-photos')
-          .upload(filePath, blob, { contentType: file.type || 'image/jpeg', upsert: false });
-        const raced = await Promise.race([
-          uploadPromise.then((r) => ({ done: true as const, r })),
-          new Promise<{ done: false }>((resolve) =>
-            setTimeout(() => resolve({ done: false }), DIRECT_STORAGE_TIMEOUT_MS),
-          ),
-        ]);
+          .upload(filePath, blob, {
+            contentType: file.type || 'image/jpeg',
+            upsert: false,
+            signal: storageAborter.signal,
+          });
         const elapsed = Date.now() - startMs;
-        if (!raced.done) {
+        clearTimeout(storageTimer);
+        if (!storageErr) {
+          const { data: urlData } = supabase.storage.from('business-photos').getPublicUrl(filePath);
+          uploadData = { url: urlData.publicUrl, filePath, success: true };
+          console.log(`[${file.name}] Direct storage upload succeeded (${elapsed}ms)`);
+        } else {
+          uploadError = { message: storageErr.message };
+          console.warn(`[${file.name}] Direct storage failed:`, storageErr.message);
+        }
+        // #region agent log
+        fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
+          body: JSON.stringify({
+            sessionId: '7b96fa',
+            location: 'PhotoUploader.tsx:direct-storage',
+            message: 'direct storage upload finished',
+            data: {
+              hypothesisId: 'H2-H5',
+              ok: !storageErr,
+              elapsedMs: elapsed,
+              errSnippet: storageErr?.message ? String(storageErr.message).slice(0, 120) : null,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+      } catch (directErr: any) {
+        clearTimeout(storageTimer);
+        const aborted =
+          directErr?.name === 'AbortError' ||
+          storageAborter.signal.aborted ||
+          String(directErr?.message || '').includes('aborted');
+        if (aborted) {
           uploadError = { message: 'Direct storage timed out' };
           console.warn(
-            `[${file.name}] Direct storage no response after ${DIRECT_STORAGE_TIMEOUT_MS}ms — trying Edge Function`,
+            `[${file.name}] Direct storage aborted after ${DIRECT_STORAGE_TIMEOUT_MS}ms — trying Edge Function`,
           );
         } else {
-          const { error: storageErr } = raced.r;
-          if (!storageErr) {
-            const { data: urlData } = supabase.storage.from('business-photos').getPublicUrl(filePath);
-            uploadData = { url: urlData.publicUrl, filePath, success: true };
-            console.log(`[${file.name}] Direct storage upload succeeded (${elapsed}ms)`);
-          } else {
-            uploadError = { message: storageErr.message };
-            console.warn(`[${file.name}] Direct storage failed:`, storageErr.message);
-          }
+          uploadError = directErr;
+          console.warn(`[${file.name}] Direct storage threw:`, directErr?.message || directErr);
         }
-      } catch (directErr: any) {
-        uploadError = directErr;
-        console.warn(`[${file.name}] Direct storage threw:`, directErr?.message || directErr);
+        // #region agent log
+        fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
+          body: JSON.stringify({
+            sessionId: '7b96fa',
+            location: 'PhotoUploader.tsx:direct-storage-catch',
+            message: 'direct storage upload error',
+            data: {
+              hypothesisId: 'H2-H5',
+              aborted: Boolean(aborted),
+              errName: directErr?.name ?? null,
+              errSnippet: String(directErr?.message || directErr || '').slice(0, 160),
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
       }
 
       // Strategy B: Edge Function fallback (if direct storage fails, e.g. RLS not applied)
       if (!uploadData && uploadError) {
         console.warn(`[${file.name}] Trying upload-photo Edge Function...`);
-        const UPLOAD_TIMEOUT_MS = 45000; // 45s max to avoid indefinite hang
+        const UPLOAD_TIMEOUT_MS = 45_000;
+        const EDGE_AUTH_HEADER_MS = 20_000;
+        const edgeAborter = new AbortController();
+        const edgeTimer = setTimeout(() => edgeAborter.abort(), UPLOAD_TIMEOUT_MS);
         try {
-          const headers = await getEdgeAuthHeaders();
-          const invokePromise = supabase.functions.invoke('upload-photo', {
+          const headersStart = Date.now();
+          const headers = await Promise.race([
+            getEdgeAuthHeaders(),
+            new Promise<Record<string, string>>((_, reject) =>
+              setTimeout(
+                () => reject(new Error('Session lookup timed out — sign out and sign in, then retry')),
+                EDGE_AUTH_HEADER_MS,
+              ),
+            ),
+          );
+          const headersMs = Date.now() - headersStart;
+          // #region agent log
+          fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
+            body: JSON.stringify({
+              sessionId: '7b96fa',
+              location: 'PhotoUploader.tsx:edge-headers',
+              message: 'getEdgeAuthHeaders completed',
+              data: {
+                hypothesisId: 'H1',
+                headersMs,
+                hasAuthHeader: Boolean(headers.Authorization),
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
+
+          const result = await supabase.functions.invoke('upload-photo', {
             body: {
               fileBase64: finalBase64,
               fileName: file.name,
@@ -418,11 +490,9 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               userId: effectiveUserId,
             },
             headers,
+            signal: edgeAborter.signal,
           });
-          const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Upload timed out after 45 seconds')), UPLOAD_TIMEOUT_MS)
-          );
-          const result = await Promise.race([invokePromise, timeoutPromise]);
+          clearTimeout(edgeTimer);
           if (!result.error && !result.data?.error) {
             uploadData = result.data;
             uploadError = null;
@@ -430,10 +500,51 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           } else {
             uploadError = result.error || { message: result.data?.error };
           }
+          // #region agent log
+          fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
+            body: JSON.stringify({
+              sessionId: '7b96fa',
+              location: 'PhotoUploader.tsx:edge-invoke',
+              message: 'upload-photo invoke settled',
+              data: {
+                hypothesisId: 'H3',
+                hasFnError: Boolean(result.error),
+                dataHasError: Boolean(result.data?.error),
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
         } catch (invokeErr: any) {
-          const isTimeout = invokeErr?.message?.includes('timed out');
-          console.warn(`[${file.name}] Edge Function ${isTimeout ? 'timed out' : 'failed'}:`, invokeErr?.message || invokeErr);
-          uploadError = invokeErr;
+          clearTimeout(edgeTimer);
+          const aborted = invokeErr?.name === 'AbortError' || edgeAborter.signal.aborted;
+          const msg = aborted
+            ? 'Upload timed out after 45 seconds'
+            : invokeErr?.message || String(invokeErr);
+          console.warn(
+            `[${file.name}] Edge Function ${aborted ? 'aborted (timeout)' : 'failed'}:`,
+            msg,
+          );
+          uploadError = { message: msg };
+          // #region agent log
+          fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '7b96fa' },
+            body: JSON.stringify({
+              sessionId: '7b96fa',
+              location: 'PhotoUploader.tsx:edge-invoke-catch',
+              message: 'upload-photo invoke failed',
+              data: {
+                hypothesisId: 'H1-H3',
+                aborted,
+                errSnippet: msg.slice(0, 200),
+              },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
         }
       }
 
