@@ -7,6 +7,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+const BEARER_PREFIX = /^Bearer\s+/i;
+
 /**
  * CORS: set CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
  */
@@ -52,7 +54,7 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.replace(BEARER_PREFIX, '').trim();
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return errorResponse('Invalid or expired session', 401);
@@ -66,9 +68,14 @@ Deno.serve(async (req) => {
       return errorResponse('Missing fileBase64');
     }
 
-    // Decode base64 to Uint8Array
-    const base64Data = fileBase64.replace(/^data:image\/\w+;base64,/, '');
-    const binary = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+    // Decode base64 to Uint8Array (invalid input → 400, not opaque 500)
+    const base64Data = String(fileBase64).replace(/^data:image\/[^;]+;base64,/, '');
+    let binary: Uint8Array;
+    try {
+      binary = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+    } catch {
+      return errorResponse('Invalid or corrupted base64 image data', 400);
+    }
 
     const ext = (fileName || 'image.jpg').split('.').pop() || 'jpg';
     const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : 'jpg';

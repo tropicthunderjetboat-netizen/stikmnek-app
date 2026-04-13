@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabase, getEdgeAuthHeaders } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
 import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, AlertTriangle, Globe, Info } from 'lucide-react';
 
 import { formatVT } from '@/lib/utils';
@@ -24,83 +25,6 @@ import {
 } from '@/lib/businessDescriptionHtml';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
-
-/** Per-invoke ceiling so cold starts / large payloads cannot hang the form forever */
-const EDGE_INVOKE_TIMEOUT_MS = 120_000;
-/** Same as PhotoUploader: avoid indefinite wait if auth lock/session read stalls */
-const EDGE_AUTH_HEADER_MS = 20_000;
-/** Primary submit path uses RPC — must not hang forever if REST/PostgREST stalls */
-const RPC_INSERT_PENDING_TIMEOUT_MS = 90_000;
-
-// ─── Retry helper for edge function calls ───
-async function invokeWithRetry(
-  fnName: string,
-  body: any,
-  maxRetries = 2,
-  label = ''
-): Promise<{ data: any; error: any }> {
-  let lastError: any = null;
-  let lastData: any = null;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      if (attempt > 0) {
-        const delay = 500 * attempt;
-        console.log(`[BusinessForm] ${label} Retry ${attempt}/${maxRetries} after ${delay}ms...`);
-        await new Promise(r => setTimeout(r, delay));
-      }
-      const startMs = Date.now();
-      const headers = await Promise.race([
-        getEdgeAuthHeaders(),
-        new Promise<Record<string, string>>((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `${label || fnName}: session lookup timed out — sign out and sign in, then retry`,
-                ),
-              ),
-            EDGE_AUTH_HEADER_MS,
-          ),
-        ),
-      ]);
-      const invokeAborter = new AbortController();
-      const invokeTimer = setTimeout(() => invokeAborter.abort(), EDGE_INVOKE_TIMEOUT_MS);
-      let result: { data: any; error: any };
-      try {
-        result = await supabase.functions.invoke(fnName, {
-          body,
-          headers,
-          signal: invokeAborter.signal,
-        });
-      } finally {
-        clearTimeout(invokeTimer);
-      }
-      const elapsed = Date.now() - startMs;
-      console.log(`[BusinessForm] ${label} ${fnName} attempt ${attempt}: ${elapsed}ms`, {
-        hasData: !!result.data,
-        hasError: !!result.error,
-        dataError: result.data?.error,
-      });
-      if (result.error) {
-        lastError = result.error;
-        lastData = result.data ?? lastData; // keep response body from non-2xx
-        console.warn(`[BusinessForm] ${label} Edge function error:`, result.error.message || result.error);
-        continue;
-      }
-      if (result.data?.error) {
-        lastError = new Error(result.data.error);
-        lastData = result.data;
-        console.warn(`[BusinessForm] ${label} Server error:`, result.data.error);
-        continue;
-      }
-      return result;
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`[BusinessForm] ${label} attempt ${attempt} threw:`, err.message);
-    }
-  }
-  return { data: lastData, error: lastError };
-}
 
 const DURATION_OPTIONS = [
   { value: '1_day', label: '1 Day', labelFr: '1 Jour', days: 1 },
@@ -514,12 +438,16 @@ const BusinessListingForm: React.FC = () => {
               filePath: p.filePath,
               isMain: i === 0,
             }));
-            const { data: attachData, error: attachErr } = await invokeWithRetry('manage-business', {
-              action: 'attach_pending_photos',
-              userId: user.id,
-              pendingId: String(directData.id),
-              photos: photoData,
-            }, 2, 'attach_pending_photos');
+            const { data: attachData, error: attachErr } = await invokeEdgeFunctionWithRetry(
+              'manage-business',
+              {
+                action: 'attach_pending_photos',
+                userId: user.id,
+                pendingId: String(directData.id),
+                photos: photoData,
+              },
+              { maxRetries: 2, label: 'attach_pending_photos', logPrefix: '[BusinessForm]' },
+            );
             if (attachErr || attachData?.error) {
               throw new Error(attachData?.error || attachErr?.message || 'Failed to save photo rows');
             }
@@ -549,11 +477,10 @@ const BusinessListingForm: React.FC = () => {
 
       // Strategy 2: Edge function fallback (if RPC not deployed or fails)
       console.warn('[BusinessForm] RPC failed, trying manage-business Edge Function...', { rpcError: rpcError?.message });
-      const { data, error } = await invokeWithRetry(
+      const { data, error } = await invokeEdgeFunctionWithRetry(
         'manage-business',
-        submissionPayload,
-        2,
-        'submit_business'
+        submissionPayload as Record<string, unknown>,
+        { maxRetries: 2, label: 'submit_business', logPrefix: '[BusinessForm]' },
       );
 
       if (data?.success && data?.business) {

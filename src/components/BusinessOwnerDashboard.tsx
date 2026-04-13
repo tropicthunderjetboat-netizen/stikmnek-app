@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
+import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
 import { toast } from 'sonner';
 import { businesses as localBusinesses } from '@/data/businesses';
 import {
@@ -40,41 +41,6 @@ import {
 } from '@/lib/businessDescriptionHtml';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
-
-// ─── Retry helper for edge function calls (matches BusinessListingForm) ───
-async function invokeWithRetry(
-  fnName: string,
-  body: Record<string, unknown>,
-  maxRetries = 2,
-  label = ''
-): Promise<{ data: any; error: any }> {
-  let lastError: any = null;
-  let lastData: any = null;
-  const headers = await getEdgeAuthHeaders();
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      if (attempt > 0) {
-        await new Promise(r => setTimeout(r, 500 * attempt));
-      }
-      const result = await supabase.functions.invoke(fnName, { headers, body });
-      if (result.error) {
-        lastError = result.error;
-        lastData = result.data ?? lastData; // Preserve response body on non-2xx (may contain error message)
-        continue;
-      }
-      if (result.data?.error) {
-        lastError = new Error(result.data.error);
-        lastData = result.data;
-        continue;
-      }
-      return result;
-    } catch (err: any) {
-      lastError = err;
-    }
-  }
-  return { data: lastData, error: lastError };
-}
-
 
 interface ReviewResponse {
   id: string;
@@ -886,13 +852,17 @@ const BusinessOwnerDashboard: React.FC = () => {
   const handleRespondToReview = async (reviewId: string) => {
     if (!selectedBusiness || !user || !selectedProfileId || !responseText[reviewId]?.trim()) return;
     try {
-      const { data, error } = await invokeWithRetry('manage-business', {
-        action: 'respond_to_review',
-        userId: user.id,
-        reviewId,
-        businessId: selectedProfileId,
-        response: responseText[reviewId],
-      });
+      const { data, error } = await invokeEdgeFunctionWithRetry(
+        'manage-business',
+        {
+          action: 'respond_to_review',
+          userId: user.id,
+          reviewId,
+          businessId: selectedProfileId,
+          response: responseText[reviewId],
+        },
+        { logPrefix: '[Dashboard]' },
+      );
       if (error) throw error instanceof Error ? error : new Error(String(error?.message || error));
       if (data?.error) throw new Error(data.error);
       setResponseText(prev => ({ ...prev, [reviewId]: '' }));
@@ -980,7 +950,7 @@ const BusinessOwnerDashboard: React.FC = () => {
 
       // ─── RESUBMIT: Edit & resubmit a rejected submission ───
       if (resubmitSubmission?.id) {
-        const { data: resubmitData, error: resubmitErr } = await invokeWithRetry(
+        const { data: resubmitData, error: resubmitErr } = await invokeEdgeFunctionWithRetry(
           'manage-business',
           {
             action: 'resubmit_pending_business',
@@ -1004,9 +974,8 @@ const BusinessOwnerDashboard: React.FC = () => {
             discountValidFrom: submitForm.discountValidFrom,
             discountValidUntil: discountValidUntil,
             pricingTiers: tiersPayload,
-          },
-          2,
-          'resubmit'
+          } as Record<string, unknown>,
+          { maxRetries: 2, label: 'resubmit', logPrefix: '[Dashboard]' },
         );
         const errMsg = resubmitData?.error || resubmitErr?.message || 'Resubmit failed';
         if (resubmitErr || resubmitData?.error) throw new Error(typeof errMsg === 'string' ? errMsg : 'Resubmit failed');
@@ -1030,27 +999,49 @@ const BusinessOwnerDashboard: React.FC = () => {
         linkToProfile != null ? effectiveProfileBusinessId(linkToProfile) : null;
 
       // Strategy 1: RPC insert (SECURITY DEFINER, bypasses RLS — most reliable)
-      const { data: rpcId, error: rpcError } = await supabase.rpc('insert_pending_business', {
-        p_owner_id: user?.id,
-        p_name: submitForm.name,
-        p_category: submitForm.category,
-        p_description: submitForm.description,
-        p_discount: submitForm.discount || '',
-        p_original_price: origPrice,
-        p_deal_price: dlPrice,
-        p_location: submitForm.location || 'Port Vila, Vanuatu',
-        p_phone: submitForm.phone,
-        p_email: submitForm.email || user?.email,
-        p_hours: submitForm.hours,
-        p_image: mainImageUrl,
-        p_map_url: submitForm.mapUrl || null,
-        p_website: normalizedWebsite,
-        p_discount_valid_from: submitForm.discountValidFrom || null,
-        p_discount_valid_until: discountValidUntil || null,
-        p_whatsapp_number: submitForm.whatsappNumber || null,
-        p_pricing_tiers: tiersPayload,
-        p_business_id: pBusinessIdForSubmit,
-      });
+      const rpcAborter = new AbortController();
+      const rpcTimer = setTimeout(() => rpcAborter.abort(), RPC_INSERT_PENDING_TIMEOUT_MS);
+      let rpcId: string | null = null;
+      let rpcError: { message?: string; name?: string } | null = null;
+      try {
+        const rpcRes = await supabase
+          .rpc('insert_pending_business', {
+            p_owner_id: user?.id,
+            p_name: submitForm.name,
+            p_category: submitForm.category,
+            p_description: submitForm.description,
+            p_discount: submitForm.discount || '',
+            p_original_price: origPrice,
+            p_deal_price: dlPrice,
+            p_location: submitForm.location || 'Port Vila, Vanuatu',
+            p_phone: submitForm.phone,
+            p_email: submitForm.email || user?.email,
+            p_hours: submitForm.hours,
+            p_image: mainImageUrl,
+            p_map_url: submitForm.mapUrl || null,
+            p_website: normalizedWebsite,
+            p_discount_valid_from: submitForm.discountValidFrom || null,
+            p_discount_valid_until: discountValidUntil || null,
+            p_whatsapp_number: submitForm.whatsappNumber || null,
+            p_pricing_tiers: tiersPayload,
+            p_business_id: pBusinessIdForSubmit,
+          })
+          .abortSignal(rpcAborter.signal);
+        rpcId = rpcRes.data != null ? String(rpcRes.data) : null;
+        rpcError = rpcRes.error;
+      } catch (rpcEx: any) {
+        const aborted =
+          rpcEx?.name === 'AbortError' ||
+          String(rpcEx?.message || '').toLowerCase().includes('abort');
+        rpcError = {
+          message: aborted
+            ? `Saving your listing timed out after ${Math.round(RPC_INSERT_PENDING_TIMEOUT_MS / 1000)}s. Check your connection and try again.`
+            : rpcEx?.message || String(rpcEx),
+          name: rpcEx?.name,
+        };
+      } finally {
+        clearTimeout(rpcTimer);
+      }
 
       if (!rpcError && rpcId) {
         const directData = { id: rpcId };
@@ -1062,7 +1053,7 @@ const BusinessOwnerDashboard: React.FC = () => {
           }));
 
           // Server-side insert (service role) to avoid silent RLS failures.
-          const { data: attachData, error: attachErr } = await invokeWithRetry(
+          const { data: attachData, error: attachErr } = await invokeEdgeFunctionWithRetry(
             'manage-business',
             {
               action: 'attach_pending_photos',
@@ -1070,8 +1061,7 @@ const BusinessOwnerDashboard: React.FC = () => {
               pendingId: directData.id,
               photos: photoData,
             },
-            2,
-            'attach_pending_photos'
+            { maxRetries: 2, label: 'attach_pending_photos', logPrefix: '[Dashboard]' },
           );
           if (attachErr || attachData?.error) {
             throw new Error(
@@ -1101,7 +1091,7 @@ const BusinessOwnerDashboard: React.FC = () => {
 
       // Strategy 2: Edge function fallback (if RPC not deployed or fails)
       console.warn('[Dashboard] RPC failed, trying manage-business Edge Function...', { rpcError: rpcError?.message });
-      const { data, error } = await invokeWithRetry(
+      const { data, error } = await invokeEdgeFunctionWithRetry(
         'manage-business',
         {
           action: 'submit_business',
@@ -1124,9 +1114,8 @@ const BusinessOwnerDashboard: React.FC = () => {
           discountValidFrom: submitForm.discountValidFrom,
           discountValidUntil: discountValidUntil,
           pricingTiers: tiersPayload,
-        },
-        2,
-        'submit_business'
+        } as Record<string, unknown>,
+        { maxRetries: 2, label: 'submit_business', logPrefix: '[Dashboard]' },
       );
 
       if (data?.success && data?.business?.id) {

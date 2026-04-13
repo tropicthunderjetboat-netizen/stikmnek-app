@@ -363,69 +363,85 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       let uploadError: any;
 
       // Strategy A: Direct storage upload (fast, no Edge Function; RLS allows authenticated)
-      const base64Data = finalBase64.replace(/^data:image\/\w+;base64,/, '');
-      const binary = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+      // Strip data-URL prefix: must allow subtypes like image/svg+xml (not only \w+).
+      const base64Data = finalBase64.replace(/^data:image\/[^;]+;base64,/, '');
+      let binary: Uint8Array;
+      try {
+        binary = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+      } catch (decodeErr: any) {
+        throw new Error(
+          `Could not read image data (${decodeErr?.message || 'invalid base64'}). Try JPG or PNG.`,
+        );
+      }
       const ext = (file.name || 'image.jpg').split('.').pop() || 'jpg';
       const safeExt = /^[a-z0-9]+$/i.test(ext) ? ext : 'jpg';
       const filePath = `${effectiveUserId}/${crypto.randomUUID()}.${safeExt}`;
       const blob = new Blob([binary], { type: file.type || 'image/jpeg' });
 
-      const DIRECT_STORAGE_TIMEOUT_MS = 45_000;
-      const storageAborter = new AbortController();
-      const storageTimer = setTimeout(() => storageAborter.abort(), DIRECT_STORAGE_TIMEOUT_MS);
+      // NOTE: @supabase/storage-js upload() accepts `signal` but uploadOrUpdate does not pass it to
+      // fetch — awaiting upload({ signal }) never cancels. Use Promise.race so we can fall back to
+      // upload-photo Edge Function after a ceiling (same as pre-regression behavior).
+      const DIRECT_STORAGE_TIMEOUT_MS = 60_000;
       try {
         const startMs = Date.now();
-        const { error: storageErr } = await supabase.storage
+        const uploadPromise = supabase.storage
           .from('business-photos')
           .upload(filePath, blob, {
             contentType: file.type || 'image/jpeg',
             upsert: false,
-            signal: storageAborter.signal,
           });
+        const raced = await Promise.race([
+          uploadPromise.then((r) => ({ kind: 'done' as const, r })),
+          new Promise<{ kind: 'timeout' }>((resolve) =>
+            setTimeout(() => resolve({ kind: 'timeout' }), DIRECT_STORAGE_TIMEOUT_MS),
+          ),
+        ]);
         const elapsed = Date.now() - startMs;
-        clearTimeout(storageTimer);
-        if (!storageErr) {
-          const { data: urlData } = supabase.storage.from('business-photos').getPublicUrl(filePath);
-          uploadData = { url: urlData.publicUrl, filePath, success: true };
-          console.log(`[${file.name}] Direct storage upload succeeded (${elapsed}ms)`);
-        } else {
-          uploadError = { message: storageErr.message };
-          console.warn(`[${file.name}] Direct storage failed:`, storageErr.message);
-        }
-      } catch (directErr: any) {
-        clearTimeout(storageTimer);
-        const aborted =
-          directErr?.name === 'AbortError' ||
-          storageAborter.signal.aborted ||
-          String(directErr?.message || '').includes('aborted');
-        if (aborted) {
+        if (raced.kind === 'timeout') {
           uploadError = { message: 'Direct storage timed out' };
           console.warn(
-            `[${file.name}] Direct storage aborted after ${DIRECT_STORAGE_TIMEOUT_MS}ms — trying Edge Function`,
+            `[${file.name}] Direct storage no response after ${DIRECT_STORAGE_TIMEOUT_MS}ms — trying Edge Function`,
           );
         } else {
-          uploadError = directErr;
-          console.warn(`[${file.name}] Direct storage threw:`, directErr?.message || directErr);
+          const { error: storageErr } = raced.r;
+          if (!storageErr) {
+            const { data: urlData } = supabase.storage.from('business-photos').getPublicUrl(filePath);
+            uploadData = { url: urlData.publicUrl, filePath, success: true };
+            console.log(`[${file.name}] Direct storage upload succeeded (${elapsed}ms)`);
+          } else {
+            uploadError = { message: storageErr.message };
+            console.warn(`[${file.name}] Direct storage failed:`, storageErr.message);
+          }
         }
+      } catch (directErr: any) {
+        uploadError = directErr;
+        console.warn(`[${file.name}] Direct storage threw:`, directErr?.message || directErr);
       }
 
       // Strategy B: Edge Function fallback (if direct storage fails, e.g. RLS not applied)
       if (!uploadData && uploadError) {
         console.warn(`[${file.name}] Trying upload-photo Edge Function...`);
-        const UPLOAD_TIMEOUT_MS = 45_000;
-        const EDGE_AUTH_HEADER_MS = 20_000;
+        const UPLOAD_TIMEOUT_MS = 60_000;
+        const EDGE_AUTH_HEADER_MS = 30_000;
         const edgeAborter = new AbortController();
         const edgeTimer = setTimeout(() => edgeAborter.abort(), UPLOAD_TIMEOUT_MS);
         try {
-          const headers = await Promise.race([
-            getEdgeAuthHeaders(),
-            new Promise<Record<string, string>>((_, reject) =>
-              setTimeout(
-                () => reject(new Error('Session lookup timed out — sign out and sign in, then retry')),
-                EDGE_AUTH_HEADER_MS,
+          let headers: Record<string, string>;
+          try {
+            headers = await Promise.race([
+              getEdgeAuthHeaders(),
+              new Promise<Record<string, string>>((_, reject) =>
+                setTimeout(
+                  () => reject(new Error('getEdgeAuthHeaders slow')),
+                  EDGE_AUTH_HEADER_MS,
+                ),
               ),
-            ),
-          ]);
+            ]);
+          } catch {
+            const { data: sess } = await supabase.auth.getSession();
+            const t = sess?.session?.access_token;
+            headers = t ? { Authorization: `Bearer ${t}` } : {};
+          }
 
           const result = await supabase.functions.invoke('upload-photo', {
             body: {
@@ -449,7 +465,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           clearTimeout(edgeTimer);
           const aborted = invokeErr?.name === 'AbortError' || edgeAborter.signal.aborted;
           const msg = aborted
-            ? 'Upload timed out after 45 seconds'
+            ? `Upload timed out after ${Math.round(UPLOAD_TIMEOUT_MS / 1000)} seconds`
             : invokeErr?.message || String(invokeErr);
           console.warn(
             `[${file.name}] Edge Function ${aborted ? 'aborted (timeout)' : 'failed'}:`,
