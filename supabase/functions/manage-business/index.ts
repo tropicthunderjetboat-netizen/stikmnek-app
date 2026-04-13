@@ -534,6 +534,7 @@ Deno.serve(async (req) => {
     }
 
     // ─── WITHDRAW_PENDING_SUBMISSION (owner: remove stuck / unwanted pending or rejected row) ───
+    // Uses service-role client `supabase` below (RLS bypass). Caller identity is verified via JWT → authUser.
     if (action === 'withdraw_pending_submission') {
       const pendingId = body.pendingId ?? body.pending_id;
       if (!pendingId) return errorResponse(req, 'Missing pendingId', 400);

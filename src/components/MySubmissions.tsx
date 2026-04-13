@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { supabase, SUPABASE_URL } from '@/lib/supabase';
+import { FunctionsHttpError } from '@supabase/supabase-js';
+import { supabase, SUPABASE_URL, getEdgeAuthHeaders } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Business } from '@/data/businesses';
 import { getBusinessImageUrl } from '@/lib/utils';
@@ -90,50 +91,115 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
 
   const handleWithdrawSubmission = useCallback(
     async (submission: Submission) => {
-      if (!user?.id) return;
-      const confirmMessage =
-        submission.status === 'approved'
-          ? language === 'en'
-            ? `Remove "${submission.name}" from My Submissions? This deletes the dashboard record only (e.g. stuck "approved" rows). It does not remove a live listing from Explore. This cannot be undone.`
-            : language === 'fr'
-              ? `Retirer « ${submission.name} » de Mes soumissions ? Supprime uniquement l’entrée du tableau de bord. Irréversible.`
-              : `Raetem "${submission.name}" long dashboard? Hem i raetem wan row nomo.`
-          : language === 'en'
-            ? `Remove "${submission.name}" from your submissions? This cannot be undone.`
-            : language === 'fr'
-              ? `Retirer « ${submission.name} » de vos soumissions ? Action irréversible.`
-              : `Raetem "${submission.name}" long ol sabmisen?`;
-      const ok = window.confirm(confirmMessage);
-      if (!ok) return;
-
-      setWithdrawingId(submission.id);
+      console.log('!!! WITHDRAW FUNCTION TRIGGERED !!!', submission.id);
       try {
-        const { data, error } = await supabase.functions.invoke('manage-business', {
-          body: {
-            action: 'withdraw_pending_submission',
-            pendingId: submission.id,
-          },
-        });
-        const payload = data as { success?: boolean; error?: string } | null | undefined;
-        let errMsg =
-          payload?.error || (error as { message?: string } | null)?.message;
-        if (!errMsg && error && typeof error === 'object' && 'context' in error) {
-          try {
-            const res = (error as { context?: Response }).context;
-            if (res && typeof res.clone === 'function') {
-              const t = await res.clone().text();
-              try {
-                errMsg = (JSON.parse(t) as { error?: string }).error;
-              } catch {
-                errMsg = t?.slice(0, 200);
-              }
-            }
-          } catch {
-            /* ignore */
-          }
+        if (!user?.id) {
+          console.warn('[MySubmissions] withdraw: skipped — no user?.id');
+          toast.error(
+            language === 'en' ? 'Sign in again to remove submissions.' : 'Reconnectez-vous pour supprimer.',
+          );
+          return;
         }
-        if (!payload?.success) {
-          console.error('[MySubmissions] withdraw_pending_submission:', error, data);
+
+        const confirmMessage =
+          submission.status === 'approved'
+            ? language === 'en'
+              ? `Remove "${submission.name}" from My Submissions? This deletes the dashboard record only (e.g. stuck "approved" rows). It does not remove a live listing from Explore. This cannot be undone.`
+              : language === 'fr'
+                ? `Retirer « ${submission.name} » de Mes soumissions ? Supprime uniquement l’entrée du tableau de bord. Irréversible.`
+                : `Raetem "${submission.name}" long dashboard? Hem i raetem wan row nomo.`
+            : language === 'en'
+              ? `Remove "${submission.name}" from your submissions? This cannot be undone.`
+              : language === 'fr'
+                ? `Retirer « ${submission.name} » de vos soumissions ? Action irréversible.`
+                : `Raetem "${submission.name}" long ol sabmisen?`;
+
+        const confirmed = window.confirm(confirmMessage);
+        console.log('[MySubmissions] withdraw: confirm result', {
+          confirmed,
+          submissionId: submission.id,
+        });
+        if (!confirmed) {
+          console.log('[MySubmissions] withdraw: user cancelled');
+          return;
+        }
+
+        setWithdrawingId(submission.id);
+
+        const headers = await getEdgeAuthHeaders();
+        console.log('Attempting Edge Function Invoke...', {
+          pendingId: submission.id,
+          hasAuthorizationHeader: Boolean(headers?.Authorization),
+        });
+
+        const invokeAborter = new AbortController();
+        const withdrawInvokeMs = 90_000;
+        const invokeTimer = setTimeout(() => invokeAborter.abort(), withdrawInvokeMs);
+
+        let data: unknown;
+        let error: unknown;
+        let response: Response | undefined;
+        try {
+          const result = await supabase.functions.invoke('manage-business', {
+            body: {
+              action: 'withdraw_pending_submission',
+              pendingId: submission.id,
+            },
+            headers,
+            signal: invokeAborter.signal,
+          });
+          data = result.data;
+          error = result.error;
+          response = result.response as Response | undefined;
+        } finally {
+          clearTimeout(invokeTimer);
+        }
+
+        console.log('[MySubmissions] withdraw: invoke settled', {
+          hasError: Boolean(error),
+          errorName: error && typeof error === 'object' && 'name' in error ? (error as Error).name : null,
+          responseStatus: response?.status,
+          dataSummary: data && typeof data === 'object' ? (data as { success?: boolean }).success : data,
+        });
+
+        if (error) {
+          console.error('!!! WITHDRAW FAILED !!!', error);
+          if (
+            error instanceof FunctionsHttpError ||
+            (error as { name?: string }).name === 'FunctionsHttpError'
+          ) {
+            const ctx = (error as FunctionsHttpError).context as Response | undefined;
+            if (ctx && typeof ctx.status === 'number') {
+              let bodyText = '';
+              try {
+                bodyText = await ctx.clone().text();
+              } catch (readErr) {
+                bodyText = `(could not read body: ${String(readErr)})`;
+              }
+              console.error('[MySubmissions] FunctionsHttpError details', {
+                status: ctx.status,
+                statusText: ctx.statusText,
+                bodyText: bodyText.slice(0, 4000),
+              });
+            }
+          }
+          const errObj = error as { message?: string };
+          let errMsg = errObj?.message;
+          if (!errMsg && error && typeof error === 'object' && 'context' in error) {
+            try {
+              const res = (error as { context?: Response }).context;
+              if (res && typeof res.clone === 'function') {
+                const t = await res.clone().text();
+                try {
+                  errMsg = (JSON.parse(t) as { error?: string }).error;
+                } catch {
+                  errMsg = t?.slice(0, 200);
+                }
+              }
+            } catch {
+              /* ignore */
+            }
+          }
           toast.error(
             errMsg ||
               (language === 'en'
@@ -142,6 +208,23 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
           );
           return;
         }
+
+        const payload = data as { success?: boolean; error?: string } | null | undefined;
+        let payloadErrMsg = payload?.error;
+        if (!payload?.success) {
+          console.error('[MySubmissions] withdraw_pending_submission: success=false or missing', {
+            data: payload,
+          });
+          toast.error(
+            payloadErrMsg ||
+              (language === 'en'
+                ? 'Could not remove submission. Try again or contact support.'
+                : 'Impossible de retirer la soumission.'),
+          );
+          return;
+        }
+
+        console.log('[MySubmissions] withdraw: success', submission.id);
         setSubmissions((prev) => prev.filter((s) => s.id !== submission.id));
         setUnseenChanges((prev) => {
           const next = new Set(prev);
@@ -156,8 +239,27 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
               ? 'Soumission supprimée.'
               : 'Sabmisen i raetem.',
         );
-      } catch (e) {
-        console.error('[MySubmissions] withdraw:', e);
+      } catch (err) {
+        console.error('!!! WITHDRAW FAILED !!!', err);
+        if (
+          err instanceof FunctionsHttpError ||
+          (err as { name?: string })?.name === 'FunctionsHttpError'
+        ) {
+          const ctx = (err as FunctionsHttpError).context as Response | undefined;
+          if (ctx && typeof ctx.status === 'number') {
+            let bodyText = '';
+            try {
+              bodyText = await ctx.clone().text();
+            } catch (readErr) {
+              bodyText = `(could not read body: ${String(readErr)})`;
+            }
+            console.error('[MySubmissions] FunctionsHttpError details (catch)', {
+              status: ctx.status,
+              statusText: ctx.statusText,
+              bodyText: bodyText.slice(0, 4000),
+            });
+          }
+        }
         toast.error(language === 'en' ? 'Could not remove submission.' : 'Échec.');
       } finally {
         setWithdrawingId(null);
@@ -1060,6 +1162,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
                       <button
                         type="button"
                         onClick={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
                           void handleWithdrawSubmission(submission);
                         }}
