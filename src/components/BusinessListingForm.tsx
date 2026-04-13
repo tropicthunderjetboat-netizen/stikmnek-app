@@ -27,6 +27,10 @@ import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 
 /** Per-invoke ceiling so cold starts / large payloads cannot hang the form forever */
 const EDGE_INVOKE_TIMEOUT_MS = 120_000;
+/** Same as PhotoUploader: avoid indefinite wait if auth lock/session read stalls */
+const EDGE_AUTH_HEADER_MS = 20_000;
+/** Primary submit path uses RPC — must not hang forever if REST/PostgREST stalls */
+const RPC_INSERT_PENDING_TIMEOUT_MS = 90_000;
 
 // ─── Retry helper for edge function calls ───
 async function invokeWithRetry(
@@ -45,20 +49,32 @@ async function invokeWithRetry(
         await new Promise(r => setTimeout(r, delay));
       }
       const startMs = Date.now();
-      const headers = await getEdgeAuthHeaders();
-      const invokePromise = supabase.functions.invoke(fnName, { body, headers });
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error(
-                `${label || fnName}: timed out after ${Math.round(EDGE_INVOKE_TIMEOUT_MS / 1000)}s`,
+      const headers = await Promise.race([
+        getEdgeAuthHeaders(),
+        new Promise<Record<string, string>>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `${label || fnName}: session lookup timed out — sign out and sign in, then retry`,
+                ),
               ),
-            ),
-          EDGE_INVOKE_TIMEOUT_MS,
+            EDGE_AUTH_HEADER_MS,
+          ),
         ),
-      );
-      const result = await Promise.race([invokePromise, timeoutPromise]);
+      ]);
+      const invokeAborter = new AbortController();
+      const invokeTimer = setTimeout(() => invokeAborter.abort(), EDGE_INVOKE_TIMEOUT_MS);
+      let result: { data: any; error: any };
+      try {
+        result = await supabase.functions.invoke(fnName, {
+          body,
+          headers,
+          signal: invokeAborter.signal,
+        });
+      } finally {
+        clearTimeout(invokeTimer);
+      }
       const elapsed = Date.now() - startMs;
       console.log(`[BusinessForm] ${label} ${fnName} attempt ${attempt}: ${elapsed}ms`, {
         hasData: !!result.data,
@@ -445,27 +461,48 @@ const BusinessListingForm: React.FC = () => {
       });
 
       // Strategy 1: RPC insert (SECURITY DEFINER, bypasses RLS — most reliable)
-      const { data: rpcId, error: rpcError } = await supabase.rpc('insert_pending_business', {
-        p_owner_id: user.id,
-        p_name: form.name,
-        p_category: form.category,
-        p_description: form.description,
-        p_discount: form.discount,
-        p_original_price: Number(form.originalPrice) || 0,
-        p_deal_price: Number(form.dealPrice) || 0,
-        p_location: form.address || 'Port Vila, Vanuatu',
-        p_phone: form.phone,
-        p_email: form.email || user.email,
-        p_hours: form.hours,
-        p_image: mainImageUrl,
-        p_map_url: form.mapUrl || null,
-        p_website: normalizedWebsite,
-        p_discount_valid_from: form.discountValidFrom || null,
-        p_discount_valid_until: discountValidUntil || null,
-        p_whatsapp_number: form.whatsappNumber || null,
-        p_pricing_tiers: tiersPayload,
-        p_business_id: ownerProfileBusinessId,
-      });
+      const rpcAborter = new AbortController();
+      const rpcTimer = setTimeout(() => rpcAborter.abort(), RPC_INSERT_PENDING_TIMEOUT_MS);
+      let rpcId: string | null = null;
+      let rpcError: { message?: string; name?: string } | null = null;
+      try {
+        const rpcRes = await supabase
+          .rpc('insert_pending_business', {
+            p_owner_id: user.id,
+            p_name: form.name,
+            p_category: form.category,
+            p_description: form.description,
+            p_discount: form.discount,
+            p_original_price: Number(form.originalPrice) || 0,
+            p_deal_price: Number(form.dealPrice) || 0,
+            p_location: form.address || 'Port Vila, Vanuatu',
+            p_phone: form.phone,
+            p_email: form.email || user.email,
+            p_hours: form.hours,
+            p_image: mainImageUrl,
+            p_map_url: form.mapUrl || null,
+            p_website: normalizedWebsite,
+            p_discount_valid_from: form.discountValidFrom || null,
+            p_discount_valid_until: discountValidUntil || null,
+            p_whatsapp_number: form.whatsappNumber || null,
+            p_pricing_tiers: tiersPayload,
+            p_business_id: ownerProfileBusinessId,
+          })
+          .abortSignal(rpcAborter.signal);
+        rpcId = rpcRes.data != null ? String(rpcRes.data) : null;
+        rpcError = rpcRes.error;
+      } catch (rpcEx: any) {
+        const aborted =
+          rpcEx?.name === 'AbortError' || String(rpcEx?.message || '').toLowerCase().includes('abort');
+        rpcError = {
+          message: aborted
+            ? `Saving your listing timed out after ${Math.round(RPC_INSERT_PENDING_TIMEOUT_MS / 1000)}s. Check your connection and try again.`
+            : rpcEx?.message || String(rpcEx),
+          name: rpcEx?.name,
+        };
+      } finally {
+        clearTimeout(rpcTimer);
+      }
 
       if (!rpcError && rpcId) {
         console.log('[BusinessForm] RPC insert SUCCESS:', rpcId);
