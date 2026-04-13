@@ -91,14 +91,19 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
   const handleWithdrawSubmission = useCallback(
     async (submission: Submission) => {
       if (!user?.id) return;
-      if (submission.status === 'approved') return;
-      const ok = window.confirm(
-        language === 'en'
-          ? `Remove "${submission.name}" from your submissions? This cannot be undone.`
-          : language === 'fr'
-            ? `Retirer « ${submission.name} » de vos soumissions ? Action irréversible.`
-            : `Raetem "${submission.name}" long ol sabmisen?`,
-      );
+      const confirmMessage =
+        submission.status === 'approved'
+          ? language === 'en'
+            ? `Remove "${submission.name}" from My Submissions? This deletes the dashboard record only (e.g. stuck "approved" rows). It does not remove a live listing from Explore. This cannot be undone.`
+            : language === 'fr'
+              ? `Retirer « ${submission.name} » de Mes soumissions ? Supprime uniquement l’entrée du tableau de bord. Irréversible.`
+              : `Raetem "${submission.name}" long dashboard? Hem i raetem wan row nomo.`
+          : language === 'en'
+            ? `Remove "${submission.name}" from your submissions? This cannot be undone.`
+            : language === 'fr'
+              ? `Retirer « ${submission.name} » de vos soumissions ? Action irréversible.`
+              : `Raetem "${submission.name}" long ol sabmisen?`;
+      const ok = window.confirm(confirmMessage);
       if (!ok) return;
 
       setWithdrawingId(submission.id);
@@ -1052,29 +1057,26 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
 
                     {/* Action buttons based on status */}
                     <div className="flex flex-wrap gap-2 mt-4">
-                      {(submission.status === 'pending' ||
-                        submission.status === 'rejected') && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleWithdrawSubmission(submission);
-                          }}
-                          disabled={withdrawingId === submission.id}
-                          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 transition-colors disabled:opacity-50"
-                        >
-                          {withdrawingId === submission.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
-                          )}
-                          {language === 'en'
-                            ? 'Delete submission'
-                            : language === 'fr'
-                              ? 'Supprimer la soumission'
-                              : 'Raetem sabmisen'}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleWithdrawSubmission(submission);
+                        }}
+                        disabled={withdrawingId === submission.id}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 transition-colors disabled:opacity-50"
+                      >
+                        {withdrawingId === submission.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5" />
+                        )}
+                        {language === 'en'
+                          ? 'Delete submission'
+                          : language === 'fr'
+                            ? 'Supprimer la soumission'
+                            : 'Raetem sabmisen'}
+                      </button>
                       {submission.status === 'approved' && (
                         <button
                           type="button"

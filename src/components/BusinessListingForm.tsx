@@ -463,13 +463,12 @@ const BusinessListingForm: React.FC = () => {
       }
     }
 
-    setSubmitting(true);
-
     const submitTimedOutMsg =
       language === 'en'
         ? 'The connection is slow. Please check your internet and try again.'
         : 'La connexion est lente. Vérifiez votre réseau et réessayez.';
 
+    setSubmitting(true);
     try {
       await Promise.race([
         (async () => {
@@ -687,6 +686,7 @@ const BusinessListingForm: React.FC = () => {
       console.error('[BusinessForm] Submit business FINAL error:', err);
       void formatListingSubmitCatchError(err, language).then((msg) => toast.error(msg));
     } finally {
+      // Always re-enable submit after RPC failure, edge failure, timeout, or thrown errors.
       setSubmitting(false);
     }
 

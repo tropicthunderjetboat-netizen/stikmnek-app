@@ -550,9 +550,7 @@ Deno.serve(async (req) => {
       if (String(row.owner_id) !== String(authUser.id)) {
         return errorResponse(req, 'Access denied', 403);
       }
-      if (row.status === 'approved') {
-        return errorResponse(req, 'Approved submissions cannot be withdrawn here', 400);
-      }
+      // Owner may remove any pending_businesses row (including status=approved) to clear stuck dashboard rows.
 
       await supabase.from('business_photos').delete().eq('business_id', String(pendingId));
       const { error: delErr } = await supabase
