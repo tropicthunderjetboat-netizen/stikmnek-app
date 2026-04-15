@@ -11,6 +11,43 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://hbaflbmfptobyfqbudrt.supabase.co';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYWZsYm1mcHRvYnlmcWJ1ZHJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MTMwMTIsImV4cCI6MjA4NzI4OTAxMn0.Ukdx0PKI6cpoEdKGcV4LgcgumkhDIfiIXbmVMgbqKL0';
 
+/** Subdomain of `*.supabase.co` — used to drop stale `sb-<other>-*` keys from other projects / hosts. */
+export function getSupabaseProjectRefFromUrl(url: string): string {
+  try {
+    const host = new URL(url).hostname;
+    return host.split('.')[0] || 'hbaflbmfptobyfqbudrt';
+  } catch {
+    return 'hbaflbmfptobyfqbudrt';
+  }
+}
+
+export const SUPABASE_PROJECT_REF = getSupabaseProjectRefFromUrl(supabaseUrl);
+
+/**
+ * GoTrue may persist sessions under `sb-<project-ref>-*` while this app uses `storageKey: 'stikmnek-auth'`.
+ * Stale `sb-<wrong-ref>-*` keys (e.g. after switching deploy URL) can make the browser send the wrong JWT to Storage.
+ */
+function purgeStaleSbPrefixedLocalStorageKeys(expectedProjectRef: string): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  const allowedPrefix = `sb-${expectedProjectRef}-`;
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('sb-') && !k.startsWith(allowedPrefix)) {
+      keysToRemove.push(k);
+    }
+  }
+  for (const k of keysToRemove) {
+    try {
+      localStorage.removeItem(k);
+      console.warn('[supabase] Removed stale localStorage key (not this project):', k);
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }
+}
+
+purgeStaleSbPrefixedLocalStorageKeys(SUPABASE_PROJECT_REF);
 
 // ═══════════════════════════════════════════════════════════════
 // DERIVED ENDPOINTS — These are the exact URLs the SDK calls.
@@ -74,6 +111,8 @@ async function authSessionLock<R>(
   }
 }
 
+// Client: no global `headers` override — Storage/REST use the session JWT from auth.
+// `storageKey: 'stikmnek-auth'` isolates session JSON from default `sb-<ref>-auth-token` keys (stale keys purged above).
 const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true,

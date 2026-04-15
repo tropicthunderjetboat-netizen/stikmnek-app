@@ -1,0 +1,5 @@
+-- Deprecated: this script used `ALTER TABLE storage.objects`, which can fail with
+-- ERROR: 42501 must be owner of table objects in some SQL Editor roles.
+--
+-- Use instead:
+--   supabase/scripts/reset_storage_business_photos_policies_dashboard.sql
