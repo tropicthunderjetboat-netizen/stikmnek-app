@@ -48,6 +48,16 @@ async function authSessionLock<R>(
   fn: () => Promise<R>
 ): Promise<R> {
   const existing = lockMap.get(name);
+  // Wait for the current lock holder *before* registering ourselves.
+  // If we set our gate first, earlier callers can no longer clear the map entry,
+  // and concurrent auth operations can overlap and deadlock the SDK/network.
+  if (existing) {
+    await Promise.race([
+      existing,
+      new Promise<void>((r) => setTimeout(r, acquireTimeout)),
+    ]);
+  }
+
   let resolveGate: (v?: any) => void;
   const gate = new Promise<void>((r) => {
     resolveGate = r;
@@ -55,12 +65,6 @@ async function authSessionLock<R>(
   lockMap.set(name, gate);
 
   try {
-    if (existing) {
-      await Promise.race([
-        existing,
-        new Promise<void>((r) => setTimeout(r, acquireTimeout)),
-      ]);
-    }
     return await fn();
   } finally {
     resolveGate!();
