@@ -64,6 +64,18 @@ function legalSlugFromPath(pathname: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+/** Single listing form instance for home + /business/new (dashboard uses the same component in its Submit tab). */
+function BusinessListingFormInLayout({ padded }: { padded: boolean }) {
+  if (padded) {
+    return (
+      <div className="pt-16 max-w-4xl mx-auto px-4">
+        <BusinessListingForm />
+      </div>
+    );
+  }
+  return <BusinessListingForm />;
+}
+
 const AppLayout: React.FC = () => {
   const location = useLocation();
   const {
@@ -242,11 +254,7 @@ const AppLayout: React.FC = () => {
           </div>
         );
       case 'business-new':
-        return (
-          <div className="pt-16 max-w-4xl mx-auto px-4">
-            <BusinessListingForm />
-          </div>
-        );
+        return <BusinessListingFormInLayout padded />;
       case 'home':
       default:
         return (
@@ -258,7 +266,7 @@ const AppLayout: React.FC = () => {
             <PassCards />
             <MapView />
             <ReviewsSection />
-            <BusinessListingForm />
+            <BusinessListingFormInLayout padded={false} />
           </>
         );
     }

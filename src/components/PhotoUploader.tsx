@@ -506,6 +506,8 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
         u.id === fileId ? { ...u, status: 'done', progress: 100 } : u
       ));
 
+      console.log('[PhotoUploader] Upload Succeeded:', file.name);
+
       setTimeout(() => {
         setUploading(prev => prev.filter(u => u.id !== fileId));
       }, 1500);
@@ -535,8 +537,8 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   }, [userId, maxSizeBytes, maxSizeMB]);
 
   /**
-   * Handle selected files. CRITICAL: We start reading files IMMEDIATELY
-   * in this handler, before any async gaps, to prevent stale file references.
+   * Handle selected files — strictly serial (read → compress+upload per file).
+   * Avoids overlapping storage / session token work that can stall when many files start at once.
    */
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -559,35 +561,25 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       toast.info(`Only uploading ${remaining} of ${fileArray.length} files (max ${maxPhotos})`);
     }
 
-    // ── CRITICAL: Start reading ALL files IMMEDIATELY ──
-    // FileReader must be initiated synchronously from the input change handler.
-    // If we wait (e.g., for a previous upload to finish), the File reference
-    // may become stale on mobile browsers.
-    console.log(`Starting immediate read of ${filesToUpload.length} files...`);
-    
-    const fileReads: Array<{ file: File; dataUrlPromise: Promise<string> }> = [];
-    
-    for (const file of filesToUpload) {
-      // Start FileReader IMMEDIATELY for each file
-      const dataUrlPromise = readFileAsDataUrl(file).catch(err => {
-        console.warn(`Immediate read failed for ${file.name}:`, err.message);
-        // Return empty string - uploadFile will try alternative methods
-        return '';
-      });
-      fileReads.push({ file, dataUrlPromise });
-    }
+    console.log(`[PhotoUploader] Serial queue: ${filesToUpload.length} file(s)`);
 
-    // Now process files sequentially (but reads are already started)
     const successful: UploadedPhoto[] = [];
-    for (const { file, dataUrlPromise } of fileReads) {
-      // Wait for the pre-read to complete
-      const preReadDataUrl = await dataUrlPromise;
-      
+    let accumulated = [...photos];
+
+    for (const file of filesToUpload) {
+      let preReadDataUrl = '';
+      try {
+        preReadDataUrl = await readFileAsDataUrl(file);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[PhotoUploader] Initial read failed for ${file.name}:`, msg);
+      }
+
       const result = await uploadFile(file, preReadDataUrl || undefined);
       if (result) {
         successful.push(result);
-        // Update photos incrementally so user sees progress
-        onPhotosChange([...photos, ...successful]);
+        accumulated = [...accumulated, result];
+        onPhotosChange(accumulated);
       }
     }
 

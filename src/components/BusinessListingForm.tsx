@@ -179,7 +179,15 @@ async function formatListingSubmitCatchError(
 }
 
 const BusinessListingForm: React.FC = () => {
-  const { language, user, setShowAuth, setAuthMode } = useAppContext();
+  const {
+    language,
+    user,
+    userProfile,
+    currentView,
+    setCurrentView,
+    setShowAuth,
+    setAuthMode,
+  } = useAppContext();
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
@@ -317,6 +325,47 @@ const BusinessListingForm: React.FC = () => {
     ? addDays(form.discountValidFrom, selectedDuration.days)
     : addDays(form.discountValidFrom, 30);
 
+  const resetFormAfterSuccess = useCallback(() => {
+    setForm({
+      name: '', category: 'dining', description: '', discount: '',
+      originalPrice: '', discountPercent: '', dealPrice: '',
+      address: '', phone: '', email: '', hours: '',
+      whatsappNumber: '',
+      mapUrl: '', website: '',
+      discountValidFrom: todayStr(),
+      listingDuration: '1_month',
+    });
+    setPhotos([]);
+    setPricingTiers([]);
+  }, []);
+
+  /** From home or /business/new, send owners to My Submissions so the new Pending row is visible. */
+  const afterListingSubmitSuccess = useCallback(() => {
+    toast.success(
+      language === 'en'
+        ? 'Business listing submitted for review!'
+        : 'Inscription soumise pour examen!',
+    );
+    resetFormAfterSuccess();
+    const role = userProfile?.role ?? user?.type;
+    if (role === 'business' && (currentView === 'home' || currentView === 'business-new')) {
+      setCurrentView('business-dashboard');
+      window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent('switch-dashboard-tab', { detail: { tab: 'submissions' } }),
+        );
+      }, 150);
+      return;
+    }
+    setSubmitted(true);
+  }, [
+    language,
+    user?.type,
+    userProfile?.role,
+    currentView,
+    setCurrentView,
+    resetFormAfterSuccess,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -615,23 +664,7 @@ const BusinessListingForm: React.FC = () => {
             throw photoEx;
           }
         }
-        setSubmitted(true);
-        toast.success(
-          language === 'en'
-            ? 'Business listing submitted for review!'
-            : 'Inscription soumise pour examen!'
-        );
-        setForm({
-          name: '', category: 'dining', description: '', discount: '',
-          originalPrice: '', discountPercent: '', dealPrice: '',
-          address: '', phone: '', email: '', hours: '',
-          whatsappNumber: '',
-          mapUrl: '', website: '',
-          discountValidFrom: todayStr(),
-          listingDuration: '1_month',
-        });
-        setPhotos([]);
-        setPricingTiers([]);
+        afterListingSubmitSuccess();
         return;
       }
 
@@ -649,23 +682,7 @@ const BusinessListingForm: React.FC = () => {
 
       if (data?.success && data?.business) {
         console.log('[BusinessForm] Edge function submission SUCCESS:', data.business.id);
-        setSubmitted(true);
-        toast.success(
-          language === 'en'
-            ? 'Business listing submitted for review!'
-            : 'Inscription soumise pour examen!'
-        );
-        setForm({
-          name: '', category: 'dining', description: '', discount: '',
-          originalPrice: '', discountPercent: '', dealPrice: '',
-          address: '', phone: '', email: '', hours: '',
-          whatsappNumber: '',
-          mapUrl: '', website: '',
-          discountValidFrom: todayStr(),
-          listingDuration: '1_month',
-        });
-        setPhotos([]);
-        setPricingTiers([]);
+        afterListingSubmitSuccess();
         return;
       }
 
