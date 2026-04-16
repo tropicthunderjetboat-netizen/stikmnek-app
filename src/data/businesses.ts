@@ -138,6 +138,16 @@ export function touristFacingOfferings(db: Business[]): Business[] {
   return db.filter((b) => b.active !== false);
 }
 
+/** Non-empty WhatsApp on listing (camelCase from mapper or snake_case passthrough). */
+export function businessListingWhatsAppRaw(biz: Business): string {
+  const raw = biz.whatsappNumber ?? biz.whatsapp_number;
+  return typeof raw === 'string' ? raw.trim() : '';
+}
+
+export function businessListingHasWhatsApp(biz: Business): boolean {
+  return businessListingWhatsAppRaw(biz).length > 0;
+}
+
 /**
  * @deprecated Prefer `touristFacingOfferings` — kept for older imports; second arg ignored (no mock fallback).
  */

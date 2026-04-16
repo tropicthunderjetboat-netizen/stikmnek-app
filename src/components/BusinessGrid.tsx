@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useAppContext, ViewMode } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import {
@@ -8,6 +8,8 @@ import {
   effectiveListingOriginalPrice,
   effectiveListingDescriptionPlain,
   touristFacingOfferings,
+  businessListingHasWhatsApp,
+  businessListingWhatsAppRaw,
 } from '@/data/businesses';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import BusinessCard from './BusinessCard';
@@ -108,13 +110,25 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [whatsappFilter, setWhatsappFilter] = useState(false);
 
+  /** Turning on WhatsApp filter must clear category — otherwise we intersect e.g. "Accommodation" with WA and show 0 while the chip still says (8). */
+  const setWhatsappFilterWrapped = useCallback(
+    (value: React.SetStateAction<boolean>) => {
+      setWhatsappFilter((prev) => {
+        const next = typeof value === 'function' ? (value as (p: boolean) => boolean)(prev) : value;
+        if (next) setSelectedCategory('all');
+        return next;
+      });
+    },
+    [setSelectedCategory],
+  );
+
   const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
   const maxPrice = useMemo(() => Math.max(...allBusinesses.map(b => b.dealPrice || b.originalPrice), 50000), [allBusinesses]);
 
   // Count businesses with WhatsApp for the filter chip badge
   const whatsappCount = useMemo(() => {
-    return allBusinesses.filter(b => !!b.whatsappNumber).length;
+    return allBusinesses.filter(businessListingHasWhatsApp).length;
   }, [allBusinesses]);
 
   const filtered = useMemo(() => {
@@ -123,7 +137,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
       if (selectedCategory !== 'all' && biz.category !== selectedCategory) return false;
 
       // WhatsApp filter
-      if (whatsappFilter && !biz.whatsappNumber) return false;
+      if (whatsappFilter && !businessListingHasWhatsApp(biz)) return false;
 
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -131,7 +145,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
         // Special: searching for 'whatsapp' shows businesses with WhatsApp numbers
         const isWhatsAppSearch = q === 'whatsapp' || q === 'wa' || q === 'whats app' || q.includes('whatsapp');
         if (isWhatsAppSearch) {
-          return !!biz.whatsappNumber;
+          return businessListingHasWhatsApp(biz);
         }
 
         // Enhanced search: name, description, location, tags, category, whatsappNumber
@@ -145,9 +159,8 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
         });
 
         // WhatsApp number in search index
-        const whatsappMatch = biz.whatsappNumber
-          ? biz.whatsappNumber.includes(q)
-          : false;
+        const wa = businessListingWhatsAppRaw(biz);
+        const whatsappMatch = wa.length > 0 ? wa.toLowerCase().includes(q) : false;
 
         // Also check phonetic-like matching (first 3 chars)
         const phoneticMatch = q.length >= 3 && (
@@ -304,7 +317,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
               setMinRating={setMinRating}
               maxPrice={maxPrice}
               whatsappFilter={whatsappFilter}
-              setWhatsappFilter={setWhatsappFilter}
+              setWhatsappFilter={setWhatsappFilterWrapped}
             />
 
             {/* Category Filters + WhatsApp Chip + View Toggle */}
@@ -341,7 +354,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
                 {/* ── Green WhatsApp Filter Chip ── */}
                 {whatsappCount > 0 && (
                   <button
-                    onClick={() => setWhatsappFilter(!whatsappFilter)}
+                    onClick={() => setWhatsappFilterWrapped((prev) => !prev)}
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                       whatsappFilter
                         ? 'bg-green-600 text-white shadow-md shadow-green-200'

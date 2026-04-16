@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { touristFacingOfferings } from '@/data/businesses';
+import { touristFacingOfferings, businessListingHasWhatsApp } from '@/data/businesses';
 import { Search, SlidersHorizontal, X, Clock, TrendingUp, ArrowUpDown, Star, ChevronDown, ChevronUp, DollarSign, Navigation, Loader2, Award, Tag, Sparkles, MessageCircle } from 'lucide-react';
 
 export type SortOption = 'featured' | 'leaderboard' | 'price-low' | 'price-high' | 'rating' | 'savings' | 'reviews' | 'near-me';
@@ -15,7 +15,7 @@ interface AdvancedSearchProps {
   setMinRating: (r: number) => void;
   maxPrice: number;
   whatsappFilter: boolean;
-  setWhatsappFilter: (v: boolean) => void;
+  setWhatsappFilter: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 // WhatsApp SVG icon component
@@ -41,7 +41,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
   // Count businesses with WhatsApp
   const whatsappCount = useMemo(() => {
-    return allBusinesses.filter(b => !!b.whatsappNumber).length;
+    return allBusinesses.filter(businessListingHasWhatsApp).length;
   }, [allBusinesses]);
 
   // Extract all unique tags from businesses for auto-suggest
