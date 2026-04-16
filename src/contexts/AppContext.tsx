@@ -406,9 +406,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loadBusinesses = useCallback(async () => {
     const DBG = '[loadBusinesses]';
     try {
-      // Load from `business_offerings` so stub profiles (`businesses.active = false`) with live
-      // offerings are not dropped by a parent `.eq('active', true)` filter. Embed `businesses`
-      // without `!inner` (default left join) so RLS can still attach the profile row when allowed.
+      // Every active offering → one `Business` in `dbBusinesses` (no Map/Object keyed by business_id).
+      // Load from `business_offerings` so stub profiles (`businesses.active = false`) still surface
+      // their live offers. Embed `businesses` without `!inner` (default left join).
       const { data: offeringRows, error: loadErr } = await supabase
         .from('business_offerings')
         .select(`
@@ -445,11 +445,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               profile,
               SUPABASE_URL,
             );
-            const profileActive = profile.active !== false;
-            mapped.push({
-              ...b,
-              active: profileActive && b.active !== false,
-            });
+            // Public visibility follows the offering row only (stub profiles may have `active = false`).
+            mapped.push(b);
           } catch (mapErr) {
             console.warn(
               `${DBG} Skipping offering:`,

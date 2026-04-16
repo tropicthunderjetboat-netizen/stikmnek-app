@@ -28,13 +28,19 @@ function asCategory(raw: unknown): Category {
   return 'dining';
 }
 
-/** Per-listing category: first canonical key in `business_offerings.tags`; if tags empty/null/non-category, use profile `businesses.category`. */
-function listingCategoryFromOffering(o: Record<string, unknown>, profileCategory: unknown): Category {
+/**
+ * Per-listing category for filters: first canonical key in `business_offerings.tags`;
+ * else parent `businesses.category` if valid; else `'activities'` so the row always has a tab bucket.
+ */
+export function listingCategoryFromOffering(o: Record<string, unknown>, profileCategory: unknown): Category {
   const tags = o.tags == null ? [] : Array.isArray(o.tags) ? (o.tags as unknown[]) : [];
   for (const t of tags) {
     if (typeof t === 'string' && CATEGORY_KEYS.has(t as Category)) return t as Category;
   }
-  return asCategory(profileCategory);
+  if (typeof profileCategory === 'string' && CATEGORY_KEYS.has(profileCategory as Category)) {
+    return profileCategory as Category;
+  }
+  return 'activities';
 }
 
 /**
@@ -136,10 +142,3 @@ export function effectiveProfileBusinessId(x: {
   return (x.profileBusinessId ?? x._profileBusinessId ?? x.id) as string;
 }
 
-/**
- * @deprecated Public deals use one card per offering; do not collapse multi-offer profiles.
- * Kept for any legacy import — returns input unchanged.
- */
-export function pickRepresentativeOfferingsPerProfile(businesses: Business[]): Business[] {
-  return businesses;
-}

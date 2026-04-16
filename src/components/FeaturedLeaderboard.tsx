@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import type { Business } from '@/data/businesses';
 import {
-  businesses as localBusinesses,
-  publicListingBusinesses,
   effectiveListingDealPrice,
   effectiveListingOriginalPrice,
   listingHasActiveDiscount,
@@ -25,7 +24,7 @@ const WEIGHTS = {
 };
 
 interface ScoredBusiness {
-  business: typeof localBusinesses[0];
+  business: Business;
   score: number;
   rank: number;
   breakdown: {
@@ -43,7 +42,7 @@ const FeaturedLeaderboard: React.FC = () => {
   const [showScoring, setShowScoring] = useState(false);
 
   const allBusinesses = useMemo(
-    () => publicListingBusinesses(dbBusinesses, localBusinesses),
+    () => dbBusinesses.filter((b) => b.active !== false),
     [dbBusinesses],
   );
 
@@ -127,7 +126,7 @@ const FeaturedLeaderboard: React.FC = () => {
   const displayCount = showAll ? leaderboard.length : 6;
   const topDeals = leaderboard.slice(0, displayCount);
 
-  const handleViewDeal = (biz: typeof localBusinesses[0]) => {
+  const handleViewDeal = (biz: Business) => {
     setSelectedBusiness(biz);
     setCurrentView('business-detail');
   };

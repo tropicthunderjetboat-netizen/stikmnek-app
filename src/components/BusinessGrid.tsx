@@ -2,9 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAppContext, ViewMode } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import {
-  businesses as localBusinesses,
   categories,
-  publicListingBusinesses,
   Business,
   effectiveListingDealPrice,
   effectiveListingOriginalPrice,
@@ -109,8 +107,9 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [whatsappFilter, setWhatsappFilter] = useState(false);
 
+  // Raw server rows only — one card per offering (`Business.id` = offering id); no dedupe/grouping.
   const allBusinesses = useMemo(
-    () => publicListingBusinesses(dbBusinesses, localBusinesses),
+    () => dbBusinesses.filter((b) => b.active !== false),
     [dbBusinesses],
   );
 
