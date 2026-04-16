@@ -130,11 +130,13 @@ export function effectiveListingDescriptionPlain(b: Business): string {
   return primaryOfferingDescriptionHtml(b);
 }
 
-/** Tourist-facing lists: hide `active === false` DB rows; keep local fallback when DB empty or only stubs. */
-export function publicListingBusinesses(db: Business[], local: Business[]): Business[] {
-  if (db.length === 0) return local;
-  const pub = db.filter((b) => b.active !== false);
-  return pub.length > 0 ? pub : local;
+/**
+ * Tourist-facing lists: hide `active === false` rows from the server.
+ * Does not substitute hardcoded mock `local` listings when the DB returns zero rows (so an empty DB shows as empty).
+ */
+export function publicListingBusinesses(db: Business[], _local: Business[] = []): Business[] {
+  void _local;
+  return db.filter((b) => b.active !== false);
 }
 
 

@@ -3,7 +3,11 @@ import { toast } from 'sonner';
 import { Language } from '@/data/translations';
 import { Business } from '@/data/businesses';
 import { supabase, directProfileInsert, SUPABASE_URL, ENDPOINTS } from '@/lib/supabase';
-import { mapJoinedOfferingToBusiness, OFFERING_LISTING_COLUMNS } from '@/lib/businessOfferingMap';
+import {
+  mapJoinedOfferingToBusiness,
+  OFFERING_LISTING_COLUMNS,
+  BUSINESS_PROFILE_EMBED_COLS,
+} from '@/lib/businessOfferingMap';
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
@@ -14,16 +18,16 @@ import { PASS_PRODUCTS, passProductIdFromDb } from '@/data/pricing';
 export type { ViewMode };
 export type { PassProductId };
 
-/** PostgREST embed: null | single object | array — normalize to object rows only. */
-function normalizeEmbeddedOfferings(raw: unknown): Record<string, unknown>[] {
-  if (raw == null) return [];
+/** Embedded parent row (`businesses`) from `business_offerings` select — never `!inner`. */
+function singleEmbeddedProfile(raw: unknown): Record<string, unknown> | null {
+  if (raw == null) return null;
   if (Array.isArray(raw)) {
-    return raw.filter((x): x is Record<string, unknown> => x != null && typeof x === 'object' && !Array.isArray(x));
+    const first = raw[0];
+    if (first && typeof first === 'object' && !Array.isArray(first)) return first as Record<string, unknown>;
+    return null;
   }
-  if (typeof raw === 'object' && !Array.isArray(raw)) {
-    return [raw as Record<string, unknown>];
-  }
-  return [];
+  if (typeof raw === 'object') return raw as Record<string, unknown>;
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -402,39 +406,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loadBusinesses = useCallback(async () => {
     const DBG = '[loadBusinesses]';
     try {
-      // Left-embed `business_offerings` (no !inner) so we can see profiles even when the join
-      // or RLS would exclude rows with !inner — filter to active offerings in the loop below.
-      const { data: profileRows, error: loadErr } = await supabase
-        .from('businesses')
+      // Load from `business_offerings` so stub profiles (`businesses.active = false`) with live
+      // offerings are not dropped by a parent `.eq('active', true)` filter. Embed `businesses`
+      // without `!inner` (default left join) so RLS can still attach the profile row when allowed.
+      const { data: offeringRows, error: loadErr } = await supabase
+        .from('business_offerings')
         .select(`
-          id,
-          name,
-          category,
-          owner_id,
-          location,
-          lat,
-          lng,
-          hours,
-          opening_hours,
-          phone,
-          email,
-          contact_email,
-          business_email,
-          whatsapp_number,
-          rating,
-          review_count,
-          featured,
-          active,
-          map_url,
-          website,
-          tags,
-          business_offerings (
-            ${OFFERING_LISTING_COLUMNS}
+          ${OFFERING_LISTING_COLUMNS},
+          businesses (
+            ${BUSINESS_PROFILE_EMBED_COLS}
           )
         `)
         .eq('active', true)
         .order('featured', { ascending: false })
-        .order('name', { ascending: true });
+        .order('title', { ascending: true });
 
       if (loadErr) {
         console.warn(`${DBG} fetch error:`, loadErr.message || loadErr, loadErr);
@@ -443,36 +428,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return;
       }
 
-      if (profileRows && profileRows.length > 0) {
-        // One `Business` card per active `business_offerings` row (`Business.id` = offering id).
+      if (offeringRows && offeringRows.length > 0) {
         const mapped: Business[] = [];
-        for (const row of profileRows as Record<string, unknown>[]) {
-          const profileName = String(row.name ?? '(no name)');
-          const profileId = String(row.id ?? '');
-
-          const rawOff = row.business_offerings;
-          const offs = normalizeEmbeddedOfferings(rawOff);
-          const { business_offerings: _drop, ...profile } = row;
-
-          if (offs.length === 0) {
+        for (const row of offeringRows as Record<string, unknown>[]) {
+          const profile = singleEmbeddedProfile(row.businesses);
+          if (!profile?.id) {
+            console.warn(`${DBG} Skipping offering (missing profile embed):`, row?.id);
             continue;
           }
-
-          for (const o of offs) {
-            const off = o as Record<string, unknown> & { active?: boolean; id?: unknown };
-            if (off.active === false) {
-              continue;
-            }
-            try {
-              const b = mapJoinedOfferingToBusiness(off, profile, SUPABASE_URL);
-              const profileActive = profile.active !== false;
-              mapped.push({
-                ...b,
-                active: profileActive && b.active !== false,
-              });
-            } catch (mapErr) {
-              console.warn(`${DBG} Skipping business:`, profileName, `id=${profileId}`, 'Reason: mapJoinedOfferingToBusiness threw:', mapErr);
-            }
+          const profileName = String(profile.name ?? '(no name)');
+          const profileId = String(profile.id ?? '');
+          const { businesses: _drop, ...offering } = row;
+          try {
+            const b = mapJoinedOfferingToBusiness(
+              offering as Record<string, unknown>,
+              profile,
+              SUPABASE_URL,
+            );
+            const profileActive = profile.active !== false;
+            mapped.push({
+              ...b,
+              active: profileActive && b.active !== false,
+            });
+          } catch (mapErr) {
+            console.warn(
+              `${DBG} Skipping offering:`,
+              profileName,
+              `profile=${profileId}`,
+              'Reason:',
+              mapErr,
+            );
           }
         }
         setDbBusinesses(mapped);
@@ -482,6 +467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setDataLoaded(true);
     } catch (err) {
       console.error('[loadBusinesses] Failed to load businesses:', err);
+      setDbBusinesses([]);
       setDataLoaded(true);
     }
   }, []);

@@ -8,6 +8,10 @@ const CATEGORY_KEYS = new Set(categories.map((c) => c.key));
 export const OFFERING_LISTING_COLUMNS =
   'id, business_id, title, description, description_fr, description_bi, discount, original_price, deal_price, image, map_url, website, discount_valid_from, discount_valid_until, whatsapp_number, pricing_tiers, tags, featured, active, created_at, updated_at';
 
+/** Parent `businesses` columns when embedded from `business_offerings` (left join — no `!inner`). */
+export const BUSINESS_PROFILE_EMBED_COLS =
+  'id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone, email, contact_email, business_email, whatsapp_number, rating, review_count, featured, active, map_url, website, tags';
+
 function offeringPrimaryImage(o: Record<string, unknown>): string {
   const direct = String(o.image ?? '').trim();
   if (direct) return direct;
@@ -24,9 +28,9 @@ function asCategory(raw: unknown): Category {
   return 'dining';
 }
 
-/** Per-listing category: prefer a canonical key in `business_offerings.tags` (first match), else profile `businesses.category`. */
+/** Per-listing category: first canonical key in `business_offerings.tags`; if tags empty/null/non-category, use profile `businesses.category`. */
 function listingCategoryFromOffering(o: Record<string, unknown>, profileCategory: unknown): Category {
-  const tags = Array.isArray(o.tags) ? (o.tags as unknown[]) : [];
+  const tags = o.tags == null ? [] : Array.isArray(o.tags) ? (o.tags as unknown[]) : [];
   for (const t of tags) {
     if (typeof t === 'string' && CATEGORY_KEYS.has(t as Category)) return t as Category;
   }
@@ -73,8 +77,12 @@ export function mapJoinedOfferingToBusiness(
   const img = offeringPrimaryImage(o);
   const oContact = (o.contact_email as string) || (o.contactEmail as string) || '';
   const { originalPrice, dealPrice } = normalizedListPrices(o.original_price, o.deal_price);
+  const oid = o.id != null ? String(o.id).trim() : '';
+  if (!oid) {
+    throw new Error('mapJoinedOfferingToBusiness: offering id is required');
+  }
   return {
-    id: String(o.id),
+    id: oid,
     profileBusinessId: String(b.id),
     name: String(o.title || b.name || '').trim() || 'Offer',
     category: cat,
