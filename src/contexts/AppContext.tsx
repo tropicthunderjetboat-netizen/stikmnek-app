@@ -444,6 +444,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (profileRows && profileRows.length > 0) {
+        // One `Business` card per active `business_offerings` row (`Business.id` = offering id).
         const mapped: Business[] = [];
         for (const row of profileRows as Record<string, unknown>[]) {
           const profileName = String(row.name ?? '(no name)');
@@ -457,7 +458,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             continue;
           }
 
-          let pushedForProfile = 0;
           for (const o of offs) {
             const off = o as Record<string, unknown> & { active?: boolean; id?: unknown };
             if (off.active === false) {
@@ -470,7 +470,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 ...b,
                 active: profileActive && b.active !== false,
               });
-              pushedForProfile += 1;
             } catch (mapErr) {
               console.warn(`${DBG} Skipping business:`, profileName, `id=${profileId}`, 'Reason: mapJoinedOfferingToBusiness threw:', mapErr);
             }

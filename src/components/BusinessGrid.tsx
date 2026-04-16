@@ -10,7 +10,7 @@ import {
   effectiveListingOriginalPrice,
   effectiveListingDescriptionPlain,
 } from '@/data/businesses';
-import { pickRepresentativeOfferingsPerProfile, profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import BusinessCard from './BusinessCard';
 import AdvancedSearch, { SortOption } from './AdvancedSearch';
 import { Search, SlidersHorizontal, LayoutGrid, List, Navigation, Loader2, Award } from 'lucide-react';
@@ -109,11 +109,10 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [whatsappFilter, setWhatsappFilter] = useState(false);
 
-  const allBusinesses = useMemo(() => {
-    const raw = publicListingBusinesses(dbBusinesses, localBusinesses);
-    if (dbBusinesses.length === 0) return raw;
-    return pickRepresentativeOfferingsPerProfile(raw);
-  }, [dbBusinesses]);
+  const allBusinesses = useMemo(
+    () => publicListingBusinesses(dbBusinesses, localBusinesses),
+    [dbBusinesses],
+  );
 
   const maxPrice = useMemo(() => Math.max(...allBusinesses.map(b => b.dealPrice || b.originalPrice), 50000), [allBusinesses]);
 

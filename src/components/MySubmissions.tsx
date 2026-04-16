@@ -404,12 +404,11 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
         }
       }
 
-      let biz: Business | undefined = dbBusinesses.find(
-        (b) =>
-          b.ownerId === user.id &&
-          (norm(b.name) === targetName ||
-            (linkProfileId && b.profileBusinessId === linkProfileId)),
-      );
+      const ownerListings = dbBusinesses.filter((b) => b.ownerId === user.id);
+      let biz: Business | undefined = ownerListings.find((b) => norm(b.name) === targetName);
+      if (!biz && linkProfileId) {
+        biz = ownerListings.find((b) => b.profileBusinessId === linkProfileId);
+      }
 
       if (!biz) {
         const { data: rows, error } = await supabase.from('businesses').select('*').eq('owner_id', user.id);

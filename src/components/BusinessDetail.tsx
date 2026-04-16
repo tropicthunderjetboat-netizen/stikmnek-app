@@ -125,8 +125,23 @@ const BusinessDetail: React.FC = () => {
   const effectiveBiz = useMemo((): Business | null => {
     if (!selectedBusiness) return null;
     if (profileOfferings.length === 0) return selectedBusiness;
-    const match = profileOfferings.find((o) => o.id === selectedBusiness.id);
-    return match ?? profileOfferings[0] ?? selectedBusiness;
+
+    const byOfferingId = profileOfferings.find((o) => o.id === selectedBusiness.id);
+    if (byOfferingId) return byOfferingId;
+
+    const profileKey = profileBusinessIdFor(selectedBusiness);
+    const idLooksLikeProfileRow =
+      selectedBusiness.id === profileKey ||
+      profileOfferings.some((o) => o.profileBusinessId === selectedBusiness.id);
+    if (idLooksLikeProfileRow) {
+      const t = (selectedBusiness.name || '').trim();
+      if (t) {
+        const byTitle = profileOfferings.find((o) => (o.name || '').trim() === t);
+        if (byTitle) return byTitle;
+      }
+    }
+
+    return profileOfferings[0] ?? selectedBusiness;
   }, [selectedBusiness, profileOfferings]);
 
   useEffect(() => {

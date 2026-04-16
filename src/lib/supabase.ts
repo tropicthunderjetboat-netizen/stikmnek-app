@@ -70,47 +70,6 @@ export const ENDPOINTS = {
   realtime:  `${supabaseUrl}/realtime/v1`,
 } as const;
 
-
-/**
- * In-memory auth lock only (serializes refresh/getSession across async callers).
- * Navigator LockManager is NOT used: on production sites it often hits short timeouts
- * during visibility/refresh storms, which led to _recoverAndRefresh clearing the session
- * and cascading 401s on REST + Edge Functions (see runtime logs).
- */
-const lockMap = new Map<string, Promise<any>>();
-
-async function authSessionLock<R>(
-  name: string,
-  acquireTimeout: number,
-  fn: () => Promise<R>
-): Promise<R> {
-  const existing = lockMap.get(name);
-  // Wait for the current lock holder *before* registering ourselves.
-  // If we set our gate first, earlier callers can no longer clear the map entry,
-  // and concurrent auth operations can overlap and deadlock the SDK/network.
-  if (existing) {
-    await Promise.race([
-      existing,
-      new Promise<void>((r) => setTimeout(r, acquireTimeout)),
-    ]);
-  }
-
-  let resolveGate: (v?: any) => void;
-  const gate = new Promise<void>((r) => {
-    resolveGate = r;
-  });
-  lockMap.set(name, gate);
-
-  try {
-    return await fn();
-  } finally {
-    resolveGate!();
-    if (lockMap.get(name) === gate) {
-      lockMap.delete(name);
-    }
-  }
-}
-
 // Client: no global `headers` override — Storage/REST use the session JWT from auth.
 // `storageKey: 'stikmnek-auth'` isolates session JSON from default `sb-<ref>-auth-token` keys (stale keys purged above).
 const supabase = createClient(supabaseUrl, supabaseKey, {
@@ -121,8 +80,6 @@ const supabase = createClient(supabaseUrl, supabaseKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'implicit',
-    lock: authSessionLock,
-    lockAcquireTimeout: 15000,
   },
 });
 

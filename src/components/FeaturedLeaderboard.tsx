@@ -8,7 +8,7 @@ import {
   listingHasActiveDiscount,
   customerFacingListPrice,
 } from '@/data/businesses';
-import { pickRepresentativeOfferingsPerProfile, profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { Star, TrendingUp, Award, Crown, Sparkles, ArrowRight, ChevronDown, ChevronUp, Flame, Eye, Info, Trophy, Medal } from 'lucide-react';
 import { formatVT } from '@/lib/utils';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
@@ -42,11 +42,10 @@ const FeaturedLeaderboard: React.FC = () => {
   const [showAll, setShowAll] = useState(false);
   const [showScoring, setShowScoring] = useState(false);
 
-  const allBusinesses = useMemo(() => {
-    const raw = publicListingBusinesses(dbBusinesses, localBusinesses);
-    if (dbBusinesses.length === 0) return raw;
-    return pickRepresentativeOfferingsPerProfile(raw);
-  }, [dbBusinesses]);
+  const allBusinesses = useMemo(
+    () => publicListingBusinesses(dbBusinesses, localBusinesses),
+    [dbBusinesses],
+  );
 
   // Calculate leaderboard scores
   const leaderboard: ScoredBusiness[] = useMemo(() => {

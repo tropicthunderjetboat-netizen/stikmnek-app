@@ -491,15 +491,17 @@ Deno.serve(async (req) => {
       }
       // Owner may remove any pending_businesses row (including status=approved) to clear stuck dashboard rows.
 
-      // Hide live deal: offerings use `title` (same as pending `name` on approve — see review_pending RPC).
+      // Deactivate only the offering created for this submission: same `business_id` + `title` as on approve
+      // (see offeringFields.title in this file — trimmed pending name, or literal "Main offer" when name is empty).
       const linkedBusinessId = row.business_id != null ? String(row.business_id).trim() : '';
       if (linkedBusinessId) {
-        const titleMatch = String(row.name ?? '').trim() || 'Main offer';
+        const pendingNameTrimmed = String(row.name ?? '').trim();
+        const offeringTitle = pendingNameTrimmed || 'Main offer';
         const { error: deactivateErr } = await supabase
           .from('business_offerings')
           .update({ active: false, updated_at: new Date().toISOString() })
           .eq('business_id', linkedBusinessId)
-          .eq('title', titleMatch);
+          .eq('title', offeringTitle);
 
         if (deactivateErr) {
           console.error(

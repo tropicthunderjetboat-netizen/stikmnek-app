@@ -24,6 +24,15 @@ function asCategory(raw: unknown): Category {
   return 'dining';
 }
 
+/** Per-listing category: prefer a canonical key in `business_offerings.tags` (first match), else profile `businesses.category`. */
+function listingCategoryFromOffering(o: Record<string, unknown>, profileCategory: unknown): Category {
+  const tags = Array.isArray(o.tags) ? (o.tags as unknown[]) : [];
+  for (const t of tags) {
+    if (typeof t === 'string' && CATEGORY_KEYS.has(t as Category)) return t as Category;
+  }
+  return asCategory(profileCategory);
+}
+
 /**
  * When `deal_price` is missing, zero, or not below `original_price`, treat as "no discount"
  * so UI never shows 0 VT vs full price (looks like 100% off).
@@ -60,7 +69,7 @@ export function mapJoinedOfferingToBusiness(
   supabaseUrl: string,
 ): Business {
   const oActive = o.active !== false;
-  const cat = asCategory(b.category);
+  const cat = listingCategoryFromOffering(o, b.category);
   const img = offeringPrimaryImage(o);
   const oContact = (o.contact_email as string) || (o.contactEmail as string) || '';
   const { originalPrice, dealPrice } = normalizedListPrices(o.original_price, o.deal_price);
@@ -120,27 +129,9 @@ export function effectiveProfileBusinessId(x: {
 }
 
 /**
- * Deals grid: one card per master profile when multiple active offerings exist.
- * Picks featured first, then higher deal price, then stable name.
+ * @deprecated Public deals use one card per offering; do not collapse multi-offer profiles.
+ * Kept for any legacy import — returns input unchanged.
  */
 export function pickRepresentativeOfferingsPerProfile(businesses: Business[]): Business[] {
-  const byProfile = new Map<string, Business[]>();
-  for (const b of businesses) {
-    const key = profileBusinessIdFor(b);
-    const list = byProfile.get(key) ?? [];
-    list.push(b);
-    byProfile.set(key, list);
-  }
-  const out: Business[] = [];
-  for (const list of byProfile.values()) {
-    list.sort((a, b) => {
-      if (Boolean(a.featured) !== Boolean(b.featured)) return a.featured ? -1 : 1;
-      const pa = a.dealPrice || a.originalPrice || 0;
-      const pb = b.dealPrice || b.originalPrice || 0;
-      if (pb !== pa) return pb - pa;
-      return (a.name || '').localeCompare(b.name || '');
-    });
-    out.push(list[0]);
-  }
-  return out;
+  return businesses;
 }
