@@ -103,6 +103,7 @@ const AdminPanel: React.FC = () => {
   const [loadingRpcPhotos, setLoadingRpcPhotos] = useState(false);
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [repairingId, setRepairingId] = useState<string | null>(null);
   const [processingPhotoId, setProcessingPhotoId] = useState<string | null>(null);
   const [loadingPending, setLoadingPending] = useState(false);
   const [loadingBusinesses, setLoadingBusinesses] = useState(false);
@@ -233,10 +234,9 @@ const AdminPanel: React.FC = () => {
         action: 'get_pending', userId: user.id, isAdmin: true,
       });
       if (data?.businesses && Array.isArray(data.businesses)) {
-        const pendingOnly = data.businesses.filter((b: PendingBusiness) => b.status === 'pending');
-        setPendingBusinesses(pendingOnly);
-        loadAllPhotos(pendingOnly);
-        if (showToast) toast.success(`Loaded ${pendingOnly.length} pending submission(s)`);
+        setPendingBusinesses((data.businesses || []) as PendingBusiness[]);
+        loadAllPhotos((data.businesses || []) as PendingBusiness[]);
+        if (showToast) toast.success(`Loaded ${(data.businesses || []).length} submission(s)`);
         setLastRefreshed(new Date());
         retryCountRef.current = 0;
         return;
@@ -254,12 +254,12 @@ const AdminPanel: React.FC = () => {
 
   const loadPendingDirect = useCallback(async (showToast = false) => {
     try {
-      const { data, error } = await supabase.from('pending_businesses').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('pending_businesses').select('*').order('created_at', { ascending: false });
       if (error) { if (pendingBusinesses.length === 0) toast.error('Could not load submissions.'); return; }
       if (data && data.length > 0) {
         setPendingBusinesses(data as PendingBusiness[]);
         loadAllPhotos(data as PendingBusiness[]);
-        if (showToast) toast.success(`Loaded ${data.length} pending submission(s)`);
+        if (showToast) toast.success(`Loaded ${data.length} submission(s)`);
       } else {
         setPendingBusinesses([]);
       }
@@ -691,19 +691,12 @@ const AdminPanel: React.FC = () => {
         (payload) => {
           console.log('[Admin] Real-time: Business submission updated', payload.new);
           const updated = payload.new as PendingBusiness;
-          // If the status is no longer 'pending', remove it from the approvals list
-          if (updated.status !== 'pending') {
-            setPendingBusinesses(prev => prev.filter(b => b.id !== updated.id));
-            toast.info(`"${updated.name}" has been ${updated.status}`, {
-              description: 'Removed from pending approvals.',
-              duration: 4000,
-            });
-          } else {
-            // Still pending — update in place (e.g. owner edited the submission)
-            setPendingBusinesses(prev =>
-              prev.map(b => b.id === updated.id ? updated : b)
-            );
-          }
+          // Keep all statuses (pending + approved/rejected) so admins can repair stuck approved rows.
+          setPendingBusinesses(prev => {
+            const exists = prev.some(b => b.id === updated.id);
+            if (exists) return prev.map(b => b.id === updated.id ? updated : b);
+            return [updated, ...prev];
+          });
         }
       )
       .subscribe((status) => {
@@ -752,50 +745,10 @@ const AdminPanel: React.FC = () => {
     const biz = pendingBusinesses.find(b => b.id === businessId);
     let rpcErrorMsg: string | null = null;
     try {
-      // Strategy 1: RPC (bypasses Edge Function, most reliable)
-      const { data: rpcData, error: rpcError } = await supabase.rpc('review_pending_business', {
-        p_pending_id: businessId,
-        p_decision: decision,
-        p_admin_notes: adminNotes[businessId] || '',
-      });
-
-      if (rpcError) rpcErrorMsg = rpcError.message;
-
-      if (!rpcError && rpcData?.success) {
-        setPendingBusinesses(prev => prev.filter(b => b.id !== businessId));
-        toast.success(`Business "${biz?.name}" ${decision === 'approved' ? 'approved' : 'rejected'} successfully!`);
-        if (decision === 'approved') {
-          setTimeout(async () => {
-            await refreshBusinesses();
-            toast.success('Business list refreshed - new business is now live!');
-          }, 1000);
-        }
-        if (biz?.email) {
-          try {
-            await supabase.functions.invoke('send-email', {
-              headers: await getEdgeAuthHeaders(),
-              body: {
-                action: 'send_business_decision',
-                owner_id: biz.owner_id || '',
-                owner_email: biz.email,
-                owner_name: biz.name,
-                business_name: biz.name,
-                category: biz.category,
-                location: biz.location,
-                discount: biz.discount,
-                decision,
-                admin_notes: adminNotes[businessId] || 'No additional notes.',
-              },
-            });
-            toast.success(`Notification email sent to ${biz.email}`);
-          } catch (emailErr) {
-            console.error('Failed to send decision email:', emailErr);
-          }
-        }
-        return;
-      }
-
-      // Strategy 2: Edge Function fallback
+      // Strategy 1 (preferred): Edge Function approval flow.
+      // IMPORTANT: the legacy RPC `review_pending_business` updates the *primary* offering for an existing
+      // profile (single-offer model) and can overwrite previous deals. We only use it as a fallback for
+      // rejections, not approvals.
       const { data, error } = await supabase.functions.invoke('manage-business', {
         body: {
           action: 'review_business',
@@ -806,8 +759,23 @@ const AdminPanel: React.FC = () => {
         },
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error || data?.error) {
+        // Strategy 2 (fallback): RPC for rejection only.
+        if (decision === 'rejected') {
+          const { data: rpcData, error: rpcError } = await supabase.rpc('review_pending_business', {
+            p_pending_id: businessId,
+            p_decision: decision,
+            p_admin_notes: adminNotes[businessId] || '',
+          });
+          if (rpcError) rpcErrorMsg = rpcError.message;
+          if (rpcError || !rpcData?.success) {
+            throw new Error(rpcErrorMsg || data?.error || error?.message || 'Review failed');
+          }
+        } else {
+          // For approvals, do NOT fall back to the RPC because it can overwrite existing offerings.
+          throw new Error(data?.error || error?.message || 'Approval failed');
+        }
+      }
 
       setPendingBusinesses(prev => prev.filter(b => b.id !== businessId));
       toast.success(`Business "${biz?.name}" ${decision === 'approved' ? 'approved' : 'rejected'} successfully!`);
@@ -847,6 +815,41 @@ const AdminPanel: React.FC = () => {
       toast.error('Failed to process review: ' + msg);
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const handleRepairApprovedSubmission = async (pendingId: string) => {
+    const biz = pendingBusinesses.find((b) => b.id === pendingId);
+    if (!biz) return;
+    if (biz.status !== 'approved') {
+      toast.error('Repair is only available for approved submissions.');
+      return;
+    }
+    if (!biz.business_id) {
+      toast.error('Repair requires an existing profile link (business_id).');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Repair live listing for "${biz.name}"? This will create a missing live offer and remove the stuck approved submission row.`,
+    );
+    if (!confirmed) return;
+
+    setRepairingId(pendingId);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        body: { action: 'repair_approved_submission', userId: user?.id, pendingId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(String(data.error));
+      toast.success(`Repaired live offer for "${biz.name}".`);
+      setPendingBusinesses((prev) => prev.filter((b) => b.id !== pendingId));
+      await refreshBusinesses();
+      void loadPending();
+    } catch (e: any) {
+      toast.error('Repair failed: ' + (e?.message || 'Unknown error'));
+    } finally {
+      setRepairingId(null);
     }
   };
 
@@ -1601,6 +1604,27 @@ const AdminPanel: React.FC = () => {
                                 <XCircle className="w-4 h-4" />
                               )}
                               Reject
+                            </button>
+                          </div>
+                        )}
+
+                        {biz.status === 'approved' && biz.business_id && (
+                          <div className="flex items-center justify-between gap-3 pt-4 border-t border-gray-100">
+                            <p className="text-xs text-gray-500">
+                              Approved but not visible on the public site? Use repair to create the missing live offer.
+                            </p>
+                            <button
+                              onClick={() => handleRepairApprovedSubmission(biz.id)}
+                              disabled={repairingId === biz.id}
+                              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                              title="Creates a new business_offerings row from this approved submission and removes the stuck pending row."
+                            >
+                              {repairingId === biz.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <ArrowRight className="w-4 h-4" />
+                              )}
+                              Repair Live Listing
                             </button>
                           </div>
                         )}

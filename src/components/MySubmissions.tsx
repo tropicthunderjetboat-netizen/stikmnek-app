@@ -550,6 +550,19 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
 
         if (offRows && offRows.length > 0) {
           const chosen = pickOfferingRow(offRows);
+          if (
+            offRows.length === 1 &&
+            norm(String((chosen.title as string) || '')) !== targetName &&
+            targetName.length > 0
+          ) {
+            toast.error(
+              language === 'en'
+                ? `Live deal "${submission.name}" wasn't found for this business yet. Ask admin to re-approve using the updated approvals flow.`
+                : language === 'fr'
+                  ? `L’offre « ${submission.name} » n’est pas encore en ligne. Demandez à l’admin de ré-approuver.`
+                  : `Dil "${submission.name}" i no stap laef yet. Askem admin blong re-apruvum.`,
+            );
+          }
           const profileId = String(chosen.business_id ?? '').trim();
           if (profileId) {
             const { data: prof, error: profFetchErr } = await supabase

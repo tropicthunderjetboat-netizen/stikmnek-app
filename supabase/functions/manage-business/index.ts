@@ -1098,6 +1098,102 @@ Deno.serve(async (req) => {
       return jsonResponse(req, { success: true });
     }
 
+    // ─── REPAIR_APPROVED_SUBMISSION ───
+    // Admin-only: some legacy approval paths set pending_businesses.status='approved' without
+    // creating a new business_offerings row (or overwrote the primary one). This repairs by
+    // inserting a fresh offering row and relinking photos, then deletes the stuck pending row.
+    if (action === 'repair_approved_submission') {
+      const denied = await assertAdmin(supabase, authUser.id, req);
+      if (denied) return denied;
+
+      const pendingId = body.pendingId ?? body.pending_id ?? body.businessId;
+      if (!pendingId) return errorResponse(req, 'Missing pendingId', 400);
+
+      const { data: pending, error: fetchErr } = await supabase
+        .from('pending_businesses')
+        .select('*')
+        .eq('id', String(pendingId))
+        .maybeSingle();
+
+      if (fetchErr || !pending) return errorResponse(req, 'Pending business not found', 404);
+      if (String((pending as any).status) !== 'approved') {
+        return errorResponse(req, 'Repair requires status=approved', 400);
+      }
+
+      const profileIdRaw = (pending as any).business_id;
+      const existingProfileId =
+        profileIdRaw != null && String(profileIdRaw).trim() !== '' ? String(profileIdRaw).trim() : null;
+      if (!existingProfileId) {
+        return errorResponse(req, 'Repair requires a linked profile business_id', 400);
+      }
+
+      const { data: prof, error: profErr } = await supabase
+        .from('businesses')
+        .select('id, owner_id')
+        .eq('id', existingProfileId)
+        .maybeSingle();
+      if (profErr || !prof) {
+        return errorResponse(req, 'Invalid business_id on pending row (profile not found)', 400);
+      }
+      if (String((prof as any).owner_id) !== String((pending as any).owner_id)) {
+        return errorResponse(req, 'Invalid business_id on pending row (owner mismatch)', 403);
+      }
+
+      const vDesc = String((pending as any).description ?? '');
+      const tagArray = [String((pending as any).category || 'dining')];
+      const offeringFields = {
+        title: (((pending as any).name && String((pending as any).name).trim()) || 'Main offer') as string,
+        description: vDesc,
+        description_fr: vDesc,
+        description_bi: vDesc,
+        discount: (pending as any).discount || '',
+        original_price: Number((pending as any).original_price) || 0,
+        deal_price: Number((pending as any).deal_price) || 0,
+        image: (pending as any).image || '',
+        map_url: (pending as any).map_url ?? null,
+        website: (pending as any).website ?? null,
+        discount_valid_from: (pending as any).discount_valid_from ?? null,
+        discount_valid_until: (pending as any).discount_valid_until ?? null,
+        whatsapp_number: (pending as any).whatsapp_number ?? null,
+        pricing_tiers: (pending as any).pricing_tiers ?? null,
+        tags: tagArray,
+        active: true,
+        featured: false,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { data: inserted, error: offInsErr } = await supabase
+        .from('business_offerings')
+        .insert({ business_id: existingProfileId, ...offeringFields })
+        .select('id')
+        .maybeSingle();
+      if (offInsErr) {
+        console.error('[manage-business] repair_approved_submission offering insert:', offInsErr);
+        return errorResponse(req, 'Failed to create live offering: ' + offInsErr.message, 500);
+      }
+
+      // Relink photos that were uploaded against the pending id (common when the pending row never got deleted).
+      const { error: relinkErr } = await supabase
+        .from('business_photos')
+        .update({ business_id: existingProfileId, status: 'approved' })
+        .eq('business_id', String(pendingId));
+      if (relinkErr) {
+        console.error('[manage-business] repair_approved_submission photos:', relinkErr);
+        // Non-fatal: offering exists; return success but warn
+      }
+
+      const { error: delErr } = await supabase
+        .from('pending_businesses')
+        .delete()
+        .eq('id', String(pendingId));
+      if (delErr) {
+        console.error('[manage-business] repair_approved_submission delete pending:', delErr);
+        return errorResponse(req, 'Repaired offering but could not delete pending row: ' + delErr.message, 500);
+      }
+
+      return jsonResponse(req, { success: true, offeringId: inserted?.id ?? null });
+    }
+
     // ─── DELETE_OWN_BUSINESS (owner only; photos + storage + row) ───
     if (action === 'delete_own_business') {
       const businessId = body.businessId;
