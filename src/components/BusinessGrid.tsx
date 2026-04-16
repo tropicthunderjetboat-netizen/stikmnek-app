@@ -7,6 +7,7 @@ import {
   effectiveListingDealPrice,
   effectiveListingOriginalPrice,
   effectiveListingDescriptionPlain,
+  touristFacingOfferings,
 } from '@/data/businesses';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import BusinessCard from './BusinessCard';
@@ -107,11 +108,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [whatsappFilter, setWhatsappFilter] = useState(false);
 
-  // Raw server rows only — one card per offering (`Business.id` = offering id); no dedupe/grouping.
-  const allBusinesses = useMemo(
-    () => dbBusinesses.filter((b) => b.active !== false),
-    [dbBusinesses],
-  );
+  const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
   const maxPrice = useMemo(() => Math.max(...allBusinesses.map(b => b.dealPrice || b.originalPrice), 50000), [allBusinesses]);
 

@@ -131,12 +131,19 @@ export function effectiveListingDescriptionPlain(b: Business): string {
 }
 
 /**
- * Tourist-facing lists: hide `active === false` rows from the server.
- * Does not substitute hardcoded mock `local` listings when the DB returns zero rows (so an empty DB shows as empty).
+ * Canonical pipeline for tourist UI: offerings from `loadBusinesses` (`Business.id` = offering id).
+ * Use everywhere (Hero, categories, map, search, deals grid, leaderboard) so counts and cards match.
+ */
+export function touristFacingOfferings(db: Business[]): Business[] {
+  return db.filter((b) => b.active !== false);
+}
+
+/**
+ * @deprecated Prefer `touristFacingOfferings` — kept for older imports; second arg ignored (no mock fallback).
  */
 export function publicListingBusinesses(db: Business[], _local: Business[] = []): Business[] {
   void _local;
-  return db.filter((b) => b.active !== false);
+  return touristFacingOfferings(db);
 }
 
 

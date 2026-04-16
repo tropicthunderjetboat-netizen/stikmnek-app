@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { businesses as localBusinesses, publicListingBusinesses } from '@/data/businesses';
+import { touristFacingOfferings } from '@/data/businesses';
 import { ArrowRight, MapPin, Star, Users } from 'lucide-react';
 
 const Hero: React.FC = () => {
@@ -21,10 +21,7 @@ const Hero: React.FC = () => {
     setShowAuth(true);
   };
 
-  const allBusinesses = useMemo(
-    () => publicListingBusinesses(dbBusinesses, localBusinesses),
-    [dbBusinesses],
-  );
+  const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
   const businessCount = allBusinesses.length;
 
   // Calculate average discount

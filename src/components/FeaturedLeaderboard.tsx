@@ -6,6 +6,7 @@ import {
   effectiveListingOriginalPrice,
   listingHasActiveDiscount,
   customerFacingListPrice,
+  touristFacingOfferings,
 } from '@/data/businesses';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { Star, TrendingUp, Award, Crown, Sparkles, ArrowRight, ChevronDown, ChevronUp, Flame, Eye, Info, Trophy, Medal } from 'lucide-react';
@@ -41,10 +42,7 @@ const FeaturedLeaderboard: React.FC = () => {
   const [showAll, setShowAll] = useState(false);
   const [showScoring, setShowScoring] = useState(false);
 
-  const allBusinesses = useMemo(
-    () => dbBusinesses.filter((b) => b.active !== false),
-    [dbBusinesses],
-  );
+  const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
   // Calculate leaderboard scores
   const leaderboard: ScoredBusiness[] = useMemo(() => {

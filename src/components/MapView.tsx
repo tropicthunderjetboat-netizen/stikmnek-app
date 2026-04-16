@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { businesses as localBusinesses, Business, publicListingBusinesses } from '@/data/businesses';
+import { Business, touristFacingOfferings } from '@/data/businesses';
 
 import {
   MapPin, Star, X, Phone, Clock, ExternalLink, Navigation,
@@ -250,10 +250,7 @@ const MapView: React.FC = () => {
   const [showLayerPicker, setShowLayerPicker] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
-  const allBusinesses = useMemo(
-    () => publicListingBusinesses(dbBusinesses, localBusinesses),
-    [dbBusinesses],
-  );
+  const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
   // Filter businesses by radius and favorites
   const filteredBusinesses = useMemo(() => {
@@ -261,7 +258,7 @@ const MapView: React.FC = () => {
 
     // Apply favorites filter
     if (showFavoritesOnly) {
-      result = result.filter(biz => favorites.includes(biz.id));
+      result = result.filter((biz) => favorites.includes(profileBusinessIdFor(biz)));
     }
 
     // Apply radius filter
@@ -578,7 +575,7 @@ const MapView: React.FC = () => {
             >
               {businessesWithMapCoords.map(({ biz, c }) => {
                 const dist = getDistanceTo(c.lat, c.lng);
-                const isFav = favorites.includes(biz.id);
+                const isFav = favorites.includes(profileBusinessIdFor(biz));
                 return (
                   <Marker
                     key={biz.id}
@@ -599,7 +596,7 @@ const MapView: React.FC = () => {
                           />
                           {/* Favorite heart button on popup image */}
                           <button
-                            onClick={(e) => { e.stopPropagation(); toggleFavorite(biz.id); }}
+                            onClick={(e) => { e.stopPropagation(); toggleFavorite(profileBusinessIdFor(biz)); }}
                             className={`absolute top-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-md ${
                               isFav
                                 ? 'bg-red-500 text-white hover:bg-red-600'
@@ -640,7 +637,7 @@ const MapView: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-1.5">
                               <button
-                                onClick={(e) => { e.stopPropagation(); toggleFavorite(biz.id); }}
+                                onClick={(e) => { e.stopPropagation(); toggleFavorite(profileBusinessIdFor(biz)); }}
                                 className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                                   isFav
                                     ? 'bg-red-50 text-red-500 hover:bg-red-100'
@@ -674,7 +671,7 @@ const MapView: React.FC = () => {
 
           {/* Selected Business Detail Card (bottom overlay) */}
           {selectedMapBiz && (() => {
-            const isSelectedFav = favorites.includes(selectedMapBiz.id);
+            const isSelectedFav = favorites.includes(profileBusinessIdFor(selectedMapBiz));
             return (
             <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-[1000]">
               <div className="relative">
@@ -688,7 +685,7 @@ const MapView: React.FC = () => {
                 </button>
                 {/* Favorite heart button on detail card image */}
                 <button
-                  onClick={() => toggleFavorite(selectedMapBiz.id)}
+                  onClick={() => toggleFavorite(profileBusinessIdFor(selectedMapBiz))}
                   className={`absolute top-2 left-2 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-lg ${
                     isSelectedFav
                       ? 'bg-red-500 text-white hover:bg-red-600 scale-110'
@@ -761,7 +758,7 @@ const MapView: React.FC = () => {
                   <div className="flex items-center gap-2">
                     {/* Favorite button in action row */}
                     <button
-                      onClick={() => toggleFavorite(selectedMapBiz.id)}
+                      onClick={() => toggleFavorite(profileBusinessIdFor(selectedMapBiz))}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                         isSelectedFav
                           ? 'bg-red-50 text-red-500 border border-red-200 hover:bg-red-100'

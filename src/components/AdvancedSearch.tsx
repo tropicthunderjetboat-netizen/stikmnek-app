@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { businesses as localBusinesses, publicListingBusinesses } from '@/data/businesses';
+import { touristFacingOfferings } from '@/data/businesses';
 import { Search, SlidersHorizontal, X, Clock, TrendingUp, ArrowUpDown, Star, ChevronDown, ChevronUp, DollarSign, Navigation, Loader2, Award, Tag, Sparkles, MessageCircle } from 'lucide-react';
 
 export type SortOption = 'featured' | 'leaderboard' | 'price-low' | 'price-high' | 'rating' | 'savings' | 'reviews' | 'near-me';
@@ -37,10 +37,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
-  const allBusinesses = useMemo(
-    () => publicListingBusinesses(dbBusinesses, localBusinesses),
-    [dbBusinesses],
-  );
+  const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
   // Count businesses with WhatsApp
   const whatsappCount = useMemo(() => {
