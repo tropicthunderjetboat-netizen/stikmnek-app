@@ -36,6 +36,93 @@ export interface Submission {
   reviewed_at: string | null;
   created_at: string;
   business_id?: string | null;
+  /** When `'live'`, this row mirrors `business_offerings` (canonical for Explore), not `pending_businesses`. */
+  listingSource?: 'pending' | 'live';
+  /** Real `business_offerings.id` when `listingSource === 'live'`. */
+  offeringId?: string | null;
+}
+
+type LiveEdgeItem = {
+  offering: Record<string, unknown>;
+  business: Record<string, unknown>;
+};
+
+function submissionFromLiveOffering(
+  offering: Record<string, unknown>,
+  profile: Record<string, unknown>,
+): Submission {
+  const b = mapJoinedOfferingToBusiness(offering, profile, SUPABASE_URL);
+  const oid = String(offering.id ?? '').trim();
+  const created = String(offering.created_at ?? new Date().toISOString());
+  return {
+    id: `live:${oid}`,
+    listingSource: 'live',
+    offeringId: oid,
+    owner_id: String(profile.owner_id ?? ''),
+    name: b.name,
+    category: b.category,
+    description: b.description,
+    discount: b.discount,
+    original_price: b.originalPrice,
+    deal_price: b.dealPrice,
+    location: b.location,
+    phone: b.phone ?? '',
+    email: typeof b.contactEmail === 'string' ? b.contactEmail : '',
+    hours: b.hours ?? '',
+    image: typeof b.image === 'string' ? b.image : '',
+    status: 'approved',
+    admin_notes: null,
+    reviewed_at: created,
+    created_at: created,
+    business_id: String(profile.id ?? ''),
+  };
+}
+
+async function fetchLiveSubmissionsForOwner(userId: string): Promise<Submission[]> {
+  try {
+    const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('manage-business', {
+      body: { action: 'get_owner_offerings_live', userId },
+    });
+    if (edgeErr) {
+      console.warn('[MySubmissions] get_owner_offerings_live:', edgeErr.message || edgeErr);
+      return [];
+    }
+    const payload = edgeData as { success?: boolean; items?: LiveEdgeItem[] } | null | undefined;
+    if (!payload?.success || !Array.isArray(payload.items)) return [];
+
+    const out: Submission[] = [];
+    for (const item of payload.items) {
+      if (!item?.offering || !item?.business) continue;
+      if (item.offering.active === false) continue; // null/undefined = treat as active (same as public mapper)
+      out.push(submissionFromLiveOffering(item.offering, item.business));
+    }
+    return out;
+  } catch (e) {
+    console.warn('[MySubmissions] fetchLiveSubmissionsForOwner:', e);
+    return [];
+  }
+}
+
+/** Drop stale `pending_businesses` rows that duplicate an active live offering (same profile + title). */
+function mergePendingAndLiveRows(pending: Submission[], live: Submission[]): Submission[] {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const pendingFiltered = pending.filter((p) => {
+    if (p.listingSource === 'live') return false;
+    if (p.status !== 'approved') return true;
+    const pid = p.business_id != null ? String(p.business_id).trim() : '';
+    const pname = norm(p.name || '');
+    if (!pid || !pname) return true;
+    const hasLiveTwin = live.some(
+      (l) =>
+        l.listingSource === 'live' &&
+        String(l.business_id || '').trim() === pid &&
+        norm(l.name) === pname,
+    );
+    return !hasLiveTwin;
+  });
+  return [...pendingFiltered, ...live].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
 }
 
 interface MySubmissionsProps {
@@ -79,7 +166,8 @@ function mapDbRowToBusiness(row: Record<string, unknown>): Business {
 }
 
 const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
-  const { user, language, setCurrentView, setSelectedBusiness, dbBusinesses } = useAppContext();
+  const { user, language, setCurrentView, setSelectedBusiness, dbBusinesses, refreshBusinesses } =
+    useAppContext();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -98,6 +186,51 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
           toast.error(
             language === 'en' ? 'Sign in again to remove submissions.' : 'Reconnectez-vous pour supprimer.',
           );
+          return;
+        }
+
+        if (submission.listingSource === 'live' && submission.offeringId) {
+          const confirmMessage =
+            language === 'en'
+              ? `Hide "${submission.name}" from Explore? Tourists will no longer see this deal.`
+              : language === 'fr'
+                ? `Masquer « ${submission.name} » sur Explore ? Les touristes ne verront plus cette offre.`
+                : `Haed "${submission.name}" long Explore?`;
+
+          if (!window.confirm(confirmMessage)) return;
+
+          setWithdrawingId(submission.id);
+          const { error: deactErr } = await supabase
+            .from('business_offerings')
+            .update({ active: false, updated_at: new Date().toISOString() })
+            .eq('id', submission.offeringId);
+
+          if (deactErr) {
+            console.error('[MySubmissions] deactivate offering:', deactErr);
+            toast.error(
+              language === 'en'
+                ? 'Could not hide listing. Try again or contact support.'
+                : 'Impossible de masquer l’annonce.',
+            );
+            setWithdrawingId(null);
+            return;
+          }
+
+          setSubmissions((prev) => prev.filter((s) => s.id !== submission.id));
+          setUnseenChanges((prev) => {
+            const next = new Set(prev);
+            next.delete(submission.id);
+            return next;
+          });
+          toast.success(
+            language === 'en'
+              ? 'Listing hidden from Explore.'
+              : language === 'fr'
+                ? 'Annonce masquée sur Explore.'
+                : 'Listing i haed long Explore.',
+          );
+          await refreshBusinesses?.();
+          setWithdrawingId(null);
           return;
         }
 
@@ -265,12 +398,54 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
         setWithdrawingId(null);
       }
     },
-    [user?.id, language],
+    [user?.id, language, refreshBusinesses],
   );
 
   const handleViewLiveListing = useCallback(
     async (submission: Submission) => {
       if (!user?.id) return;
+
+      if (submission.listingSource === 'live' && submission.offeringId) {
+        const { data: off, error: oErr } = await supabase
+          .from('business_offerings')
+          .select(OFFERING_LIVE_COLS)
+          .eq('id', submission.offeringId)
+          .maybeSingle();
+        if (oErr || !off) {
+          console.error('[MySubmissions] view live offering:', oErr);
+          toast.error(
+            language === 'en'
+              ? 'Could not open listing. Refresh and try again.'
+              : 'Impossible d’ouvrir l’annonce.',
+          );
+          return;
+        }
+        const profileId = String((off as Record<string, unknown>).business_id ?? '').trim();
+        const { data: prof, error: pErr } = await supabase
+          .from('businesses')
+          .select(PROFILE_LIVE_COLS)
+          .eq('id', profileId)
+          .maybeSingle();
+        if (pErr || !prof) {
+          console.error('[MySubmissions] view live profile:', pErr);
+          toast.error(
+            language === 'en'
+              ? 'Could not open listing. Refresh and try again.'
+              : 'Impossible d’ouvrir l’annonce.',
+          );
+          return;
+        }
+        setSelectedBusiness(
+          mapJoinedOfferingToBusiness(
+            off as Record<string, unknown>,
+            prof as Record<string, unknown>,
+            SUPABASE_URL,
+          ),
+        );
+        setCurrentView('business-detail');
+        return;
+      }
+
       const norm = (s: string) => s.trim().toLowerCase();
       const targetName = norm(submission.name);
       const linkProfileId = submission.business_id ? String(submission.business_id) : '';
@@ -442,29 +617,35 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
     [user, dbBusinesses, language, setSelectedBusiness, setCurrentView],
   );
 
-  // Load submissions from DB
+  // Load pending rows + active live offerings (Explore) into one list
   const loadSubmissions = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    let pendingRows: Submission[] = [];
+
+    const applyMerged = (pending: Submission[], live: Submission[]) => {
+      const merged = mergePendingAndLiveRows(pending, live);
+      setSubmissions(merged);
+      if (!initialLoadDone.current) {
+        const statusMap = new Map<string, string>();
+        merged.forEach((b) => {
+          if (!b.id.startsWith('live:')) {
+            statusMap.set(b.id, b.status);
+          }
+        });
+        previousStatusesRef.current = statusMap;
+        initialLoadDone.current = true;
+      }
+    };
+
     try {
-      // Try edge function first
       const { data, error } = await supabase.functions.invoke('manage-business', {
         body: { action: 'get_pending', userId: user.id },
       });
 
-      if (data?.businesses) {
-        setSubmissions(data.businesses);
-        // Store initial statuses
-        if (!initialLoadDone.current) {
-          const statusMap = new Map<string, string>();
-          data.businesses.forEach((b: Submission) => {
-            statusMap.set(b.id, b.status);
-          });
-          previousStatusesRef.current = statusMap;
-          initialLoadDone.current = true;
-        }
+      if (Array.isArray(data?.businesses)) {
+        pendingRows = data.businesses as Submission[];
       } else {
-        // Fallback: direct DB query
         const { data: directData, error: directError } = await supabase
           .from('pending_businesses')
           .select('*')
@@ -472,31 +653,29 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
           .order('created_at', { ascending: false });
 
         if (!directError && directData) {
-          setSubmissions(directData as Submission[]);
-          if (!initialLoadDone.current) {
-            const statusMap = new Map<string, string>();
-            directData.forEach((b: any) => {
-              statusMap.set(b.id, b.status);
-            });
-            previousStatusesRef.current = statusMap;
-            initialLoadDone.current = true;
-          }
+          pendingRows = directData as Submission[];
         }
       }
+      if (error) {
+        console.warn('[MySubmissions] get_pending invoke:', error.message || error);
+      }
+
+      const liveRows = await fetchLiveSubmissionsForOwner(user.id);
+      applyMerged(pendingRows, liveRows);
     } catch (err) {
       console.error('Failed to load submissions:', err);
-      // Fallback to direct query
       try {
         const { data, error } = await supabase
           .from('pending_businesses')
           .select('*')
           .eq('owner_id', user.id)
           .order('created_at', { ascending: false });
-        if (!error && data) {
-          setSubmissions(data as Submission[]);
-        }
+        pendingRows = !error && data ? (data as Submission[]) : [];
+        const liveRows = await fetchLiveSubmissionsForOwner(user.id);
+        applyMerged(pendingRows, liveRows);
       } catch (e) {
         console.error('Direct query also failed:', e);
+        setSubmissions([]);
       }
     } finally {
       setLoading(false);
@@ -598,12 +777,33 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
           previousStatusesRef.current.set(newSub.id, newSub.status);
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'pending_businesses',
+          filter: `owner_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const oldRow = payload.old as { id?: string } | null;
+          if (oldRow?.id) {
+            previousStatusesRef.current.delete(oldRow.id);
+            setUnseenChanges((prev) => {
+              const next = new Set(prev);
+              next.delete(oldRow.id);
+              return next;
+            });
+          }
+          void loadSubmissions();
+        },
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, language]);
+  }, [user, language, loadSubmissions]);
 
   // Notify parent of unseen changes count
   useEffect(() => {
@@ -948,6 +1148,11 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
                       </h3>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                      {submission.listingSource === 'live' && (
+                        <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 font-semibold capitalize">
+                          {language === 'en' ? 'Live on Explore' : language === 'fr' ? 'En ligne' : 'Laef long Explore'}
+                        </span>
+                      )}
                       <span className="px-2 py-0.5 rounded-md bg-gray-100 font-medium capitalize">
                         {getCategoryLabel(submission.category)}
                       </span>
@@ -1173,11 +1378,17 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
                         ) : (
                           <Trash2 className="w-3.5 h-3.5" />
                         )}
-                        {language === 'en'
-                          ? 'Delete submission'
-                          : language === 'fr'
-                            ? 'Supprimer la soumission'
-                            : 'Raetem sabmisen'}
+                        {submission.listingSource === 'live'
+                          ? language === 'en'
+                            ? 'Hide from Explore'
+                            : language === 'fr'
+                              ? 'Masquer sur Explore'
+                              : 'Haed long Explore'
+                          : language === 'en'
+                            ? 'Delete submission'
+                            : language === 'fr'
+                              ? 'Supprimer la soumission'
+                              : 'Raetem sabmisen'}
                       </button>
                       {submission.status === 'approved' && (
                         <button

@@ -131,24 +131,23 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
     return allBusinesses.filter(businessListingHasWhatsApp).length;
   }, [allBusinesses]);
 
-  const filtered = useMemo(() => {
-    let result = allBusinesses.filter(biz => {
+  /**
+   * Everything except category tab — so category chip counts match what appears
+   * when that tab is selected under the same WhatsApp / search / price / rating filters.
+   */
+  const matchesSharedListingFilters = useCallback(
+    (biz: Business) => {
       if (showFeaturedOnly && !biz.featured) return false;
-      if (selectedCategory !== 'all' && biz.category !== selectedCategory) return false;
-
-      // WhatsApp filter
       if (whatsappFilter && !businessListingHasWhatsApp(biz)) return false;
 
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
 
-        // Special: searching for 'whatsapp' shows businesses with WhatsApp numbers
         const isWhatsAppSearch = q === 'whatsapp' || q === 'wa' || q === 'whats app' || q.includes('whatsapp');
         if (isWhatsAppSearch) {
           return businessListingHasWhatsApp(biz);
         }
 
-        // Enhanced search: name, description, location, tags, category, whatsappNumber
         const nameMatch = fuzzyMatch(q, biz.name);
         const descMatch = fuzzyMatch(q, plainTextFromHtml(effectiveListingDescriptionPlain(biz)));
         const locationMatch = fuzzyMatch(q, biz.location);
@@ -158,25 +157,32 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
           return tagLower.includes(q) || q.includes(tagLower) || fuzzyMatch(q, tagLower);
         });
 
-        // WhatsApp number in search index
         const wa = businessListingWhatsAppRaw(biz);
         const whatsappMatch = wa.length > 0 ? wa.toLowerCase().includes(q) : false;
 
-        // Also check phonetic-like matching (first 3 chars)
-        const phoneticMatch = q.length >= 3 && (
-          (biz.name ?? '').toLowerCase().startsWith(q.substring(0, 3)) ||
-          (biz.tags ?? []).some(tag => String(tag).toLowerCase().startsWith(q.substring(0, 3)))
-        );
+        const phoneticMatch =
+          q.length >= 3 &&
+          ((biz.name ?? '').toLowerCase().startsWith(q.substring(0, 3)) ||
+            (biz.tags ?? []).some(tag => String(tag).toLowerCase().startsWith(q.substring(0, 3))));
 
-        if (!nameMatch && !descMatch && !locationMatch && !categoryMatch && !tagMatch && !phoneticMatch && !whatsappMatch) return false;
+        if (!nameMatch && !descMatch && !locationMatch && !categoryMatch && !tagMatch && !phoneticMatch && !whatsappMatch)
+          return false;
       }
-      // Price range filter
       const price = effectiveListingDealPrice(biz) || effectiveListingOriginalPrice(biz);
       if (price < priceRange[0] || price > priceRange[1]) return false;
-      // Rating filter
       if (biz.rating < minRating) return false;
       return true;
-    });
+    },
+    [showFeaturedOnly, whatsappFilter, searchQuery, priceRange, minRating],
+  );
+
+  const tabPool = useMemo(
+    () => allBusinesses.filter(matchesSharedListingFilters),
+    [allBusinesses, matchesSharedListingFilters],
+  );
+
+  const filtered = useMemo(() => {
+    let result = tabPool.filter((biz) => selectedCategory === 'all' || biz.category === selectedCategory);
 
     // Sort
     switch (sortBy) {
@@ -233,7 +239,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
     }
 
     return result;
-  }, [allBusinesses, showFeaturedOnly, selectedCategory, searchQuery, priceRange, minRating, sortBy, userLocation, dbReviews, redemptions, whatsappFilter]);
+  }, [tabPool, selectedCategory, sortBy, userLocation, dbReviews, redemptions, allBusinesses]);
 
 
   const categoryIcons: Record<string, React.ReactNode> = {
@@ -274,15 +280,14 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
     ),
   };
 
-  // Compute real-time category counts
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const biz of allBusinesses) {
+    for (const biz of tabPool) {
       const cat = biz.category ?? 'other';
       counts[cat] = (counts[cat] || 0) + 1;
     }
     return counts;
-  }, [allBusinesses]);
+  }, [tabPool]);
 
   return (
     <section className="py-16 bg-gray-50/50">
@@ -333,7 +338,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
                 >
                   {categoryIcons.all}
                   {t('cat.all', language)}
-                  <span className="text-[10px] opacity-70">({allBusinesses.length})</span>
+                  <span className="text-[10px] opacity-70">({tabPool.length})</span>
                 </button>
                 {categories.map(cat => (
                   <button
@@ -414,7 +419,11 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
               : 'space-y-4'
           }>
             {filtered.map(biz => (
-              <BusinessCard key={biz.id} business={biz} listView={viewMode === 'list'} />
+              <BusinessCard
+                key={`${profileBusinessIdFor(biz)}-${biz.id}`}
+                business={biz}
+                listView={viewMode === 'list'}
+              />
             ))}
           </div>
         ) : (
