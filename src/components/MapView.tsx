@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 
 import { formatDistance, estimateWalkingTime, estimateDrivingTime } from '@/hooks/useGeolocation';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { effectiveBusinessCoords } from '@/lib/urlHelpers';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
