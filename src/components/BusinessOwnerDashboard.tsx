@@ -40,7 +40,12 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
-import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
+import {
+  effectiveProfileBusinessId,
+  OFFERING_LISTING_COLUMNS,
+  BUSINESS_PROFILE_EMBED_COLS,
+  listingCategoryFromOffering,
+} from '@/lib/businessOfferingMap';
 
 const DASHBOARD_LISTING_SUBMIT_DEADLINE_MS = 150_000;
 
@@ -118,7 +123,7 @@ function mapOfferingRowToUnified(
     id: String(o.id),
     _profileBusinessId: pid,
     name: String(o.title || profile.name || 'Offer'),
-    category: String(profile.category || 'dining'),
+    category: listingCategoryFromOffering(o, profile.category),
     description: String(o.description ?? ''),
     descriptionFr: String((o.description_fr ?? o.description) ?? ''),
     descriptionBi: String((o.description_bi ?? o.description) ?? ''),
@@ -182,7 +187,7 @@ async function buildApprovedUnifiedFromProfiles(
   if (profileIds.length > 0) {
     const { data } = await supabase
       .from('business_offerings')
-      .select('*, businesses(*)')
+      .select(`${OFFERING_LISTING_COLUMNS}, businesses(${BUSINESS_PROFILE_EMBED_COLS})`)
       .in('business_id', profileIds);
     offeringRows = (data as OfferingRow[]) || [];
   }
@@ -210,6 +215,10 @@ const BusinessOwnerDashboard: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [selectedBusinessId, setSelectedBusinessId] = useState<string>('');
+  const selectedBusinessIdRef = useRef('');
+  useEffect(() => {
+    selectedBusinessIdRef.current = selectedBusinessId;
+  }, [selectedBusinessId]);
   const [reviewResponses, setReviewResponses] = useState<ReviewResponse[]>([]);
   const [responseText, setResponseText] = useState<Record<string, string>>({});
   const [pendingBusinesses, setPendingBusinesses] = useState<any[]>([]);
@@ -404,7 +413,7 @@ const BusinessOwnerDashboard: React.FC = () => {
         }
 
         // Auto-select first business if none selected
-        if (unified.length > 0 && !selectedBusinessId) {
+        if (unified.length > 0 && !selectedBusinessIdRef.current) {
           // Prefer approved businesses
           const firstApproved = unified.find(b => b._source === 'approved');
           setSelectedBusinessId(firstApproved?.id || unified[0].id);
@@ -465,7 +474,7 @@ const BusinessOwnerDashboard: React.FC = () => {
       }
       setUnifiedBusinesses(unified);
 
-      if (unified.length > 0 && !selectedBusinessId) {
+      if (unified.length > 0 && !selectedBusinessIdRef.current) {
         const firstApproved = unified.find(b => b._source === 'approved');
         setSelectedBusinessId(firstApproved?.id || unified[0].id);
       }
@@ -507,7 +516,7 @@ const BusinessOwnerDashboard: React.FC = () => {
         }
         setUnifiedBusinesses(unified);
 
-        if (unified.length > 0 && !selectedBusinessId) {
+        if (unified.length > 0 && !selectedBusinessIdRef.current) {
           const firstApproved = unified.find(b => b._source === 'approved');
           setSelectedBusinessId(firstApproved?.id || unified[0].id);
         }
@@ -518,7 +527,7 @@ const BusinessOwnerDashboard: React.FC = () => {
     } finally {
       setOwnerDataLoading(false);
     }
-  }, [user, selectedBusinessId]);
+  }, [user]);
 
   const handleListingDeleted = useCallback(async () => {
     setSelectedBusinessId('');
@@ -636,11 +645,11 @@ const BusinessOwnerDashboard: React.FC = () => {
   }, [selectedBusiness]);
 
   useEffect(() => {
-    if (unifiedBusinesses.length > 0 && !selectedBusinessId) {
+    if (unifiedBusinesses.length > 0 && !selectedBusinessIdRef.current) {
       const firstApproved = unifiedBusinesses.find(b => b._source === 'approved');
       setSelectedBusinessId(firstApproved?.id || unifiedBusinesses[0].id);
     }
-  }, [unifiedBusinesses, selectedBusinessId]);
+  }, [unifiedBusinesses]);
 
   useEffect(() => {
     if (selectedBusiness) {

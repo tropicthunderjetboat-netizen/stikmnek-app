@@ -953,19 +953,9 @@ Deno.serve(async (req) => {
           return errorResponse(req, 'Invalid business_id on pending row (owner mismatch)', 403);
         }
 
-        const { error: profUpdErr } = await supabase
-          .from('businesses')
-          .update(stubProfilePatch())
-          .eq('id', existingProfileId);
-
-        if (profUpdErr) {
-          console.error('[manage-business] Failed to update businesses stub on re-approve:', profUpdErr);
-          return errorResponse(
-            req,
-            'Approved but failed to update profile: ' + profUpdErr.message,
-            500,
-          );
-        }
+        // Additional listing on an existing profile: do NOT overwrite `businesses` with this
+        // pending row (name/category/location would replace the master profile and hide other deals).
+        // Listing copy lives only on `business_offerings`; profile fields are edited in the dashboard.
 
         // New listing on an existing profile: always INSERT a row. Updating the "primary"
         // offering overwrote the owner's previous approved deals (only the last one appeared).
