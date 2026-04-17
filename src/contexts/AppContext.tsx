@@ -330,6 +330,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Track whether we've already processed the initial session
   const sessionProcessedRef = useRef(false);
+  /** Monotonic id so concurrent `loadBusinesses` calls cannot let an older error wipe newer data. */
+  const businessesLoadGenRef = useRef(0);
 
   // ═══ ROLE PERSISTENCE GUARDS ═══
   const lastDbResolvedRoleRef = useRef<'tourist' | 'business' | 'admin' | null>(null);
@@ -405,11 +407,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   const loadBusinesses = useCallback(async () => {
     const DBG = '[loadBusinesses]';
+    const gen = ++businessesLoadGenRef.current;
+    const listAbort = typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(45_000) : undefined;
     try {
       // Every active offering → one `Business` in `dbBusinesses` (no Map/Object keyed by business_id).
       // Load from `business_offerings` so stub profiles (`businesses.active = false`) still surface
       // their live offers. Embed `businesses` without `!inner` (default left join).
-      const { data: offeringRows, error: loadErr } = await supabase
+      let q = supabase
         .from('business_offerings')
         .select(`
           ${OFFERING_LISTING_COLUMNS},
@@ -420,10 +424,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .eq('active', true)
         .order('featured', { ascending: false })
         .order('title', { ascending: true });
+      if (listAbort) q = q.abortSignal(listAbort);
+      const { data: offeringRows, error: loadErr } = await q;
+
+      if (gen !== businessesLoadGenRef.current) return;
 
       if (loadErr) {
         console.warn(`${DBG} fetch error:`, loadErr.message || loadErr, loadErr);
-        setDbBusinesses([]);
+        // Do not wipe existing listings on transient errors (concurrent loads / flaky mobile).
         setDataLoaded(true);
         return;
       }
@@ -457,14 +465,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             );
           }
         }
+        if (gen !== businessesLoadGenRef.current) return;
         setDbBusinesses(mapped);
       } else {
+        if (gen !== businessesLoadGenRef.current) return;
         setDbBusinesses([]);
       }
       setDataLoaded(true);
     } catch (err) {
+      if (gen !== businessesLoadGenRef.current) return;
       console.error('[loadBusinesses] Failed to load businesses:', err);
-      setDbBusinesses([]);
       setDataLoaded(true);
     }
   }, []);
@@ -640,11 +650,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (userId) {
             const approxRestUrl = `${ENDPOINTS.rest}/user_profiles?select=*&user_id=eq.${encodeURIComponent(userId)}`;
             const startedAt = Date.now();
-            const { data, error } = await supabase
-              .from('user_profiles')
-              .select('*')
-              .eq('user_id', userId)
-              .maybeSingle();
+            const profileAbort =
+              typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+                ? AbortSignal.timeout(12_000)
+                : undefined;
+            let pq = supabase.from('user_profiles').select('*').eq('user_id', userId).maybeSingle();
+            if (profileAbort) pq = pq.abortSignal(profileAbort);
+            const { data, error } = await pq;
             const elapsedMs = Date.now() - startedAt;
 
             if (error) {
@@ -819,8 +831,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     authProcessingRef.current = true;
 
-    // Sync session onto the Supabase client before any RLS-backed user_profiles calls.
-    await supabase.auth.getSession();
+    // Yield off the GoTrue notifier stack — awaiting getSession() here has caused rare deadlocks
+    // with localStorage/session restore where auth never settles and sign-in spins until timeout.
+    await new Promise<void>((r) => setTimeout(r, 0));
 
     if (profileBannerTimerRef.current) {
       clearTimeout(profileBannerTimerRef.current);
@@ -963,10 +976,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadBusinesses();
     loadReviews();
 
+    const getSessionWithTimeout = async (ms: number) => {
+      return Promise.race([
+        supabase.auth.getSession(),
+        new Promise<{ data: { session: null }; error: Error }>((_, reject) =>
+          setTimeout(() => reject(new Error(`getSession timed out after ${ms}ms`)), ms),
+        ),
+      ]);
+    };
+
     // Proactive session restore — don't rely solely on INITIAL_SESSION
     const initSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await getSessionWithTimeout(15_000);
         if (session?.user && !sessionProcessedRef.current) {
           sessionProcessedRef.current = true;
           await handleAuthenticatedUser(session.user, false);
@@ -977,14 +999,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setAuthLoading(false);
         }
       } catch (err) {
-        console.warn('[Init] getSession error:', err);
+        console.warn('[Init] getSession error or timeout:', err);
+        sessionProcessedRef.current = true;
         setAuthLoading(false);
       }
     };
     initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
+        setTimeout(() => {
+          void (async () => {
         try {
           switch (event) {
             case 'SIGNED_OUT': {
@@ -1053,6 +1078,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.error('[onAuthStateChange] Unhandled error:', err);
           setAuthLoading(false);
         }
+          })();
+        }, 0);
       }
     );
 
@@ -1060,7 +1087,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const fallbackTimer = setTimeout(async () => {
       if (!sessionProcessedRef.current) {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
+          const { data: { session } } = await getSessionWithTimeout(15_000);
           if (session?.user) {
             sessionProcessedRef.current = true;
             await handleAuthenticatedUser(session.user, false);
@@ -1069,7 +1096,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setAuthLoading(false);
           }
         } catch (err) {
-          console.error('[Init] getSession error:', err);
+          console.error('[Init] fallback getSession error or timeout:', err);
           sessionProcessedRef.current = true;
           setAuthLoading(false);
         }
