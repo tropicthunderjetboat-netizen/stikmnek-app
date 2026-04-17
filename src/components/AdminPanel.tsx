@@ -148,12 +148,16 @@ const AdminPanel: React.FC = () => {
   const [previewBusinessId, setPreviewBusinessId] = useState<string | null>(null);
 
 
-  // Ref to prevent duplicate loads
-  const loadingRef = useRef(false);
   const retryCountRef = useRef(0);
 
   // ─── Helper: invoke edge function with retry + rate-limit awareness ───
-  const invokeWithRetry = async (fnName: string, body: any, maxRetries = 2, label = ''): Promise<{ data: any; error: any }> => {
+  const invokeWithRetry = async (
+    fnName: string,
+    body: any,
+    maxRetries = 2,
+    label = '',
+    headers?: Record<string, string>,
+  ): Promise<{ data: any; error: any }> => {
     let lastError: any = null;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -163,7 +167,10 @@ const AdminPanel: React.FC = () => {
           console.log('[Admin]' + (label ? ' ' + label : '') + ' Retry ' + attempt + '/' + maxRetries + ' after ' + delay + 'ms...');
           await new Promise(r => setTimeout(r, delay));
         }
-        const result = await supabase.functions.invoke(fnName, { body });
+        const result = await supabase.functions.invoke(fnName, {
+          body,
+          ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
+        });
 
         // Check if the error is a rate-limit (429) or other HTTP error
         if (result.error) {
@@ -214,8 +221,7 @@ const AdminPanel: React.FC = () => {
   // Strategy 2: Edge Function
   // Strategy 3: Direct query (may be blocked by RLS if policies missing)
   const loadPending = useCallback(async (showToast = false) => {
-    if (!user || loadingRef.current) return;
-    loadingRef.current = true;
+    if (!user) return;
     setLoadingPending(true);
     try {
       // Strategy 1: RPC — bypasses RLS, guaranteed to work for admins
@@ -229,10 +235,19 @@ const AdminPanel: React.FC = () => {
         return;
       }
 
-      // Strategy 2: Edge Function
-      const { data, error } = await invokeWithRetry('manage-business', {
-        action: 'get_pending', userId: user.id, isAdmin: true,
-      });
+      // Strategy 2: Edge Function (JWT required — pass Authorization like other admin invokes)
+      const edgeHeaders = await getEdgeAuthHeaders();
+      const { data, error } = await invokeWithRetry(
+        'manage-business',
+        {
+          action: 'get_pending',
+          userId: user.id,
+          isAdmin: true,
+        },
+        2,
+        'get_pending',
+        edgeHeaders,
+      );
       if (data?.businesses && Array.isArray(data.businesses)) {
         setPendingBusinesses((data.businesses || []) as PendingBusiness[]);
         loadAllPhotos((data.businesses || []) as PendingBusiness[]);
@@ -248,7 +263,6 @@ const AdminPanel: React.FC = () => {
       await loadPendingDirect(showToast);
     } finally {
       setLoadingPending(false);
-      loadingRef.current = false;
     }
   }, [user]);
 
@@ -463,11 +477,13 @@ const AdminPanel: React.FC = () => {
     setDeletingId(listingId);
     try {
       // Strategy 1: Try edge function with retry (handles rate limiting + transient errors)
+      const delHeaders = await getEdgeAuthHeaders();
       const { data, error } = await invokeWithRetry(
         'manage-business',
         { action: 'admin_delete_business', userId: user?.id, businessId: profileId },
         2,
-        'delete_business'
+        'delete_business',
+        delHeaders,
       );
 
       if (data && !data.error && data.success !== false) {
@@ -648,19 +664,20 @@ const AdminPanel: React.FC = () => {
 
 
   // ─── Auto-refresh when switching to businesses or approvals tab ───
-  // Stagger requests to avoid concurrent edge function call failures
   useEffect(() => {
-    if (activeTab === 'businesses') {
-      handleRefreshBusinesses();
-    }
-    if (activeTab === 'approvals') {
-      console.log('[Admin] Switched to approvals tab — refreshing (staggered)...');
-      loadPending();
-      // Stagger the edits load by 300ms to avoid concurrent request failures
-      const timer = setTimeout(() => loadPendingEdits(), 300);
-      return () => clearTimeout(timer);
-    }
-  }, [activeTab]);
+    if (activeTab !== 'businesses') return;
+    handleRefreshBusinesses();
+  }, [activeTab, handleRefreshBusinesses]);
+
+  useEffect(() => {
+    if (activeTab !== 'approvals' || !user) return;
+    console.log('[Admin] Switched to approvals tab — refreshing (staggered)...');
+    void loadPending();
+    const timer = setTimeout(() => {
+      void loadPendingEdits();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [activeTab, user, loadPending]);
 
 
   // ─── Real-time subscription for pending_businesses table ───
@@ -708,7 +725,7 @@ const AdminPanel: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user, loadPending]);
 
 
   // ─── Polling: refresh every 30s when on approvals tab ───
