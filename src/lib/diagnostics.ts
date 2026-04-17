@@ -8,7 +8,7 @@
  *   import('/src/lib/diagnostics.ts').then(m => m.runFullDiagnostic())
  */
 
-import { supabase } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 
 const isDev = import.meta.env.DEV;
 
@@ -21,7 +21,11 @@ async function guardedInvoke(
   context: string,
 ): Promise<{ data: unknown; error: { message?: string } | null }> {
   try {
-    const { data, error } = await supabase.functions.invoke(fnName, { body });
+    const headers = await getEdgeAuthHeaders();
+    const { data, error } = await supabase.functions.invoke(fnName, {
+      body,
+      ...(Object.keys(headers).length > 0 ? { headers } : {}),
+    });
     if (error) {
       console.warn(
         `[Diagnostics] ${context} — ${fnName}:`,

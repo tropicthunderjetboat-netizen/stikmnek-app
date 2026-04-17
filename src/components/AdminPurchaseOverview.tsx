@@ -31,6 +31,40 @@ interface PassPurchase {
   valid_until: string;
   paypal_order_id: string;
   created_at: string;
+  /** From `passes.active` — cleared when pass expires (cron) */
+  pass_is_active?: boolean | null;
+}
+
+type PassRow = Record<string, unknown>;
+
+function mapPassRowToPurchase(
+  row: PassRow,
+  profile: { email?: string | null; display_name?: string | null; name?: string | null } | null,
+): PassPurchase {
+  const purchasedAt = (row.purchased_at as string) || (row.expires_at as string) || new Date().toISOString();
+  const uid = String(row.user_id ?? '');
+  const sessionId = String(row.payment_session_id ?? '');
+  const provider = String(row.payment_provider ?? '');
+  const id = String(row.id ?? '');
+  return {
+    id,
+    user_id: uid,
+    pass_type: String(row.pass_type ?? ''),
+    purchase_date: purchasedAt,
+    expiry_date: String(row.expires_at ?? ''),
+    amount_paid: Number(row.amount_paid) || 0,
+    payment_status: 'completed',
+    receipt_number: sessionId ? sessionId.slice(0, 16) : id.slice(0, 8),
+    payment_method: provider || 'card',
+    user_email: profile?.email ?? '',
+    user_name:
+      (profile?.display_name || profile?.name || (uid ? `User ${uid.slice(0, 8)}…` : '')) || 'Unknown',
+    valid_from: String(row.valid_from ?? ''),
+    valid_until: String(row.valid_until ?? ''),
+    paypal_order_id: provider === 'paypal' ? sessionId : '',
+    created_at: purchasedAt,
+    pass_is_active: row.active as boolean | null | undefined,
+  };
 }
 
 interface AdminPurchaseOverviewProps {
@@ -73,16 +107,18 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
   const loadPurchases = useCallback(async (showToast = false) => {
     try {
       let query = supabase
-        .from('pass_purchases')
-        .select('*')
-        .order('purchase_date', { ascending: false });
+        .from('passes')
+        .select(
+          'id, user_id, pass_type, purchased_at, expires_at, amount_paid, active, payment_provider, payment_session_id, valid_from, valid_until',
+        )
+        .order('purchased_at', { ascending: false })
+        .order('id', { ascending: false });
 
-      // Apply time range filter
       if (timeRange !== 'all') {
         const daysMap = { '7d': 7, '30d': 30, '90d': 90 };
         const since = new Date();
         since.setDate(since.getDate() - daysMap[timeRange]);
-        query = query.gte('purchase_date', since.toISOString());
+        query = query.gte('purchased_at', since.toISOString());
       }
 
       const { data, error } = await query;
@@ -93,9 +129,24 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
         return;
       }
 
-      setPurchases((data || []) as PassPurchase[]);
+      const rows = (data || []) as PassRow[];
+      const userIds = [...new Set(rows.map((r) => String(r.user_id || '')).filter(Boolean))];
+      const profilesByUser = new Map<string, { email?: string | null; display_name?: string | null; name?: string | null }>();
+      if (userIds.length > 0) {
+        const { data: profs, error: profErr } = await supabase
+          .from('user_profiles')
+          .select('user_id, email, display_name, name')
+          .in('user_id', userIds);
+        if (!profErr && profs) {
+          for (const p of profs as { user_id: string; email?: string | null; display_name?: string | null; name?: string | null }[]) {
+            profilesByUser.set(p.user_id, p);
+          }
+        }
+      }
+
+      setPurchases(rows.map((r) => mapPassRowToPurchase(r, profilesByUser.get(String(r.user_id)) ?? null)));
       setLastRefreshed(new Date());
-      if (showToast) toast.success(`Loaded ${(data || []).length} purchase records`);
+      if (showToast) toast.success(`Loaded ${rows.length} purchase records`);
     } catch (err) {
       console.error('[AdminPurchaseOverview] Load error:', err);
       if (showToast) toast.error('Failed to load purchase data');
@@ -110,21 +161,24 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
   // Set up realtime subscription
   useEffect(() => {
     const channel = supabase
-      .channel('admin-pass-purchases-realtime')
+      .channel('admin-passes-realtime')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pass_purchases' },
+        { event: 'INSERT', schema: 'public', table: 'passes' },
         (payload) => {
-          const newPurchase = payload.new as PassPurchase;
-          setPurchases(prev => [newPurchase, ...prev]);
-          toast.info(`New pass purchase: ${PASS_LABELS[newPurchase.pass_type] || newPurchase.pass_type} - $${newPurchase.amount_paid}`, {
-            duration: 5000,
-          });
-        }
+          const newPurchase = mapPassRowToPurchase(payload.new as PassRow, null);
+          setPurchases((prev) => [newPurchase, ...prev]);
+          toast.info(
+            `New pass purchase: ${PASS_LABELS[newPurchase.pass_type as DbPassType] || newPurchase.pass_type} - $${newPurchase.amount_paid}`,
+            { duration: 5000 },
+          );
+        },
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleRefresh = async () => {
@@ -139,7 +193,9 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
   const now = new Date();
 
   const totalRevenue = completedPurchases.reduce((sum, p) => sum + Number(p.amount_paid), 0);
-  const activePasses = completedPurchases.filter(p => new Date(p.expiry_date) > now).length;
+  const activePasses = completedPurchases.filter(
+    (p) => new Date(p.expiry_date) > now && p.pass_is_active !== false,
+  ).length;
   const totalPurchases = completedPurchases.length;
   const avgOrderValue = totalPurchases > 0 ? totalRevenue / totalPurchases : 0;
 
@@ -151,7 +207,9 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
       shortName: type.charAt(0).toUpperCase() + type.slice(1),
       value: typePurchases.reduce((sum, p) => sum + Number(p.amount_paid), 0),
       count: typePurchases.length,
-      active: typePurchases.filter(p => new Date(p.expiry_date) > now).length,
+      active: typePurchases.filter(
+        (p) => new Date(p.expiry_date) > now && p.pass_is_active !== false,
+      ).length,
       color: PASS_COLORS[type],
       price: PASS_PRICES[type],
     };
@@ -286,7 +344,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `pass_purchases_${new Date().toISOString().split('T')[0]}.csv`;
+      link.download = `passes_export_${new Date().toISOString().split('T')[0]}.csv`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -645,7 +703,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
           </div>
           <h3 className="text-lg font-bold text-gray-900 mb-2">No Purchase Data Yet</h3>
           <p className="text-gray-500 text-sm max-w-md mx-auto">
-            Pass purchases will appear here once tourists start buying passes through PayPal.
+            Pass purchases will appear here once tourists start buying passes (card or PayPal).
             All revenue, trends, and analytics will be tracked in real-time.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
@@ -692,7 +750,8 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
               <tbody className="divide-y divide-gray-50">
                 {recentPurchases.map(purchase => {
                   const statusStyle = STATUS_COLORS[purchase.payment_status] || STATUS_COLORS.pending;
-                  const isExpired = new Date(purchase.expiry_date) < now;
+                  const isExpired =
+                    new Date(purchase.expiry_date) < now || purchase.pass_is_active === false;
                   return (
                     <tr key={purchase.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-5 py-3">

@@ -804,27 +804,42 @@ const AdminPanel: React.FC = () => {
         }, 1000);
       }
 
-      // Send email notification to business owner
+      // Send email notification to business owner (edge requires a valid user JWT)
       if (biz?.email) {
         try {
-          await supabase.functions.invoke('send-email', {
-            headers: await getEdgeAuthHeaders(),
-            body: {
-              action: 'send_business_decision',
-              owner_id: biz.owner_id || '',
-              owner_email: biz.email,
-              owner_name: biz.name,
-              business_name: biz.name,
-              category: biz.category,
-              location: biz.location,
-              discount: biz.discount,
-              decision,
-              admin_notes: adminNotes[businessId] || 'No additional notes.',
-            },
-          });
-          toast.success(`Notification email sent to ${biz.email}`);
+          const emailHeaders = await getEdgeAuthHeaders();
+          if (!emailHeaders.Authorization) {
+            toast.error('Your session expired — sign in again to send the decision email.');
+          } else {
+            const { error: emailInvokeError } = await supabase.functions.invoke('send-email', {
+              headers: emailHeaders,
+              body: {
+                action: 'send_business_decision',
+                owner_id: biz.owner_id || '',
+                owner_email: biz.email,
+                owner_name: biz.name,
+                business_name: biz.name,
+                category: biz.category,
+                location: biz.location,
+                discount: biz.discount,
+                decision,
+                admin_notes: adminNotes[businessId] || 'No additional notes.',
+              },
+            });
+            if (emailInvokeError) {
+              console.warn('[Admin] send-email failed:', emailInvokeError.message || emailInvokeError);
+              toast.error(
+                emailInvokeError.message?.includes('401') || String(emailInvokeError).includes('401')
+                  ? 'Could not send email (session invalid). Try signing out and back in.'
+                  : `Could not send email: ${emailInvokeError.message || 'unknown error'}`,
+              );
+            } else {
+              toast.success(`Notification email sent to ${biz.email}`);
+            }
+          }
         } catch (emailErr) {
           console.error('Failed to send decision email:', emailErr);
+          toast.error('Could not send decision email.');
         }
       }
     } catch (err: any) {

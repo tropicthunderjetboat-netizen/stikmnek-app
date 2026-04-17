@@ -4,7 +4,7 @@ import { t } from '@/data/translations';
 import { SITE_URL, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { X, Mail, Lock, User, Briefcase, Plane, Loader2, Shield, ArrowLeft, Store, MapPin, Globe } from 'lucide-react';
-import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
@@ -520,6 +520,13 @@ const AuthModal: React.FC = () => {
               ? 'Connexion ou création de compte StikmNek'
               : 'Saen in o mekem akaont StikmNek'}
         </DialogTitle>
+        <DialogDescription className="sr-only">
+          {language === 'en'
+            ? 'Choose how to sign in or create an account, then enter your email and password.'
+            : language === 'fr'
+              ? 'Choisissez comment vous connecter ou créer un compte, puis saisissez votre e-mail et votre mot de passe.'
+              : 'Jusum we blong saen in o mekem akaont, afta putum email mo paswod.'}
+        </DialogDescription>
         {isChooseType
           ? renderChooseType()
           : authMode === 'signin' && (forgotPasswordMode || forgotPasswordSent)
