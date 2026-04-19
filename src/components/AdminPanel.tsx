@@ -33,6 +33,25 @@ import PassEditor from './PassEditor';
 import AdminPurchaseOverview from './AdminPurchaseOverview';
 import AdminUserManager from './AdminUserManager';
 
+/** On HTTP errors, `invoke` often leaves `data` null; the edge JSON may be on `FunctionsHttpError.context` (a `Response`). */
+async function tryReadEdgeFunctionJsonError(invokeError: unknown): Promise<string | null> {
+  if (!invokeError || typeof invokeError !== 'object') return null;
+  if ((invokeError as { name?: string }).name !== 'FunctionsHttpError') return null;
+  const ctx = (invokeError as { context?: unknown }).context;
+  if (!(ctx instanceof Response)) return null;
+  try {
+    const ct = (ctx.headers.get('Content-Type') || '').toLowerCase();
+    if (!ct.includes('application/json')) return null;
+    const j = (await ctx.clone().json()) as { error?: unknown; message?: unknown };
+    const err = typeof j.error === 'string' ? j.error.trim() : '';
+    if (err) return err;
+    const msg = typeof j.message === 'string' ? j.message.trim() : '';
+    return msg || null;
+  } catch {
+    return null;
+  }
+}
+
 
 
 
@@ -836,22 +855,27 @@ const AdminPanel: React.FC = () => {
               );
             } else if (emailInvokeError) {
               console.warn('[Admin] send-email failed:', emailInvokeError.message || emailInvokeError);
-              const raw = String(
-                (emailInvokeError as { message?: string }).message ||
-                  (typeof emailInvokeError === 'object' ? JSON.stringify(emailInvokeError) : emailInvokeError),
-              );
-              const vagueEdge =
-                /non-2xx|2xx|FunctionsHttpError|Edge Function returned/i.test(raw) ||
-                raw.includes('non-2xx');
-              const msg401 =
-                (emailInvokeError as { message?: string }).message?.includes('401') || raw.includes('401');
-              toast.error(
-                msg401
-                  ? 'Could not send email (session invalid). Try signing out and back in.'
-                  : vagueEdge
-                    ? 'Could not reach the email service. If the listing email is invalid or blocked, fix it and try again — or check Supabase function logs.'
-                    : `Could not send email: ${raw || 'unknown error'}`,
-              );
+              const fromBody = await tryReadEdgeFunctionJsonError(emailInvokeError);
+              if (fromBody) {
+                toast.error(fromBody);
+              } else {
+                const raw = String(
+                  (emailInvokeError as { message?: string }).message ||
+                    (typeof emailInvokeError === 'object' ? JSON.stringify(emailInvokeError) : emailInvokeError),
+                );
+                const vagueEdge =
+                  /non-2xx|2xx|FunctionsHttpError|Edge Function returned/i.test(raw) ||
+                  raw.includes('non-2xx');
+                const msg401 =
+                  (emailInvokeError as { message?: string }).message?.includes('401') || raw.includes('401');
+                toast.error(
+                  msg401
+                    ? 'Could not send email (session invalid). Try signing out and back in.'
+                    : vagueEdge
+                      ? 'Could not reach the email service. Check Supabase → Edge Functions → send-email logs; confirm SENDGRID_API_KEY and a verified SENDGRID_FROM_EMAIL.'
+                      : `Could not send email: ${raw || 'unknown error'}`,
+                );
+              }
             } else {
               toast.success(`Notification email sent to ${biz.email}`);
             }
