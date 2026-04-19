@@ -811,7 +811,7 @@ const AdminPanel: React.FC = () => {
           if (!emailHeaders.Authorization) {
             toast.error('Your session expired — sign in again to send the decision email.');
           } else {
-            const { error: emailInvokeError } = await supabase.functions.invoke('send-email', {
+            const { data: emailData, error: emailInvokeError } = await supabase.functions.invoke('send-email', {
               headers: emailHeaders,
               body: {
                 action: 'send_business_decision',
@@ -826,19 +826,30 @@ const AdminPanel: React.FC = () => {
                 admin_notes: adminNotes[businessId] || 'No additional notes.',
               },
             });
-            if (emailInvokeError) {
+
+            const emailPayload = emailData as { success?: boolean; error?: string } | null;
+
+            if (emailPayload && emailPayload.success === false) {
+              toast.error(
+                emailPayload.error ||
+                  'Could not send notification email (see SendGrid / function logs for details).',
+              );
+            } else if (emailInvokeError) {
               console.warn('[Admin] send-email failed:', emailInvokeError.message || emailInvokeError);
-              const raw = String(emailInvokeError.message || emailInvokeError);
+              const raw = String(
+                (emailInvokeError as { message?: string }).message ||
+                  (typeof emailInvokeError === 'object' ? JSON.stringify(emailInvokeError) : emailInvokeError),
+              );
               const vagueEdge =
                 /non-2xx|2xx|FunctionsHttpError|Edge Function returned/i.test(raw) ||
                 raw.includes('non-2xx');
               const msg401 =
-                emailInvokeError.message?.includes('401') || raw.includes('401');
+                (emailInvokeError as { message?: string }).message?.includes('401') || raw.includes('401');
               toast.error(
                 msg401
                   ? 'Could not send email (session invalid). Try signing out and back in.'
                   : vagueEdge
-                    ? 'Could not send email (server rejected the request). Check SendGrid / Supabase function logs, or try again shortly.'
+                    ? 'Could not reach the email service. If the listing email is invalid or blocked, fix it and try again — or check Supabase function logs.'
                     : `Could not send email: ${raw || 'unknown error'}`,
               );
             } else {

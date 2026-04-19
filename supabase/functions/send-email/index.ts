@@ -30,6 +30,24 @@ function errorResponse(req: Request, message: string, status = 400, extra?: Reco
   return jsonResponse(req, { success: false, error: message, errorCode: status, ...extra }, status);
 }
 
+/** Parse SendGrid v3 JSON error body for a short operator-facing message. */
+function userFacingSendGridError(status: number, errText: string): string {
+  try {
+    const parsed = JSON.parse(errText) as { errors?: { message?: string }[] };
+    const first = parsed?.errors?.[0]?.message;
+    if (first && typeof first === 'string' && first.trim()) return first.trim();
+  } catch {
+    /* ignore */
+  }
+  if (status === 401 || status === 403) {
+    return 'SendGrid rejected the request (check API key and sender authentication).';
+  }
+  if (status === 400) {
+    return 'SendGrid rejected the recipient (invalid, blocked, or non-existent address is common).';
+  }
+  return `Email could not be sent (SendGrid HTTP ${status}).`;
+}
+
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
 
@@ -256,8 +274,19 @@ Deno.serve(async (req) => {
       }
 
       const { owner_email, business_name, decision, admin_notes } = body;
-      if (!owner_email) {
-        return errorResponse(req, 'Missing owner_email');
+      const emailStr = String(owner_email ?? '').trim();
+      if (!emailStr) {
+        return jsonResponse(req, {
+          success: false,
+          error: 'This submission has no owner email — add a valid address on the listing before notifying.',
+        });
+      }
+      const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr);
+      if (!emailLooksValid) {
+        return jsonResponse(req, {
+          success: false,
+          error: `Owner email is not a valid address: ${emailStr}`,
+        });
       }
 
       const safeBusinessName = escapeHtml(business_name);
@@ -279,7 +308,7 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          personalizations: [{ to: [{ email: owner_email }] }],
+          personalizations: [{ to: [{ email: emailStr }] }],
           from: {
             email: Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com',
             name: Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek',
@@ -298,11 +327,14 @@ Deno.serve(async (req) => {
         }
         const logMsg = `[send-email] SendGrid send_business_decision FAILED status=${res.status} body=${errText}`;
         console.error(logMsg);
-        return jsonResponse(
-          req,
-          { success: false, error: `SendGrid error: ${res.status}`, details: errText },
-          500,
-        );
+        const userMsg = userFacingSendGridError(res.status, errText);
+        // HTTP 200 so the browser client receives JSON instead of a generic "non-2xx" invoke error.
+        return jsonResponse(req, {
+          success: false,
+          error: userMsg,
+          sendgridStatus: res.status,
+          details: errText.slice(0, 1200),
+        });
       }
 
       return jsonResponse(req, { success: true, sent: true });
