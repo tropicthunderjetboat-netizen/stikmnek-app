@@ -828,10 +828,18 @@ const AdminPanel: React.FC = () => {
             });
             if (emailInvokeError) {
               console.warn('[Admin] send-email failed:', emailInvokeError.message || emailInvokeError);
+              const raw = String(emailInvokeError.message || emailInvokeError);
+              const vagueEdge =
+                /non-2xx|2xx|FunctionsHttpError|Edge Function returned/i.test(raw) ||
+                raw.includes('non-2xx');
+              const msg401 =
+                emailInvokeError.message?.includes('401') || raw.includes('401');
               toast.error(
-                emailInvokeError.message?.includes('401') || String(emailInvokeError).includes('401')
+                msg401
                   ? 'Could not send email (session invalid). Try signing out and back in.'
-                  : `Could not send email: ${emailInvokeError.message || 'unknown error'}`,
+                  : vagueEdge
+                    ? 'Could not send email (server rejected the request). Check SendGrid / Supabase function logs, or try again shortly.'
+                    : `Could not send email: ${raw || 'unknown error'}`,
               );
             } else {
               toast.success(`Notification email sent to ${biz.email}`);

@@ -3,7 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { categories, touristFacingOfferings } from '@/data/businesses';
 
 const CategoryShowcase: React.FC = () => {
-  const { language, setSelectedCategory, setCurrentView, dbBusinesses, dataLoaded } = useAppContext();
+  const { language, setSelectedCategory, setCurrentView, setSearchQuery, dbBusinesses, dataLoaded } = useAppContext();
 
   const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
@@ -62,6 +62,8 @@ const CategoryShowcase: React.FC = () => {
   ];
 
   const handleCategoryClick = (key: string) => {
+    // Deals grid applies global search + price filters; clear search so home category counts match the grid.
+    setSearchQuery('');
     setSelectedCategory(key);
     setCurrentView('deals');
   };

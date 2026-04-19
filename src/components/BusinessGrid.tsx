@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { useAppContext, ViewMode } from '@/contexts/AppContext';
+import React, { useState, useMemo, useCallback, useLayoutEffect, useRef } from 'react';
+import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import {
   categories,
@@ -110,6 +110,30 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [whatsappFilter, setWhatsappFilter] = useState(false);
 
+  const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
+
+  const maxPrice = useMemo(
+    () =>
+      Math.max(
+        ...allBusinesses.map((b) => effectiveListingDealPrice(b) || effectiveListingOriginalPrice(b) || 0),
+        50000,
+      ),
+    [allBusinesses],
+  );
+
+  /** Tracks catalog-wide max deal price so we can widen the default slider ceiling when new listings exceed VT 50k. */
+  const prevCatalogMaxRef = useRef(maxPrice);
+
+  useLayoutEffect(() => {
+    const prev = prevCatalogMaxRef.current;
+    prevCatalogMaxRef.current = maxPrice;
+    setPriceRange(([lo, hi]) => {
+      if (hi === 50000 && maxPrice > 50000) return [lo, maxPrice];
+      if (hi >= prev && maxPrice > prev) return [lo, maxPrice];
+      return [lo, hi];
+    });
+  }, [maxPrice]);
+
   /** Turning on WhatsApp filter must clear category — otherwise we intersect e.g. "Accommodation" with WA and show 0 while the chip still says (8). */
   const setWhatsappFilterWrapped = useCallback(
     (value: React.SetStateAction<boolean>) => {
@@ -121,10 +145,6 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
     },
     [setSelectedCategory],
   );
-
-  const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
-
-  const maxPrice = useMemo(() => Math.max(...allBusinesses.map(b => b.dealPrice || b.originalPrice), 50000), [allBusinesses]);
 
   // Count businesses with WhatsApp for the filter chip badge
   const whatsappCount = useMemo(() => {
