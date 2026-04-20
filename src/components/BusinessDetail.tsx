@@ -66,6 +66,7 @@ const BusinessDetail: React.FC = () => {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewResponsesById, setReviewResponsesById] = useState<Record<string, ReviewResponseRow>>({});
   const [displayCoverImage, setDisplayCoverImage] = useState('');
+  const [descExpanded, setDescExpanded] = useState(false);
   const [profileOfferings, setProfileOfferings] = useState<Business[]>([]);
   const [offeringsFetchError, setOfferingsFetchError] = useState<string | null>(null);
   const [offeringsLoaded, setOfferingsLoaded] = useState(false);
@@ -144,10 +145,6 @@ const BusinessDetail: React.FC = () => {
     return profileOfferings[0] ?? selectedBusiness;
   }, [selectedBusiness, profileOfferings]);
 
-  useEffect(() => {
-    setDisplayCoverImage(effectiveBiz?.image || '');
-  }, [effectiveBiz?.id, effectiveBiz?.image]);
-
   const reviews = useMemo(
     () => (profileId ? dbReviews.filter((r) => r.business_id === profileId) : []),
     [dbReviews, profileId],
@@ -202,6 +199,13 @@ const BusinessDetail: React.FC = () => {
       fromEmbed
     );
   }, [effectiveBiz, language, selectedBusiness]);
+
+  const descPlainLen = useMemo(() => plainTextFromHtml(desc || '').length, [desc]);
+  const descriptionCollapsible = descPlainLen > 400 || (desc || '').length > 900;
+
+  useEffect(() => {
+    setDescExpanded(false);
+  }, [effectiveBiz?.id]);
 
   const pricingTiers = useMemo(() => {
     const o = primaryEmbeddedOffering(selectedBusiness as Business);
@@ -270,12 +274,18 @@ const BusinessDetail: React.FC = () => {
 
   useEffect(() => {
     if (!effectiveBiz?.id || !profileId) return;
+    const listingCover = String(effectiveBiz.image || '').trim();
+    if (listingCover) {
+      setDisplayCoverImage(listingCover);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const { data, error } = await supabase
         .from('business_photos')
         .select('url, file_path')
         .eq('business_id', profileId)
+        .eq('offering_id', effectiveBiz.id)
         .eq('status', 'approved')
         .order('is_main', { ascending: false })
         .order('created_at', { ascending: true })
@@ -283,11 +293,10 @@ const BusinessDetail: React.FC = () => {
       if (cancelled || error) return;
       const first = data?.[0] as { url?: string; file_path?: string } | undefined;
       if (!first) {
-        setDisplayCoverImage(effectiveBiz.image || '');
+        setDisplayCoverImage('');
         return;
       }
-      const resolved =
-        getPhotoDisplayUrl(first, SUPABASE_URL) || first.url || effectiveBiz.image || '';
+      const resolved = getPhotoDisplayUrl(first, SUPABASE_URL) || first.url || '';
       setDisplayCoverImage(resolved);
     })();
     return () => {
@@ -479,24 +488,8 @@ const BusinessDetail: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-              {looksLikeRichDescriptionHtml(desc || '') ? (
-                <div
-                  className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: sanitizeBusinessDescriptionHtml(desc || '') }}
-                />
-              ) : (
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap break-words">{desc}</p>
-              )}
-              <div className="flex flex-wrap gap-2 mt-4">
-                {biz.tags.map(tag => (
-                  <span key={tag} className="px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-medium">{tag}</span>
-                ))}
-              </div>
-            </div>
-
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="order-2 min-w-0 space-y-6 lg:order-1 lg:col-span-2">
             {showTieredTable && (
               <div className="bg-white rounded-xl p-5 shadow-sm border border-violet-100">
                 <div className="flex items-center gap-2 mb-3">
@@ -551,6 +544,61 @@ const BusinessDetail: React.FC = () => {
                 </div>
               </div>
             )}
+
+            <div className="relative bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-gray-100">
+              <div
+                className={
+                  descriptionCollapsible && !descExpanded
+                    ? 'relative max-h-[22rem] overflow-hidden'
+                    : ''
+                }
+              >
+                {looksLikeRichDescriptionHtml(desc || '') ? (
+                  <div
+                    className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: sanitizeBusinessDescriptionHtml(desc || '') }}
+                  />
+                ) : (
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap break-words text-[15px] sm:text-base">{desc}</p>
+                )}
+                {descriptionCollapsible && !descExpanded && (
+                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent" aria-hidden />
+                )}
+              </div>
+              {descriptionCollapsible && (
+                <button
+                  type="button"
+                  onClick={() => setDescExpanded((v) => !v)}
+                  className="mt-3 text-sm font-semibold text-teal-700 hover:text-teal-800"
+                >
+                  {descExpanded
+                    ? language === 'en'
+                      ? 'Show less'
+                      : language === 'fr'
+                        ? 'Afficher moins'
+                        : 'Ridim smol'
+                    : language === 'en'
+                      ? 'Read more'
+                      : language === 'fr'
+                        ? 'Lire la suite'
+                        : 'Ridim moa'}
+                </button>
+              )}
+              <div className="flex flex-wrap gap-2 mt-4">
+                {biz.tags.map((tag) => (
+                  <span key={tag} className="px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-xs font-medium">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <PhotoGallery
+              businessId={profileId}
+              offeringId={biz.id}
+              coverImage={displayCoverImage || biz.image}
+              businessName={biz.name}
+            />
 
             {/* WhatsApp Contact Card */}
             {hasWhatsApp && (
@@ -623,13 +671,6 @@ const BusinessDetail: React.FC = () => {
                 </div>
               </div>
             )}
-
-            {/* Photo Gallery */}
-            <PhotoGallery
-              businessId={profileId}
-              coverImage={displayCoverImage || biz.image}
-              businessName={biz.name}
-            />
 
             {/* Reviews Section */}
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
@@ -776,8 +817,8 @@ const BusinessDetail: React.FC = () => {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 sticky top-20">
+          <div className="order-1 min-w-0 space-y-4 lg:order-2 lg:col-span-1">
+            <div className="bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-gray-100 lg:sticky lg:top-20">
               {showTieredTable ? (
                 <div className="mb-4">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
@@ -785,10 +826,10 @@ const BusinessDetail: React.FC = () => {
                   </p>
                   <p className="text-sm text-gray-700">
                     {language === 'en'
-                      ? 'Tiered per-person rates — see the table in the description for Adult / Child / Infant VT.'
+                      ? 'Tiered per-person rates — see the pricing table on this page for Adult / Child / Infant VT.'
                       : language === 'fr'
-                        ? 'Tarifs par palier — voir le tableau sous la description.'
-                        : 'Praes long wanwan man — lukim tebol long diskripsen.'}
+                        ? 'Tarifs par palier — voir le tableau des prix sur cette page.'
+                        : 'Praes long wanwan man — lukim tebol long pej ia.'}
                   </p>
                 </div>
               ) : (

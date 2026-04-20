@@ -829,68 +829,8 @@ const AdminPanel: React.FC = () => {
         }, 1000);
       }
 
-      // Send email notification to business owner (edge requires a valid user JWT)
-      if (biz?.email) {
-        try {
-          const emailHeaders = await getEdgeAuthHeaders();
-          if (!emailHeaders.Authorization) {
-            toast.error('Your session expired — sign in again to send the decision email.');
-          } else {
-            const { data: emailData, error: emailInvokeError } = await supabase.functions.invoke('send-email', {
-              headers: emailHeaders,
-              body: {
-                action: 'send_business_decision',
-                owner_id: biz.owner_id || '',
-                owner_email: biz.email,
-                owner_name: biz.name,
-                business_name: biz.name,
-                category: biz.category,
-                location: biz.location,
-                discount: biz.discount,
-                decision,
-                admin_notes: adminNotes[businessId] || 'No additional notes.',
-              },
-            });
-
-            const emailPayload = emailData as { success?: boolean; error?: string } | null;
-
-            if (emailPayload && emailPayload.success === false) {
-              toast.error(
-                emailPayload.error ||
-                  'Could not send notification email (see SendGrid / function logs for details).',
-              );
-            } else if (emailInvokeError) {
-              console.warn('[Admin] send-email failed:', emailInvokeError.message || emailInvokeError);
-              const fromBody = await tryReadEdgeFunctionJsonError(emailInvokeError);
-              if (fromBody) {
-                toast.error(fromBody);
-              } else {
-                const raw = String(
-                  (emailInvokeError as { message?: string }).message ||
-                    (typeof emailInvokeError === 'object' ? JSON.stringify(emailInvokeError) : emailInvokeError),
-                );
-                const vagueEdge =
-                  /non-2xx|2xx|FunctionsHttpError|Edge Function returned/i.test(raw) ||
-                  raw.includes('non-2xx');
-                const msg401 =
-                  (emailInvokeError as { message?: string }).message?.includes('401') || raw.includes('401');
-                toast.error(
-                  msg401
-                    ? 'Could not send email (session invalid). Try signing out and back in.'
-                    : vagueEdge
-                      ? 'Could not reach the email service. Check Supabase → Edge Functions → send-email logs; confirm SENDGRID_API_KEY and a verified SENDGRID_FROM_EMAIL.'
-                      : `Could not send email: ${raw || 'unknown error'}`,
-                );
-              }
-            } else {
-              toast.success(`Notification email sent to ${biz.email}`);
-            }
-          }
-        } catch (emailErr) {
-          console.error('Failed to send decision email:', emailErr);
-          toast.error('Could not send decision email.');
-        }
-      }
+      // Owner decision emails are sent from the `manage-business` edge function (SendGrid + service role)
+      // so the browser never calls `send-email` here (avoids duplicate mail and JWT/RS256 invoke issues).
     } catch (err: any) {
       const msg = rpcErrorMsg || err?.message || 'Unknown error';
       toast.error('Failed to process review: ' + msg);

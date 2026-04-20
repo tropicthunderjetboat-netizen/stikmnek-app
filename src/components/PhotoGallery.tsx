@@ -7,6 +7,7 @@ import { SUPABASE_URL } from '@/lib/supabase';
 interface BusinessPhoto {
   id: string;
   business_id: string;
+  offering_id?: string | null;
   url: string;
   file_path: string;
   is_main: boolean;
@@ -18,9 +19,16 @@ interface PhotoGalleryProps {
   businessId: string;
   coverImage: string;
   businessName: string;
+  /** When set, only photos tagged for this listing (`business_offerings.id`) are shown. */
+  offeringId?: string | null;
 }
 
-const PhotoGallery: React.FC<PhotoGalleryProps> = ({ businessId, coverImage, businessName }) => {
+const PhotoGallery: React.FC<PhotoGalleryProps> = ({
+  businessId,
+  coverImage,
+  businessName,
+  offeringId = null,
+}) => {
   const [photos, setPhotos] = useState<BusinessPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -59,11 +67,16 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ businessId, coverImage, bus
     const fetchPhotos = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        let q = supabase
           .from('business_photos')
           .select('*')
           .eq('business_id', businessId)
-          .eq('status', 'approved')
+          .eq('status', 'approved');
+        const oid = offeringId && String(offeringId).trim() ? String(offeringId).trim() : '';
+        if (oid) {
+          q = q.eq('offering_id', oid);
+        }
+        const { data, error } = await q
           .order('is_main', { ascending: false })
           .order('created_at', { ascending: true });
 
@@ -83,7 +96,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ businessId, coverImage, bus
     };
 
     fetchPhotos();
-  }, [businessId]);
+  }, [businessId, offeringId]);
 
   const goToSlide = useCallback((index: number) => {
     setActiveIndex(index);

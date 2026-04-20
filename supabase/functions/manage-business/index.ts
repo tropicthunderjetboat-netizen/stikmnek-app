@@ -304,6 +304,69 @@ async function sendInitialListingLiveEmail(params: {
   }
 }
 
+const DECISION_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * SendGrid: short admin decision notice (matches legacy `send-email` send_business_decision copy).
+ * Best-effort only — never throws.
+ */
+async function sendAdminDecisionNotificationEmail(params: {
+  toEmail: string;
+  businessName: string;
+  decision: 'approved' | 'rejected';
+  adminNotes: string;
+}): Promise<{ sent: boolean; skipped?: boolean; error?: string }> {
+  const apiKey = Deno.env.get('SENDGRID_API_KEY');
+  if (!apiKey) {
+    console.warn('[manage-business] SENDGRID_API_KEY not set — skipping admin decision email');
+    return { sent: false, skipped: true, error: 'SENDGRID_API_KEY not set' };
+  }
+  const emailStr = String(params.toEmail ?? '').trim();
+  if (!emailStr || !DECISION_EMAIL_RE.test(emailStr)) {
+    return { sent: false, error: 'Invalid recipient' };
+  }
+
+  const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
+  const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
+  const subjectName = String(params.businessName ?? '').replace(/[\r\n\x00]/g, ' ').trim().slice(0, 200);
+  const subject = params.decision === 'approved'
+    ? `Your business "${subjectName}" has been approved!`
+    : `Update on your business "${subjectName}" listing`;
+  const safeBusinessName = escapeHtmlEmail(params.businessName);
+  const notesBlock = params.adminNotes
+    ? `<p><strong>Admin note:</strong> ${escapeHtmlEmail(params.adminNotes)}</p>`
+    : '';
+  const html = params.decision === 'approved'
+    ? `<p>Congratulations! Your business listing "${safeBusinessName}" has been approved and is now live on StikmNek.</p>${notesBlock}`
+    : `<p>Your business listing "${safeBusinessName}" was not approved at this time.</p>${notesBlock}<p>Please contact support if you have questions.</p>`;
+
+  try {
+    const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: emailStr }] }],
+        from: { email: fromEmail, name: fromName },
+        subject,
+        content: [{ type: 'text/html', value: html }],
+      }),
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('[manage-business] SendGrid decision email FAILED:', res.status, errText);
+      return { sent: false, error: `SendGrid error: ${res.status}` };
+    }
+    return { sent: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[manage-business] SendGrid decision email fetch error:', msg);
+    return { sent: false, error: msg };
+  }
+}
+
 Deno.serve(async (req) => {
   console.log('Manage Business Triggered:', req.method);
   if (req.method === 'OPTIONS') {
@@ -868,6 +931,22 @@ Deno.serve(async (req) => {
           })
           .eq('id', pendingId);
         if (updateErr) return errorResponse(req, updateErr.message, 500);
+
+        const rejectListingName =
+          (pending.name != null && String(pending.name).trim()) || 'Your listing';
+        const rejectEmailRaw = (pending.email && String(pending.email).trim()) || '';
+        if (rejectEmailRaw && DECISION_EMAIL_RE.test(rejectEmailRaw)) {
+          const sg = await sendAdminDecisionNotificationEmail({
+            toEmail: rejectEmailRaw,
+            businessName: rejectListingName,
+            decision: 'rejected',
+            adminNotes: String(adminNotes || '').trim() || 'No additional notes.',
+          });
+          if (!sg.sent) {
+            console.warn('[manage-business] Rejection notice email:', sg.skipped ? 'skipped' : sg.error ?? 'failed');
+          }
+        }
+
         return jsonResponse(req, { success: true });
       }
 
@@ -878,6 +957,7 @@ Deno.serve(async (req) => {
           ? String(pendingRow.business_id)
           : null;
       const isInitialNewBusinessApproval = existingProfileId == null;
+      let newOfferingId: string | null = null;
 
       const vDesc = String(pending.description ?? '');
       const tagArray = [String(pending.category || 'dining')];
@@ -959,11 +1039,15 @@ Deno.serve(async (req) => {
 
         // New listing on an existing profile: always INSERT a row. Updating the "primary"
         // offering overwrote the owner's previous approved deals (only the last one appeared).
-        const { error: offInsErr } = await supabase.from('business_offerings').insert({
-          business_id: existingProfileId,
-          ...offeringFields,
-          featured: false,
-        });
+        const { data: insertedOff, error: offInsErr } = await supabase
+          .from('business_offerings')
+          .insert({
+            business_id: existingProfileId,
+            ...offeringFields,
+            featured: false,
+          })
+          .select('id')
+          .single();
         if (offInsErr) {
           console.error('[manage-business] Failed to insert business_offerings (existing profile):', offInsErr);
           return errorResponse(
@@ -972,6 +1056,7 @@ Deno.serve(async (req) => {
             500,
           );
         }
+        if (insertedOff?.id) newOfferingId = String(insertedOff.id);
 
         liveBusinessId = existingProfileId;
       } else {
@@ -994,11 +1079,15 @@ Deno.serve(async (req) => {
 
         liveBusinessId = newBiz.id as string;
 
-        const { error: offInsErr } = await supabase.from('business_offerings').insert({
-          business_id: liveBusinessId,
-          ...offeringFields,
-          featured: false,
-        });
+        const { data: insertedOff, error: offInsErr } = await supabase
+          .from('business_offerings')
+          .insert({
+            business_id: liveBusinessId,
+            ...offeringFields,
+            featured: false,
+          })
+          .select('id')
+          .single();
         if (offInsErr) {
           console.error('[manage-business] Offering insert failed after stub insert:', offInsErr);
           return errorResponse(
@@ -1007,6 +1096,7 @@ Deno.serve(async (req) => {
             500,
           );
         }
+        if (insertedOff?.id) newOfferingId = String(insertedOff.id);
       }
 
       const { error: rejErr } = await supabase
@@ -1024,9 +1114,15 @@ Deno.serve(async (req) => {
         );
       }
 
+      const approvedPhotoPatch: Record<string, unknown> = {
+        business_id: liveBusinessId,
+        status: 'approved',
+      };
+      if (newOfferingId) approvedPhotoPatch.offering_id = newOfferingId;
+
       const { error: photoErr } = await supabase
         .from('business_photos')
-        .update({ business_id: liveBusinessId, status: 'approved' })
+        .update(approvedPhotoPatch)
         .eq('business_id', pendingId);
 
       if (photoErr) {
@@ -1036,6 +1132,29 @@ Deno.serve(async (req) => {
           'Business approved but photos could not be updated. Please manually approve photos for this business. Error: ' + photoErr.message,
           500,
         );
+      }
+
+      if (!isInitialNewBusinessApproval) {
+        const listingTitle =
+          (pending.name != null && String(pending.name).trim()) || 'Your listing';
+        const toExtra =
+          vEmail && DECISION_EMAIL_RE.test(vEmail)
+            ? vEmail
+            : await resolveOwnerNotificationEmail(supabase, String(pending.owner_id));
+        if (toExtra) {
+          const sgExtra = await sendAdminDecisionNotificationEmail({
+            toEmail: toExtra,
+            businessName: listingTitle,
+            decision: 'approved',
+            adminNotes: String(adminNotes || '').trim() || 'No additional notes.',
+          });
+          if (!sgExtra.sent) {
+            console.warn(
+              '[manage-business] Additional-listing approval email:',
+              sgExtra.skipped ? 'skipped' : sgExtra.error ?? 'failed',
+            );
+          }
+        }
       }
 
       if (isInitialNewBusinessApproval) {
@@ -1163,9 +1282,15 @@ Deno.serve(async (req) => {
       }
 
       // Relink photos that were uploaded against the pending id (common when the pending row never got deleted).
+      const relinkPatch: Record<string, unknown> = {
+        business_id: existingProfileId,
+        status: 'approved',
+      };
+      if (inserted?.id) relinkPatch.offering_id = String(inserted.id);
+
       const { error: relinkErr } = await supabase
         .from('business_photos')
-        .update({ business_id: existingProfileId, status: 'approved' })
+        .update(relinkPatch)
         .eq('business_id', String(pendingId));
       if (relinkErr) {
         console.error('[manage-business] repair_approved_submission photos:', relinkErr);
