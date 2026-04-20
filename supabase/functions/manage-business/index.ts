@@ -1226,14 +1226,75 @@ Deno.serve(async (req) => {
     }
 
     // ─── ADMIN_DELETE_BUSINESS ───
+    // Prefer `offeringId` (business_offerings.id) — admin grid rows are per-offering; one profile can have
+    // multiple offers. Deleting only `businessId` removes the whole profile (all offers) and breaks a
+    // second row for the same profile. If `offeringId` is omitted, legacy behaviour: delete profile + cascade.
     if (action === 'admin_delete_business') {
-      const businessId = body.businessId;
-      if (!businessId) return errorResponse(req, 'Missing businessId');
+      const businessIdRaw = body.businessId != null ? String(body.businessId).trim() : '';
+      const offeringIdRaw = body.offeringId != null ? String(body.offeringId).trim() : '';
 
       const denied = await assertAdmin(supabase, authUser.id, req);
       if (denied) return denied;
 
-      const purge = await purgeBusinessPhotosAndStorage(supabase, businessId);
+      if (offeringIdRaw) {
+        const { data: offRow, error: offErr } = await supabase
+          .from('business_offerings')
+          .select('id, business_id')
+          .eq('id', offeringIdRaw)
+          .maybeSingle();
+        if (offErr) return errorResponse(req, offErr.message, 500);
+        if (!offRow) {
+          return jsonResponse(req, { success: true, message: 'Offering already removed' });
+        }
+        const profileId = String(offRow.business_id);
+        if (businessIdRaw && profileId !== businessIdRaw) {
+          return errorResponse(req, 'offeringId does not match businessId', 400);
+        }
+
+        const { error: delOffErr } = await supabase
+          .from('business_offerings')
+          .delete()
+          .eq('id', offeringIdRaw);
+        if (delOffErr) return errorResponse(req, delOffErr.message, 500);
+
+        const { data: remaining, error: remErr } = await supabase
+          .from('business_offerings')
+          .select('id')
+          .eq('business_id', profileId);
+        if (remErr) return errorResponse(req, remErr.message, 500);
+        if (remaining && remaining.length > 0) {
+          return jsonResponse(req, {
+            success: true,
+            profileId,
+            remainingOfferings: remaining.length,
+          });
+        }
+
+        const purge = await purgeBusinessPhotosAndStorage(supabase, profileId);
+        if (purge.error) {
+          return errorResponse(req, purge.error, 500);
+        }
+        const { data: deletedAdmin, error: delBizErr } = await supabase
+          .from('businesses')
+          .delete()
+          .eq('id', profileId)
+          .select('id');
+        if (delBizErr) return errorResponse(req, delBizErr.message, 500);
+        if (!deletedAdmin?.length) {
+          return errorResponse(
+            req,
+            'Business profile was not found after removing the last offer (it may have been deleted elsewhere).',
+            404,
+          );
+        }
+        return jsonResponse(req, { success: true });
+      }
+
+      if (!businessIdRaw) {
+        return errorResponse(req, 'Missing businessId or offeringId', 400);
+      }
+
+      const purge = await purgeBusinessPhotosAndStorage(supabase, businessIdRaw);
       if (purge.error) {
         return errorResponse(req, purge.error, 500);
       }
@@ -1241,13 +1302,13 @@ Deno.serve(async (req) => {
       const { data: deletedAdmin, error } = await supabase
         .from('businesses')
         .delete()
-        .eq('id', businessId)
+        .eq('id', businessIdRaw)
         .select('id');
       if (error) return errorResponse(req, error.message, 500);
       if (!deletedAdmin?.length) {
         return errorResponse(
           req,
-          'No matching business profile to delete. Use the profile id (not the deal/listing row id).',
+          'No matching business profile to delete. Pass offeringId to remove a single listing row.',
           404,
         );
       }

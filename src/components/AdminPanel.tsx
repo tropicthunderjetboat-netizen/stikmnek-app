@@ -491,73 +491,56 @@ const AdminPanel: React.FC = () => {
     const isFromDb = dbBusinesses.some(db => db.id === listingId);
     if (!isFromDb) { toast.error('Sample businesses cannot be deleted.'); setConfirmDeleteId(null); return; }
     if (!biz) { setConfirmDeleteId(null); return; }
-    /** `public.businesses.id` — delete APIs key the master profile, not `business_offerings.id` (listing row). */
+    /** `public.businesses.id` — master profile; `listingId` is `business_offerings.id` (grid row). */
     const profileId = profileBusinessIdFor(biz);
     setDeletingId(listingId);
     try {
-      // Strategy 1: Try edge function with retry (handles rate limiting + transient errors)
       const delHeaders = await getEdgeAuthHeaders();
       const { data, error } = await invokeWithRetry(
         'manage-business',
-        { action: 'admin_delete_business', userId: user?.id, businessId: profileId },
+        {
+          action: 'admin_delete_business',
+          userId: user?.id,
+          businessId: profileId,
+          offeringId: listingId,
+        },
         2,
         'delete_business',
         delHeaders,
       );
 
       if (data && !data.error && data.success !== false) {
-        toast.success('"' + (biz?.name || 'Business') + '" has been permanently deleted.');
+        const suffix =
+          typeof data.remainingOfferings === 'number' && data.remainingOfferings > 0
+            ? ` (${data.remainingOfferings} other offer(s) still on this business profile.)`
+            : '';
+        toast.success('"' + (biz?.name || 'Business') + '" removed.' + suffix);
         await refreshBusinesses();
         return;
       }
 
-      // If edge function returned an error in data, throw it
-      if (data?.error) throw new Error(data.error);
+      if (data?.error) throw new Error(String(data.error));
       if (error) throw error;
 
-      // If we got here with no data and no error, something unexpected happened
       throw new Error('No response from server');
-    } catch (err: any) {
-      const errMsg = err?.message || 'Unknown error';
-      console.warn('[Admin] Edge function delete failed:', errMsg, '— trying direct DB fallback...');
-
-      // Strategy 2: Direct database deletion fallback
-      try {
-        // Delete related data first (photos, reviews, favorites, redemptions) — keyed by profile id
-        const tables = ['business_photos', 'reviews', 'favorites', 'redemptions'];
-        for (const table of tables) {
-          try {
-            await supabase.from(table).delete().eq('business_id', profileId);
-          } catch (tableErr) {
-            console.warn('[Admin] Could not clean ' + table + ':', tableErr);
-          }
-        }
-
-        // Delete the business itself
-        const { data: deletedRows, error: deleteError } = await supabase
-          .from('businesses')
-          .delete()
-          .eq('id', profileId)
-          .select('id');
-
-        if (deleteError) throw deleteError;
-        if (!deletedRows?.length) {
-          throw new Error('No matching business profile was removed (check listing id).');
-        }
-
-        toast.success('"' + (biz?.name || 'Business') + '" has been permanently deleted (direct).');
-        await refreshBusinesses();
-      } catch (directErr: any) {
-        console.error('[Admin] Direct DB delete also failed:', directErr);
-        // Show a helpful error message based on the original error
-        if (errMsg.includes('Rate limited') || errMsg.includes('429') || errMsg.includes('temporarily unavailable')) {
-          toast.error('Server is busy. Please wait a moment and try again.', {
-            description: 'The server is rate-limiting requests. Try again in 30-60 seconds.',
-            duration: 6000,
-          });
-        } else {
-          toast.error('Failed to delete business: ' + (directErr.message || errMsg));
-        }
+    } catch (err: unknown) {
+      const fromBody = tryReadEdgeFunctionJsonError(err);
+      const errMsg =
+        fromBody ||
+        (err instanceof Error ? err.message : String(err ?? 'Unknown error'));
+      console.warn('[Admin] delete listing failed:', errMsg, err);
+      if (errMsg.includes('Rate limited') || errMsg.includes('429') || errMsg.includes('temporarily unavailable')) {
+        toast.error('Server is busy. Please wait a moment and try again.', {
+          description: 'The server is rate-limiting requests. Try again in 30-60 seconds.',
+          duration: 6000,
+        });
+      } else {
+        toast.error('Failed to delete listing.', {
+          description:
+            errMsg +
+            ' Admin deletes run through the edge function (browser RLS cannot remove other owners’ rows). Refresh the page if the listing may already be gone.',
+          duration: 8000,
+        });
       }
     } finally {
       setDeletingId(null);

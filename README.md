@@ -216,7 +216,7 @@ The primary API endpoint handling 25+ actions:
 | `admin_delete_user` | Admin | Delete a user |
 | `admin_create_business` | Admin | Create business directly |
 | `admin_update_business` | Admin | Update business fields |
-| `admin_delete_business` | Admin | Delete business and related data |
+| `admin_delete_business` | Admin | Delete listing: pass `offeringId` (row id) + `businessId` (profile); removes one offer or whole profile when it was the last offer |
 | `admin_get_businesses` | Admin | List all businesses |
 
 **Rate Limiting**: Built-in per-user rate limiting:
