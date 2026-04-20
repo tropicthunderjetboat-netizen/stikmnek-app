@@ -76,16 +76,32 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         if (oid) {
           q = q.eq('offering_id', oid);
         }
-        const { data, error } = await q
+        let { data, error } = await q
           .order('is_main', { ascending: false })
           .order('created_at', { ascending: true });
 
         if (error) {
           console.error('Failed to load business photos:', error);
         } else if (data) {
-          const approvedOnly = (data as BusinessPhoto[]).filter(
+          let approvedOnly = (data as BusinessPhoto[]).filter(
             (p) => String(p.status || '').toLowerCase() === 'approved',
           );
+          // Legacy rows (approved before per-listing `offering_id`): fall back to shared profile gallery.
+          if (oid && approvedOnly.length === 0) {
+            const legacy = await supabase
+              .from('business_photos')
+              .select('*')
+              .eq('business_id', businessId)
+              .eq('status', 'approved')
+              .is('offering_id', null)
+              .order('is_main', { ascending: false })
+              .order('created_at', { ascending: true });
+            if (!legacy.error && legacy.data?.length) {
+              approvedOnly = (legacy.data as BusinessPhoto[]).filter(
+                (p) => String(p.status || '').toLowerCase() === 'approved',
+              );
+            }
+          }
           setPhotos(approvedOnly);
         }
       } catch (err) {

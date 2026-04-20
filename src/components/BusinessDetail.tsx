@@ -281,7 +281,7 @@ const BusinessDetail: React.FC = () => {
     }
     let cancelled = false;
     void (async () => {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('business_photos')
         .select('url, file_path')
         .eq('business_id', profileId)
@@ -291,7 +291,20 @@ const BusinessDetail: React.FC = () => {
         .order('created_at', { ascending: true })
         .limit(1);
       if (cancelled || error) return;
-      const first = data?.[0] as { url?: string; file_path?: string } | undefined;
+      let first = data?.[0] as { url?: string; file_path?: string } | undefined;
+      if (!first) {
+        const legacy = await supabase
+          .from('business_photos')
+          .select('url, file_path')
+          .eq('business_id', profileId)
+          .is('offering_id', null)
+          .eq('status', 'approved')
+          .order('is_main', { ascending: false })
+          .order('created_at', { ascending: true })
+          .limit(1);
+        if (cancelled || legacy.error) return;
+        first = legacy.data?.[0] as { url?: string; file_path?: string } | undefined;
+      }
       if (!first) {
         setDisplayCoverImage('');
         return;

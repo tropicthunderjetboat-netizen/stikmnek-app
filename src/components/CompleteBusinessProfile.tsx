@@ -185,10 +185,10 @@ const CompleteBusinessProfile: React.FC = () => {
               : 'Setapem bisnis blong yu',
         subtitle:
           language === 'en'
-            ? 'We use this so tourists can reach you and your listings stay consistent.'
+            ? 'We use this so tourists can reach you. After you save, open your dashboard and use “Submit a business listing” for each deal — your phone, WhatsApp, and address copy into that form automatically.'
             : language === 'fr'
-              ? 'Pour que les touristes puissent vous contacter et que vos annonces restent cohérentes.'
-              : 'Blong turis i save kontakt yu mo listing i stret.',
+              ? 'Pour que les touristes puissent vous contacter. Ensuite, ouvrez le tableau de bord et « Soumettre une annonce » pour chaque offre — téléphone et WhatsApp se copient automatiquement.'
+              : 'Blong turis i save kontakt yu. Bifo yu save, openem dashboard mo yusum Submit listing blong evri dil — fon mo WhatsApp i kopi automatik.',
       };
 
   return (

@@ -198,6 +198,8 @@ const BusinessListingForm: React.FC = () => {
     photos?: string;
     pricing?: string;
   }>({});
+  /** Bumps after successful submit so contact prefill runs again on an empty form. */
+  const [prefillNonce, setPrefillNonce] = useState(0);
   const [agreedPartnerTerms, setAgreedPartnerTerms] = useState(false);
   const [form, setForm] = useState({
     name: '', category: 'dining', description: '', discount: '',
@@ -222,14 +224,13 @@ const BusinessListingForm: React.FC = () => {
       const { data, error } = await supabase
         .from('businesses')
         .select('id')
-        .eq('owner_id', user.id);
+        .eq('owner_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
       if (cancelled || error) return;
-      const rows = data || [];
-      if (rows.length === 1 && rows[0]?.id) {
-        setOwnerProfileBusinessId(String(rows[0].id));
-      } else {
-        setOwnerProfileBusinessId(null);
-      }
+      if (data?.id) setOwnerProfileBusinessId(String(data.id));
+      else setOwnerProfileBusinessId(null);
     })();
     return () => {
       cancelled = true;
@@ -284,40 +285,44 @@ const BusinessListingForm: React.FC = () => {
     }
   }, [form.category]);
 
-  // Pre-fill from owner's first businesses row (onboarding stub or approved listing)
+  // Pre-fill contact & location from the owner's primary business profile (not the deal title).
   useEffect(() => {
     if (!user?.id || user.type !== 'business') return;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       const { data, error } = await supabase
         .from('businesses')
-        .select('name, category, email, phone, whatsapp_number, location')
+        .select('email, phone, whatsapp_number, location, map_url, website, hours, opening_hours')
         .eq('owner_id', user.id)
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle();
       if (cancelled || error || !data) return;
-      const validCats = ['dining', 'activities', 'tours', 'shopping', 'spa', 'accommodation'];
-      const cat =
-        typeof data.category === 'string' && validCats.includes(data.category)
-          ? data.category
-          : 'dining';
+      const hoursVal =
+        (typeof data.opening_hours === 'string' && data.opening_hours.trim()
+          ? data.opening_hours
+          : typeof data.hours === 'string'
+            ? data.hours
+            : '') || '';
+      const mapUrl = typeof data.map_url === 'string' ? data.map_url.trim() : '';
+      const website = typeof data.website === 'string' ? data.website.trim() : '';
       setForm((prev) => ({
         ...prev,
-        name: prev.name.trim() ? prev.name : (data.name as string) || prev.name,
-        category: prev.name.trim() ? prev.category : cat,
-        email: prev.email.trim() ? prev.email : (data.email as string) || prev.email,
-        phone: prev.phone.trim() ? prev.phone : (data.phone as string) || prev.phone,
+        email: prev.email.trim() ? prev.email : String(data.email || '').trim() || prev.email,
+        phone: prev.phone.trim() ? prev.phone : String(data.phone || '').trim() || prev.phone,
         whatsappNumber: prev.whatsappNumber.trim()
           ? prev.whatsappNumber
-          : (data.whatsapp_number as string) || prev.whatsappNumber,
-        address: prev.address.trim() ? prev.address : (data.location as string) || prev.address,
+          : String(data.whatsapp_number || '').trim() || prev.whatsappNumber,
+        address: prev.address.trim() ? prev.address : String(data.location || '').trim() || prev.address,
+        mapUrl: prev.mapUrl.trim() ? prev.mapUrl : mapUrl || prev.mapUrl,
+        website: prev.website.trim() ? prev.website : website || prev.website,
+        hours: prev.hours.trim() ? prev.hours : hoursVal || prev.hours,
       }));
     })();
     return () => {
       cancelled = true;
     };
-  }, [user?.id, user?.type]);
+  }, [user?.id, user?.type, prefillNonce]);
 
   // Auto-calculate end date
   const selectedDuration = DURATION_OPTIONS.find(d => d.value === form.listingDuration);
@@ -337,6 +342,7 @@ const BusinessListingForm: React.FC = () => {
     });
     setPhotos([]);
     setPricingTiers([]);
+    setPrefillNonce((n) => n + 1);
   }, []);
 
   /** From home or /business/new, send owners to My Submissions so the new Pending row is visible. */
@@ -397,8 +403,10 @@ const BusinessListingForm: React.FC = () => {
     if (!form.name?.trim()) {
       toast.error(
         language === 'en'
-          ? 'Please enter your business name.'
-          : 'Veuillez indiquer le nom de l’entreprise.',
+          ? 'Please enter a title for this deal or listing.'
+          : language === 'fr'
+            ? 'Veuillez indiquer un titre pour cette offre.'
+            : 'Putem titel blong dil ia.',
       );
       return;
     }
@@ -752,7 +760,20 @@ const BusinessListingForm: React.FC = () => {
           </p>
         </div>
 
-
+        {user?.type === 'business' && (
+          <div className="mb-6 rounded-xl border border-teal-100 bg-white p-4 text-left text-sm text-gray-700 shadow-sm">
+            <p className="font-semibold text-teal-900 mb-1">
+              {language === 'en' ? 'Simple flow' : language === 'fr' ? 'Parcours simple' : 'Wanwan wok'}
+            </p>
+            <p className="text-gray-600 leading-relaxed">
+              {language === 'en'
+                ? 'First complete your business profile (Dashboard) with phone, WhatsApp, and address. Here you add each deal separately — we copy those saved details into this form so you do not have to retype them. Use a clear title for this deal (not only your company name).'
+                : language === 'fr'
+                  ? 'Complétez dabord votre profil entreprise (tableau de bord) avec téléphone, WhatsApp et adresse. Ici vous ajoutez chaque offre — nous copions ces informations (vous pouvez les modifier). Donnez un titre clair pour cette offre.'
+                  : 'Fes komplitim profil bisnis long dashboard wetem fon, WhatsApp, mo adres. Hia yu adem evri dil — ol detaels i save kopi automatik (yu save senis). Yusum klia titel blong dil ia.'}
+            </p>
+          </div>
+        )}
 
         {!user && (
           <div className="mb-6 p-5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 text-center">
@@ -815,15 +836,32 @@ const BusinessListingForm: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {language === 'en' ? 'Business Name *' : 'Nom de l\'entreprise *'}
+                {language === 'en'
+                  ? 'Deal / listing title *'
+                  : language === 'fr'
+                    ? 'Titre de l’offre *'
+                    : 'Titel blong dil *'}
               </label>
               <input
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                placeholder="e.g. Waterfront Bar & Grill"
+                placeholder={
+                  language === 'en'
+                    ? 'e.g. Reef Explorer Semi-Sub Tour – Port Vila'
+                    : language === 'fr'
+                      ? 'ex. Visite semi-submersible – Port-Vila'
+                      : 'ex. Semi-sub tua – Port Vila'
+                }
               />
+              <p className="text-[11px] text-gray-500 mt-1">
+                {language === 'en'
+                  ? 'This is the name tourists see for this deal. Your company profile name is separate.'
+                  : language === 'fr'
+                    ? 'C’est le nom visible pour cette offre. Le nom de votre entreprise est géré dans le profil.'
+                    : 'Nem ia turis bae luk long dil ia. Nem blong kampeni i stap long profil.'}
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
