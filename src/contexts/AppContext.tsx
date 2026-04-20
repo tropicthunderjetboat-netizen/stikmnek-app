@@ -348,6 +348,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     >(),
   );
   const signInCooldownRef = useRef<number>(0);
+  /** Only true immediately after `signIn` / signup-with-session so `SIGNED_IN` can redirect; stray tab-sync events skip dashboard redirect. */
+  const authIntentRedirectRef = useRef(false);
   const authProcessingRef = useRef<boolean>(false);
   /** Delays the red profile banner so transient timeouts / double auth events do not flash a false error. */
   const profileBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1037,7 +1039,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setAuthLoading(false);
                 break;
               }
-              await handleAuthenticatedUser(session.user, true);
+              const wantRedirect = authIntentRedirectRef.current;
+              authIntentRedirectRef.current = false;
+              await handleAuthenticatedUser(session.user, wantRedirect);
               break;
             }
 
@@ -1128,7 +1132,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // When auth modal opens but user is already logged in (session restored from localStorage),
   // close the modal and show a toast. Do NOT redirect — user may have clicked "Sign In" by accident
-  // or may want to stay on the current page. Redirect only happens on explicit sign-in (SIGNED_IN).
+  // or may want to stay on the current page. Role redirect runs only when `authIntentRedirectRef` was set by sign-in / sign-up-with-session.
   useEffect(() => {
     if (showAuth && user) {
       setShowAuth(false);
@@ -1211,10 +1215,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   const signIn = useCallback(async (email: string, password: string) => {
     setAuthLoading(true);
+    authIntentRedirectRef.current = true;
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
+      authIntentRedirectRef.current = false;
       console.error('[signIn] Error:', error.message);
       setAuthLoading(false);
       toast.error(error.message || 'Sign in failed');
@@ -1235,6 +1241,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   const signUp = useCallback(async (name: string, email: string, password: string, type: 'tourist' | 'business') => {
     setAuthLoading(true);
+    authIntentRedirectRef.current = true;
 
     // ─── Step 1: Create the auth user ───
     // Auth metadata includes name and user_type so the trigger can read them
@@ -1247,6 +1254,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     if (authError) {
+      authIntentRedirectRef.current = false;
       console.error('[signUp] Auth error:', authError.message);
       setAuthLoading(false);
       toast.error(authError.message || 'Sign up failed');
@@ -1255,8 +1263,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const authUser = authData?.user;
     const hasSession = !!authData?.session;
+    if (!hasSession) {
+      authIntentRedirectRef.current = false;
+    }
 
     if (!authUser) {
+      authIntentRedirectRef.current = false;
       setAuthLoading(false);
       toast.error('Sign up failed — no user returned');
       throw new Error('No user returned from sign up');

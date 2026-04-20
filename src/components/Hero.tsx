@@ -1,16 +1,22 @@
 import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { touristFacingOfferings } from '@/data/businesses';
 import { ArrowRight, MapPin, Star, Users } from 'lucide-react';
 
 const Hero: React.FC = () => {
+  const navigate = useNavigate();
   const { language, user, setShowAuth, setAuthMode, dbBusinesses } = useAppContext();
 
   const scrollToListBusiness = () => {
     if (!user) {
       setAuthMode('signup-business');
       setShowAuth(true);
+      return;
+    }
+    if (user.type === 'business') {
+      navigate('/business/new');
       return;
     }
     document.getElementById('list-business')?.scrollIntoView({ behavior: 'smooth', block: 'start' });

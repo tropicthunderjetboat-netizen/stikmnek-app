@@ -6,10 +6,10 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   Edit3, X, RotateCcw, Eye, Clock, Phone, MapPin,
-  Tag, DollarSign, FileText, ShieldCheck, Loader2,
+  DollarSign, FileText, ShieldCheck, Loader2,
   CheckCircle, XCircle, AlertCircle, ArrowRight, History,
   RefreshCw, Power, Undo2, Info, Star,
-  Hash, Sparkles, Percent, Type, MessageCircle, Trash2,
+  Hash, Type, MessageCircle, Trash2,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -36,6 +36,20 @@ import {
   validatePricingTiersForSubmit,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
+import PricingDiscountFields from './PricingDiscountFields';
+
+/** Seed the % field from badge text (e.g. "25% OFF") or from original vs deal price. */
+function deriveDiscountPercentInput(discount: string, originalPrice: number, dealPrice: number): string {
+  const m = (discount || '').match(/(\d+(?:\.\d+)?)\s*%/);
+  if (m) {
+    const p = parseFloat(m[1]);
+    if (Number.isFinite(p) && p > 0 && p < 100) return String(Math.round(p));
+  }
+  if (originalPrice > 0 && dealPrice >= 0 && dealPrice < originalPrice) {
+    return String(Math.round((1 - dealPrice / originalPrice) * 100));
+  }
+  return '';
+}
 
 
 interface PendingEdit {
@@ -130,6 +144,9 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
   const [isActive, setIsActive] = useState(true);
   const [pricingTiers, setPricingTiers] = useState<PricingTierInput[]>([]);
   const [originalPricingTiers, setOriginalPricingTiers] = useState<PricingTierInput[]>([]);
+  /** Same controlled strings as `BusinessListingForm` / dashboard submit (PricingDiscountFields). */
+  const [listingOriginalPriceStr, setListingOriginalPriceStr] = useState('');
+  const [listingDiscountPercent, setListingDiscountPercent] = useState('');
 
   // Form state
   const [form, setForm] = useState<EditFormData>({
@@ -182,6 +199,14 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
       const tiers = pricingTiersFromDb(rawTiers);
       setPricingTiers(tiers.map((t) => ({ ...t })));
       setOriginalPricingTiers(tiers.map((t) => ({ ...t })));
+      setListingOriginalPriceStr(String(selectedBusiness.originalPrice ?? ''));
+      setListingDiscountPercent(
+        deriveDiscountPercentInput(
+          selectedBusiness.discount,
+          selectedBusiness.originalPrice,
+          selectedBusiness.dealPrice,
+        ),
+      );
     }
   }, [selectedBusiness]);
 
@@ -241,7 +266,16 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
   const isFieldChanged = (field: string) => changedFields.includes(field);
 
   const resetField = (field: keyof EditFormData) => {
-    setForm(prev => ({ ...prev, [field]: original[field] }));
+    setForm(prev => {
+      const next = { ...prev, [field]: original[field] };
+      if (field === 'original_price' || field === 'deal_price' || field === 'discount') {
+        setListingOriginalPriceStr(String(next.original_price ?? ''));
+        setListingDiscountPercent(
+          deriveDiscountPercentInput(next.discount, next.original_price, next.deal_price),
+        );
+      }
+      return next;
+    });
   };
 
   const resetPricingTiers = () => {
@@ -250,6 +284,10 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
 
   const resetAll = () => {
     setForm({ ...original });
+    setListingOriginalPriceStr(String(original.original_price ?? ''));
+    setListingDiscountPercent(
+      deriveDiscountPercentInput(original.discount, original.original_price, original.deal_price),
+    );
     resetPricingTiers();
     toast.info('All changes reverted');
   };
@@ -368,11 +406,6 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
       setDeleting(false);
     }
   };
-
-  // Calculate savings percentage
-  const savingsPercent = form.original_price > 0
-    ? Math.round(((form.original_price - form.deal_price) / form.original_price) * 100)
-    : 0;
 
   const sections: {
     key: EditSection;
@@ -677,9 +710,20 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                 {changedFields.some(f => ['discount', 'original_price', 'deal_price', 'pricing_tiers'].includes(f)) && (
                   <button
                     onClick={() => {
-                      resetField('discount');
-                      resetField('original_price');
-                      resetField('deal_price');
+                      setForm(prev => ({
+                        ...prev,
+                        discount: original.discount,
+                        original_price: original.original_price,
+                        deal_price: original.deal_price,
+                      }));
+                      setListingOriginalPriceStr(String(original.original_price ?? ''));
+                      setListingDiscountPercent(
+                        deriveDiscountPercentInput(
+                          original.discount,
+                          original.original_price,
+                          original.deal_price,
+                        ),
+                      );
                       resetPricingTiers();
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors self-start sm:self-auto"
@@ -690,108 +734,44 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                 )}
               </div>
 
-              {/* Discount Label */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
-                  <Percent className="w-3.5 h-3.5 text-gray-400" />
-                  Discount Label
-                  {isFieldChanged('discount') && (
-                    <span className="flex items-center gap-1 text-[10px] text-orange-500 font-semibold bg-orange-50 px-1.5 py-0.5 rounded">
-                      <Edit3 className="w-2.5 h-2.5" /> Modified
-                    </span>
-                  )}
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={form.discount}
-                    onChange={(e) => setForm(prev => ({ ...prev, discount: e.target.value }))}
-                    className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors ${
-                      isFieldChanged('discount') ? 'border-orange-300 bg-orange-50/30' : 'border-gray-200'
-                    }`}
-                    placeholder="e.g. 25% OFF, Buy 1 Get 1, Free Dessert"
-                  />
-                  {isFieldChanged('discount') && (
-                    <button
-                      onClick={() => resetField('discount')}
-                      className="absolute top-1/2 -translate-y-1/2 right-2 p-1 rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <Undo2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-                <p className="text-[11px] text-gray-400 mt-1">This appears as a badge on your listing card</p>
-              </div>
-
-              {/* Price Fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
-                    <DollarSign className="w-3.5 h-3.5 text-gray-400" />
-                    Original Price (VT)
-                    {isFieldChanged('original_price') && (
-                      <span className="flex items-center gap-1 text-[10px] text-orange-500 font-semibold bg-orange-50 px-1.5 py-0.5 rounded">
-                        <Edit3 className="w-2.5 h-2.5" /> Modified
-                      </span>
-                    )}
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">VT</span>
-                    <input
-                      type="number"
-                      value={form.original_price}
-                      onChange={(e) => setForm(prev => ({ ...prev, original_price: Number(e.target.value) }))}
-                      className={`w-full pl-12 pr-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors ${
-                        isFieldChanged('original_price') ? 'border-orange-300 bg-orange-50/30' : 'border-gray-200'
-                      }`}
-                      min={0}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
-                    <Tag className="w-3.5 h-3.5 text-gray-400" />
-                    Deal Price (VT)
-                    {isFieldChanged('deal_price') && (
-                      <span className="flex items-center gap-1 text-[10px] text-orange-500 font-semibold bg-orange-50 px-1.5 py-0.5 rounded">
-                        <Edit3 className="w-2.5 h-2.5" /> Modified
-                      </span>
-                    )}
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">VT</span>
-                    <input
-                      type="number"
-                      value={form.deal_price}
-                      onChange={(e) => setForm(prev => ({ ...prev, deal_price: Number(e.target.value) }))}
-                      className={`w-full pl-12 pr-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors ${
-                        isFieldChanged('deal_price') ? 'border-orange-300 bg-orange-50/30' : 'border-gray-200'
-                      }`}
-                      min={0}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Savings Preview */}
-              {form.original_price > 0 && form.deal_price > 0 && (
-                <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-                      <Sparkles className="w-6 h-6 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-emerald-800">
-                        Tourists save VT {(form.original_price - form.deal_price).toLocaleString()} ({savingsPercent}% off)
-                      </p>
-                      <p className="text-xs text-emerald-600 mt-0.5">
-                        <span className="line-through">VT {form.original_price.toLocaleString()}</span>
-                        <span className="font-bold ml-2">VT {form.deal_price.toLocaleString()}</span>
-                      </p>
-                    </div>
-                  </div>
+              {(isFieldChanged('discount') ||
+                isFieldChanged('original_price') ||
+                isFieldChanged('deal_price')) && (
+                <div className="flex items-center gap-2 text-[10px] text-orange-600 font-semibold bg-orange-50 px-2 py-1.5 rounded-lg border border-orange-100 w-fit">
+                  <Edit3 className="w-3 h-3 shrink-0" />
+                  Pricing updated — matches the public listing form (discount % fills the badge and deal price).
                 </div>
               )}
+
+              <PricingDiscountFields
+                originalPrice={listingOriginalPriceStr}
+                discountPercent={listingDiscountPercent}
+                onOriginalPriceChange={(val) => {
+                  setListingOriginalPriceStr(val);
+                  const n = parseFloat(val);
+                  setForm((prev) => ({
+                    ...prev,
+                    original_price: Number.isFinite(n) ? n : 0,
+                  }));
+                }}
+                onDiscountPercentChange={setListingDiscountPercent}
+                onCalculatedValues={(dealPrice, discountLabel) => {
+                  setForm((prev) => {
+                    const orig = prev.original_price;
+                    const nextDeal = dealPrice
+                      ? parseFloat(dealPrice)
+                      : orig > 0
+                        ? orig
+                        : 0;
+                    return {
+                      ...prev,
+                      deal_price: Number.isFinite(nextDeal) ? nextDeal : 0,
+                      discount: discountLabel || '',
+                    };
+                  });
+                }}
+                language={language}
+              />
 
               {form.deal_price >= form.original_price && form.original_price > 0 && (
                 <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
