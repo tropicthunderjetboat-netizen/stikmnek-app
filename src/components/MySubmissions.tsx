@@ -1076,7 +1076,11 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200"
             >
               <Store className="w-5 h-5" />
-              {language === 'en' ? 'Submit a Business' : language === 'fr' ? 'Soumettre une entreprise' : 'Sabmitem wan Bisnis'}
+              {language === 'en'
+                ? 'Submit a business listing'
+                : language === 'fr'
+                  ? 'Soumettre une fiche commerciale'
+                  : 'Sabmitem wan business listing'}
             </button>
           )}
           {filter !== 'all' && (
