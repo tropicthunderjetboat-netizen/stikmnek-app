@@ -138,6 +138,8 @@ const AdminPanel: React.FC = () => {
   // Delete business state
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /** When true, admin_delete_business removes the whole `businesses` row (all deals). Default: remove one deal only. */
+  const [deleteEntireBusinessProfile, setDeleteEntireBusinessProfile] = useState(false);
 
   // ─── Add Business modal state ───
   const [showAddBusiness, setShowAddBusiness] = useState(false);
@@ -493,28 +495,48 @@ const AdminPanel: React.FC = () => {
     if (!biz) { setConfirmDeleteId(null); return; }
     /** `public.businesses.id` — master profile; `listingId` is `business_offerings.id` (grid row). */
     const profileId = profileBusinessIdFor(biz);
+    const purgeEntire = deleteEntireBusinessProfile;
     setDeletingId(listingId);
     try {
       const delHeaders = await getEdgeAuthHeaders();
-      const { data, error } = await invokeWithRetry(
-        'manage-business',
-        {
+      const dealsOnProfile = dbBusinesses.filter((b) => profileBusinessIdFor(b) === profileId).length;
+      const body = purgeEntire
+        ? {
+          action: 'admin_delete_business',
+          userId: user?.id,
+          businessId: profileId,
+          confirmDeleteEntireProfile: true,
+        }
+        : {
           action: 'admin_delete_business',
           userId: user?.id,
           businessId: profileId,
           offeringId: listingId,
-        },
+          /** When this was the only deal row for the profile, edge removes the business row after the offer. */
+          onlyDealOnProfile: dealsOnProfile === 1,
+        };
+      const { data, error } = await invokeWithRetry(
+        'manage-business',
+        body,
         2,
         'delete_business',
         delHeaders,
       );
 
       if (data && !data.error && data.success !== false) {
-        const suffix =
-          typeof data.remainingOfferings === 'number' && data.remainingOfferings > 0
-            ? ` (${data.remainingOfferings} other offer(s) still on this business profile.)`
-            : '';
-        toast.success('"' + (biz?.name || 'Business') + '" removed.' + suffix);
+        if (purgeEntire) {
+          toast.success('Entire business profile and all deals have been removed.');
+        } else if (data.removedProfileAsEmpty === true) {
+          toast.success('Deal removed — this was the only deal, so the business profile was removed as well.');
+        } else {
+          const rem = typeof data.remainingOfferings === 'number' ? data.remainingOfferings : null;
+          let detail = '';
+          if (rem != null && rem > 0) {
+            detail = ` ${rem} other deal(s) for this business are still live.`;
+          }
+          toast.success('This deal has been removed from the directory.' + detail);
+        }
+        setDeleteEntireBusinessProfile(false);
         await refreshBusinesses();
         return;
       }
@@ -545,6 +567,7 @@ const AdminPanel: React.FC = () => {
     } finally {
       setDeletingId(null);
       setConfirmDeleteId(null);
+      setDeleteEntireBusinessProfile(false);
     }
   };
 
@@ -1155,7 +1178,10 @@ const AdminPanel: React.FC = () => {
 
                                 {isFromDb ? (
                                   <button
-                                    onClick={() => setConfirmDeleteId(biz.id)}
+                                    onClick={() => {
+                                      setDeleteEntireBusinessProfile(false);
+                                      setConfirmDeleteId(biz.id);
+                                    }}
                                     disabled={deletingId === biz.id}
                                     className="px-3 py-1 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center gap-1"
                                   >
@@ -1971,12 +1997,21 @@ const AdminPanel: React.FC = () => {
         {/* ═══ DELETE CONFIRMATION MODAL ═══ */}
         {confirmDeleteId && (() => {
           const bizToDelete = allBusinesses.find(b => b.id === confirmDeleteId);
+          const profilePid = bizToDelete ? profileBusinessIdFor(bizToDelete) : '';
+          const dealCountForProfile = profilePid
+            ? allBusinesses.filter((b) => profileBusinessIdFor(b) === profilePid).length
+            : 0;
           return (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
               {/* Backdrop */}
               <div
                 className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-                onClick={() => !deletingId && setConfirmDeleteId(null)}
+                onClick={() => {
+                  if (!deletingId) {
+                    setConfirmDeleteId(null);
+                    setDeleteEntireBusinessProfile(false);
+                  }
+                }}
               />
               {/* Modal */}
               <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-0 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -1986,16 +2021,28 @@ const AdminPanel: React.FC = () => {
                     <AlertTriangle className="w-5 h-5 text-red-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-red-900">Delete Business Listing</h3>
+                    <h3 className="text-lg font-bold text-red-900">
+                      {deleteEntireBusinessProfile ? 'Delete entire business' : 'Remove this deal'}
+                    </h3>
                     <p className="text-xs text-red-600">This action cannot be undone</p>
                   </div>
                 </div>
 
                 {/* Body */}
                 <div className="px-6 py-5">
-                  <p className="text-sm text-gray-600 mb-4">
-                    Are you sure you want to permanently delete this business listing? All associated data will be removed:
-                  </p>
+                  {!deleteEntireBusinessProfile ? (
+                    <p className="text-sm text-gray-600 mb-4">
+                      Removes <strong>only this row</strong> (one deal / listing) from the directory.
+                      {dealCountForProfile > 1
+                        ? ` This business has ${dealCountForProfile} deals in the table — the other ${dealCountForProfile - 1} stay online.`
+                        : ' The business profile stays so the owner can add more deals later.'}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-600 mb-4">
+                      You are about to delete the <strong>whole business profile</strong> and{' '}
+                      <strong>every deal</strong> under it ({dealCountForProfile} in this list), plus related data below.
+                    </p>
+                  )}
 
                   {/* Business preview */}
                   {bizToDelete && (
@@ -2014,27 +2061,45 @@ const AdminPanel: React.FC = () => {
                     </div>
                   )}
 
-                  {/* What will be deleted */}
-                  <div className="space-y-2 mb-2">
-                    {[
-                      'Business listing and all details',
-                      'All uploaded photos',
-                      'Customer reviews and ratings',
-                      'Favorites and saved items',
-                      'Redemption history',
-                    ].map((item, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs text-gray-500">
-                        <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-                        {item}
-                      </div>
-                    ))}
-                  </div>
+                  <label className="flex items-start gap-3 p-3 rounded-xl border border-amber-200 bg-amber-50/80 cursor-pointer mb-4">
+                    <input
+                      type="checkbox"
+                      className="mt-1 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                      checked={deleteEntireBusinessProfile}
+                      onChange={(e) => setDeleteEntireBusinessProfile(e.target.checked)}
+                      disabled={!!deletingId}
+                    />
+                    <span className="text-xs text-amber-950 leading-relaxed">
+                      <strong>Delete entire business</strong> — all deals in the directory for this profile, photos,
+                      reviews, favorites, and redemptions (same as wiping the company from StikmNek).
+                    </span>
+                  </label>
+
+                  {deleteEntireBusinessProfile && (
+                    <div className="space-y-2 mb-2">
+                      {[
+                        'All deals / listings for this business',
+                        'Business profile and owner link to this listing',
+                        'Uploaded photos in storage',
+                        'Customer reviews and ratings',
+                        'Favorites and redemption history for this business',
+                      ].map((item, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-gray-500">
+                          <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer actions */}
                 <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
                   <button
-                    onClick={() => setConfirmDeleteId(null)}
+                    onClick={() => {
+                      setConfirmDeleteId(null);
+                      setDeleteEntireBusinessProfile(false);
+                    }}
                     disabled={!!deletingId}
                     className="px-5 py-2.5 rounded-xl bg-white border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                   >
@@ -2053,7 +2118,7 @@ const AdminPanel: React.FC = () => {
                     ) : (
                       <>
                         <Trash2 className="w-4 h-4" />
-                        Delete Permanently
+                        {deleteEntireBusinessProfile ? 'Delete entire business' : 'Remove this deal'}
                       </>
                     )}
                   </button>
