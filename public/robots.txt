@@ -1,5 +1,5 @@
 # StikmNek Robots.txt
-# https://stikm.nek/
+# https://www.stikmnek.com/
 
 User-agent: *
 Allow: /
@@ -35,7 +35,7 @@ User-agent: anthropic-ai
 Disallow: /
 
 # Sitemap
-Sitemap: https://stikm.nek/sitemap.xml
+Sitemap: https://www.stikmnek.com/sitemap.xml
 
 # Host
-Host: https://stikm.nek
+Host: https://www.stikmnek.com

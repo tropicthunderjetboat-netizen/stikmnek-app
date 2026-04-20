@@ -54,7 +54,7 @@ const defaultVars: ReceiptVars = {
   business_category: 'Water Activities & Tours',
   business_location: 'Port Vila, Vanuatu',
   business_discount: '25% OFF All Water Activities',
-  dashboard_url: 'https://stikm.nek/dashboard',
+  dashboard_url: 'https://www.stikmnek.com/dashboard',
 };
 
 const EmailReceiptManager: React.FC<Props> = ({ onBack }) => {
@@ -225,7 +225,7 @@ const EmailReceiptManager: React.FC<Props> = ({ onBack }) => {
             <h4 className="text-sm font-bold text-amber-900">SendGrid Sender Verification Required</h4>
             <p className="text-xs text-amber-700 mt-1 leading-relaxed">
               Your SendGrid account requires a verified sender identity before emails can be delivered. 
-              The current <code className="px-1.5 py-0.5 bg-amber-100 rounded text-amber-800 font-mono text-[10px]">noreply@stikm.nek</code> address 
+              The current <code className="px-1.5 py-0.5 bg-amber-100 rounded text-amber-800 font-mono text-[10px]">no-reply@stikmnek.com</code> address 
               is not verified.
             </p>
             <div className="mt-3 space-y-2">

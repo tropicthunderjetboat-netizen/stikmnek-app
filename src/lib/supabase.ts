@@ -56,7 +56,8 @@ export const SUPABASE_URL = supabaseUrl;
 
 /**
  * Canonical site URL for auth redirects (reset password, email links).
- * Prefer env override; otherwise use current origin in browser; final fallback is production.
+ * Prefer `VITE_SITE_URL` in production (e.g. https://www.stikmnek.com); otherwise use current
+ * origin in the browser; final fallback matches README production URL.
  */
 export const SITE_URL =
   (import.meta.env.VITE_SITE_URL && String(import.meta.env.VITE_SITE_URL).trim()) ||

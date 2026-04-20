@@ -325,7 +325,7 @@ async function invokeExtendPassWithRetry(
 
 function getShareAppUrl(): string {
   if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
-  return 'https://stikmnek-app.vercel.app';
+  return 'https://www.stikmnek.com';
 }
 
 type ShareLang = 'en' | 'fr' | 'bi';

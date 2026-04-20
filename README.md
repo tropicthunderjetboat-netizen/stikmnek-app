@@ -517,7 +517,7 @@ Proprietary - All rights reserved.
 
 ## Support
 
-- **Email**: support@stikm.nek
-- **Website**: https://stikm.nek
+- **Email**: support@stikmnek.com
+- **Website**: https://www.stikmnek.com
 - **Location**: Vanuatu
 

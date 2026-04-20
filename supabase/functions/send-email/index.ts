@@ -505,7 +505,7 @@ Deno.serve(async (req) => {
                       ${escapeHtml(promo.body)}
                     </div>
                     <div style="margin-top:12px;">
-                      <a href="https://stikmnek.com" style="display:inline-block; background:#0d9488; color:#ffffff; text-decoration:none; padding:10px 14px; border-radius:10px; font-size:13px; font-weight:700;">
+                      <a href="https://www.stikmnek.com" style="display:inline-block; background:#0d9488; color:#ffffff; text-decoration:none; padding:10px 14px; border-radius:10px; font-size:13px; font-weight:700;">
                         Open StikmNek
                       </a>
                     </div>

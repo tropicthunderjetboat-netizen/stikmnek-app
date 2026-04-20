@@ -5,7 +5,7 @@
  * Uses SUPABASE_SERVICE_ROLE_KEY to bypass RLS for secure database operations.
  *
  * Email (initial listing approval): requires SENDGRID_API_KEY (same as send-email / paypal-capture).
- * Optional: SENDGRID_FROM_EMAIL (default stikmnek@gmail.com if unset), SENDGRID_FROM_NAME, APP_BASE_URL (default https://stikmnek.com).
+ * Optional: SENDGRID_FROM_EMAIL (default stikmnek@gmail.com if unset), SENDGRID_FROM_NAME, APP_BASE_URL (default https://www.stikmnek.com).
  * CORS: set CORS_ALLOWED_ORIGINS (comma-separated origins) in Edge Function secrets.
  * If unset, Access-Control-Allow-Origin is *. If set, request Origin must match an entry (see getSafeCorsHeaders).
  */
@@ -161,11 +161,11 @@ async function purgeBusinessPhotosAndStorage(
 
 /** Public app URL for listing links (no trailing slash). Uses `APP_BASE_URL` secret (Deno env ≈ `process.env.APP_BASE_URL`). */
 function getAppBaseUrl(): string {
-  const raw = (Deno.env.get('APP_BASE_URL') || 'https://stikmnek.com').trim();
+  const raw = (Deno.env.get('APP_BASE_URL') || 'https://www.stikmnek.com').trim();
   return raw.replace(/\/+$/, '');
 }
 
-const LISTING_LIVE_BADGE_URL = 'https://stikmnek.com/images/stikmnek-badge.png';
+const LISTING_LIVE_BADGE_URL = 'https://www.stikmnek.com/images/stikmnek-badge.png';
 
 function escapeHtmlEmail(s: unknown): string {
   return String(s ?? '')

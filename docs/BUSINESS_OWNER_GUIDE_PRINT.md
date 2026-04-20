@@ -3,7 +3,7 @@
 **File:** `public/business-owner-guide-print.html`
 
 **Live URL (after deploy):**  
-https://stikmnek.com/business-owner-guide-print.html
+https://www.stikmnek.com/business-owner-guide-print.html
 
 ## How to use
 
