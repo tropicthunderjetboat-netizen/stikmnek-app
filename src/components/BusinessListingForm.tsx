@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { FunctionsHttpError, FunctionsFetchError, PostgrestError } from '@supabase/supabase-js';
@@ -16,8 +16,10 @@ import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 import {
   categoryUsesTieredPricing,
   validatePricingTiersForSubmit,
+  pricingTiersFromDb,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
+import { categories, type Business, type Category } from '@/data/businesses';
 import {
   hasMeaningfulDescriptionContent,
   plainTextFromHtml,
@@ -178,7 +180,134 @@ async function formatListingSubmitCatchError(
   return fallback;
 }
 
-const BusinessListingForm: React.FC = () => {
+export type EmbeddedListingEdit = {
+  profileBusinessId: string;
+  business: Business;
+  onEditSubmitted?: () => void;
+};
+
+type BusinessListingFormProps = {
+  embeddedEdit?: EmbeddedListingEdit | null;
+};
+
+function asCategoryKey(raw: string): Category {
+  return categories.some((c) => c.key === raw) ? (raw as Category) : 'dining';
+}
+
+function deriveDiscountPercentFromBusiness(b: Business): string {
+  const disc = (b.discount || '').trim();
+  const m = disc.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (m) {
+    const p = parseFloat(m[1]);
+    if (Number.isFinite(p) && p > 0 && p < 100) return String(Math.round(p));
+  }
+  const orig = b.originalPrice;
+  const deal = b.dealPrice;
+  if (orig > 0 && deal >= 0 && deal < orig) {
+    return String(Math.round((1 - deal / orig) * 100));
+  }
+  return '';
+}
+
+type EditBaseline = {
+  description: string;
+  hours: string;
+  phone: string;
+  discount: string;
+  original_price: number;
+  deal_price: number;
+  location: string;
+  whatsapp_number: string | null;
+  map_url: string;
+  website: string;
+  image: string;
+  pricing_tiers: unknown[] | null;
+};
+
+function buildEditBaseline(b: Business): EditBaseline {
+  const rawTiers = b.pricingTiers ?? null;
+  const tiered = categoryUsesTieredPricing(asCategoryKey(b.category));
+  let pricing_tiers: unknown[] | null = null;
+  if (tiered) {
+    const { data, error } = validatePricingTiersForSubmit(pricingTiersFromDb(rawTiers));
+    pricing_tiers = error ? null : data ?? null;
+  }
+  const wa = (b.whatsappNumber || b.whatsapp_number || '').trim();
+  return {
+    description: b.description || '',
+    hours: b.hours || '',
+    phone: b.phone || '',
+    discount: (b.discount || '').trim(),
+    original_price: Number(b.originalPrice) || 0,
+    deal_price: Number(b.dealPrice) || 0,
+    location: (b.location || '').trim(),
+    whatsapp_number: wa === '' ? null : wa,
+    map_url: ((b.mapUrl ?? b.map_url) as string | undefined | null)?.trim() || '',
+    website: normalizeWebsiteForStorage(typeof b.website === 'string' ? b.website : '') || '',
+    image: (b.image || '').trim(),
+    pricing_tiers,
+  };
+}
+
+function baselineSnapshotFromFormState(args: {
+  form: {
+    description: string;
+    hours: string;
+    phone: string;
+    discount: string;
+    originalPrice: string;
+    dealPrice: string;
+    address: string;
+    whatsappNumber: string;
+    mapUrl: string;
+    website: string;
+    category: string;
+  };
+  photos: { url: string }[];
+  pricingTiers: PricingTierInput[];
+}): EditBaseline {
+  const descriptionForStorage = trimBusinessDescriptionHtmlForStorage(args.form.description);
+  const tiered = categoryUsesTieredPricing(asCategoryKey(args.form.category));
+  let pricing_tiers: unknown[] | null = null;
+  if (tiered) {
+    const { data } = validatePricingTiersForSubmit(args.pricingTiers);
+    pricing_tiers = data ?? null;
+  }
+  const wa = args.form.whatsappNumber.trim();
+  return {
+    description: descriptionForStorage,
+    hours: args.form.hours,
+    phone: args.form.phone,
+    discount: (args.form.discount || '').trim(),
+    original_price: Number(args.form.originalPrice) || 0,
+    deal_price: Number(args.form.dealPrice) || 0,
+    location: (args.form.address || '').trim(),
+    whatsapp_number: wa === '' ? null : wa,
+    map_url: (args.form.mapUrl || '').trim(),
+    website: normalizeWebsiteForStorage(args.form.website) || '',
+    image: (args.photos[0]?.url || '').trim(),
+    pricing_tiers,
+  };
+}
+
+function editBaselinesEqual(a: EditBaseline, b: EditBaseline): boolean {
+  return (
+    a.description === b.description &&
+    a.hours === b.hours &&
+    a.phone === b.phone &&
+    a.discount === b.discount &&
+    a.original_price === b.original_price &&
+    a.deal_price === b.deal_price &&
+    a.location === b.location &&
+    a.whatsapp_number === b.whatsapp_number &&
+    a.map_url === b.map_url &&
+    (a.website || '') === (b.website || '') &&
+    a.image === b.image &&
+    JSON.stringify(a.pricing_tiers) === JSON.stringify(b.pricing_tiers)
+  );
+}
+
+const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit = null }) => {
   const {
     language,
     user,
@@ -213,6 +342,70 @@ const BusinessListingForm: React.FC = () => {
 
   /** When the owner has exactly one profile, link new pending rows to it (multi-offer workflow). */
   const [ownerProfileBusinessId, setOwnerProfileBusinessId] = useState<string | null>(null);
+
+  const editBaselineRef = useRef<EditBaseline | null>(null);
+  const embeddedPrefillKeyRef = useRef<string>('');
+
+  useEffect(() => {
+    if (!embeddedEdit) {
+      embeddedPrefillKeyRef.current = '';
+      editBaselineRef.current = null;
+      return;
+    }
+    const key = `${embeddedEdit.profileBusinessId}:${embeddedEdit.business.id}`;
+    if (embeddedPrefillKeyRef.current === key) return;
+    embeddedPrefillKeyRef.current = key;
+    const b = embeddedEdit.business;
+    const tiers = pricingTiersFromDb(b.pricingTiers ?? null);
+    setPricingTiers(tiers.map((t) => ({ ...t })));
+    const img = (b.image || '').trim();
+    setPhotos(
+      img
+        ? [
+            {
+              id: `existing-${b.id}`,
+              url: img,
+              filePath: '',
+              name: 'cover',
+              size: 0,
+              preview: img,
+            },
+          ]
+        : [],
+    );
+    const tiered = categoryUsesTieredPricing(asCategoryKey(b.category));
+    const pct = deriveDiscountPercentFromBusiness(b);
+    const origStr = !tiered && b.originalPrice > 0 ? String(b.originalPrice) : '';
+    const dealStr = tiered
+      ? ''
+      : pct && b.originalPrice > 0
+        ? String(Math.round(b.originalPrice * (1 - Number(pct) / 100)))
+        : b.dealPrice > 0
+          ? String(b.dealPrice)
+          : origStr;
+    setForm({
+      name: b.name || '',
+      category: asCategoryKey(b.category),
+      description: b.description || '',
+      discount: (b.discount || '').trim(),
+      originalPrice: origStr,
+      discountPercent: pct,
+      dealPrice: dealStr,
+      address: b.location || '',
+      phone: b.phone || '',
+      email: (b.contactEmail || '').trim() || user?.email || '',
+      hours: b.hours || '',
+      whatsappNumber: (b.whatsappNumber || b.whatsapp_number || '').trim(),
+      mapUrl: ((b.mapUrl ?? b.map_url) as string | undefined)?.trim() || '',
+      website: (typeof b.website === 'string' ? b.website : '').trim(),
+      discountValidFrom: todayStr(),
+      listingDuration: '1_month',
+    });
+    setAgreedPartnerTerms(true);
+    setSubmitted(false);
+    setFieldErrors({});
+    editBaselineRef.current = buildEditBaseline(b);
+  }, [embeddedEdit?.profileBusinessId, embeddedEdit?.business.id, user?.email]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -261,8 +454,9 @@ const BusinessListingForm: React.FC = () => {
     return '';
   }, [form.discountPercent]);
 
-  // Sync calculated values into form state for submission
+  // Sync calculated values into form state for submission (flat pricing only; tiered deals keep DB discount text)
   useEffect(() => {
+    if (categoryUsesTieredPricing(form.category)) return;
     if (calculatedDealPrice && calculatedDiscountLabel) {
       setForm(prev => ({
         ...prev,
@@ -270,14 +464,13 @@ const BusinessListingForm: React.FC = () => {
         discount: calculatedDiscountLabel,
       }));
     } else {
-      // Clear deal price and discount label when inputs are incomplete
       setForm(prev => ({
         ...prev,
         dealPrice: '',
         discount: '',
       }));
     }
-  }, [calculatedDealPrice, calculatedDiscountLabel]);
+  }, [calculatedDealPrice, calculatedDiscountLabel, form.category]);
 
   useEffect(() => {
     if (!categoryUsesTieredPricing(form.category)) {
@@ -287,6 +480,7 @@ const BusinessListingForm: React.FC = () => {
 
   // Pre-fill contact & location from the owner's primary business profile (not the deal title).
   useEffect(() => {
+    if (embeddedEdit) return;
     if (!user?.id || user.type !== 'business') return;
     let cancelled = false;
     void (async () => {
@@ -322,7 +516,7 @@ const BusinessListingForm: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, user?.type, prefillNonce]);
+  }, [user?.id, user?.type, prefillNonce, embeddedEdit]);
 
   // Auto-calculate end date
   const selectedDuration = DURATION_OPTIONS.find(d => d.value === form.listingDuration);
@@ -389,7 +583,7 @@ const BusinessListingForm: React.FC = () => {
       return;
     }
 
-    if (!agreedPartnerTerms) {
+    if (!embeddedEdit && !agreedPartnerTerms) {
       toast.error(
         language === 'en'
           ? 'Please read and accept the Business partner & listing terms to continue.'
@@ -518,6 +712,69 @@ const BusinessListingForm: React.FC = () => {
         toast.error(msg);
         return;
       }
+    }
+
+    if (embeddedEdit) {
+      const base = editBaselineRef.current;
+      if (!base) {
+        toast.error(language === 'en' ? 'Still loading this listing — try again in a moment.' : 'Chargement…');
+        return;
+      }
+      const next = baselineSnapshotFromFormState({ form, photos, pricingTiers });
+      const changes: Record<string, unknown> = {};
+      if (next.description !== base.description) changes.description = next.description;
+      if (next.hours !== base.hours) changes.hours = next.hours;
+      if (next.phone !== base.phone) changes.phone = next.phone;
+      if (next.discount !== base.discount) changes.discount = next.discount;
+      if (next.original_price !== base.original_price) changes.original_price = next.original_price;
+      if (next.deal_price !== base.deal_price) changes.deal_price = next.deal_price;
+      if (next.location !== base.location) changes.location = next.location;
+      const nw = next.whatsapp_number ?? null;
+      const bw = base.whatsapp_number ?? null;
+      if (nw !== bw) changes.whatsapp_number = nw;
+      if (next.map_url !== base.map_url) changes.map_url = next.map_url.trim() === '' ? null : next.map_url.trim();
+      const nWeb = (next.website || '').trim();
+      const bWeb = (base.website || '').trim();
+      if (nWeb !== bWeb) changes.website = nWeb === '' ? null : nWeb;
+      if (next.image !== base.image) changes.image = next.image;
+      if (JSON.stringify(next.pricing_tiers) !== JSON.stringify(base.pricing_tiers)) {
+        changes.pricing_tiers = next.pricing_tiers;
+      }
+
+      if (Object.keys(changes).length === 0) {
+        toast.info(language === 'en' ? 'No changes to submit.' : 'Aucune modification.');
+        return;
+      }
+
+      setSubmitting(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('manage-business', {
+          body: {
+            action: 'submit_edit',
+            userId: user.id,
+            businessId: embeddedEdit.profileBusinessId,
+            changes,
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(String(data.error));
+        toast.success(
+          data?.updated
+            ? language === 'en'
+              ? 'Pending edit updated.'
+              : 'Brouillon mis à jour'
+            : language === 'en'
+              ? 'Edit submitted for admin review.'
+              : 'Envoyé pour validation',
+        );
+        editBaselineRef.current = next;
+        embeddedEdit.onEditSubmitted?.();
+      } catch (err: unknown) {
+        void formatListingSubmitCatchError(err, language).then((msg) => toast.error(msg));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
     }
 
     const submitTimedOutMsg =
@@ -743,24 +1000,55 @@ const BusinessListingForm: React.FC = () => {
     );
   }
 
+  const isEmbeddedEdit = Boolean(embeddedEdit);
+
   return (
-    <section className="py-20 bg-gradient-to-b from-teal-50 to-white" id="list-business">
+    <section
+      className={`${isEmbeddedEdit ? 'py-8' : 'py-20'} bg-gradient-to-b from-teal-50 to-white`}
+      id={isEmbeddedEdit ? undefined : 'list-business'}
+    >
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
+        {isEmbeddedEdit && (
+          <div className="mb-6 rounded-xl border border-teal-200 bg-gradient-to-r from-teal-50 to-emerald-50 p-4 flex gap-3">
+            <Info className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" aria-hidden />
+            <p className="text-sm text-teal-900">
+              {language === 'en'
+                ? 'Updates here match the public listing form. Changes are sent for admin review before they go live (except listing on/off from your dashboard).'
+                : 'Les changements sont envoyés pour validation avant publication.'}
+            </p>
+          </div>
+        )}
         <div className="text-center mb-10">
           <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center">
             <Store className="w-7 h-7 text-white" />
           </div>
           <h2 className="text-3xl font-extrabold text-gray-900 mb-3">
-            {language === 'en' ? 'List Your Business for Free' : language === 'fr' ? 'Inscrivez votre entreprise gratuitement' : 'Listem Bisnis Blong Yu Fri'}
+            {isEmbeddedEdit
+              ? language === 'en'
+                ? 'Edit your listing'
+                : language === 'fr'
+                  ? 'Modifier votre annonce'
+                  : 'Senisim listing'
+              : language === 'en'
+                ? 'List Your Business for Free'
+                : language === 'fr'
+                  ? 'Inscrivez votre entreprise gratuitement'
+                  : 'Listem Bisnis Blong Yu Fri'}
           </h2>
           <p className="text-gray-500">
-            {language === 'en' ? 'Join 120+ local businesses reaching thousands of tourists' :
-             language === 'fr' ? 'Rejoignez plus de 120 entreprises locales atteignant des milliers de touristes' :
-             'Joinem 120+ lokal bisnis we i rijim plante turis'}
+            {isEmbeddedEdit
+              ? language === 'en'
+                ? 'Same fields as creating a new deal — your live listing is pre-filled below.'
+                : 'Mêmes champs que pour une nouvelle offre — votre annonce est pré-remplie.'
+              : language === 'en'
+                ? 'Join 120+ local businesses reaching thousands of tourists'
+                : language === 'fr'
+                  ? 'Rejoignez plus de 120 entreprises locales atteignant des milliers de touristes'
+                  : 'Joinem 120+ lokal bisnis we i rijim plante turis'}
           </p>
         </div>
 
-        {user?.type === 'business' && (
+        {user?.type === 'business' && !isEmbeddedEdit && (
           <div className="mb-6 rounded-xl border border-teal-100 bg-white p-4 text-left text-sm text-gray-700 shadow-sm">
             <p className="font-semibold text-teal-900 mb-1">
               {language === 'en' ? 'Simple flow' : language === 'fr' ? 'Parcours simple' : 'Wanwan wok'}
@@ -775,7 +1063,7 @@ const BusinessListingForm: React.FC = () => {
           </div>
         )}
 
-        {!user && (
+        {!user && !isEmbeddedEdit && (
           <div className="mb-6 p-5 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 text-center">
             <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
               <Store className="w-6 h-6 text-white" />
@@ -808,7 +1096,7 @@ const BusinessListingForm: React.FC = () => {
         )}
 
         {/* Tourist user - redirect to business signup */}
-        {user && user.type === 'tourist' && (
+        {user && user.type === 'tourist' && !isEmbeddedEdit && (
           <div className="mb-6 p-5 rounded-xl bg-amber-50 border border-amber-200 text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <AlertTriangle className="w-5 h-5 text-amber-600" />
@@ -845,8 +1133,11 @@ const BusinessListingForm: React.FC = () => {
               <input
                 type="text"
                 value={form.name}
+                readOnly={isEmbeddedEdit}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                  isEmbeddedEdit ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed' : 'border-gray-200'
+                }`}
                 placeholder={
                   language === 'en'
                     ? 'e.g. Reef Explorer Semi-Sub Tour – Port Vila'
@@ -856,11 +1147,15 @@ const BusinessListingForm: React.FC = () => {
                 }
               />
               <p className="text-[11px] text-gray-500 mt-1">
-                {language === 'en'
-                  ? 'This is the name tourists see for this deal. Your company profile name is separate.'
-                  : language === 'fr'
-                    ? 'C’est le nom visible pour cette offre. Le nom de votre entreprise est géré dans le profil.'
-                    : 'Nem ia turis bae luk long dil ia. Nem blong kampeni i stap long profil.'}
+                {isEmbeddedEdit
+                  ? language === 'en'
+                    ? 'To change this title, contact support — it is tied to your approved listing.'
+                    : 'Pour changer le titre, contactez le support.'
+                  : language === 'en'
+                    ? 'This is the name tourists see for this deal. Your company profile name is separate.'
+                    : language === 'fr'
+                      ? 'C’est le nom visible pour cette offre. Le nom de votre entreprise est géré dans le profil.'
+                      : 'Nem ia turis bae luk long dil ia. Nem blong kampeni i stap long profil.'}
               </p>
             </div>
             <div>
@@ -869,8 +1164,11 @@ const BusinessListingForm: React.FC = () => {
               </label>
               <select
                 value={form.category}
+                disabled={isEmbeddedEdit}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white ${
+                  isEmbeddedEdit ? 'border-gray-200 opacity-70 cursor-not-allowed' : 'border-gray-200'
+                }`}
               >
                 <option value="dining">Dining</option>
                 <option value="activities">Activities</option>
@@ -1346,74 +1644,97 @@ const BusinessListingForm: React.FC = () => {
             )}
           </div>
 
-          {/* Partner terms agreement */}
-          <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                id="listing-partner-terms"
-                checked={agreedPartnerTerms}
-                onChange={(e) => setAgreedPartnerTerms(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-              />
-              <span className="text-sm text-gray-700 leading-snug">
-                {language === 'en' ? (
-                  <>
-                    I have read and agree to the{' '}
-                    <Link
-                      to="/legal/business-partner"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-teal-600 font-semibold hover:underline"
-                    >
-                      Business partner &amp; listing terms
-                    </Link>
-                    , including maintaining appropriate insurance and permits, conducting business honestly, and honouring StikmNek passes at the agreed discounted rates.
-                  </>
-                ) : language === 'fr' ? (
-                  <>
-                    J’ai lu et j’accepte les{' '}
-                    <Link
-                      to="/legal/business-partner"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-teal-600 font-semibold hover:underline"
-                    >
-                      conditions Partenaires commerciaux et d’inscription
-                    </Link>
-                    , y compris l’assurance et les autorisations appropriées, une activité honnête, et le respect des pass StikmNek aux tarifs réduits convenus.
-                  </>
-                ) : (
-                  <>
-                    Mi bin ridim mo mi agri long{' '}
-                    <Link
-                      to="/legal/business-partner"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-teal-600 font-semibold hover:underline"
-                    >
-                      Business partner &amp; listing terms
-                    </Link>
-                    : insuren mo pemit we i stret, wok honest mo professional, mo honor ol StikmNek pas long diskon we i stap long listing.
-                  </>
-                )}
-              </span>
-            </label>
-          </div>
+          {!isEmbeddedEdit && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="listing-partner-terms"
+                  checked={agreedPartnerTerms}
+                  onChange={(e) => setAgreedPartnerTerms(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                />
+                <span className="text-sm text-gray-700 leading-snug">
+                  {language === 'en' ? (
+                    <>
+                      I have read and agree to the{' '}
+                      <Link
+                        to="/legal/business-partner"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-teal-600 font-semibold hover:underline"
+                      >
+                        Business partner &amp; listing terms
+                      </Link>
+                      , including maintaining appropriate insurance and permits, conducting business honestly, and honouring StikmNek passes at the agreed discounted rates.
+                    </>
+                  ) : language === 'fr' ? (
+                    <>
+                      J’ai lu et j’accepte les{' '}
+                      <Link
+                        to="/legal/business-partner"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-teal-600 font-semibold hover:underline"
+                      >
+                        conditions Partenaires commerciaux et d’inscription
+                      </Link>
+                      , y compris l’assurance et les autorisations appropriées, une activité honnête, et le respect des pass StikmNek aux tarifs réduits convenus.
+                    </>
+                  ) : (
+                    <>
+                      Mi bin ridim mo mi agri long{' '}
+                      <Link
+                        to="/legal/business-partner"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-teal-600 font-semibold hover:underline"
+                      >
+                        Business partner &amp; listing terms
+                      </Link>
+                      : insuren mo pemit we i stret, wok honest mo professional, mo honor ol StikmNek pas long diskon we i stap long listing.
+                    </>
+                  )}
+                </span>
+              </label>
+            </div>
+          )}
 
           {/* Submit */}
           <button
             type="submit"
-            disabled={submitting || !agreedPartnerTerms}
+            disabled={submitting || (!isEmbeddedEdit && !agreedPartnerTerms)}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-sm hover:from-teal-700 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
-            {submitting ? (<><Loader2 className="w-5 h-5 animate-spin" />{language === 'en' ? 'Submitting...' : 'Soumission en cours...'}</>) : (<><Store className="w-5 h-5" />{language === 'en' ? 'Submit for Review (Free)' : 'Soumettre pour examen (Gratuit)'}</>)}
+            {submitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {language === 'en' ? 'Submitting...' : 'Soumission en cours...'}
+              </>
+            ) : (
+              <>
+                <Store className="w-5 h-5" />
+                {isEmbeddedEdit
+                  ? language === 'en'
+                    ? 'Submit changes for review'
+                    : language === 'fr'
+                      ? 'Envoyer les modifications'
+                      : 'Submitem senis'
+                  : language === 'en'
+                    ? 'Submit for Review (Free)'
+                    : 'Soumettre pour examen (Gratuit)'}
+              </>
+            )}
           </button>
 
           <p className="text-xs text-center text-gray-400">
-            {language === 'en'
-              ? 'Your listing will be reviewed within 24 hours. Listing is completely free.'
-              : 'Votre inscription sera examinée dans les 24 heures. L\'inscription est entièrement gratuite.'}
+            {isEmbeddedEdit
+              ? language === 'en'
+                ? 'Edits are reviewed before they appear on the public site.'
+                : 'Les modifications sont vérifiées avant publication.'
+              : language === 'en'
+                ? 'Your listing will be reviewed within 24 hours. Listing is completely free.'
+                : 'Votre inscription sera examinée dans les 24 heures. L\'inscription est entièrement gratuite.'}
           </p>
         </form>
       </div>

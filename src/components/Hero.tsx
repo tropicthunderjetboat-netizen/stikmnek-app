@@ -19,7 +19,8 @@ const Hero: React.FC = () => {
       navigate('/business/new');
       return;
     }
-    document.getElementById('list-business')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setAuthMode('signup-business');
+    setShowAuth(true);
   };
 
   const openTouristSignup = () => {

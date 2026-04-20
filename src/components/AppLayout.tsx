@@ -266,7 +266,6 @@ const AppLayout: React.FC = () => {
             <PassCards />
             <MapView />
             <ReviewsSection />
-            <BusinessListingFormInLayout padded={false} />
           </>
         );
     }

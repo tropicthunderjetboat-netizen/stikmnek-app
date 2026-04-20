@@ -3,7 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
 import { toast } from 'sonner';
-import { businesses as localBusinesses } from '@/data/businesses';
+import { businesses as localBusinesses, categories, type Business, type Category } from '@/data/businesses';
 import {
   Store, Edit3, BarChart3, MessageSquare, Image, Power,
   Save, X, ChevronRight, TrendingUp, Users, DollarSign,
@@ -19,7 +19,6 @@ import PhotoUploader, { UploadedPhoto } from './PhotoUploader';
 import MySubmissions from './MySubmissions';
 import DashboardOverview from './DashboardOverview';
 import DashboardAnalytics from './DashboardAnalytics';
-import EditListingPanel from './EditListingPanel';
 import PricingDiscountFields, { DURATION_OPTIONS, addDays, todayStr } from './PricingDiscountFields';
 import QRScanner from './QRScanner';
 import BusinessHomeScreen from './BusinessHomeScreen';
@@ -110,6 +109,12 @@ interface UnifiedBusiness {
   _profileBusinessId?: string;
   /** From `business_offerings.pricing_tiers` (or profile fallback); drives edit-listing tier editor. */
   pricingTiers?: unknown;
+  /** Offering or profile map link (prefill full listing form). */
+  mapUrl?: string | null;
+  website?: string | null;
+  /** Public / contact email for listing form prefill. */
+  email?: string;
+  whatsappNumber?: string | null;
 }
 
 function mapOfferingRowToUnified(
@@ -142,6 +147,13 @@ function mapOfferingRowToUnified(
     featured: Boolean(o.featured) || Boolean(profile.featured),
     ownerId: (profile.owner_id as string) || null,
     pricingTiers: o.pricing_tiers ?? null,
+    mapUrl: String(o.map_url ?? profile.map_url ?? '').trim() || null,
+    website: String(o.website ?? profile.website ?? '').trim() || null,
+    email: String(
+      profile.contact_email ?? profile.email ?? profile.business_email ?? '',
+    ).trim(),
+    whatsappNumber:
+      String(o.whatsapp_number ?? profile.whatsapp_number ?? '').trim() || null,
     _source: 'approved',
     _status: 'approved',
     _createdAt: (o.created_at as string) || (profile.created_at as string),
@@ -172,9 +184,47 @@ function mapProfileRowToUnified(b: Record<string, unknown>): UnifiedBusiness {
     featured: Boolean(b.featured),
     ownerId: (b.owner_id as string) || null,
     pricingTiers: b.pricing_tiers ?? null,
+    mapUrl: String(b.map_url ?? '').trim() || null,
+    website: String(b.website ?? '').trim() || null,
+    email: String(b.contact_email ?? b.email ?? b.business_email ?? '').trim(),
+    whatsappNumber: String(b.whatsapp_number ?? '').trim() || null,
     _source: 'approved',
     _status: 'approved',
     _createdAt: b.created_at as string | undefined,
+  };
+}
+
+function unifiedToListingBusiness(u: UnifiedBusiness): Business {
+  const cat = categories.some((c) => c.key === u.category) ? (u.category as Category) : 'dining';
+  return {
+    id: u.id,
+    profileBusinessId: u._profileBusinessId,
+    name: u.name,
+    category: cat,
+    description: u.description,
+    descriptionFr: u.descriptionFr,
+    descriptionBi: u.descriptionBi,
+    image: u.image,
+    rating: u.rating,
+    reviewCount: u.reviewCount,
+    discount: u.discount,
+    originalPrice: u.originalPrice,
+    dealPrice: u.dealPrice,
+    location: u.location,
+    lat: u.lat,
+    lng: u.lng,
+    mapUrl: u.mapUrl ?? null,
+    map_url: u.mapUrl ?? null,
+    website: u.website ?? null,
+    hours: u.hours,
+    phone: u.phone,
+    contactEmail: u.email || null,
+    whatsappNumber: u.whatsappNumber ?? null,
+    whatsapp_number: u.whatsappNumber ?? null,
+    tags: [...u.tags],
+    featured: u.featured,
+    ownerId: u.ownerId ?? null,
+    pricingTiers: u.pricingTiers ?? null,
   };
 }
 
@@ -225,10 +275,6 @@ const BusinessOwnerDashboard: React.FC = () => {
   const [unseenSubmissionChanges, setUnseenSubmissionChanges] = useState(0);
   const [businessSelectorOpen, setBusinessSelectorOpen] = useState(false);
   const [showScanner, setShowScanner] = useState<boolean>(false);
-  const [editInitialSection, setEditInitialSection] = useState<'basic' | 'pricing' | 'contact' | 'media' | undefined>(undefined);
-
-
-
   // ═══ UNIFIED OWNER DATA STATE ═══
   const [ownerDataLoading, setOwnerDataLoading] = useState(true);
   const [approvedBusinesses, setApprovedBusinesses] = useState<any[]>([]);
@@ -696,6 +742,21 @@ const BusinessOwnerDashboard: React.FC = () => {
   }, [selectedBusiness, user, selectedIsApproved, selectedProfileId]);
 
   useEffect(() => { loadPendingEdits(); }, [loadPendingEdits]);
+
+  const listingEmbeddedEdit = useMemo(() => {
+    if (!selectedBusiness || !selectedIsApproved || !user?.id) return null;
+    const profileBusinessId = effectiveProfileBusinessId(selectedBusiness);
+    const biz =
+      dbBusinesses.find((b) => b.id === selectedBusiness.id) ?? unifiedToListingBusiness(selectedBusiness);
+    return {
+      profileBusinessId,
+      business: biz,
+      onEditSubmitted: () => {
+        void refreshBusinesses();
+        void loadPendingEdits();
+      },
+    };
+  }, [selectedBusiness, selectedIsApproved, user?.id, dbBusinesses, refreshBusinesses, loadPendingEdits]);
 
   const loadReviewResponses = useCallback(async () => {
     if (!selectedProfileId || !selectedIsApproved) return;
@@ -1714,9 +1775,8 @@ const BusinessOwnerDashboard: React.FC = () => {
                     setSelectedBusinessId(businessId);
                   }
                   // Set initial section to pricing and switch to edit tab
-                  setEditInitialSection('pricing');
                   setActiveTab('edit');
-                  toast.info('Switched to Edit Listing — update your deal dates in the Pricing section.');
+                  toast.info('Switched to Edit listing — scroll to Pricing & discount dates in the form below.');
                 }}
               />
             )}
@@ -1758,12 +1818,10 @@ const BusinessOwnerDashboard: React.FC = () => {
 
             {activeTab === 'analytics' && selectedBusiness && selectedIsApproved && (<DashboardAnalytics selectedBusiness={selectedBusiness as any} />)}
             {activeTab === 'analytics' && selectedBusiness && !selectedIsApproved && renderPendingOnlyNotice('Analytics are available once your listing is approved.')}
-            {activeTab === 'edit' && selectedBusiness && selectedIsApproved && (
-              <EditListingPanel
-                selectedBusiness={selectedBusiness as any}
-                onToggleActive={handleToggleActive}
-                onListingDeleted={handleListingDeleted}
-                initialSection={editInitialSection}
+            {activeTab === 'edit' && selectedBusiness && selectedIsApproved && listingEmbeddedEdit && (
+              <BusinessListingForm
+                key={`edit-${selectedBusiness.id}`}
+                embeddedEdit={listingEmbeddedEdit}
               />
             )}
             {activeTab === 'edit' && selectedBusiness && !selectedIsApproved && renderPendingOnlyNotice('Editing is available once your listing is approved.')}

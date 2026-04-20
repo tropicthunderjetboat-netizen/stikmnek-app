@@ -304,7 +304,7 @@ const FeaturedLeaderboard: React.FC = () => {
                           <span className="hidden sm:inline">{business.location}</span>
                         </div>
 
-                        <p className="text-sm text-gray-500 line-clamp-1 hidden sm:block">
+                        <p className="text-sm text-gray-500 line-clamp-3 sm:line-clamp-4 min-w-0 max-w-full break-words">
                           {plainTextFromHtml(
                             language === 'fr'
                               ? business.descriptionFr || ''

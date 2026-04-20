@@ -2,11 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Store, Loader2, AlertCircle } from 'lucide-react';
+import { Store, Loader2, AlertCircle, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { categories, type Category } from '@/data/businesses';
+import PhotoUploader, { type UploadedPhoto } from '@/components/PhotoUploader';
+import LocationMapPicker from '@/components/LocationMapPicker';
+import WebsiteUrlInput from '@/components/WebsiteUrlInput';
+import { parseLatLngFromMapUrl, normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 
 const CompleteBusinessProfile: React.FC = () => {
   const {
@@ -29,6 +33,9 @@ const CompleteBusinessProfile: React.FC = () => {
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [category, setCategory] = useState<Category>('dining');
   const [address, setAddress] = useState('');
+  const [mapUrl, setMapUrl] = useState('');
+  const [website, setWebsite] = useState('');
+  const [logoPhotos, setLogoPhotos] = useState<UploadedPhoto[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -77,27 +84,37 @@ const CompleteBusinessProfile: React.FC = () => {
 
     setSubmitting(true);
     try {
+      const parsed = mapUrl.trim() ? parseLatLngFromMapUrl(mapUrl.trim()) : null;
+      const logoUrl = logoPhotos[0]?.url?.trim() || '';
+      const insertRow: Record<string, unknown> = {
+        name: businessName.trim(),
+        category,
+        description: '',
+        description_fr: '',
+        description_bi: '',
+        image: logoUrl,
+        discount: '',
+        original_price: 0,
+        deal_price: 0,
+        location: address.trim(),
+        hours: '',
+        phone: businessPhone.trim(),
+        email: businessEmail.trim(),
+        whatsapp_number: whatsappNumber.trim(),
+        owner_id: user.id,
+        tags: [category],
+        active: false,
+        map_url: mapUrl.trim() || null,
+        website: normalizeWebsiteForStorage(website) ?? null,
+      };
+      if (parsed) {
+        insertRow.lat = parsed.lat;
+        insertRow.lng = parsed.lng;
+      }
+
       const { data: inserted, error: insertErr } = await supabase
         .from('businesses')
-        .insert({
-          name: businessName.trim(),
-          category,
-          description: '',
-          description_fr: '',
-          description_bi: '',
-          image: '',
-          discount: '',
-          original_price: 0,
-          deal_price: 0,
-          location: address.trim(),
-          hours: '',
-          phone: businessPhone.trim(),
-          email: businessEmail.trim(),
-          whatsapp_number: whatsappNumber.trim(),
-          owner_id: user.id,
-          tags: [category],
-          active: false,
-        })
+        .insert(insertRow as never)
         .select('id')
         .single();
 
@@ -138,19 +155,16 @@ const CompleteBusinessProfile: React.FC = () => {
 
       toast.success(
         language === 'en'
-          ? 'Business profile saved! You can add your listing details next.'
+          ? 'Business profile saved! Opening your dashboard to add listings.'
           : language === 'fr'
-            ? 'Profil entreprise enregistré ! Vous pouvez compléter votre annonce.'
+            ? 'Profil enregistré ! Ouverture du tableau de bord.'
             : 'Bisnis profail i sevem!',
       );
 
-      if (inserted?.id) {
-        setTimeout(() => {
-          document.getElementById('list-business')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-      }
-
-      setCurrentView('home');
+      setCurrentView('business-dashboard');
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('switch-dashboard-tab', { detail: { tab: 'submit' } }));
+      }, 150);
     } catch (err: any) {
       console.error('[CompleteBusinessProfile]', err);
       toast.error(err?.message || 'Failed to save business profile');
@@ -185,10 +199,10 @@ const CompleteBusinessProfile: React.FC = () => {
               : 'Setapem bisnis blong yu',
         subtitle:
           language === 'en'
-            ? 'We use this so tourists can reach you. After you save, open your dashboard and use “Submit a business listing” for each deal — your phone, WhatsApp, and address copy into that form automatically.'
+            ? 'Tell us who you are, how to reach you, and (optionally) drop a map pin and logo. When you save, we open your Business Hub on “Submit a listing” so you can add each deal with the same form as the public site — your details copy across automatically.'
             : language === 'fr'
-              ? 'Pour que les touristes puissent vous contacter. Ensuite, ouvrez le tableau de bord et « Soumettre une annonce » pour chaque offre — téléphone et WhatsApp se copient automatiquement.'
-              : 'Blong turis i save kontakt yu. Bifo yu save, openem dashboard mo yusum Submit listing blong evri dil — fon mo WhatsApp i kopi automatik.',
+              ? 'Indiquez comment vous joindre, et en option une carte et un logo. Après enregistrement, nous ouvrons votre tableau de bord sur « Soumettre une annonce ».'
+              : 'Telemom ol samting, mo optional map mo logo. Afta save bae i openem Business Hub long Submit listing.',
       };
 
   return (
@@ -343,6 +357,48 @@ const CompleteBusinessProfile: React.FC = () => {
               />
               {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
             </div>
+
+            {user?.id && (
+              <div className="space-y-4 rounded-xl border border-violet-100 bg-violet-50/50 p-4">
+                <div className="flex items-center gap-2 text-violet-900 font-semibold text-sm">
+                  <Globe className="w-4 h-4 shrink-0" aria-hidden />
+                  {language === 'en'
+                    ? 'Logo & map (recommended)'
+                    : language === 'fr'
+                      ? 'Logo et carte (recommandé)'
+                      : 'Logo mo map'}
+                </div>
+                <p className="text-xs text-violet-800/90">
+                  {language === 'en'
+                    ? 'Tourists see your logo on the map and in search. Tap the map to set GPS (we store a Google Maps link).'
+                    : 'Les touristes voient votre logo sur la carte. Touchez la carte pour déposer une épingle.'}
+                </p>
+                <PhotoUploader
+                  photos={logoPhotos}
+                  onPhotosChange={setLogoPhotos}
+                  maxPhotos={1}
+                  userId={user.id}
+                  label={language === 'en' ? 'Business logo' : language === 'fr' ? 'Logo' : 'Logo'}
+                  sublabel={
+                    language === 'en'
+                      ? 'Optional — square PNG or JPG, up to 5MB.'
+                      : 'Optionnel — carré, PNG ou JPG.'
+                  }
+                />
+                <LocationMapPicker mapUrl={mapUrl} onMapUrlChange={setMapUrl} language={language} />
+                <div>
+                  <Label htmlFor="cbp-website">{language === 'en' ? 'Website' : language === 'fr' ? 'Site web' : 'Website'}</Label>
+                  <div className="mt-1.5">
+                    <WebsiteUrlInput
+                      id="cbp-website"
+                      website={website}
+                      onWebsiteChange={setWebsite}
+                      language={language}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             <Button
               type="submit"
