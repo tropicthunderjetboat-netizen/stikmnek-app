@@ -36,6 +36,8 @@ import {
   primaryEmbeddedOffering,
   primaryOfferingDescriptionHtml,
 } from '@/data/businesses';
+import { legacyUntaggedPhotoBelongsToOffering } from '@/lib/offeringPhotoPartition';
+import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
 
@@ -296,20 +298,42 @@ const BusinessDetail: React.FC = () => {
         const { count, error: cntErr } = await supabase
           .from('business_offerings')
           .select('id', { count: 'exact', head: true })
-          .eq('business_id', profileId);
+          .eq('business_id', profileId)
+          .eq('active', true);
         const offerCount = !cntErr && typeof count === 'number' ? count : 99;
-        if (offerCount <= 1) {
-          const legacy = await supabase
-            .from('business_photos')
-            .select('url, file_path')
+
+        const legacy = await supabase
+          .from('business_photos')
+          .select('url, file_path, created_at')
+          .eq('business_id', profileId)
+          .is('offering_id', null)
+          .eq('status', 'approved')
+          .order('is_main', { ascending: false })
+          .order('created_at', { ascending: true });
+
+        if (cancelled || legacy.error || !legacy.data?.length) {
+          // leave first undefined
+        } else if (offerCount <= 1) {
+          first = legacy.data[0] as { url?: string; file_path?: string };
+        } else {
+          const { data: rows, error: oErr } = await supabase
+            .from('business_offerings')
+            .select('id, created_at')
             .eq('business_id', profileId)
-            .is('offering_id', null)
-            .eq('status', 'approved')
-            .order('is_main', { ascending: false })
-            .order('created_at', { ascending: true })
-            .limit(1);
-          if (cancelled || legacy.error) return;
-          first = legacy.data?.[0] as { url?: string; file_path?: string } | undefined;
+            .eq('active', true)
+            .order('created_at', { ascending: true });
+          if (!cancelled && !oErr && rows?.length) {
+            const ordered = rows as OfferingCreatedRow[];
+            const match = legacy.data.find((row) => {
+              const r = row as { created_at?: string };
+              return legacyUntaggedPhotoBelongsToOffering(
+                String(r.created_at || ''),
+                effectiveBiz.id,
+                ordered,
+              );
+            });
+            first = match as { url?: string; file_path?: string } | undefined;
+          }
         }
       }
       if (!first) {

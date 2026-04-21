@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, X, Expand, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { getPhotoDisplayUrl } from '@/lib/utils';
 import { SUPABASE_URL } from '@/lib/supabase';
+import { legacyUntaggedPhotoBelongsToOffering } from '@/lib/offeringPhotoPartition';
+import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
 
 interface BusinessPhoto {
   id: string;
@@ -93,21 +95,38 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
             const { count, error: cntErr } = await supabase
               .from('business_offerings')
               .select('id', { count: 'exact', head: true })
-              .eq('business_id', businessId);
+              .eq('business_id', businessId)
+              .eq('active', true);
             const offerCount = !cntErr && typeof count === 'number' ? count : 99;
-            if (offerCount <= 1) {
-              const legacy = await supabase
-                .from('business_photos')
-                .select('*')
-                .eq('business_id', businessId)
-                .eq('status', 'approved')
-                .is('offering_id', null)
-                .order('is_main', { ascending: false })
-                .order('created_at', { ascending: true });
-              if (!legacy.error && legacy.data?.length) {
-                approvedOnly = (legacy.data as BusinessPhoto[]).filter(
-                  (p) => String(p.status || '').toLowerCase() === 'approved',
-                );
+
+            const legacy = await supabase
+              .from('business_photos')
+              .select('*')
+              .eq('business_id', businessId)
+              .eq('status', 'approved')
+              .is('offering_id', null)
+              .order('is_main', { ascending: false })
+              .order('created_at', { ascending: true });
+
+            if (!legacy.error && legacy.data?.length) {
+              const list = (legacy.data as BusinessPhoto[]).filter(
+                (p) => String(p.status || '').toLowerCase() === 'approved',
+              );
+              if (offerCount <= 1) {
+                approvedOnly = list;
+              } else {
+                const { data: rows, error: oErr } = await supabase
+                  .from('business_offerings')
+                  .select('id, created_at')
+                  .eq('business_id', businessId)
+                  .eq('active', true)
+                  .order('created_at', { ascending: true });
+                if (!oErr && rows?.length) {
+                  const ordered = rows as OfferingCreatedRow[];
+                  approvedOnly = list.filter((p) =>
+                    legacyUntaggedPhotoBelongsToOffering(p.created_at, oid, ordered),
+                  );
+                }
               }
             }
           }
