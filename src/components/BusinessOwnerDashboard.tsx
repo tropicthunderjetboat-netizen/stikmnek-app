@@ -811,6 +811,34 @@ const BusinessOwnerDashboard: React.FC = () => {
     };
   }, [selectedBusiness, selectedIsApproved, user?.id, dbBusinesses, refreshBusinesses, loadPendingEdits]);
 
+  useEffect(() => {
+    if (!listingEmbeddedEdit || !selectedBusiness) return;
+    const isOfferingRow = Boolean(
+      selectedBusiness._profileBusinessId &&
+        String(selectedBusiness.id) !== String(selectedBusiness._profileBusinessId),
+    );
+    const oid = (listingEmbeddedEdit.offeringId || '').trim();
+    // #region agent log
+    fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
+      body: JSON.stringify({
+        sessionId: 'df574b',
+        runId: 'pre-fix',
+        hypothesisId: 'H1',
+        location: 'BusinessOwnerDashboard.tsx:embeddedEditProbe',
+        message: 'sidebar row vs offeringId for editor',
+        data: {
+          isOfferingRow,
+          offeringIdEmpty: oid.length === 0,
+          listingTitleLen: (listingEmbeddedEdit.listingTitle || '').trim().length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [listingEmbeddedEdit, selectedBusiness]);
+
   const loadReviewResponses = useCallback(async () => {
     if (!selectedProfileId || !selectedIsApproved) return;
     try {

@@ -375,6 +375,21 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     const oid = embeddedEdit.offeringId?.trim();
     const pid = embeddedEdit.profileBusinessId?.trim();
     if (!oid || !pid) {
+      // #region agent log
+      fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
+        body: JSON.stringify({
+          sessionId: 'df574b',
+          runId: 'pre-fix',
+          hypothesisId: 'H1',
+          location: 'BusinessListingForm.tsx:embeddedFetch',
+          message: 'skip DB snapshot (missing offeringId or profileId)',
+          data: { hasOid: Boolean(oid), hasPid: Boolean(pid) },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       setEmbeddedResolved(null);
       return;
     }
@@ -384,12 +399,52 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       const b = await fetchListingEditorBusiness(supabase, pid, oid, SUPABASE_URL);
       if (cancelled) return;
       if (!b || String(b.id) !== oid) {
+        // #region agent log
+        fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
+          body: JSON.stringify({
+            sessionId: 'df574b',
+            runId: 'pre-fix',
+            hypothesisId: 'H2',
+            location: 'BusinessListingForm.tsx:embeddedFetch',
+            message: 'snapshot null or id mismatch',
+            data: {
+              hasB: Boolean(b),
+              bIdMatchesOid: b ? String(b.id) === oid : false,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
         if (!b) console.warn('[BusinessListingForm] embedded listing snapshot failed');
         return;
       }
       const galleryRows = await fetchApprovedPhotosForOffering(supabase, pid, oid, SUPABASE_URL);
       if (cancelled) return;
       const galleryPhotos = photoRowsToUploadedPhotos(galleryRows, SUPABASE_URL);
+      // #region agent log
+      fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
+        body: JSON.stringify({
+          sessionId: 'df574b',
+          runId: 'pre-fix',
+          hypothesisId: 'H4',
+          location: 'BusinessListingForm.tsx:embeddedFetch',
+          message: 'embeddedResolved set',
+          data: {
+            nameLen: (b.name || '').length,
+            locLen: (b.location || '').length,
+            hoursLen: (b.hours || '').length,
+            phoneLen: (b.phone || '').length,
+            emailLen: ((b.contactEmail || '') as string).length,
+            galleryCount: galleryPhotos.length,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       setEmbeddedResolved({ business: b, galleryPhotos });
     })();
     return () => {
@@ -411,6 +466,29 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
 
     const lockedTitle =
       embeddedEdit.listingTitle?.trim() || b.name?.trim() || 'Offer';
+    // #region agent log
+    fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
+      body: JSON.stringify({
+        sessionId: 'df574b',
+        runId: 'pre-fix',
+        hypothesisId: 'H3',
+        location: 'BusinessListingForm.tsx:embeddedPrefill',
+        message: 'prefill source',
+        data: {
+          useResolved,
+          lockedTitleLen: lockedTitle.length,
+          listingTitleLen: (embeddedEdit.listingTitle || '').trim().length,
+          stubNameLen: (embeddedEdit.business.name || '').length,
+          bNameLen: (b.name || '').length,
+          bLocLen: (b.location || '').length,
+          bHoursLen: (b.hours || '').length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     const lockedCategoryRaw =
       embeddedEdit.listingCategory?.trim() || String(b.category || '');
     const cat = asCategoryKey(lockedCategoryRaw);
@@ -547,6 +625,39 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       }));
     }
   }, [calculatedDealPrice, calculatedDiscountLabel, form.category, embeddedEdit]);
+
+  useEffect(() => {
+    if (!embeddedEdit) return;
+    const tiered = categoryUsesTieredPricing(form.category);
+    // #region agent log
+    fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
+      body: JSON.stringify({
+        sessionId: 'df574b',
+        runId: 'pre-fix',
+        hypothesisId: 'H5',
+        location: 'BusinessListingForm.tsx:dealPriceSyncProbe',
+        message: 'embedded flat-price auto deal sync inputs',
+        data: {
+          tiered,
+          calcDealLen: calculatedDealPrice.length,
+          labelLen: calculatedDiscountLabel.length,
+          origLen: (form.originalPrice || '').length,
+          pctLen: (form.discountPercent || '').length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [
+    embeddedEdit,
+    form.category,
+    calculatedDealPrice,
+    calculatedDiscountLabel,
+    form.originalPrice,
+    form.discountPercent,
+  ]);
 
   useEffect(() => {
     if (embeddedEdit) return;
