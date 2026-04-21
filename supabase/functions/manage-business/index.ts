@@ -1459,7 +1459,15 @@ Deno.serve(async (req) => {
     if (action === 'submit_edit') {
       const userId = authUser.id;
       const businessId = body.businessId;
-      const changes = body.changes || {};
+      const rawChanges = body.changes || {};
+      const offeringIdBody =
+        body.offeringId != null && String(body.offeringId).trim() !== ''
+          ? String(body.offeringId).trim()
+          : '';
+      const changes: Record<string, unknown> = { ...rawChanges };
+      if (offeringIdBody) {
+        changes._target_offering_id = offeringIdBody;
+      }
 
       if (!businessId || Object.keys(changes).length === 0) {
         return errorResponse(req, 'Missing businessId or changes');
@@ -1491,7 +1499,8 @@ Deno.serve(async (req) => {
         .single();
 
       if (existing) {
-        const mergedChanges = { ...(existing.changes as object || {}), ...changes };
+        const prior = (existing.changes as Record<string, unknown>) || {};
+        const mergedChanges = { ...prior, ...changes };
         const { error } = await supabase
           .from('pending_edits')
           .update({ changes: mergedChanges })
@@ -1505,7 +1514,7 @@ Deno.serve(async (req) => {
         .insert({
           business_id: businessId,
           owner_id: ownerIdForEdit,
-          changes,
+          changes: changes as object,
           status: 'pending',
         });
 
@@ -1545,7 +1554,10 @@ Deno.serve(async (req) => {
 
       if (decision === 'approved' && edit.changes) {
         const updates: Record<string, any> = {};
-        const changes = edit.changes as Record<string, any>;
+        const rawChanges = edit.changes as Record<string, any>;
+        const targetOfferingId = String(rawChanges._target_offering_id || '').trim();
+        const changes = { ...rawChanges };
+        delete changes._target_offering_id;
         const colMap: Record<string, string> = {
           description: 'description',
           hours: 'hours',
@@ -1562,6 +1574,7 @@ Deno.serve(async (req) => {
           pricing_tiers: 'pricing_tiers',
         };
         for (const [k, v] of Object.entries(changes)) {
+          if (k.startsWith('_')) continue;
           const col = colMap[k] || k;
           if (v !== undefined) updates[col] = v;
         }
@@ -1604,17 +1617,33 @@ Deno.serve(async (req) => {
         if (Object.keys(offeringPatch).length > 0) {
           offeringPatch.active = true;
           offeringPatch.updated_at = new Date().toISOString();
-          const { data: primaryRows, error: offSelErr } = await supabase
-            .from('business_offerings')
-            .select('id')
-            .eq('business_id', edit.business_id)
-            .order('created_at', { ascending: true })
-            .limit(1);
-          if (offSelErr) {
-            console.error('[manage-business] review_edit offering lookup:', offSelErr);
-            return errorResponse(req, offSelErr.message, 500);
+          let oid: string | undefined;
+          if (targetOfferingId) {
+            const { data: ownRow, error: ownErr } = await supabase
+              .from('business_offerings')
+              .select('id')
+              .eq('id', targetOfferingId)
+              .eq('business_id', edit.business_id)
+              .maybeSingle();
+            if (ownErr) {
+              console.error('[manage-business] review_edit offering by id:', ownErr);
+              return errorResponse(req, ownErr.message, 500);
+            }
+            if (ownRow?.id) oid = String(ownRow.id);
           }
-          const oid = primaryRows?.[0]?.id as string | undefined;
+          if (!oid) {
+            const { data: primaryRows, error: offSelErr } = await supabase
+              .from('business_offerings')
+              .select('id')
+              .eq('business_id', edit.business_id)
+              .order('created_at', { ascending: true })
+              .limit(1);
+            if (offSelErr) {
+              console.error('[manage-business] review_edit offering lookup:', offSelErr);
+              return errorResponse(req, offSelErr.message, 500);
+            }
+            oid = primaryRows?.[0]?.id as string | undefined;
+          }
           if (oid) {
             const { error: offErr } = await supabase
               .from('business_offerings')

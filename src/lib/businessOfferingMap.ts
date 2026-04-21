@@ -28,6 +28,13 @@ function asCategory(raw: unknown): Category {
   return 'dining';
 }
 
+/** Match DB / UI strings like `Tours` or ` TOURS ` to a canonical category key. */
+export function normalizeListingCategoryKey(raw: unknown): Category | null {
+  if (typeof raw !== 'string') return null;
+  const k = raw.trim().toLowerCase();
+  return CATEGORY_KEYS.has(k as Category) ? (k as Category) : null;
+}
+
 /**
  * Per-listing category for filters: first canonical key in `business_offerings.tags`;
  * else parent `businesses.category` if valid; else `'activities'` so the row always has a tab bucket.
@@ -35,11 +42,13 @@ function asCategory(raw: unknown): Category {
 export function listingCategoryFromOffering(o: Record<string, unknown>, profileCategory: unknown): Category {
   const tags = o.tags == null ? [] : Array.isArray(o.tags) ? (o.tags as unknown[]) : [];
   for (const t of tags) {
-    if (typeof t === 'string' && CATEGORY_KEYS.has(t as Category)) return t as Category;
+    if (typeof t === 'string') {
+      const nk = normalizeListingCategoryKey(t);
+      if (nk) return nk;
+    }
   }
-  if (typeof profileCategory === 'string' && CATEGORY_KEYS.has(profileCategory as Category)) {
-    return profileCategory as Category;
-  }
+  const fromProfile = normalizeListingCategoryKey(profileCategory);
+  if (fromProfile) return fromProfile;
   return 'activities';
 }
 

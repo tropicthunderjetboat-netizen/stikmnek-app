@@ -195,7 +195,8 @@ function mapProfileRowToUnified(b: Record<string, unknown>): UnifiedBusiness {
 }
 
 function unifiedToListingBusiness(u: UnifiedBusiness): Business {
-  const cat = categories.some((c) => c.key === u.category) ? (u.category as Category) : 'dining';
+  const catRaw = String(u.category || '').trim().toLowerCase();
+  const cat = categories.some((c) => c.key === catRaw) ? (catRaw as Category) : 'dining';
   return {
     id: u.id,
     profileBusinessId: u._profileBusinessId,
@@ -225,6 +226,26 @@ function unifiedToListingBusiness(u: UnifiedBusiness): Business {
     featured: u.featured,
     ownerId: u.ownerId ?? null,
     pricingTiers: u.pricingTiers ?? null,
+  };
+}
+
+/** Prefer unified dashboard row for deal-specific fields; `dbBusinesses` can lag or omit title after fetch. */
+function mergeListingBusinessForEdit(selected: UnifiedBusiness, fromDb: Business | undefined): Business {
+  const uBiz = unifiedToListingBusiness(selected);
+  if (!fromDb) return uBiz;
+  return {
+    ...fromDb,
+    name: uBiz.name?.trim() || fromDb.name?.trim() || 'Offer',
+    category: uBiz.category,
+    description: uBiz.description || fromDb.description,
+    descriptionFr: uBiz.descriptionFr || fromDb.descriptionFr,
+    descriptionBi: uBiz.descriptionBi || fromDb.descriptionBi,
+    originalPrice: uBiz.originalPrice,
+    dealPrice: uBiz.dealPrice,
+    discount: uBiz.discount,
+    pricingTiers: uBiz.pricingTiers ?? fromDb.pricingTiers,
+    image: (fromDb.image && String(fromDb.image).trim()) ? fromDb.image : uBiz.image,
+    tags: uBiz.tags?.length ? uBiz.tags : fromDb.tags,
   };
 }
 
@@ -746,10 +767,20 @@ const BusinessOwnerDashboard: React.FC = () => {
   const listingEmbeddedEdit = useMemo(() => {
     if (!selectedBusiness || !selectedIsApproved || !user?.id) return null;
     const profileBusinessId = effectiveProfileBusinessId(selectedBusiness);
-    const biz =
-      dbBusinesses.find((b) => b.id === selectedBusiness.id) ?? unifiedToListingBusiness(selectedBusiness);
+    const fromDb = dbBusinesses.find((b) => b.id === selectedBusiness.id);
+    const biz = mergeListingBusinessForEdit(selectedBusiness, fromDb);
+    const isOfferingRow = Boolean(
+      selectedBusiness._profileBusinessId &&
+        String(selectedBusiness.id) !== String(selectedBusiness._profileBusinessId),
+    );
+    const listingTitle =
+      String(selectedBusiness.name || '').trim() || biz.name?.trim() || 'Offer';
+    const listingCategory = String(selectedBusiness.category || '').trim() || String(biz.category || '');
     return {
       profileBusinessId,
+      offeringId: isOfferingRow ? String(selectedBusiness.id) : '',
+      listingTitle,
+      listingCategory,
       business: biz,
       onEditSubmitted: () => {
         void refreshBusinesses();
@@ -1820,7 +1851,7 @@ const BusinessOwnerDashboard: React.FC = () => {
             {activeTab === 'analytics' && selectedBusiness && !selectedIsApproved && renderPendingOnlyNotice('Analytics are available once your listing is approved.')}
             {activeTab === 'edit' && selectedBusiness && selectedIsApproved && listingEmbeddedEdit && (
               <BusinessListingForm
-                key={`edit-${selectedBusiness.id}`}
+                key={`edit-${listingEmbeddedEdit.profileBusinessId}-${listingEmbeddedEdit.offeringId || listingEmbeddedEdit.business.id}`}
                 embeddedEdit={listingEmbeddedEdit}
               />
             )}

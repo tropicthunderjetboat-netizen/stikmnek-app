@@ -19,6 +19,7 @@ import {
   pricingTiersFromDb,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
+import { normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
 import { categories, type Business, type Category } from '@/data/businesses';
 import {
   hasMeaningfulDescriptionContent,
@@ -182,6 +183,11 @@ async function formatListingSubmitCatchError(
 
 export type EmbeddedListingEdit = {
   profileBusinessId: string;
+  /** `business_offerings.id` for the deal being edited (empty for profile-only sidebar rows). */
+  offeringId: string;
+  /** Deal title from the dashboard row (source of truth vs `dbBusinesses` prefetch). */
+  listingTitle: string;
+  listingCategory: string;
   business: Business;
   onEditSubmitted?: () => void;
 };
@@ -191,7 +197,7 @@ type BusinessListingFormProps = {
 };
 
 function asCategoryKey(raw: string): Category {
-  return categories.some((c) => c.key === raw) ? (raw as Category) : 'dining';
+  return normalizeListingCategoryKey(raw) ?? 'dining';
 }
 
 function deriveDiscountPercentFromBusiness(b: Business): string {
@@ -352,10 +358,14 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       editBaselineRef.current = null;
       return;
     }
-    const key = `${embeddedEdit.profileBusinessId}:${embeddedEdit.business.id}`;
+    const key = `${embeddedEdit.profileBusinessId}:${embeddedEdit.business.id}:${embeddedEdit.listingTitle}:${embeddedEdit.listingCategory}`;
     if (embeddedPrefillKeyRef.current === key) return;
     embeddedPrefillKeyRef.current = key;
     const b = embeddedEdit.business;
+    const lockedTitle =
+      embeddedEdit.listingTitle?.trim() || b.name?.trim() || 'Offer';
+    const lockedCategoryRaw =
+      embeddedEdit.listingCategory?.trim() || String(b.category || '');
     const tiers = pricingTiersFromDb(b.pricingTiers ?? null);
     setPricingTiers(tiers.map((t) => ({ ...t })));
     const img = (b.image || '').trim();
@@ -384,8 +394,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           ? String(b.dealPrice)
           : origStr;
     setForm({
-      name: b.name || '',
-      category: asCategoryKey(b.category),
+      name: lockedTitle,
+      category: asCategoryKey(lockedCategoryRaw),
       description: b.description || '',
       discount: (b.discount || '').trim(),
       originalPrice: origStr,
@@ -404,8 +414,18 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     setAgreedPartnerTerms(true);
     setSubmitted(false);
     setFieldErrors({});
-    editBaselineRef.current = buildEditBaseline(b);
-  }, [embeddedEdit?.profileBusinessId, embeddedEdit?.business.id, user?.email]);
+    editBaselineRef.current = buildEditBaseline({ ...b, name: lockedTitle, category: asCategoryKey(lockedCategoryRaw) });
+  }, [
+    embeddedEdit?.profileBusinessId,
+    embeddedEdit?.business.id,
+    embeddedEdit?.listingTitle,
+    embeddedEdit?.listingCategory,
+    embeddedEdit?.business.description,
+    embeddedEdit?.business.pricingTiers,
+    embeddedEdit?.business.originalPrice,
+    embeddedEdit?.business.dealPrice,
+    user?.email,
+  ]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -594,7 +614,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       return;
     }
 
-    if (!form.name?.trim()) {
+    const titleForSubmit = embeddedEdit
+      ? (form.name?.trim() || embeddedEdit.listingTitle?.trim())
+      : form.name?.trim();
+    if (!titleForSubmit) {
       toast.error(
         language === 'en'
           ? 'Please enter a title for this deal or listing.'
@@ -753,6 +776,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             action: 'submit_edit',
             userId: user.id,
             businessId: embeddedEdit.profileBusinessId,
+            offeringId: embeddedEdit.offeringId || undefined,
             changes,
           },
         });
