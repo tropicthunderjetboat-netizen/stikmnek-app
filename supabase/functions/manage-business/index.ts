@@ -118,6 +118,124 @@ async function assertAdminOrOwner(
 }
 
 /**
+ * Applies edit payload to `businesses` + `business_offerings` (same shape as `pending_edits.changes`).
+ * Optional `_target_offering_id` scopes the offering row; otherwise the oldest offering for the profile is used.
+ */
+async function applyListingEditChangesToLive(
+  supabase: SupabaseServiceClient,
+  businessId: string,
+  rawChanges: Record<string, any>,
+): Promise<{ error: string | null }> {
+  const targetOfferingId = String(rawChanges._target_offering_id || '').trim();
+  const changes = { ...rawChanges };
+  delete changes._target_offering_id;
+
+  if (changes.description !== undefined) {
+    changes.description = trimPendingDescription(changes.description);
+  }
+
+  const updates: Record<string, any> = {};
+  const colMap: Record<string, string> = {
+    description: 'description',
+    hours: 'hours',
+    phone: 'phone',
+    discount: 'discount',
+    deal_price: 'deal_price',
+    original_price: 'original_price',
+    location: 'location',
+    tags: 'tags',
+    whatsapp_number: 'whatsapp_number',
+    map_url: 'map_url',
+    website: 'website',
+    image: 'image',
+    pricing_tiers: 'pricing_tiers',
+  };
+  for (const [k, v] of Object.entries(changes)) {
+    if (k.startsWith('_')) continue;
+    const col = colMap[k] || k;
+    if (v !== undefined) updates[col] = v;
+  }
+  if (Object.keys(updates).length > 0) {
+    const { error: bizUpdErr } = await supabase
+      .from('businesses')
+      .update(updates)
+      .eq('id', businessId);
+    if (bizUpdErr) {
+      console.error('[manage-business] applyListingEditChangesToLive businesses:', bizUpdErr);
+      return { error: bizUpdErr.message };
+    }
+  }
+
+  const offeringPatch: Record<string, unknown> = {};
+  if (changes.description !== undefined) {
+    offeringPatch.description = changes.description;
+    offeringPatch.description_fr = changes.description;
+    offeringPatch.description_bi = changes.description;
+  }
+  if (changes.discount !== undefined) offeringPatch.discount = changes.discount;
+  if (changes.original_price !== undefined) {
+    offeringPatch.original_price = Number(changes.original_price) || 0;
+  }
+  if (changes.deal_price !== undefined) {
+    offeringPatch.deal_price = Number(changes.deal_price) || 0;
+  }
+  if (changes.whatsapp_number !== undefined) {
+    offeringPatch.whatsapp_number = changes.whatsapp_number;
+  }
+  if (changes.tags !== undefined) offeringPatch.tags = changes.tags;
+  if (changes.map_url !== undefined) offeringPatch.map_url = changes.map_url;
+  if (changes.website !== undefined) offeringPatch.website = changes.website;
+  if (changes.image !== undefined) offeringPatch.image = changes.image;
+  if (changes.pricing_tiers !== undefined) {
+    offeringPatch.pricing_tiers = changes.pricing_tiers;
+  }
+
+  if (Object.keys(offeringPatch).length > 0) {
+    offeringPatch.active = true;
+    offeringPatch.updated_at = new Date().toISOString();
+    let oid: string | undefined;
+    if (targetOfferingId) {
+      const { data: ownRow, error: ownErr } = await supabase
+        .from('business_offerings')
+        .select('id')
+        .eq('id', targetOfferingId)
+        .eq('business_id', businessId)
+        .maybeSingle();
+      if (ownErr) {
+        console.error('[manage-business] applyListingEditChangesToLive offering by id:', ownErr);
+        return { error: ownErr.message };
+      }
+      if (ownRow?.id) oid = String(ownRow.id);
+    }
+    if (!oid) {
+      const { data: primaryRows, error: offSelErr } = await supabase
+        .from('business_offerings')
+        .select('id')
+        .eq('business_id', businessId)
+        .order('created_at', { ascending: true })
+        .limit(1);
+      if (offSelErr) {
+        console.error('[manage-business] applyListingEditChangesToLive offering lookup:', offSelErr);
+        return { error: offSelErr.message };
+      }
+      oid = primaryRows?.[0]?.id as string | undefined;
+    }
+    if (oid) {
+      const { error: offErr } = await supabase
+        .from('business_offerings')
+        .update(offeringPatch)
+        .eq('id', oid);
+      if (offErr) {
+        console.error('[manage-business] applyListingEditChangesToLive offering update:', offErr);
+        return { error: offErr.message };
+      }
+    }
+  }
+
+  return { error: null };
+}
+
+/**
  * Remove gallery rows + Storage objects for a business, then caller deletes `businesses` row.
  * `business_photos` may not have ON DELETE CASCADE in all deployments.
  */
@@ -1489,37 +1607,23 @@ Deno.serve(async (req) => {
         ownerIdForEdit = String(bizRow.owner_id);
       }
 
-      // Check for existing pending edit
-      const { data: existing } = await supabase
+      // Owner edits apply immediately (public reads `business_offerings`). Remove stale queue rows.
+      await supabase
         .from('pending_edits')
-        .select('id, changes')
+        .delete()
         .eq('business_id', businessId)
         .eq('owner_id', ownerIdForEdit)
-        .eq('status', 'pending')
-        .single();
+        .eq('status', 'pending');
 
-      if (existing) {
-        const prior = (existing.changes as Record<string, unknown>) || {};
-        const mergedChanges = { ...prior, ...changes };
-        const { error } = await supabase
-          .from('pending_edits')
-          .update({ changes: mergedChanges })
-          .eq('id', existing.id);
-        if (error) return errorResponse(req, error.message, 500);
-        return jsonResponse(req, { success: true, updated: true });
+      const applyRes = await applyListingEditChangesToLive(
+        supabase,
+        String(businessId),
+        changes as Record<string, any>,
+      );
+      if (applyRes.error) {
+        return errorResponse(req, applyRes.error, 500);
       }
-
-      const { error } = await supabase
-        .from('pending_edits')
-        .insert({
-          business_id: businessId,
-          owner_id: ownerIdForEdit,
-          changes: changes as object,
-          status: 'pending',
-        });
-
-      if (error) return errorResponse(req, error.message, 500);
-      return jsonResponse(req, { success: true });
+      return jsonResponse(req, { success: true, appliedLive: true });
     }
 
     // ─── REVIEW_EDIT ───
@@ -1553,107 +1657,13 @@ Deno.serve(async (req) => {
       if (updateErr) return errorResponse(req, updateErr.message, 500);
 
       if (decision === 'approved' && edit.changes) {
-        const updates: Record<string, any> = {};
-        const rawChanges = edit.changes as Record<string, any>;
-        const targetOfferingId = String(rawChanges._target_offering_id || '').trim();
-        const changes = { ...rawChanges };
-        delete changes._target_offering_id;
-        const colMap: Record<string, string> = {
-          description: 'description',
-          hours: 'hours',
-          phone: 'phone',
-          discount: 'discount',
-          deal_price: 'deal_price',
-          original_price: 'original_price',
-          location: 'location',
-          tags: 'tags',
-          whatsapp_number: 'whatsapp_number',
-          map_url: 'map_url',
-          website: 'website',
-          image: 'image',
-          pricing_tiers: 'pricing_tiers',
-        };
-        for (const [k, v] of Object.entries(changes)) {
-          if (k.startsWith('_')) continue;
-          const col = colMap[k] || k;
-          if (v !== undefined) updates[col] = v;
-        }
-        if (Object.keys(updates).length > 0) {
-          const { error: bizUpdErr } = await supabase
-            .from('businesses')
-            .update(updates)
-            .eq('id', edit.business_id);
-          if (bizUpdErr) {
-            console.error('[manage-business] review_edit businesses update:', bizUpdErr);
-            return errorResponse(req, bizUpdErr.message, 500);
-          }
-        }
-
-        // Public deals read from business_offerings — mirror editable fields onto primary offering.
-        const offeringPatch: Record<string, unknown> = {};
-        if (changes.description !== undefined) {
-          offeringPatch.description = changes.description;
-          offeringPatch.description_fr = changes.description;
-          offeringPatch.description_bi = changes.description;
-        }
-        if (changes.discount !== undefined) offeringPatch.discount = changes.discount;
-        if (changes.original_price !== undefined) {
-          offeringPatch.original_price = Number(changes.original_price) || 0;
-        }
-        if (changes.deal_price !== undefined) {
-          offeringPatch.deal_price = Number(changes.deal_price) || 0;
-        }
-        if (changes.whatsapp_number !== undefined) {
-          offeringPatch.whatsapp_number = changes.whatsapp_number;
-        }
-        if (changes.tags !== undefined) offeringPatch.tags = changes.tags;
-        if (changes.map_url !== undefined) offeringPatch.map_url = changes.map_url;
-        if (changes.website !== undefined) offeringPatch.website = changes.website;
-        if (changes.image !== undefined) offeringPatch.image = changes.image;
-        if (changes.pricing_tiers !== undefined) {
-          offeringPatch.pricing_tiers = changes.pricing_tiers;
-        }
-
-        if (Object.keys(offeringPatch).length > 0) {
-          offeringPatch.active = true;
-          offeringPatch.updated_at = new Date().toISOString();
-          let oid: string | undefined;
-          if (targetOfferingId) {
-            const { data: ownRow, error: ownErr } = await supabase
-              .from('business_offerings')
-              .select('id')
-              .eq('id', targetOfferingId)
-              .eq('business_id', edit.business_id)
-              .maybeSingle();
-            if (ownErr) {
-              console.error('[manage-business] review_edit offering by id:', ownErr);
-              return errorResponse(req, ownErr.message, 500);
-            }
-            if (ownRow?.id) oid = String(ownRow.id);
-          }
-          if (!oid) {
-            const { data: primaryRows, error: offSelErr } = await supabase
-              .from('business_offerings')
-              .select('id')
-              .eq('business_id', edit.business_id)
-              .order('created_at', { ascending: true })
-              .limit(1);
-            if (offSelErr) {
-              console.error('[manage-business] review_edit offering lookup:', offSelErr);
-              return errorResponse(req, offSelErr.message, 500);
-            }
-            oid = primaryRows?.[0]?.id as string | undefined;
-          }
-          if (oid) {
-            const { error: offErr } = await supabase
-              .from('business_offerings')
-              .update(offeringPatch)
-              .eq('id', oid);
-            if (offErr) {
-              console.error('[manage-business] review_edit offering update:', offErr);
-              return errorResponse(req, offErr.message, 500);
-            }
-          }
+        const applyRes = await applyListingEditChangesToLive(
+          supabase,
+          String(edit.business_id),
+          edit.changes as Record<string, any>,
+        );
+        if (applyRes.error) {
+          return errorResponse(req, applyRes.error, 500);
         }
       }
 

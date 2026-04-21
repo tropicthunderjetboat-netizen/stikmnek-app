@@ -783,13 +783,17 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         if (error) throw error;
         if (data?.error) throw new Error(String(data.error));
         toast.success(
-          data?.updated
+          data?.appliedLive
             ? language === 'en'
-              ? 'Pending edit updated.'
-              : 'Brouillon mis à jour'
-            : language === 'en'
-              ? 'Edit submitted for admin review.'
-              : 'Envoyé pour validation',
+              ? 'Listing updated — changes are live on your deal page.'
+              : 'Annonce mise à jour — visible sur votre page.'
+            : data?.updated
+              ? language === 'en'
+                ? 'Pending edit updated.'
+                : 'Brouillon mis à jour'
+              : language === 'en'
+                ? 'Edit saved.'
+                : 'Enregistré.',
         );
         editBaselineRef.current = next;
         embeddedEdit.onEditSubmitted?.();
