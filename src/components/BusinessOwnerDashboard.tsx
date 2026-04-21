@@ -40,6 +40,7 @@ import {
 } from '@/lib/businessDescriptionHtml';
 import BusinessDescriptionEditor from './BusinessDescriptionEditor';
 import {
+  businessHoursFromProfileRow,
   effectiveProfileBusinessId,
   OFFERING_LISTING_COLUMNS,
   BUSINESS_PROFILE_EMBED_COLS,
@@ -143,7 +144,7 @@ function mapOfferingRowToUnified(
     location: String(profile.location ?? ''),
     lat: Number(profile.lat) || 0,
     lng: Number(profile.lng) || 0,
-    hours: String(profile.hours ?? profile.opening_hours ?? ''),
+    hours: businessHoursFromProfileRow(profile as Record<string, unknown>),
     phone: String(profile.phone ?? ''),
     tags: Array.isArray(o.tags) ? (o.tags as string[]) : Array.isArray(profile.tags) ? (profile.tags as string[]) : [],
     featured: Boolean(o.featured) || Boolean(profile.featured),
@@ -188,7 +189,7 @@ function mapProfileRowToUnified(b: Record<string, unknown>): UnifiedBusiness {
     location: String(b.location ?? ''),
     lat: Number(b.lat) || 0,
     lng: Number(b.lng) || 0,
-    hours: String((b.hours as string) || (b.opening_hours as string) || ''),
+    hours: businessHoursFromProfileRow(b),
     phone: String(b.phone ?? ''),
     tags: Array.isArray(b.tags) ? (b.tags as string[]) : [],
     featured: Boolean(b.featured),

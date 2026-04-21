@@ -12,6 +12,16 @@ export const OFFERING_LISTING_COLUMNS =
 export const BUSINESS_PROFILE_EMBED_COLS =
   'id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone, email, contact_email, business_email, whatsapp_number, rating, review_count, featured, active, map_url, website, tags';
 
+/**
+ * `businesses.hours` is often `''` after migrations while `opening_hours` holds the text.
+ * `??` alone would keep the empty string and hide `opening_hours` (same for whitespace-only).
+ */
+export function businessHoursFromProfileRow(b: Record<string, unknown>): string {
+  const primary = String(b.hours ?? '').trim();
+  if (primary) return primary;
+  return String(b.opening_hours ?? '').trim();
+}
+
 function offeringPrimaryImage(o: Record<string, unknown>): string {
   const direct = String(o.image ?? '').trim();
   if (direct) return direct;
@@ -116,7 +126,7 @@ export function mapJoinedOfferingToBusiness(
     mapUrl: (o.map_url as string) || (b.map_url as string) || null,
     map_url: (o.map_url as string) || (b.map_url as string) || null,
     website: (o.website as string) || (b.website as string) || null,
-    hours: String(b.hours ?? b.opening_hours ?? ''),
+    hours: businessHoursFromProfileRow(b),
     phone: String(b.phone ?? ''),
     contactEmail:
       oContact ||
