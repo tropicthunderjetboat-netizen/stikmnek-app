@@ -869,9 +869,19 @@ const BusinessOwnerDashboard: React.FC = () => {
     if (!selectedBusiness || !user || !selectedProfileId || newGalleryPhotos.length === 0) return;
     setSavingGallery(true);
     try {
+      const listingOfferingId =
+        selectedBusiness._profileBusinessId &&
+        String(selectedBusiness.id) !== String(selectedBusiness._profileBusinessId)
+          ? String(selectedBusiness.id)
+          : null;
       const photoRecords = newGalleryPhotos.map((photo, index) => ({
-        business_id: selectedProfileId, url: photo.url, file_path: photo.filePath,
-        uploaded_by: user.id, is_main: galleryPhotos.length === 0 && index === 0,
+        business_id: selectedProfileId,
+        ...(listingOfferingId ? { offering_id: listingOfferingId } : {}),
+        url: photo.url,
+        file_path: photo.filePath,
+        uploaded_by: user.id,
+        is_main: galleryPhotos.length === 0 && index === 0,
+        status: 'approved' as const,
       }));
       const { error } = await supabase.from('business_photos').insert(photoRecords);
       if (error) throw error;
