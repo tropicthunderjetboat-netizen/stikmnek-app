@@ -189,6 +189,12 @@ async function applyListingEditChangesToLive(
   if (changes.pricing_tiers !== undefined) {
     offeringPatch.pricing_tiers = changes.pricing_tiers;
   }
+  if (changes.discount_valid_from !== undefined) {
+    offeringPatch.discount_valid_from = changes.discount_valid_from;
+  }
+  if (changes.discount_valid_until !== undefined) {
+    offeringPatch.discount_valid_until = changes.discount_valid_until;
+  }
 
   if (Object.keys(offeringPatch).length > 0) {
     offeringPatch.active = true;

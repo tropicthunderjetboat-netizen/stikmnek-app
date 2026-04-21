@@ -72,6 +72,10 @@ export interface Business {
    * Master profile `businesses.active` may differ (e.g. stub false while deals are live).
    */
   active?: boolean;
+  /** From `business_offerings.discount_valid_from` (YYYY-MM-DD). */
+  discountValidFrom?: string | null;
+  /** From `business_offerings.discount_valid_until` (YYYY-MM-DD). */
+  discountValidUntil?: string | null;
 }
 
 /** First active (or first) embedded offering — safe vs missing `business_offerings`. */

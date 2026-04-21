@@ -134,12 +134,33 @@ export function mapJoinedOfferingToBusiness(
     /** Tourist discovery uses offering `active`; profile `active` is separate (stub / owner hide). */
     active: oActive,
     profileName: String(b.name ?? '').trim() || undefined,
+    discountValidFrom: isoDateOnly(o.discount_valid_from),
+    discountValidUntil: isoDateOnly(o.discount_valid_until),
   };
 }
 
 /** Favorites, reviews, photos, QR/redemption still use `businesses.id`. */
 export function profileBusinessIdFor(b: Business): string {
   return b.profileBusinessId ?? b.id;
+}
+
+/** PostgREST embed: `businesses` may be object or single-element array. */
+export function unwrapPostgrestEmbed(raw: unknown): Record<string, unknown> | null {
+  if (raw == null) return null;
+  if (Array.isArray(raw)) {
+    const first = raw[0];
+    if (first && typeof first === 'object' && !Array.isArray(first)) return first as Record<string, unknown>;
+    return null;
+  }
+  if (typeof raw === 'object') return raw as Record<string, unknown>;
+  return null;
+}
+
+function isoDateOnly(raw: unknown): string | null {
+  if (raw == null || raw === '') return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  return s.includes('T') ? s.split('T')[0]! : s.slice(0, 10);
 }
 
 /** Unified dashboard rows use `_profileBusinessId`; public `Business` uses `profileBusinessId`. */

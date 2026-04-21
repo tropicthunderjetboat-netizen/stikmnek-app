@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { FunctionsHttpError, FunctionsFetchError, PostgrestError } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
 import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, AlertTriangle, Globe, Info } from 'lucide-react';
 
@@ -19,7 +19,14 @@ import {
   pricingTiersFromDb,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
-import { normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
+import {
+  normalizeListingCategoryKey,
+  OFFERING_LISTING_COLUMNS,
+  BUSINESS_PROFILE_EMBED_COLS,
+  mapJoinedOfferingToBusiness,
+  unwrapPostgrestEmbed,
+} from '@/lib/businessOfferingMap';
+import { fetchApprovedPhotosForOffering, photoRowsToUploadedPhotos } from '@/lib/fetchApprovedPhotosForOffering';
 import { categories, type Business, type Category } from '@/data/businesses';
 import {
   hasMeaningfulDescriptionContent,
@@ -44,6 +51,16 @@ const DURATION_OPTIONS = [
   { value: '6_months', label: '6 Months', labelFr: '6 Mois', days: 180 },
   { value: '1_year', label: '1 Year', labelFr: '1 An', days: 365 },
 ];
+
+/** Match saved discount window to a listing-duration option when possible. */
+function inferListingDuration(validFrom: string, validUntil: string): string {
+  const from = new Date(`${validFrom.replace(/T.*/, '')}T12:00:00`).getTime();
+  const until = new Date(`${validUntil.replace(/T.*/, '')}T12:00:00`).getTime();
+  if (!Number.isFinite(from) || !Number.isFinite(until) || until < from) return '1_month';
+  const days = Math.round((until - from) / 86400000);
+  const hit = DURATION_OPTIONS.find((d) => d.days === days);
+  return hit?.value ?? '1_month';
+}
 
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr);
@@ -191,6 +208,8 @@ export type EmbeddedListingEdit = {
   business: Business;
   onEditSubmitted?: () => void;
 };
+
+type EmbeddedListingResolved = { business: Business; galleryPhotos: UploadedPhoto[] };
 
 type BusinessListingFormProps = {
   embeddedEdit?: EmbeddedListingEdit | null;
@@ -350,40 +369,91 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
   const [ownerProfileBusinessId, setOwnerProfileBusinessId] = useState<string | null>(null);
 
   const editBaselineRef = useRef<EditBaseline | null>(null);
-  const embeddedPrefillKeyRef = useRef<string>('');
+  /** Fresh `business_offerings` + gallery from DB (avoids stale `dbBusinesses` / unified row). */
+  const [embeddedResolved, setEmbeddedResolved] = useState<EmbeddedListingResolved | null>(null);
 
   useEffect(() => {
     if (!embeddedEdit) {
-      embeddedPrefillKeyRef.current = '';
+      setEmbeddedResolved(null);
+      return;
+    }
+    const oid = embeddedEdit.offeringId?.trim();
+    const pid = embeddedEdit.profileBusinessId?.trim();
+    if (!oid || !pid) {
+      setEmbeddedResolved(null);
+      return;
+    }
+    setEmbeddedResolved(null);
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from('business_offerings')
+        .select(`${OFFERING_LISTING_COLUMNS}, businesses(${BUSINESS_PROFILE_EMBED_COLS})`)
+        .eq('id', oid)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || !data) {
+        console.warn('[BusinessListingForm] embedded offering fetch:', error?.message);
+        return;
+      }
+      const row = data as Record<string, unknown>;
+      const profile = unwrapPostgrestEmbed(row.businesses);
+      if (!profile?.id) return;
+      let b: Business;
+      try {
+        const { businesses: _drop, ...offering } = row;
+        b = mapJoinedOfferingToBusiness(offering, profile, SUPABASE_URL);
+      } catch {
+        return;
+      }
+      if (String(b.id) !== oid) return;
+      const galleryRows = await fetchApprovedPhotosForOffering(supabase, pid, oid, SUPABASE_URL);
+      if (cancelled) return;
+      const galleryPhotos = photoRowsToUploadedPhotos(galleryRows, SUPABASE_URL);
+      setEmbeddedResolved({ business: b, galleryPhotos });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [embeddedEdit?.offeringId, embeddedEdit?.profileBusinessId]);
+
+  useEffect(() => {
+    if (!embeddedEdit) {
       editBaselineRef.current = null;
       return;
     }
-    const key = `${embeddedEdit.profileBusinessId}:${embeddedEdit.business.id}:${embeddedEdit.listingTitle}:${embeddedEdit.listingCategory}`;
-    if (embeddedPrefillKeyRef.current === key) return;
-    embeddedPrefillKeyRef.current = key;
-    const b = embeddedEdit.business;
+    const oid = embeddedEdit.offeringId?.trim();
+    const useResolved = Boolean(
+      oid && embeddedResolved && embeddedResolved.business.id === oid,
+    );
+    const b = useResolved ? embeddedResolved!.business : embeddedEdit.business;
+    const galleryPhotos = useResolved ? embeddedResolved!.galleryPhotos : [];
+
     const lockedTitle =
       embeddedEdit.listingTitle?.trim() || b.name?.trim() || 'Offer';
     const lockedCategoryRaw =
       embeddedEdit.listingCategory?.trim() || String(b.category || '');
+    const cat = asCategoryKey(lockedCategoryRaw);
     const tiers = pricingTiersFromDb(b.pricingTiers ?? null);
     setPricingTiers(tiers.map((t) => ({ ...t })));
     const img = (b.image || '').trim();
     setPhotos(
-      img
-        ? [
-            {
-              id: `existing-${b.id}`,
-              url: img,
-              filePath: '',
-              name: 'cover',
-              size: 0,
-              preview: img,
-            },
-          ]
-        : [],
+      galleryPhotos.length > 0
+        ? galleryPhotos.map((p) => ({ ...p }))
+        : img
+          ? [
+              {
+                id: `existing-${b.id}`,
+                url: img,
+                filePath: '',
+                name: 'cover',
+                size: 0,
+                preview: img,
+              },
+            ]
+          : [],
     );
-    const tiered = categoryUsesTieredPricing(asCategoryKey(b.category));
+    const tiered = categoryUsesTieredPricing(cat);
     const pct = deriveDiscountPercentFromBusiness(b);
     const origStr = !tiered && b.originalPrice > 0 ? String(b.originalPrice) : '';
     const dealStr = tiered
@@ -393,9 +463,17 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         : b.dealPrice > 0
           ? String(b.dealPrice)
           : origStr;
+    const savedFrom =
+      (b.discountValidFrom && String(b.discountValidFrom).trim().split('T')[0]) || '';
+    const savedUntil =
+      (b.discountValidUntil && String(b.discountValidUntil).trim().split('T')[0]) || '';
+    const discountValidFrom = savedFrom || todayStr();
+    const listingDuration =
+      savedFrom && savedUntil ? inferListingDuration(savedFrom, savedUntil) : '1_month';
+
     setForm({
       name: lockedTitle,
-      category: asCategoryKey(lockedCategoryRaw),
+      category: cat,
       description: b.description || '',
       discount: (b.discount || '').trim(),
       originalPrice: origStr,
@@ -408,22 +486,20 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       whatsappNumber: (b.whatsappNumber || b.whatsapp_number || '').trim(),
       mapUrl: ((b.mapUrl ?? b.map_url) as string | undefined)?.trim() || '',
       website: (typeof b.website === 'string' ? b.website : '').trim(),
-      discountValidFrom: todayStr(),
-      listingDuration: '1_month',
+      discountValidFrom,
+      listingDuration,
     });
     setAgreedPartnerTerms(true);
     setSubmitted(false);
     setFieldErrors({});
-    editBaselineRef.current = buildEditBaseline({ ...b, name: lockedTitle, category: asCategoryKey(lockedCategoryRaw) });
+    editBaselineRef.current = buildEditBaseline({ ...b, name: lockedTitle, category: cat });
   }, [
+    embeddedResolved,
     embeddedEdit?.profileBusinessId,
+    embeddedEdit?.offeringId,
     embeddedEdit?.business.id,
     embeddedEdit?.listingTitle,
     embeddedEdit?.listingCategory,
-    embeddedEdit?.business.description,
-    embeddedEdit?.business.pricingTiers,
-    embeddedEdit?.business.originalPrice,
-    embeddedEdit?.business.dealPrice,
     user?.email,
   ]);
 
@@ -483,20 +559,21 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         dealPrice: calculatedDealPrice,
         discount: calculatedDiscountLabel,
       }));
-    } else {
+    } else if (!embeddedEdit) {
       setForm(prev => ({
         ...prev,
         dealPrice: '',
         discount: '',
       }));
     }
-  }, [calculatedDealPrice, calculatedDiscountLabel, form.category]);
+  }, [calculatedDealPrice, calculatedDiscountLabel, form.category, embeddedEdit]);
 
   useEffect(() => {
+    if (embeddedEdit) return;
     if (!categoryUsesTieredPricing(form.category)) {
       setPricingTiers([]);
     }
-  }, [form.category]);
+  }, [form.category, embeddedEdit]);
 
   // Pre-fill contact & location from the owner's primary business profile (not the deal title).
   useEffect(() => {
@@ -1041,8 +1118,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             <Info className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" aria-hidden />
             <p className="text-sm text-teal-900">
               {language === 'en'
-                ? 'Updates here match the public listing form. Changes are sent for admin review before they go live (except listing on/off from your dashboard).'
-                : 'Les changements sont envoyés pour validation avant publication.'}
+                ? 'This form loads your saved listing from the database. Save to update your live deal (title and category stay fixed; contact support to change the title).'
+                : 'Ce formulaire charge votre annonce enregistrée. Enregistrer pour mettre à jour la page publique.'}
             </p>
           </div>
         )}

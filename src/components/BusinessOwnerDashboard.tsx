@@ -115,6 +115,8 @@ interface UnifiedBusiness {
   /** Public / contact email for listing form prefill. */
   email?: string;
   whatsappNumber?: string | null;
+  discountValidFrom?: string | null;
+  discountValidUntil?: string | null;
 }
 
 function mapOfferingRowToUnified(
@@ -154,6 +156,14 @@ function mapOfferingRowToUnified(
     ).trim(),
     whatsappNumber:
       String(o.whatsapp_number ?? profile.whatsapp_number ?? '').trim() || null,
+    discountValidFrom:
+      typeof o.discount_valid_from === 'string' && o.discount_valid_from.trim()
+        ? String(o.discount_valid_from).split('T')[0]
+        : null,
+    discountValidUntil:
+      typeof o.discount_valid_until === 'string' && o.discount_valid_until.trim()
+        ? String(o.discount_valid_until).split('T')[0]
+        : null,
     _source: 'approved',
     _status: 'approved',
     _createdAt: (o.created_at as string) || (profile.created_at as string),
@@ -188,6 +198,14 @@ function mapProfileRowToUnified(b: Record<string, unknown>): UnifiedBusiness {
     website: String(b.website ?? '').trim() || null,
     email: String(b.contact_email ?? b.email ?? b.business_email ?? '').trim(),
     whatsappNumber: String(b.whatsapp_number ?? '').trim() || null,
+    discountValidFrom:
+      typeof b.discount_valid_from === 'string' && String(b.discount_valid_from).trim()
+        ? String(b.discount_valid_from).split('T')[0]
+        : null,
+    discountValidUntil:
+      typeof b.discount_valid_until === 'string' && String(b.discount_valid_until).trim()
+        ? String(b.discount_valid_until).split('T')[0]
+        : null,
     _source: 'approved',
     _status: 'approved',
     _createdAt: b.created_at as string | undefined,
@@ -226,6 +244,8 @@ function unifiedToListingBusiness(u: UnifiedBusiness): Business {
     featured: u.featured,
     ownerId: u.ownerId ?? null,
     pricingTiers: u.pricingTiers ?? null,
+    discountValidFrom: u.discountValidFrom ?? null,
+    discountValidUntil: u.discountValidUntil ?? null,
   };
 }
 
@@ -246,6 +266,8 @@ function mergeListingBusinessForEdit(selected: UnifiedBusiness, fromDb: Business
     pricingTiers: uBiz.pricingTiers ?? fromDb.pricingTiers,
     image: (fromDb.image && String(fromDb.image).trim()) ? fromDb.image : uBiz.image,
     tags: uBiz.tags?.length ? uBiz.tags : fromDb.tags,
+    discountValidFrom: uBiz.discountValidFrom ?? fromDb.discountValidFrom ?? null,
+    discountValidUntil: uBiz.discountValidUntil ?? fromDb.discountValidUntil ?? null,
   };
 }
 
