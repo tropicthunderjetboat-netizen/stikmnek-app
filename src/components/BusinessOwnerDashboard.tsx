@@ -45,6 +45,7 @@ import {
   OFFERING_LISTING_COLUMNS,
   BUSINESS_PROFILE_EMBED_COLS,
   listingCategoryFromOffering,
+  listingDisplayTitleFromOfferingRow,
 } from '@/lib/businessOfferingMap';
 
 const DASHBOARD_LISTING_SUBMIT_DEADLINE_MS = 150_000;
@@ -130,7 +131,7 @@ function mapOfferingRowToUnified(
   return {
     id: String(o.id),
     _profileBusinessId: pid,
-    name: String(o.title || profile.name || 'Offer'),
+    name: listingDisplayTitleFromOfferingRow(o.title, profile.name),
     category: listingCategoryFromOffering(o, profile.category),
     description: String(o.description ?? ''),
     descriptionFr: String((o.description_fr ?? o.description) ?? ''),
@@ -264,7 +265,7 @@ function mergeListingBusinessForEdit(selected: UnifiedBusiness, fromDb: Business
   if (!fromDb) return uBiz;
   return {
     ...fromDb,
-    name: uBiz.name?.trim() || fromDb.name?.trim() || 'Offer',
+    name: listingDisplayTitleFromOfferingRow(uBiz.name, fromDb.profileName ?? fromDb.name),
     category: uBiz.category,
     description: uBiz.description || fromDb.description,
     descriptionFr: uBiz.descriptionFr || fromDb.descriptionFr,

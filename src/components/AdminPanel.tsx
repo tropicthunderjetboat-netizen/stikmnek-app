@@ -86,7 +86,8 @@ interface PendingBusiness {
 
 interface BusinessPhoto {
   id: string;
-  business_id: string;
+  business_id: string | null;
+  pending_id?: string | null;
   url: string;
   file_path: string;
   uploaded_by: string;
@@ -305,7 +306,8 @@ const AdminPanel: React.FC = () => {
   const groupPhotosByBusinessId = useCallback((photos: BusinessPhoto[]) => {
     const grouped: Record<string, BusinessPhoto[]> = {};
     for (const photo of photos) {
-      const key = String(photo.business_id ?? '');
+      const key = String(photo.pending_id ?? photo.business_id ?? '');
+      if (!key) continue;
       if (!grouped[key]) grouped[key] = [];
       grouped[key].push(photo);
     }
@@ -377,9 +379,11 @@ const AdminPanel: React.FC = () => {
       if (data && data.length > 0) {
         const grouped: Record<string, BusinessPhoto[]> = {};
         for (const photo of data) {
-          const key = String((photo as BusinessPhoto).business_id ?? '');
+          const p = photo as BusinessPhoto;
+          const key = String(p.pending_id ?? p.business_id ?? '');
+          if (!key) continue;
           if (!grouped[key]) grouped[key] = [];
-          grouped[key].push(photo as BusinessPhoto);
+          grouped[key].push(p);
         }
         setBusinessPhotos(grouped);
       }
@@ -397,7 +401,7 @@ const AdminPanel: React.FC = () => {
       const { data, error } = await supabase
         .from('business_photos')
         .select('*')
-        .eq('business_id', pendingId)
+        .eq('pending_id', pendingId)
         .order('created_at', { ascending: true });
       if (error) return;
       if (data && data.length > 0) {

@@ -110,6 +110,27 @@ export function categoryUsesTieredPricing(category: string): boolean {
   return c === 'tours' || c === 'activities';
 }
 
+/**
+ * When flat `deal_price` / `original_price` are zero but JSON tiers exist, cards still need a headline VT.
+ * Uses the tier with the lowest StikmNek (deal) price as a “from” style representative pair.
+ */
+export function representativePerPersonPricesFromTiers(
+  pricingTiers: unknown,
+): { original_price_vt: number; deal_price_vt: number } | null {
+  const rows = pricingTiersFromDb(pricingTiers).filter(
+    (t) =>
+      t.original_price_vt > 0 &&
+      t.deal_price_vt >= 0 &&
+      t.deal_price_vt < t.original_price_vt,
+  );
+  if (rows.length === 0) return null;
+  let best = rows[0];
+  for (const t of rows) {
+    if (t.deal_price_vt < best.deal_price_vt) best = t;
+  }
+  return { original_price_vt: best.original_price_vt, deal_price_vt: best.deal_price_vt };
+}
+
 /** Deep equality for edit forms / change detection (null max_pax matches undefined). */
 export function pricingTiersEqual(a: PricingTierInput[], b: PricingTierInput[]): boolean {
   if (a.length !== b.length) return false;

@@ -1,3 +1,5 @@
+import { representativePerPersonPricesFromTiers } from '@/lib/pricingTiers';
+
 export type Category = 'dining' | 'activities' | 'tours' | 'shopping' | 'spa' | 'accommodation';
 
 /** Raw `business_offerings` row shape when embedded from PostgREST (before mapping to `Business`). */
@@ -95,13 +97,26 @@ export function primaryOfferingDescriptionHtml(b: Business | null | undefined): 
   return String(o.description_html ?? o.description ?? '').trim();
 }
 
-/** Deal / list price with fallback to embedded offering (unmapped / partial rows). */
+function tierHeadlinePrices(b: Business) {
+  const o = primaryEmbeddedOffering(b);
+  const raw =
+    b.pricingTiers ??
+    (b as Record<string, unknown>).pricing_tiers ??
+    o?.pricing_tiers ??
+    (o as Record<string, unknown> | undefined)?.tier_pricing;
+  return representativePerPersonPricesFromTiers(raw);
+}
+
+/** Deal / list price with fallback to embedded offering and tier JSON (legacy tier-only rows). */
 export function effectiveListingDealPrice(b: Business): number {
   const n = Number(b.dealPrice);
   if (Number.isFinite(n) && n > 0) return n;
   const o = primaryEmbeddedOffering(b);
   const d = Number(o?.deal_price);
-  return Number.isFinite(d) ? d : 0;
+  if (Number.isFinite(d) && d > 0) return d;
+  const th = tierHeadlinePrices(b);
+  if (th) return th.deal_price_vt;
+  return 0;
 }
 
 export function effectiveListingOriginalPrice(b: Business): number {
@@ -109,7 +124,10 @@ export function effectiveListingOriginalPrice(b: Business): number {
   if (Number.isFinite(n) && n > 0) return n;
   const o = primaryEmbeddedOffering(b);
   const d = Number(o?.original_price);
-  return Number.isFinite(d) ? d : 0;
+  if (Number.isFinite(d) && d > 0) return d;
+  const th = tierHeadlinePrices(b);
+  if (th) return th.original_price_vt;
+  return 0;
 }
 
 /** True when there is a real StikmNek deal (deal strictly below standard list price). */

@@ -624,10 +624,10 @@ Deno.serve(async (req) => {
 
       const attachPhotosForPending = async (pendingRowId: string) => {
         const photos = body.photos || [];
-        await supabase.from('business_photos').delete().eq('business_id', pendingRowId);
+        await supabase.from('business_photos').delete().eq('pending_id', pendingRowId);
         if (photos.length === 0) return null;
         const photoRecords = photos.map((p: any, i: number) => ({
-          business_id: pendingRowId,
+          pending_id: pendingRowId,
           url: p.url || '',
           file_path: p.filePath || null,
           uploaded_by: userId,
@@ -726,7 +726,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      await supabase.from('business_photos').delete().eq('business_id', String(pendingId));
+      await supabase.from('business_photos').delete().eq('pending_id', String(pendingId));
       const { error: delErr } = await supabase
         .from('pending_businesses')
         .delete()
@@ -798,9 +798,9 @@ Deno.serve(async (req) => {
 
         const photos = (body.photos || []).filter((p: any) => p?.url);
         if (photos.length > 0) {
-          await supabase.from('business_photos').delete().eq('business_id', pendingId);
+          await supabase.from('business_photos').delete().eq('pending_id', pendingId);
           const photoRecords = photos.map((p: any, i: number) => ({
-            business_id: pendingId,
+            pending_id: pendingId,
             url: p.url,
             file_path: p.filePath || null,
             uploaded_by: userId,
@@ -953,10 +953,10 @@ Deno.serve(async (req) => {
       if (validPhotos.length === 0) return jsonResponse(req, { success: true, inserted: 0 });
 
       // Replace existing rows for this pending listing to avoid duplicates on retries.
-      await supabase.from('business_photos').delete().eq('business_id', pendingId);
+      await supabase.from('business_photos').delete().eq('pending_id', pendingId);
 
       const photoRecords = validPhotos.map((p: any, i: number) => ({
-        business_id: pendingId,
+        pending_id: pendingId,
         url: p.url,
         file_path: p.filePath || null,
         uploaded_by: userId,
@@ -1247,8 +1247,8 @@ Deno.serve(async (req) => {
 
       const { error: rejErr } = await supabase
         .from('business_photos')
-        .update({ business_id: liveBusinessId })
-        .eq('business_id', pendingId)
+        .update({ business_id: liveBusinessId, pending_id: null })
+        .eq('pending_id', pendingId)
         .eq('status', 'rejected');
 
       if (rejErr) {
@@ -1262,6 +1262,7 @@ Deno.serve(async (req) => {
 
       const approvedPhotoPatch: Record<string, unknown> = {
         business_id: liveBusinessId,
+        pending_id: null,
         status: 'approved',
       };
       if (newOfferingId) approvedPhotoPatch.offering_id = newOfferingId;
@@ -1269,7 +1270,8 @@ Deno.serve(async (req) => {
       const { error: photoErr } = await supabase
         .from('business_photos')
         .update(approvedPhotoPatch)
-        .eq('business_id', pendingId);
+        .eq('pending_id', pendingId)
+        .neq('status', 'rejected');
 
       if (photoErr) {
         console.error('[manage-business] Photo update failed after business approval:', photoErr);
@@ -1430,6 +1432,7 @@ Deno.serve(async (req) => {
       // Relink photos that were uploaded against the pending id (common when the pending row never got deleted).
       const relinkPatch: Record<string, unknown> = {
         business_id: existingProfileId,
+        pending_id: null,
         status: 'approved',
       };
       if (inserted?.id) relinkPatch.offering_id = String(inserted.id);
@@ -1437,7 +1440,7 @@ Deno.serve(async (req) => {
       const { error: relinkErr } = await supabase
         .from('business_photos')
         .update(relinkPatch)
-        .eq('business_id', String(pendingId));
+        .eq('pending_id', String(pendingId));
       if (relinkErr) {
         console.error('[manage-business] repair_approved_submission photos:', relinkErr);
         // Non-fatal: offering exists; return success but warn

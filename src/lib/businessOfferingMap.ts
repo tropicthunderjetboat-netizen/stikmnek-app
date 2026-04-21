@@ -4,6 +4,24 @@ import { getBusinessImageUrl } from '@/lib/utils';
 
 const CATEGORY_KEYS = new Set(categories.map((c) => c.key));
 
+/** DB placeholders / legacy defaults — should not hide the profile trading name. */
+export function isGenericPlaceholderListingTitle(title: unknown): boolean {
+  const t = String(title ?? '').trim().toLowerCase();
+  return t === '' || t === 'offer' || t === 'main offer';
+}
+
+/** Prefer a real deal title; otherwise profile `businesses.name`; then any title; last resort `Offer`. */
+export function listingDisplayTitleFromOfferingRow(
+  offeringTitle: unknown,
+  profileName: unknown,
+): string {
+  const ot = String(offeringTitle ?? '').trim();
+  const pn = String(profileName ?? '').trim();
+  if (ot && !isGenericPlaceholderListingTitle(ot)) return ot;
+  if (pn) return pn;
+  return 'Offer';
+}
+
 /** PostgREST column list for `business_offerings` rows (no embed). */
 export const OFFERING_LISTING_COLUMNS =
   'id, business_id, title, description, description_fr, description_bi, discount, original_price, deal_price, image, map_url, website, discount_valid_from, discount_valid_until, whatsapp_number, pricing_tiers, tags, featured, active, created_at, updated_at';
@@ -109,7 +127,7 @@ export function mapJoinedOfferingToBusiness(
   return {
     id: oid,
     profileBusinessId: String(b.id),
-    name: String(o.title || b.name || '').trim() || 'Offer',
+    name: listingDisplayTitleFromOfferingRow(o.title, b.name),
     category: cat,
     description: String(o.description ?? ''),
     descriptionFr: String((o.description_fr ?? o.description) ?? ''),

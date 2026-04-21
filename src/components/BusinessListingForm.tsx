@@ -25,6 +25,7 @@ import {
   type PricingTierInput,
 } from '@/lib/pricingTiers';
 import { normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
+import { syncEmbeddedEditGalleryPhotos } from '@/lib/syncEmbeddedListingPhotos';
 import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
 import { fetchApprovedPhotosForOffering, photoRowsToUploadedPhotos } from '@/lib/fetchApprovedPhotosForOffering';
 import { categories, type Business, type Category } from '@/data/businesses';
@@ -396,6 +397,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
   const editBaselineRef = useRef<EditBaseline | null>(null);
   /** Fresh `business_offerings` + gallery from DB (avoids stale `dbBusinesses` / unified row). */
   const [embeddedResolved, setEmbeddedResolved] = useState<EmbeddedListingResolved | null>(null);
+  /** Bumps to re-run the embedded listing fetch (e.g. after syncing new gallery rows). */
+  const [embeddedFetchNonce, setEmbeddedFetchNonce] = useState(0);
+  /** Approved photo URLs when the editor last loaded — used to insert only new `business_photos`. */
+  const embeddedApprovedPhotoUrlKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!embeddedEdit) {
@@ -440,7 +445,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     return () => {
       cancelled = true;
     };
-  }, [embeddedEdit?.offeringId, embeddedEdit?.profileBusinessId]);
+  }, [embeddedEdit?.offeringId, embeddedEdit?.profileBusinessId, embeddedFetchNonce]);
 
   useEffect(() => {
     if (!embeddedEdit) {
@@ -482,6 +487,13 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             ]
           : [],
     );
+    const galleryUrlKeys = new Set<string>();
+    for (const ph of galleryPhotos) {
+      const u = String(ph.url || '').trim();
+      if (u) galleryUrlKeys.add(u);
+    }
+    if (galleryUrlKeys.size === 0 && img) galleryUrlKeys.add(img);
+    embeddedApprovedPhotoUrlKeysRef.current = galleryUrlKeys;
     const tiered = categoryUsesTieredPricing(cat);
     const pct = deriveDiscountPercentFromBusiness(b);
     const origStr = !tiered && b.originalPrice > 0 ? String(b.originalPrice) : '';
@@ -916,6 +928,28 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         });
         if (error) throw error;
         if (data?.error) throw new Error(String(data.error));
+        const offeringIdForPhotos = String(
+          embeddedResolved?.business?.id || embeddedEdit.offeringId || '',
+        ).trim();
+        if (user.id && offeringIdForPhotos) {
+          const syncRes = await syncEmbeddedEditGalleryPhotos({
+            client: supabase,
+            userId: user.id,
+            profileBusinessId: embeddedEdit.profileBusinessId,
+            offeringId: offeringIdForPhotos,
+            photos,
+            existingUrlKeys: embeddedApprovedPhotoUrlKeysRef.current,
+          });
+          if (syncRes.error) {
+            toast.error(
+              language === 'en'
+                ? `Listing saved but photos failed: ${syncRes.error}`
+                : `Annonce enregistrée mais photos: ${syncRes.error}`,
+            );
+          } else if (syncRes.inserted > 0) {
+            setEmbeddedFetchNonce((n) => n + 1);
+          }
+        }
         toast.success(
           data?.appliedLive
             ? language === 'en'
