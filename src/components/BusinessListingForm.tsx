@@ -19,13 +19,8 @@ import {
   pricingTiersFromDb,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
-import {
-  normalizeListingCategoryKey,
-  OFFERING_LISTING_COLUMNS,
-  BUSINESS_PROFILE_EMBED_COLS,
-  mapJoinedOfferingToBusiness,
-  unwrapPostgrestEmbed,
-} from '@/lib/businessOfferingMap';
+import { normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
+import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
 import { fetchApprovedPhotosForOffering, photoRowsToUploadedPhotos } from '@/lib/fetchApprovedPhotosForOffering';
 import { categories, type Business, type Category } from '@/data/businesses';
 import {
@@ -386,67 +381,11 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     setEmbeddedResolved(null);
     let cancelled = false;
     void (async () => {
-      const { data, error } = await supabase
-        .from('business_offerings')
-        .select(`${OFFERING_LISTING_COLUMNS}, businesses(${BUSINESS_PROFILE_EMBED_COLS})`)
-        .eq('id', oid)
-        .maybeSingle();
+      const b = await fetchListingEditorBusiness(supabase, pid, oid, SUPABASE_URL);
       if (cancelled) return;
-      if (error || !data) {
-        console.warn('[BusinessListingForm] embedded offering fetch:', error?.message);
+      if (!b || String(b.id) !== oid) {
+        if (!b) console.warn('[BusinessListingForm] embedded listing snapshot failed');
         return;
-      }
-      const row = data as Record<string, unknown>;
-      const profile = unwrapPostgrestEmbed(row.businesses);
-      if (!profile?.id) return;
-      let b: Business;
-      try {
-        const { businesses: _drop, ...offering } = row;
-        b = mapJoinedOfferingToBusiness(offering, profile, SUPABASE_URL);
-      } catch {
-        return;
-      }
-      if (String(b.id) !== oid) return;
-      // Embed can be stale vs live profile; refresh contact/location fields from `businesses`.
-      const { data: profLive, error: liveErr } = await supabase
-        .from('businesses')
-        .select(
-          'hours, opening_hours, phone, email, contact_email, business_email, location, map_url, website, whatsapp_number',
-        )
-        .eq('id', pid)
-        .maybeSingle();
-      if (!cancelled && !liveErr && profLive && typeof profLive === 'object') {
-        const pr = profLive as Record<string, unknown>;
-        const hoursVal = String(b.hours || pr.hours || pr.opening_hours || '').trim();
-        const phoneVal = String(b.phone || pr.phone || '').trim();
-        const emailVal =
-          (b.contactEmail && String(b.contactEmail).trim()) ||
-          String(pr.contact_email || pr.email || pr.business_email || '').trim() ||
-          null;
-        const locVal = String(b.location || pr.location || '').trim();
-        const mapVal =
-          ((b.mapUrl ?? b.map_url) as string | undefined)?.trim() ||
-          String(pr.map_url || '').trim() ||
-          '';
-        const webRaw =
-          (typeof b.website === 'string' && b.website.trim()) ||
-          (typeof pr.website === 'string' ? pr.website.trim() : '') ||
-          '';
-        const waVal = String(
-          b.whatsappNumber || b.whatsapp_number || pr.whatsapp_number || '',
-        ).trim();
-        b = {
-          ...b,
-          hours: hoursVal,
-          phone: phoneVal,
-          contactEmail: emailVal,
-          location: locVal,
-          mapUrl: mapVal || b.mapUrl || null,
-          map_url: mapVal || b.map_url || null,
-          website: webRaw || b.website || null,
-          whatsappNumber: waVal || b.whatsappNumber || null,
-          whatsapp_number: waVal || b.whatsapp_number || null,
-        };
       }
       const galleryRows = await fetchApprovedPhotosForOffering(supabase, pid, oid, SUPABASE_URL);
       if (cancelled) return;
