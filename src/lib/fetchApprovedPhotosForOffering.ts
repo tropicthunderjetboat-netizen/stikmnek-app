@@ -13,7 +13,7 @@ type PhotoRow = {
 };
 
 /**
- * Approved gallery rows for a listing (matches public `PhotoGallery` resolution).
+ * Approved gallery rows for one offering (same legacy rules as `PhotoGallery`, then capped at 5 for the editor).
  */
 export async function fetchApprovedPhotosForOffering(
   client: SupabaseClient,
@@ -61,9 +61,10 @@ export async function fetchApprovedPhotosForOffering(
     if (legacy.error || !legacy.data?.length) return [];
 
     const list = legacy.data as PhotoRow[];
-    if (offerCount <= 1) {
+    // `offerCount === 0` must NOT fall through as "<= 1" — that pooled every legacy photo onto one deal.
+    if (offerCount === 1) {
       rows = list;
-    } else {
+    } else if (offerCount > 1) {
       const { data: ord, error: oErr } = await client
         .from('business_offerings')
         .select('id, created_at')
@@ -76,10 +77,14 @@ export async function fetchApprovedPhotosForOffering(
           legacyUntaggedPhotoBelongsToOffering(p.created_at, oid, ordered),
         );
       }
+    } else {
+      rows = [];
     }
   }
 
-  return rows.filter((p) => String(p.status || '').toLowerCase() === 'approved');
+  const approved = rows.filter((p) => String(p.status || '').toLowerCase() === 'approved');
+  /** Listing editor enforces the same cap as `PhotoUploader` (public gallery may show more). */
+  return approved.slice(0, 5);
 }
 
 /** Map DB rows to `PhotoUploader` / submit payload shape. */

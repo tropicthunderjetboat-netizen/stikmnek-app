@@ -14,6 +14,7 @@ import LocationMapPicker from './LocationMapPicker';
 import WebsiteUrlInput from './WebsiteUrlInput';
 import {
   displayWebsiteForInput,
+  effectiveBusinessCoords,
   googleMapsUrlFromLatLng,
   normalizeWebsiteForStorage,
 } from '@/lib/urlHelpers';
@@ -57,8 +58,15 @@ function inferListingDuration(validFrom: string, validUntil: string): string {
   const until = new Date(`${validUntil.replace(/T.*/, '')}T12:00:00`).getTime();
   if (!Number.isFinite(from) || !Number.isFinite(until) || until < from) return '1_month';
   const days = Math.round((until - from) / 86400000);
-  const hit = DURATION_OPTIONS.find((d) => d.days === days);
-  return hit?.value ?? '1_month';
+  const exact = DURATION_OPTIONS.find((d) => d.days === days);
+  if (exact) return exact.value;
+  /** Inclusive calendar windows often land on 364/366 vs nominal 365 — pick closest preset within ±3 days. */
+  let best: { value: string; diff: number } | null = null;
+  for (const d of DURATION_OPTIONS) {
+    const diff = Math.abs(days - d.days);
+    if (diff <= 3 && (!best || diff < best.diff)) best = { value: d.value, diff };
+  }
+  return best?.value ?? '1_month';
 }
 
 function addDays(dateStr: string, days: number): string {
@@ -493,13 +501,14 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       savedFrom && savedUntil ? inferListingDuration(savedFrom, savedUntil) : '1_month';
 
     const rawMap = ((b.mapUrl ?? b.map_url) as string | undefined)?.trim() || '';
-    const latN = Number(b.lat);
-    const lngN = Number(b.lng);
-    const hasCoords =
-      Number.isFinite(latN) &&
-      Number.isFinite(lngN) &&
-      (Math.abs(latN) > 0.0001 || Math.abs(lngN) > 0.0001);
-    const mapUrlPrefill = rawMap || (hasCoords ? googleMapsUrlFromLatLng(latN, lngN) : '');
+    const coords = effectiveBusinessCoords({
+      lat: b.lat,
+      lng: b.lng,
+      mapUrl: b.mapUrl ?? undefined,
+      map_url: b.map_url ?? undefined,
+    });
+    const mapUrlPrefill =
+      rawMap || (coords ? googleMapsUrlFromLatLng(coords.lat, coords.lng) : '');
 
     setForm({
       name: lockedTitle,
@@ -580,14 +589,18 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     return '';
   }, [form.discountPercent]);
 
-  /** Shown in “New price (auto)” when useMemo discount math is empty but `form.dealPrice` was prefilled from DB. */
+  /** Shown in “New price (auto)” — derived from VT + % (and DB deal as fallback). */
   const displayAutoDealPrice = useMemo(() => {
     if (categoryUsesTieredPricing(form.category)) return '';
-    if (calculatedDealPrice) return calculatedDealPrice;
-    const fd = parseFloat(form.dealPrice);
+    const orig = parseFloat(String(form.originalPrice).replace(/,/g, ''));
+    const pct = parseFloat(String(form.discountPercent).replace(/,/g, ''));
+    if (Number.isFinite(orig) && orig > 0 && Number.isFinite(pct) && pct > 0 && pct < 100) {
+      return (orig * (1 - pct / 100)).toFixed(2);
+    }
+    const fd = parseFloat(String(form.dealPrice).replace(/,/g, ''));
     if (Number.isFinite(fd) && fd > 0) return String(fd);
     return '';
-  }, [calculatedDealPrice, form.category, form.dealPrice]);
+  }, [form.category, form.originalPrice, form.discountPercent, form.dealPrice]);
 
   // Sync calculated values into form state for submission (flat pricing only; tiered deals keep DB discount text)
   useEffect(() => {
@@ -1354,7 +1367,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </p>
             )}
           </div>
-          {/* ─── Pricing & Discount Section ─── */}
+          {/* ─── Pricing & Discount (flat VT only — tiered categories use the per-person editor below) ─── */}
+          {!categoryUsesTieredPricing(form.category) && (
           <div
             className={`p-5 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border ${
               fieldErrors.pricing && !categoryUsesTieredPricing(form.category)
@@ -1531,6 +1545,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </p>
             )}
           </div>
+          )}
 
           {categoryUsesTieredPricing(form.category) && (
             <div

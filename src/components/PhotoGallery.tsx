@@ -112,9 +112,9 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
               const list = (legacy.data as BusinessPhoto[]).filter(
                 (p) => String(p.status || '').toLowerCase() === 'approved',
               );
-              if (offerCount <= 1) {
+              if (offerCount === 1) {
                 approvedOnly = list;
-              } else {
+              } else if (offerCount > 1) {
                 const { data: rows, error: oErr } = await supabase
                   .from('business_offerings')
                   .select('id, created_at')
@@ -127,6 +127,8 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                     legacyUntaggedPhotoBelongsToOffering(p.created_at, oid, ordered),
                   );
                 }
+              } else {
+                approvedOnly = [];
               }
             }
           }
