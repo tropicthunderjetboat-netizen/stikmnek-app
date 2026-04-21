@@ -12,7 +12,11 @@ import PhotoUploader, { UploadedPhoto } from './PhotoUploader';
 import PricingTiersEditor from './PricingTiersEditor';
 import LocationMapPicker from './LocationMapPicker';
 import WebsiteUrlInput from './WebsiteUrlInput';
-import { displayWebsiteForInput, normalizeWebsiteForStorage } from '@/lib/urlHelpers';
+import {
+  displayWebsiteForInput,
+  googleMapsUrlFromLatLng,
+  normalizeWebsiteForStorage,
+} from '@/lib/urlHelpers';
 import {
   categoryUsesTieredPricing,
   validatePricingTiersForSubmit,
@@ -233,6 +237,7 @@ type EditBaseline = {
   description: string;
   hours: string;
   phone: string;
+  email: string;
   discount: string;
   original_price: number;
   deal_price: number;
@@ -242,6 +247,10 @@ type EditBaseline = {
   website: string;
   image: string;
   pricing_tiers: unknown[] | null;
+  /** Deal title (`business_offerings.title`). */
+  listing_title: string;
+  /** Canonical category key (also drives offering `tags` when changed). */
+  category: string;
 };
 
 function buildEditBaseline(b: Business): EditBaseline {
@@ -253,10 +262,12 @@ function buildEditBaseline(b: Business): EditBaseline {
     pricing_tiers = error ? null : data ?? null;
   }
   const wa = (b.whatsappNumber || b.whatsapp_number || '').trim();
+  const cat = asCategoryKey(String(b.category || 'dining'));
   return {
     description: b.description || '',
     hours: b.hours || '',
     phone: b.phone || '',
+    email: ((b.contactEmail as string) || '').trim(),
     discount: (b.discount || '').trim(),
     original_price: Number(b.originalPrice) || 0,
     deal_price: Number(b.dealPrice) || 0,
@@ -266,14 +277,18 @@ function buildEditBaseline(b: Business): EditBaseline {
     website: normalizeWebsiteForStorage(typeof b.website === 'string' ? b.website : '') || '',
     image: (b.image || '').trim(),
     pricing_tiers,
+    listing_title: (b.name || '').trim(),
+    category: cat,
   };
 }
 
 function baselineSnapshotFromFormState(args: {
   form: {
+    name: string;
     description: string;
     hours: string;
     phone: string;
+    email: string;
     discount: string;
     originalPrice: string;
     dealPrice: string;
@@ -294,10 +309,12 @@ function baselineSnapshotFromFormState(args: {
     pricing_tiers = data ?? null;
   }
   const wa = args.form.whatsappNumber.trim();
+  const cat = asCategoryKey(args.form.category);
   return {
     description: descriptionForStorage,
     hours: args.form.hours,
     phone: args.form.phone,
+    email: (args.form.email || '').trim(),
     discount: (args.form.discount || '').trim(),
     original_price: Number(args.form.originalPrice) || 0,
     deal_price: Number(args.form.dealPrice) || 0,
@@ -307,6 +324,8 @@ function baselineSnapshotFromFormState(args: {
     website: normalizeWebsiteForStorage(args.form.website) || '',
     image: (args.photos[0]?.url || '').trim(),
     pricing_tiers,
+    listing_title: (args.form.name || '').trim(),
+    category: cat,
   };
 }
 
@@ -315,6 +334,7 @@ function editBaselinesEqual(a: EditBaseline, b: EditBaseline): boolean {
     a.description === b.description &&
     a.hours === b.hours &&
     a.phone === b.phone &&
+    a.email === b.email &&
     a.discount === b.discount &&
     a.original_price === b.original_price &&
     a.deal_price === b.deal_price &&
@@ -323,7 +343,9 @@ function editBaselinesEqual(a: EditBaseline, b: EditBaseline): boolean {
     a.map_url === b.map_url &&
     (a.website || '') === (b.website || '') &&
     a.image === b.image &&
-    JSON.stringify(a.pricing_tiers) === JSON.stringify(b.pricing_tiers)
+    JSON.stringify(a.pricing_tiers) === JSON.stringify(b.pricing_tiers) &&
+    a.listing_title === b.listing_title &&
+    a.category === b.category
   );
 }
 
@@ -374,77 +396,37 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     }
     const oid = embeddedEdit.offeringId?.trim();
     const pid = embeddedEdit.profileBusinessId?.trim();
-    if (!oid || !pid) {
-      // #region agent log
-      fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
-        body: JSON.stringify({
-          sessionId: 'df574b',
-          runId: 'pre-fix',
-          hypothesisId: 'H1',
-          location: 'BusinessListingForm.tsx:embeddedFetch',
-          message: 'skip DB snapshot (missing offeringId or profileId)',
-          data: { hasOid: Boolean(oid), hasPid: Boolean(pid) },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
+    if (!pid) {
       setEmbeddedResolved(null);
       return;
     }
     setEmbeddedResolved(null);
     let cancelled = false;
     void (async () => {
-      const b = await fetchListingEditorBusiness(supabase, pid, oid, SUPABASE_URL);
+      let effectiveOid = oid;
+      if (!effectiveOid) {
+        const { data: pick, error: pickErr } = await supabase
+          .from('business_offerings')
+          .select('id')
+          .eq('business_id', pid)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (cancelled) return;
+        if (pickErr || !pick?.id) {
+          return;
+        }
+        effectiveOid = String(pick.id);
+      }
+      const b = await fetchListingEditorBusiness(supabase, pid, effectiveOid, SUPABASE_URL);
       if (cancelled) return;
-      if (!b || String(b.id) !== oid) {
-        // #region agent log
-        fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
-          body: JSON.stringify({
-            sessionId: 'df574b',
-            runId: 'pre-fix',
-            hypothesisId: 'H2',
-            location: 'BusinessListingForm.tsx:embeddedFetch',
-            message: 'snapshot null or id mismatch',
-            data: {
-              hasB: Boolean(b),
-              bIdMatchesOid: b ? String(b.id) === oid : false,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
+      if (!b || String(b.id) !== effectiveOid) {
         if (!b) console.warn('[BusinessListingForm] embedded listing snapshot failed');
         return;
       }
-      const galleryRows = await fetchApprovedPhotosForOffering(supabase, pid, oid, SUPABASE_URL);
+      const galleryRows = await fetchApprovedPhotosForOffering(supabase, pid, effectiveOid, SUPABASE_URL);
       if (cancelled) return;
       const galleryPhotos = photoRowsToUploadedPhotos(galleryRows, SUPABASE_URL);
-      // #region agent log
-      fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
-        body: JSON.stringify({
-          sessionId: 'df574b',
-          runId: 'pre-fix',
-          hypothesisId: 'H4',
-          location: 'BusinessListingForm.tsx:embeddedFetch',
-          message: 'embeddedResolved set',
-          data: {
-            nameLen: (b.name || '').length,
-            locLen: (b.location || '').length,
-            hoursLen: (b.hours || '').length,
-            phoneLen: (b.phone || '').length,
-            emailLen: ((b.contactEmail || '') as string).length,
-            galleryCount: galleryPhotos.length,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       setEmbeddedResolved({ business: b, galleryPhotos });
     })();
     return () => {
@@ -458,37 +440,18 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       return;
     }
     const oid = embeddedEdit.offeringId?.trim();
+    const pid = embeddedEdit.profileBusinessId?.trim();
     const useResolved = Boolean(
-      oid && embeddedResolved && embeddedResolved.business.id === oid,
+      embeddedResolved &&
+        pid &&
+        String(embeddedResolved.business.profileBusinessId || '') === pid &&
+        (!oid || embeddedResolved.business.id === oid),
     );
     const b = useResolved ? embeddedResolved!.business : embeddedEdit.business;
     const galleryPhotos = useResolved ? embeddedResolved!.galleryPhotos : [];
 
     const lockedTitle =
       embeddedEdit.listingTitle?.trim() || b.name?.trim() || 'Offer';
-    // #region agent log
-    fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
-      body: JSON.stringify({
-        sessionId: 'df574b',
-        runId: 'pre-fix',
-        hypothesisId: 'H3',
-        location: 'BusinessListingForm.tsx:embeddedPrefill',
-        message: 'prefill source',
-        data: {
-          useResolved,
-          lockedTitleLen: lockedTitle.length,
-          listingTitleLen: (embeddedEdit.listingTitle || '').trim().length,
-          stubNameLen: (embeddedEdit.business.name || '').length,
-          bNameLen: (b.name || '').length,
-          bLocLen: (b.location || '').length,
-          bHoursLen: (b.hours || '').length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     const lockedCategoryRaw =
       embeddedEdit.listingCategory?.trim() || String(b.category || '');
     const cat = asCategoryKey(lockedCategoryRaw);
@@ -529,6 +492,15 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     const listingDuration =
       savedFrom && savedUntil ? inferListingDuration(savedFrom, savedUntil) : '1_month';
 
+    const rawMap = ((b.mapUrl ?? b.map_url) as string | undefined)?.trim() || '';
+    const latN = Number(b.lat);
+    const lngN = Number(b.lng);
+    const hasCoords =
+      Number.isFinite(latN) &&
+      Number.isFinite(lngN) &&
+      (Math.abs(latN) > 0.0001 || Math.abs(lngN) > 0.0001);
+    const mapUrlPrefill = rawMap || (hasCoords ? googleMapsUrlFromLatLng(latN, lngN) : '');
+
     setForm({
       name: lockedTitle,
       category: cat,
@@ -542,7 +514,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       email: (b.contactEmail || '').trim() || user?.email || '',
       hours: b.hours || '',
       whatsappNumber: (b.whatsappNumber || b.whatsapp_number || '').trim(),
-      mapUrl: ((b.mapUrl ?? b.map_url) as string | undefined)?.trim() || '',
+      mapUrl: mapUrlPrefill,
       website: displayWebsiteForInput(b.website ?? null),
       discountValidFrom,
       listingDuration,
@@ -608,6 +580,15 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     return '';
   }, [form.discountPercent]);
 
+  /** Shown in “New price (auto)” when useMemo discount math is empty but `form.dealPrice` was prefilled from DB. */
+  const displayAutoDealPrice = useMemo(() => {
+    if (categoryUsesTieredPricing(form.category)) return '';
+    if (calculatedDealPrice) return calculatedDealPrice;
+    const fd = parseFloat(form.dealPrice);
+    if (Number.isFinite(fd) && fd > 0) return String(fd);
+    return '';
+  }, [calculatedDealPrice, form.category, form.dealPrice]);
+
   // Sync calculated values into form state for submission (flat pricing only; tiered deals keep DB discount text)
   useEffect(() => {
     if (categoryUsesTieredPricing(form.category)) return;
@@ -625,39 +606,6 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       }));
     }
   }, [calculatedDealPrice, calculatedDiscountLabel, form.category, embeddedEdit]);
-
-  useEffect(() => {
-    if (!embeddedEdit) return;
-    const tiered = categoryUsesTieredPricing(form.category);
-    // #region agent log
-    fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
-      body: JSON.stringify({
-        sessionId: 'df574b',
-        runId: 'pre-fix',
-        hypothesisId: 'H5',
-        location: 'BusinessListingForm.tsx:dealPriceSyncProbe',
-        message: 'embedded flat-price auto deal sync inputs',
-        data: {
-          tiered,
-          calcDealLen: calculatedDealPrice.length,
-          labelLen: calculatedDiscountLabel.length,
-          origLen: (form.originalPrice || '').length,
-          pctLen: (form.discountPercent || '').length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [
-    embeddedEdit,
-    form.category,
-    calculatedDealPrice,
-    calculatedDiscountLabel,
-    form.originalPrice,
-    form.discountPercent,
-  ]);
 
   useEffect(() => {
     if (embeddedEdit) return;
@@ -927,6 +875,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       const nWeb = (next.website || '').trim();
       const bWeb = (base.website || '').trim();
       if (nWeb !== bWeb) changes.website = nWeb === '' ? null : nWeb;
+      if (next.email !== base.email) changes.contact_email = next.email.trim() === '' ? null : next.email.trim();
+      if (next.listing_title !== base.listing_title) changes.title = next.listing_title;
+      if (next.category !== base.category) changes.tags = [next.category];
       if (next.image !== base.image) changes.image = next.image;
       if (JSON.stringify(next.pricing_tiers) !== JSON.stringify(base.pricing_tiers)) {
         changes.pricing_tiers = next.pricing_tiers;
@@ -944,7 +895,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             action: 'submit_edit',
             userId: user.id,
             businessId: embeddedEdit.profileBusinessId,
-            offeringId: embeddedEdit.offeringId || undefined,
+            offeringId:
+              String(embeddedResolved?.business?.id || embeddedEdit.offeringId || '')
+                .trim() || undefined,
             changes,
           },
         });
@@ -1209,7 +1162,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             <Info className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" aria-hidden />
             <p className="text-sm text-teal-900">
               {language === 'en'
-                ? 'This form loads your saved listing from the database. Save to update your live deal (title and category stay fixed; contact support to change the title).'
+                ? 'This form loads your saved listing from the database. Save to update your live deal (title, category, and all fields below).'
                 : 'Ce formulaire charge votre annonce enregistrée. Enregistrer pour mettre à jour la page publique.'}
             </p>
           </div>
@@ -1329,11 +1282,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               <input
                 type="text"
                 value={form.name}
-                readOnly={isEmbeddedEdit}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 ${
-                  isEmbeddedEdit ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed' : 'border-gray-200'
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 placeholder={
                   language === 'en'
                     ? 'e.g. Reef Explorer Semi-Sub Tour – Port Vila'
@@ -1343,15 +1293,11 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 }
               />
               <p className="text-[11px] text-gray-500 mt-1">
-                {isEmbeddedEdit
-                  ? language === 'en'
-                    ? 'To change this title, contact support — it is tied to your approved listing.'
-                    : 'Pour changer le titre, contactez le support.'
-                  : language === 'en'
-                    ? 'This is the name tourists see for this deal. Your company profile name is separate.'
-                    : language === 'fr'
-                      ? 'C’est le nom visible pour cette offre. Le nom de votre entreprise est géré dans le profil.'
-                      : 'Nem ia turis bae luk long dil ia. Nem blong kampeni i stap long profil.'}
+                {language === 'en'
+                  ? 'This is the name tourists see for this deal. Save to update your live listing.'
+                  : language === 'fr'
+                    ? 'C’est le nom visible pour cette offre. Enregistrez pour mettre à jour.'
+                    : 'Nem ia turis bae luk long dil ia. Sevem blong apdetem.'}
               </p>
             </div>
             <div>
@@ -1360,11 +1306,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </label>
               <select
                 value={form.category}
-                disabled={isEmbeddedEdit}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white ${
-                  isEmbeddedEdit ? 'border-gray-200 opacity-70 cursor-not-allowed' : 'border-gray-200'
-                }`}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
               >
                 <option value="dining">Dining</option>
                 <option value="activities">Activities</option>
@@ -1501,10 +1444,14 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">VT</span>
                   <input
                     type="text"
-                    value={calculatedDealPrice ? formatVT(parseFloat(calculatedDealPrice)).replace('VT ', '') : '—'}
+                    value={
+                      displayAutoDealPrice
+                        ? formatVT(parseFloat(displayAutoDealPrice)).replace('VT ', '')
+                        : '—'
+                    }
                     readOnly
                     className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm cursor-not-allowed ${
-                      calculatedDealPrice
+                      displayAutoDealPrice
                         ? 'bg-emerald-50 border-emerald-300 text-emerald-700 font-bold'
                         : 'bg-gray-50 border-gray-200 text-gray-400'
                     }`}
@@ -1517,7 +1464,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             </div>
 
             {/* ─── Live Price Breakdown Preview ─── */}
-            {calculatedDealPrice && form.originalPrice && (
+            {displayAutoDealPrice && form.originalPrice && (
               <div className="mt-4 p-4 rounded-xl bg-white border border-teal-200 shadow-sm">
                 <div className="flex items-center gap-1.5 mb-3">
                   <Tag className="w-3.5 h-3.5 text-teal-600" />
@@ -1558,7 +1505,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                       {language === 'en' ? 'Now' : 'Maintenant'}
                     </span>
                     <span className="text-2xl font-extrabold text-emerald-600">
-                      {formatVT(parseFloat(calculatedDealPrice))}
+                      {formatVT(parseFloat(displayAutoDealPrice))}
                     </span>
                   </div>
                 </div>
@@ -1569,7 +1516,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                     {language === 'en' ? 'Customer saves' : language === 'fr' ? 'Le client économise' : 'Kastoma i sevem'}
                   </span>
                   <span className="text-sm font-bold text-emerald-600">
-                    {formatVT(parseFloat(form.originalPrice) - parseFloat(calculatedDealPrice))}{' '}
+                    {formatVT(parseFloat(form.originalPrice) - parseFloat(displayAutoDealPrice))}{' '}
                     <span className="text-xs font-normal text-gray-400">
                       {language === 'en' ? 'per person' : 'par personne'}
                     </span>

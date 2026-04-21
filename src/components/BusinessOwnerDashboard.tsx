@@ -249,6 +249,14 @@ function unifiedToListingBusiness(u: UnifiedBusiness): Business {
   };
 }
 
+function firstNonEmptyStr(...parts: (string | null | undefined)[]): string {
+  for (const p of parts) {
+    const s = String(p ?? '').trim();
+    if (s) return s;
+  }
+  return '';
+}
+
 /** Prefer unified dashboard row for deal-specific fields; `dbBusinesses` can lag or omit title after fetch. */
 function mergeListingBusinessForEdit(selected: UnifiedBusiness, fromDb: Business | undefined): Business {
   const uBiz = unifiedToListingBusiness(selected);
@@ -268,6 +276,21 @@ function mergeListingBusinessForEdit(selected: UnifiedBusiness, fromDb: Business
     tags: uBiz.tags?.length ? uBiz.tags : fromDb.tags,
     discountValidFrom: uBiz.discountValidFrom ?? fromDb.discountValidFrom ?? null,
     discountValidUntil: uBiz.discountValidUntil ?? fromDb.discountValidUntil ?? null,
+    // Profile / contact: unified row + live fetch use `businesses`; `fromDb` can be a stale offering-shaped row with blanks.
+    location: firstNonEmptyStr(uBiz.location, fromDb.location),
+    lat: Number(uBiz.lat) || Number(fromDb.lat) || 0,
+    lng: Number(uBiz.lng) || Number(fromDb.lng) || 0,
+    hours: firstNonEmptyStr(uBiz.hours, fromDb.hours),
+    phone: firstNonEmptyStr(uBiz.phone, fromDb.phone),
+    contactEmail:
+      firstNonEmptyStr(uBiz.contactEmail ?? undefined, fromDb.contactEmail ?? undefined) || null,
+    mapUrl: firstNonEmptyStr(uBiz.mapUrl ?? undefined, fromDb.mapUrl ?? undefined) || null,
+    map_url: firstNonEmptyStr(uBiz.map_url ?? undefined, fromDb.map_url ?? undefined) || null,
+    website: firstNonEmptyStr(uBiz.website ?? undefined, fromDb.website ?? undefined) || null,
+    whatsappNumber:
+      firstNonEmptyStr(uBiz.whatsappNumber ?? undefined, fromDb.whatsappNumber ?? undefined) || null,
+    whatsapp_number:
+      firstNonEmptyStr(uBiz.whatsapp_number ?? undefined, fromDb.whatsapp_number ?? undefined) || null,
   };
 }
 
@@ -810,34 +833,6 @@ const BusinessOwnerDashboard: React.FC = () => {
       },
     };
   }, [selectedBusiness, selectedIsApproved, user?.id, dbBusinesses, refreshBusinesses, loadPendingEdits]);
-
-  useEffect(() => {
-    if (!listingEmbeddedEdit || !selectedBusiness) return;
-    const isOfferingRow = Boolean(
-      selectedBusiness._profileBusinessId &&
-        String(selectedBusiness.id) !== String(selectedBusiness._profileBusinessId),
-    );
-    const oid = (listingEmbeddedEdit.offeringId || '').trim();
-    // #region agent log
-    fetch('http://127.0.0.1:7527/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'df574b' },
-      body: JSON.stringify({
-        sessionId: 'df574b',
-        runId: 'pre-fix',
-        hypothesisId: 'H1',
-        location: 'BusinessOwnerDashboard.tsx:embeddedEditProbe',
-        message: 'sidebar row vs offeringId for editor',
-        data: {
-          isOfferingRow,
-          offeringIdEmpty: oid.length === 0,
-          listingTitleLen: (listingEmbeddedEdit.listingTitle || '').trim().length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [listingEmbeddedEdit, selectedBusiness]);
 
   const loadReviewResponses = useCallback(async () => {
     if (!selectedProfileId || !selectedIsApproved) return;

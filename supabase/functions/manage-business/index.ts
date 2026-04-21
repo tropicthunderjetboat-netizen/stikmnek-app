@@ -130,6 +130,18 @@ async function applyListingEditChangesToLive(
   const changes = { ...rawChanges };
   delete changes._target_offering_id;
 
+  /** `business_offerings.title` — not a `businesses` column. */
+  const titleForOffering =
+    changes.title !== undefined ? String(changes.title ?? '').trim() || 'Offer' : undefined;
+  delete (changes as { title?: unknown }).title;
+
+  /** When editing a specific deal, listing category tabs read `business_offerings.tags` first. */
+  let tagsForOfferingOnly: unknown = undefined;
+  if (targetOfferingId && changes.tags !== undefined) {
+    tagsForOfferingOnly = changes.tags;
+    delete (changes as { tags?: unknown }).tags;
+  }
+
   if (changes.description !== undefined) {
     changes.description = trimPendingDescription(changes.description);
   }
@@ -139,6 +151,9 @@ async function applyListingEditChangesToLive(
     description: 'description',
     hours: 'hours',
     phone: 'phone',
+    email: 'email',
+    contact_email: 'contact_email',
+    business_email: 'business_email',
     discount: 'discount',
     deal_price: 'deal_price',
     original_price: 'original_price',
@@ -149,6 +164,7 @@ async function applyListingEditChangesToLive(
     website: 'website',
     image: 'image',
     pricing_tiers: 'pricing_tiers',
+    category: 'category',
   };
   for (const [k, v] of Object.entries(changes)) {
     if (k.startsWith('_')) continue;
@@ -188,6 +204,12 @@ async function applyListingEditChangesToLive(
   if (changes.image !== undefined) offeringPatch.image = changes.image;
   if (changes.pricing_tiers !== undefined) {
     offeringPatch.pricing_tiers = changes.pricing_tiers;
+  }
+  if (titleForOffering !== undefined) {
+    offeringPatch.title = titleForOffering;
+  }
+  if (tagsForOfferingOnly !== undefined) {
+    offeringPatch.tags = tagsForOfferingOnly;
   }
   if (changes.discount_valid_from !== undefined) {
     offeringPatch.discount_valid_from = changes.discount_valid_from;
