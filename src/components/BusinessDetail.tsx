@@ -313,9 +313,9 @@ const BusinessDetail: React.FC = () => {
 
         if (cancelled || legacy.error || !legacy.data?.length) {
           // leave first undefined
-        } else if (offerCount <= 1) {
+        } else if (offerCount === 1) {
           first = legacy.data[0] as { url?: string; file_path?: string };
-        } else {
+        } else if (offerCount > 1) {
           const { data: rows, error: oErr } = await supabase
             .from('business_offerings')
             .select('id, created_at')
@@ -334,6 +334,8 @@ const BusinessDetail: React.FC = () => {
             });
             first = match as { url?: string; file_path?: string } | undefined;
           }
+        } else {
+          first = undefined;
         }
       }
       if (!first) {
@@ -351,6 +353,8 @@ const BusinessDetail: React.FC = () => {
   if (!selectedBusiness || !effectiveBiz) return null;
 
   const biz = effectiveBiz;
+  /** Profile hours (mapper merges `hours` + `opening_hours`). */
+  const operatingHoursText = String(biz.hours || '').trim();
   const dealPx = effectiveListingDealPrice(biz);
   const origPx = effectiveListingOriginalPrice(biz);
   const hasActiveDiscount = listingHasActiveDiscount(biz);
@@ -643,6 +647,28 @@ const BusinessDetail: React.FC = () => {
               coverImage={displayCoverImage || biz.image}
               businessName={biz.name}
             />
+
+            {operatingHoursText && (
+              <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5 text-teal-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-gray-900 text-sm mb-1">
+                      {language === 'en'
+                        ? 'Operating hours'
+                        : language === 'fr'
+                          ? 'Heures d’ouverture'
+                          : 'Taem wok'}
+                    </h3>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                      {operatingHoursText}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* WhatsApp Contact Card */}
             {hasWhatsApp && (
@@ -966,7 +992,21 @@ const BusinessDetail: React.FC = () => {
                     {language === 'en' ? 'View on Google Maps' : language === 'fr' ? 'Voir sur Google Maps' : 'Lukim long Google Maps'}
                   </a>
                 ) : null}
-                <div className="flex items-center gap-3 text-sm text-gray-600"><Clock className="w-4 h-4 text-teal-600 shrink-0" />{biz.hours}</div>
+                {operatingHoursText ? (
+                  <div className="rounded-lg border border-gray-100 bg-gray-50/90 px-3 py-2.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                      {language === 'en'
+                        ? 'Operating hours'
+                        : language === 'fr'
+                          ? 'Heures d’ouverture'
+                          : 'Taem wok'}
+                    </p>
+                    <div className="flex items-start gap-2 text-sm text-gray-700">
+                      <Clock className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
+                      <span className="leading-snug whitespace-pre-wrap">{operatingHoursText}</span>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="flex items-center gap-3 text-sm text-gray-600"><Phone className="w-4 h-4 text-teal-600 shrink-0" />{biz.phone}</div>
                 {hasWhatsApp && (
                   <button
