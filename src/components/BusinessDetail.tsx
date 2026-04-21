@@ -293,17 +293,24 @@ const BusinessDetail: React.FC = () => {
       if (cancelled || error) return;
       let first = data?.[0] as { url?: string; file_path?: string } | undefined;
       if (!first) {
-        const legacy = await supabase
-          .from('business_photos')
-          .select('url, file_path')
-          .eq('business_id', profileId)
-          .is('offering_id', null)
-          .eq('status', 'approved')
-          .order('is_main', { ascending: false })
-          .order('created_at', { ascending: true })
-          .limit(1);
-        if (cancelled || legacy.error) return;
-        first = legacy.data?.[0] as { url?: string; file_path?: string } | undefined;
+        const { count, error: cntErr } = await supabase
+          .from('business_offerings')
+          .select('id', { count: 'exact', head: true })
+          .eq('business_id', profileId);
+        const offerCount = !cntErr && typeof count === 'number' ? count : 99;
+        if (offerCount <= 1) {
+          const legacy = await supabase
+            .from('business_photos')
+            .select('url, file_path')
+            .eq('business_id', profileId)
+            .is('offering_id', null)
+            .eq('status', 'approved')
+            .order('is_main', { ascending: false })
+            .order('created_at', { ascending: true })
+            .limit(1);
+          if (cancelled || legacy.error) return;
+          first = legacy.data?.[0] as { url?: string; file_path?: string } | undefined;
+        }
       }
       if (!first) {
         setDisplayCoverImage('');

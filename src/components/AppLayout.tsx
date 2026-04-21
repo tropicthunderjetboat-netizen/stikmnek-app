@@ -16,6 +16,7 @@ import PassCards from './PassCards';
 import MapView from './MapView';
 import ReviewsSection from './ReviewsSection';
 import BusinessListingForm from './BusinessListingForm';
+import ListYourBusinessCta from './ListYourBusinessCta';
 import Footer from './Footer';
 import AuthModal from './AuthModal';
 import BusinessDetail from './BusinessDetail';
@@ -266,6 +267,7 @@ const AppLayout: React.FC = () => {
             <PassCards />
             <MapView />
             <ReviewsSection />
+            <ListYourBusinessCta />
           </>
         );
     }
