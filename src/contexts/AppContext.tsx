@@ -5,8 +5,8 @@ import { Business } from '@/data/businesses';
 import { supabase, directProfileInsert, SUPABASE_URL, ENDPOINTS } from '@/lib/supabase';
 import {
   mapJoinedOfferingToBusiness,
-  OFFERING_LISTING_COLUMNS,
-  BUSINESS_PROFILE_EMBED_COLS,
+  splitBusinessListingsViewRow,
+  BUSINESS_LISTINGS_VIEW_COLUMNS,
 } from '@/lib/businessOfferingMap';
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
@@ -17,18 +17,6 @@ import { PASS_PRODUCTS, passProductIdFromDb } from '@/data/pricing';
 
 export type { ViewMode };
 export type { PassProductId };
-
-/** Embedded parent row (`businesses`) from `business_offerings` select — never `!inner`. */
-function singleEmbeddedProfile(raw: unknown): Record<string, unknown> | null {
-  if (raw == null) return null;
-  if (Array.isArray(raw)) {
-    const first = raw[0];
-    if (first && typeof first === 'object' && !Array.isArray(first)) return first as Record<string, unknown>;
-    return null;
-  }
-  if (typeof raw === 'object') return raw as Record<string, unknown>;
-  return null;
-}
 
 // ═══════════════════════════════════════════════════════════════
 // ADMIN EMAILS: These always get 'admin' role regardless of DB
@@ -413,16 +401,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const listAbort = typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(45_000) : undefined;
     try {
       // Every active offering → one `Business` in `dbBusinesses` (no Map/Object keyed by business_id).
-      // Load from `business_offerings` so stub profiles (`businesses.active = false`) still surface
-      // their live offers. Embed `businesses` without `!inner` (default left join).
+      // Load from `business_listings_view` (merged businesses + business_offerings; offering-first).
+      // Stub profiles (`businesses.active = false`) still surface live offers via `active` on the view.
       let q = supabase
-        .from('business_offerings')
-        .select(`
-          ${OFFERING_LISTING_COLUMNS},
-          businesses (
-            ${BUSINESS_PROFILE_EMBED_COLS}
-          )
-        `)
+        .from('business_listings_view')
+        .select(BUSINESS_LISTINGS_VIEW_COLUMNS)
         .eq('active', true)
         .order('featured', { ascending: false })
         .order('title', { ascending: true });
@@ -441,21 +424,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (offeringRows && offeringRows.length > 0) {
         const mapped: Business[] = [];
         for (const row of offeringRows as Record<string, unknown>[]) {
-          const profile = singleEmbeddedProfile(row.businesses);
+          const { o: offering, b: profile } = splitBusinessListingsViewRow(row);
           if (!profile?.id) {
-            console.warn(`${DBG} Skipping offering (missing profile embed):`, row?.id);
+            console.warn(`${DBG} Skipping row (missing profile_business_id):`, row?.id);
             continue;
           }
           const profileName = String(profile.name ?? '(no name)');
           const profileId = String(profile.id ?? '');
-          const { businesses: _drop, ...offering } = row;
           try {
-            const b = mapJoinedOfferingToBusiness(
-              offering as Record<string, unknown>,
-              profile,
-              SUPABASE_URL,
-            );
-            // Public visibility follows the offering row only (stub profiles may have `active = false`).
+            const b = mapJoinedOfferingToBusiness(offering, profile, SUPABASE_URL);
             mapped.push(b);
           } catch (mapErr) {
             console.warn(
@@ -1163,7 +1140,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Realtime: refetch listings (business_offerings + profile join, or legacy businesses)
+  // Realtime: refetch listings when underlying tables change (view has no postgres_changes channel)
   useEffect(() => {
     const debounced = () => {
       void loadBusinessesRef.current?.();
