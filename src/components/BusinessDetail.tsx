@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, MessageSquarePlus, Sparkles, ExternalLink, Store, Layers, Globe } from 'lucide-react';
@@ -10,7 +10,7 @@ import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import BookingInquiryModal from '@/components/BookingInquiryModal';
 import { categoryUsesTieredPricing, pricingTiersFromDb } from '@/lib/pricingTiers';
-import BusinessDetailMap from '@/components/BusinessDetailMap';
+const BusinessDetailMap = React.lazy(() => import('@/components/BusinessDetailMap'));
 import {
   displayWebsiteForInput,
   effectiveBusinessCoords,
@@ -960,12 +960,21 @@ const BusinessDetail: React.FC = () => {
               <div className="mt-5 space-y-3 pt-5 border-t border-gray-100">
                 <div className="flex items-center gap-3 text-sm text-gray-600"><MapPin className="w-4 h-4 text-teal-600 shrink-0" />{biz.location}</div>
                 {mapCoords && (
-                  <BusinessDetailMap
-                    lat={mapCoords.lat}
-                    lng={mapCoords.lng}
-                    savedMapUrl={savedMapUrlTrimmed || null}
-                    language={language}
-                  />
+                  <Suspense
+                    fallback={
+                      <div
+                        className="h-48 w-full rounded-xl bg-gray-100 animate-pulse"
+                        aria-hidden
+                      />
+                    }
+                  >
+                    <BusinessDetailMap
+                      lat={mapCoords.lat}
+                      lng={mapCoords.lng}
+                      savedMapUrl={savedMapUrlTrimmed || null}
+                      language={language}
+                    />
+                  </Suspense>
                 )}
                 {websiteHref && (
                   <a

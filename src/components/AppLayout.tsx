@@ -13,13 +13,10 @@ import CategoryShowcase from './CategoryShowcase';
 import FeaturedLeaderboard from './FeaturedLeaderboard';
 import BusinessGrid from './BusinessGrid';
 import PassCards from './PassCards';
-import MapView from './MapView';
 import ReviewsSection from './ReviewsSection';
-import BusinessListingForm from './BusinessListingForm';
 import ListYourBusinessCta from './ListYourBusinessCta';
 import Footer from './Footer';
 import AuthModal from './AuthModal';
-import BusinessDetail from './BusinessDetail';
 import CookieConsent from './CookieConsent';
 import PaymentConfirmation from './PaymentConfirmation';
 import FloatingPassButton from './FloatingPassButton';
@@ -33,6 +30,9 @@ const AdminPanel = React.lazy(() => import('./AdminPanel'));
 const PaymentCheckout = React.lazy(() => import('./PaymentCheckout'));
 const BusinessOwnerDashboard = React.lazy(() => import('./BusinessOwnerDashboard'));
 const HelpCenter = React.lazy(() => import('./HelpCenter'));
+const MapView = React.lazy(() => import('./MapView'));
+const BusinessDetail = React.lazy(() => import('./BusinessDetail'));
+const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
 
 /** URL path → in-app view (excludes /legal/* handled separately). */
 const PATH_TO_VIEW: Record<string, ViewMode> = {
@@ -67,14 +67,21 @@ function legalSlugFromPath(pathname: string): string | null {
 
 /** Single listing form instance for home + /business/new (dashboard uses the same component in its Submit tab). */
 function BusinessListingFormInLayout({ padded }: { padded: boolean }) {
+  const form = (
+    <Suspense
+      fallback={
+        <div className="min-h-[24rem] flex items-center justify-center rounded-xl border border-gray-100 bg-gray-50/80">
+          <LoadingSkeleton />
+        </div>
+      }
+    >
+      <BusinessListingForm />
+    </Suspense>
+  );
   if (padded) {
-    return (
-      <div className="pt-16 max-w-4xl mx-auto px-4">
-        <BusinessListingForm />
-      </div>
-    );
+    return <div className="pt-16 max-w-4xl mx-auto px-4">{form}</div>;
   }
-  return <BusinessListingForm />;
+  return form;
 }
 
 const AppLayout: React.FC = () => {

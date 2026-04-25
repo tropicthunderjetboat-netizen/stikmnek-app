@@ -26,7 +26,7 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX,
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
-import BusinessDescriptionEditor from './BusinessDescriptionEditor';
+import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import PricingTiersEditor from './PricingTiersEditor';
 import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
 import {
@@ -580,7 +580,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                   )}
                 </label>
                 <div className="relative min-w-0 max-w-full">
-                  <BusinessDescriptionEditor
+                  <LazyBusinessDescriptionEditor
                     value={form.description}
                     onChange={(html) => setForm((prev) => ({ ...prev, description: html }))}
                     placeholder="Describe your business to tourists..."

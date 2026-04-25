@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
@@ -18,12 +18,10 @@ import EmailNotificationCenter from './EmailNotificationCenter';
 import PhotoUploader, { UploadedPhoto } from './PhotoUploader';
 import MySubmissions from './MySubmissions';
 import DashboardOverview from './DashboardOverview';
-import DashboardAnalytics from './DashboardAnalytics';
 import PricingDiscountFields, { DURATION_OPTIONS, addDays, todayStr } from './PricingDiscountFields';
 import QRScanner from './QRScanner';
 import BusinessHomeScreen from './BusinessHomeScreen';
 import DealExpiryWarningBanner from './DealExpiryWarningBanner';
-import BusinessListingForm from './BusinessListingForm';
 import PricingTiersEditor from './PricingTiersEditor';
 import {
   categoryUsesTieredPricing,
@@ -38,7 +36,7 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX,
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
-import BusinessDescriptionEditor from './BusinessDescriptionEditor';
+import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import {
   businessHoursFromProfileRow,
   effectiveProfileBusinessId,
@@ -47,6 +45,9 @@ import {
   listingCategoryFromOffering,
   listingDisplayTitleFromOfferingRow,
 } from '@/lib/businessOfferingMap';
+
+const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
+const DashboardAnalytics = React.lazy(() => import('./DashboardAnalytics'));
 
 const DASHBOARD_LISTING_SUBMIT_DEADLINE_MS = 150_000;
 
@@ -1626,7 +1627,17 @@ const BusinessOwnerDashboard: React.FC = () => {
 
     // Standardize "New Listing" with the public List a Business form.
     if (!isResubmit) {
-      return <BusinessListingForm />;
+      return (
+        <Suspense
+          fallback={
+            <div className="flex justify-center py-16">
+              <Loader2 className="h-8 w-8 text-teal-500 animate-spin" aria-hidden />
+            </div>
+          }
+        >
+          <BusinessListingForm />
+        </Suspense>
+      );
     }
 
     return (
@@ -1663,7 +1674,7 @@ const BusinessOwnerDashboard: React.FC = () => {
             {/* Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Description *</label>
-              <BusinessDescriptionEditor
+              <LazyBusinessDescriptionEditor
                 value={submitForm.description}
                 onChange={(html) => setSubmitForm({ ...submitForm, description: html })}
                 placeholder="Describe your business and what makes it special..."
@@ -1904,13 +1915,31 @@ const BusinessOwnerDashboard: React.FC = () => {
             )}
 
 
-            {activeTab === 'analytics' && selectedBusiness && selectedIsApproved && (<DashboardAnalytics selectedBusiness={selectedBusiness as any} />)}
+            {activeTab === 'analytics' && selectedBusiness && selectedIsApproved && (
+              <Suspense
+                fallback={
+                  <div className="flex justify-center py-16">
+                    <Loader2 className="h-8 w-8 text-teal-500 animate-spin" aria-hidden />
+                  </div>
+                }
+              >
+                <DashboardAnalytics selectedBusiness={selectedBusiness as any} />
+              </Suspense>
+            )}
             {activeTab === 'analytics' && selectedBusiness && !selectedIsApproved && renderPendingOnlyNotice('Analytics are available once your listing is approved.')}
             {activeTab === 'edit' && selectedBusiness && selectedIsApproved && listingEmbeddedEdit && (
-              <BusinessListingForm
-                key={`edit-${listingEmbeddedEdit.profileBusinessId}-${listingEmbeddedEdit.offeringId || listingEmbeddedEdit.business.id}`}
-                embeddedEdit={listingEmbeddedEdit}
-              />
+              <Suspense
+                fallback={
+                  <div className="flex justify-center py-16">
+                    <Loader2 className="h-8 w-8 text-teal-500 animate-spin" aria-hidden />
+                  </div>
+                }
+              >
+                <BusinessListingForm
+                  key={`edit-${listingEmbeddedEdit.profileBusinessId}-${listingEmbeddedEdit.offeringId || listingEmbeddedEdit.business.id}`}
+                  embeddedEdit={listingEmbeddedEdit}
+                />
+              </Suspense>
             )}
             {activeTab === 'edit' && selectedBusiness && !selectedIsApproved && renderPendingOnlyNotice('Editing is available once your listing is approved.')}
             {activeTab === 'reviews' && selectedBusiness && renderReviewsTab()}

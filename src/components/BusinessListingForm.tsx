@@ -36,7 +36,7 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
   trimBusinessDescriptionHtmlForStorage,
 } from '@/lib/businessDescriptionHtml';
-import BusinessDescriptionEditor from './BusinessDescriptionEditor';
+import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 
 
 /** Whole submit (RPC + edge + attach) — allow RPC + edge cold starts without false “slow connection” */
@@ -1370,7 +1370,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {language === 'en' ? 'Description *' : 'Description *'}
             </label>
-            <BusinessDescriptionEditor
+            <LazyBusinessDescriptionEditor
               value={form.description}
               onChange={(html) => {
                 setFieldErrors((fe) => ({ ...fe, description: undefined }));

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as hardcodedBusinesses, Business } from '@/data/businesses';
 
@@ -24,14 +24,32 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
 import PricingDiscountFields from './PricingDiscountFields';
-import BusinessDescriptionEditor from './BusinessDescriptionEditor';
+import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 
-import EmailReceiptManager from './EmailReceiptManager';
-import EmailNotificationCenter from './EmailNotificationCenter';
-import PassEditor from './PassEditor';
-import AdminPurchaseOverview from './AdminPurchaseOverview';
-import AdminUserManager from './AdminUserManager';
+const AdminPurchaseOverview = React.lazy(() => import('./AdminPurchaseOverview'));
+const PassEditor = React.lazy(() => import('./PassEditor'));
+const AdminUserManager = React.lazy(() => import('./AdminUserManager'));
+const EmailReceiptManager = React.lazy(() => import('./EmailReceiptManager'));
+const EmailNotificationCenter = React.lazy(() => import('./EmailNotificationCenter'));
+
+function AdminTabFallback() {
+  return (
+    <div className="flex justify-center py-16" role="status" aria-live="polite">
+      <Loader2 className="h-8 w-8 text-teal-600 animate-spin" aria-hidden />
+    </div>
+  );
+}
+
+/** Emails tab: minimal placeholder (no spinner) while receipt + notification chunks load in parallel. */
+function AdminEmailTabFallback() {
+  return (
+    <div className="space-y-6" role="status" aria-live="polite">
+      <div className="h-36 rounded-xl border border-gray-100 bg-gray-50/90 animate-pulse" />
+      <div className="h-48 rounded-xl border border-gray-100 bg-gray-50/90 animate-pulse" />
+    </div>
+  );
+}
 
 /** On HTTP errors, `invoke` often leaves `data` null; the edge JSON may be on `FunctionsHttpError.context` (a `Response`). */
 async function tryReadEdgeFunctionJsonError(invokeError: unknown): Promise<string | null> {
@@ -51,15 +69,6 @@ async function tryReadEdgeFunctionJsonError(invokeError: unknown): Promise<strin
     return null;
   }
 }
-
-
-
-
-
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, Area, AreaChart
-} from 'recharts';
 
 interface PendingBusiness {
   id: string;
@@ -991,12 +1000,16 @@ const AdminPanel: React.FC = () => {
 
         {/* ═══ PASSES TAB ═══ */}
         {activeTab === 'passes' && (
-          <PassEditor />
+          <Suspense fallback={<AdminTabFallback />}>
+            <PassEditor />
+          </Suspense>
         )}
 
         {/* ═══ USERS TAB ═══ */}
         {activeTab === 'users' && (
-          <AdminUserManager />
+          <Suspense fallback={<AdminTabFallback />}>
+            <AdminUserManager />
+          </Suspense>
         )}
 
 
@@ -1004,10 +1017,12 @@ const AdminPanel: React.FC = () => {
 
 
         {activeTab === 'overview' && (
-          <AdminPurchaseOverview
-            totalBusinesses={allBusinesses.length}
-            dbBusinessCount={dbBusinesses.length}
-          />
+          <Suspense fallback={<AdminTabFallback />}>
+            <AdminPurchaseOverview
+              totalBusinesses={allBusinesses.length}
+              dbBusinessCount={dbBusinesses.length}
+            />
+          </Suspense>
         )}
 
 
@@ -1846,18 +1861,16 @@ const AdminPanel: React.FC = () => {
           </div>
         )}
 
-        {/* ═══ EMAILS TAB ═══ */}
+        {/* ═══ EMAILS TAB ═══ (lazy: receipt manager + notification center load in parallel) */}
         {activeTab === 'emails' && (
-          <div className="space-y-8">
-            {/* Receipt Manager */}
-            <EmailReceiptManager />
-
-            {/* Divider */}
-            <div className="border-t border-gray-200 pt-8">
-              {/* Email Notification Center (admin mode) */}
-              <EmailNotificationCenter mode="admin" />
+          <Suspense fallback={<AdminEmailTabFallback />}>
+            <div className="space-y-8">
+              <EmailReceiptManager />
+              <div className="border-t border-gray-200 pt-8">
+                <EmailNotificationCenter mode="admin" />
+              </div>
             </div>
-          </div>
+          </Suspense>
         )}
 
 
@@ -2091,7 +2104,7 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Description *</label>
-                  <BusinessDescriptionEditor
+                  <LazyBusinessDescriptionEditor
                     value={addForm.description}
                     onChange={(html) => setAddForm((p) => ({ ...p, description: html }))}
                     placeholder="Describe the business..."
@@ -2168,7 +2181,7 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
-                  <BusinessDescriptionEditor
+                  <LazyBusinessDescriptionEditor
                     value={editForm.description}
                     onChange={(html) => setEditForm((p) => ({ ...p, description: html }))}
                     className="focus-within:ring-blue-500"

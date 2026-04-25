@@ -101,31 +101,6 @@
   }
 }
 
-.markdown-editor {
-  @apply font-mono text-base leading-relaxed;
-}
-
-.markdown-preview {
-  @apply prose max-w-none prose-blue dark:prose-invert;
-}
-
-.markdown-preview pre {
-  @apply bg-secondary p-4 rounded-md overflow-x-auto;
-}
-
-.markdown-preview code {
-  @apply text-sm font-mono text-primary;
-}
-
-.markdown-preview h1,
-.markdown-preview h2,
-.markdown-preview h3,
-.markdown-preview h4,
-.markdown-preview h5,
-.markdown-preview h6 {
-  @apply font-sans font-semibold text-foreground;
-}
-
 /* Hard clamp utility for production (avoids Tailwind line-clamp plugin dependency). */
 .stikmnek-clamp-3 {
   display: -webkit-box !important;
@@ -133,15 +108,6 @@
   -webkit-line-clamp: 3 !important;
   -webkit-box-orient: vertical !important;
   word-break: break-word !important;
-}
-
-.markdown-preview ul,
-.markdown-preview ol {
-  @apply my-4 ml-6;
-}
-.markdown-preview ul,
-.markdown-preview ol {
-  @apply my-4 ml-6;
 }
 
 /* React Quill — business listing description (mobile: no page overflow; 16px avoids iOS input zoom) */
