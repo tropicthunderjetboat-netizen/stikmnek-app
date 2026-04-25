@@ -2,6 +2,13 @@ import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { Menu, X, User, MapPin, Tag, LayoutDashboard, Shield, Ticket, Store, Plane, Briefcase, HelpCircle } from 'lucide-react';
+import {
+  loadAdminPanel,
+  loadBusinessOwnerDashboard,
+  loadMapView,
+  loadTouristDashboard,
+  prefetchChunk,
+} from '@/lib/heavyChunks';
 
 const APP_ICON = 'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg';
 
@@ -114,6 +121,20 @@ const Navbar: React.FC = () => {
               <button
                 key={item.key}
                 onClick={() => setCurrentView(item.view)}
+                onMouseEnter={() => {
+                  // Strategic prefetch on intent (hover/focus) only.
+                  if (item.view === 'map') prefetchChunk(loadMapView);
+                  if (item.view === 'dashboard') prefetchChunk(loadTouristDashboard);
+                  if (item.view === 'business-dashboard') prefetchChunk(loadBusinessOwnerDashboard);
+                  if (item.view === 'admin') prefetchChunk(loadAdminPanel);
+                }}
+                onFocus={() => {
+                  // Keyboard users: prefetch on focus.
+                  if (item.view === 'map') prefetchChunk(loadMapView);
+                  if (item.view === 'dashboard') prefetchChunk(loadTouristDashboard);
+                  if (item.view === 'business-dashboard') prefetchChunk(loadBusinessOwnerDashboard);
+                  if (item.view === 'admin') prefetchChunk(loadAdminPanel);
+                }}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                   currentView === item.view
                     ? 'bg-teal-50 text-teal-700'
