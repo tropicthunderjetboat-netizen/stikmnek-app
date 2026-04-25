@@ -22,6 +22,7 @@ import {
   plainTextFromHtml,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
+import { PROSE_CLASSES } from '@/lib/prose';
 import {
   mapJoinedOfferingToBusiness,
   OFFERING_LISTING_COLUMNS,
@@ -603,7 +604,7 @@ const BusinessDetail: React.FC = () => {
               >
                 {looksLikeRichDescriptionHtml(desc || '') ? (
                   <div
-                    className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                    className={`${PROSE_CLASSES} text-gray-700 leading-relaxed`}
                     dangerouslySetInnerHTML={{ __html: sanitizeBusinessDescriptionHtml(desc || '') }}
                   />
                 ) : (

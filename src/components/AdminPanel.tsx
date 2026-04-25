@@ -23,6 +23,7 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX,
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
+import { PROSE_CLASSES } from '@/lib/prose';
 import PricingDiscountFields from './PricingDiscountFields';
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
@@ -2260,7 +2261,7 @@ const AdminPanel: React.FC = () => {
                   </div>
                   {looksLikeRichDescriptionHtml(biz.description || '') ? (
                     <div
-                      className="prose prose-sm max-w-none text-gray-600 mb-4 leading-relaxed"
+                      className={`${PROSE_CLASSES} text-gray-600 mb-4 leading-relaxed`}
                       dangerouslySetInnerHTML={{ __html: sanitizeBusinessDescriptionHtml(biz.description || '') }}
                     />
                   ) : (

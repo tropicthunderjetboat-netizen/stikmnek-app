@@ -15,6 +15,7 @@ import {
   looksLikeRichDescriptionHtml,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
+import { PROSE_CLASSES } from '@/lib/prose';
 import { mapJoinedOfferingToBusiness } from '@/lib/businessOfferingMap';
 
 export interface Submission {
@@ -1305,7 +1306,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
                           </p>
                           {looksLikeRichDescriptionHtml(submission.description) ? (
                             <div
-                              className="prose prose-sm max-w-none text-sm text-gray-700"
+                              className={`${PROSE_CLASSES} text-sm text-gray-700`}
                               dangerouslySetInnerHTML={{
                                 __html: sanitizeBusinessDescriptionHtml(submission.description),
                               }}

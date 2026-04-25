@@ -4,8 +4,13 @@ import typography from "@tailwindcss/typography";
 
 export default {
   darkMode: ["class"],
-  // Vite entry + all TS/TSX (avoid legacy root ./pages|./components|./app — none exist; ./src covers src/pages).
-  content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  // Vite entry + all TS/TSX (exclude test and Cypress files for faster builds and smaller CSS)
+  content: [
+    "./index.html",
+    "./src/**/*.{ts,tsx}",
+    "!./src/**/*.test.{ts,tsx}",     // Exclude Jest/Vitest test files
+    "!./src/**/*.cy.{ts,tsx}",       // Exclude Cypress test files
+  ],
   prefix: "",
   theme: {
     container: {
