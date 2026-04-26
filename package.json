@@ -22,7 +22,10 @@
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
     "cypress:component": "cypress run --component",
-    "cypress:component:open": "cypress open --component"
+    "cypress:component:open": "cypress open --component",
+    "perf:bundle": "node ./bundle-report.js",
+    "perf:analyze": "vite build --mode analyze",
+    "perf:ci": "npm run build && node ./bundle-report.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -102,10 +105,12 @@
     "jest-environment-jsdom": "^30.3.0",
     "pg": "^8.20.0",
     "postcss": "^8.5.10",
+    "rollup-plugin-visualizer": "^7.0.1",
     "tailwindcss": "^3.4.19",
     "ts-jest": "^29.4.9",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^8.0.9"
+    "vite": "^8.0.9",
+    "web-vitals": "^5.2.0"
   }
 }

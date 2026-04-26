@@ -24,14 +24,28 @@ function manualChunks(id: string): string | undefined {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig(() => ({
+export default defineConfig(async ({ mode }) => {
+  const analyze = mode === "analyze" || process.env.ANALYZE === "true";
+  const plugins = [react()];
+  if (analyze) {
+    const { visualizer } = await import("rollup-plugin-visualizer");
+    plugins.push(
+      visualizer({
+        filename: "artifacts/perf/bundle-visualizer.html",
+        gzipSize: true,
+        brotliSize: true,
+        template: "treemap",
+        open: false,
+      }),
+    );
+  }
+
+  return {
   server: {
     host: "::",
     port: 8080,
   },
-  plugins: [
-    react()
-  ].filter(Boolean),
+  plugins,
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -45,4 +59,5 @@ export default defineConfig(() => ({
       },
     },
   },
-}));
+  };
+});

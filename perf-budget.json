@@ -1,0 +1,21 @@
+{
+  "budgets": {
+    "css": {
+      "index.css.gz.kb": 25,
+      "vendor-quill.css.gz.kb": 5
+    },
+    "js": {
+      "initial.gz.kb": 300,
+      "singleChunkApp.gz.kb": 150,
+      "vendor-maps.gz.kb": 120,
+      "vendor-recharts.gz.kb": 120,
+      "vendor-quill.gz.kb": 70
+    }
+  },
+  "baseline": {
+    "note": "Update this after intentional bundle changes (run: npm run perf:bundle).",
+    "generatedAt": null,
+    "top": []
+  }
+}
+
