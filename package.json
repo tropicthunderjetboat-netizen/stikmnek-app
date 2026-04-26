@@ -25,7 +25,11 @@
     "cypress:component:open": "cypress open --component",
     "perf:bundle": "node ./bundle-report.js",
     "perf:analyze": "vite build --mode analyze",
-    "perf:ci": "npm run build && node ./bundle-report.js"
+    "perf:ci": "npm run build && node ./bundle-report.js",
+    "perf:budget": "node ./perf-budget-check.js --mode fail",
+    "perf:budget:warn": "node ./perf-budget-check.js --mode warn",
+    "perf:budget:update-baseline": "node ./perf-budget-check.js --update-baseline --mode warn",
+    "perf:ci:budget": "npm run perf:ci && node ./perf-budget-check.js --mode fail"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
