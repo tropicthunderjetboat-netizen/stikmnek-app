@@ -8,6 +8,11 @@
 ALTER TABLE public.businesses
   ADD COLUMN IF NOT EXISTS opening_hours text;
 
+-- If a previous version of the view exists with different column names,
+-- Postgres may reject CREATE OR REPLACE with "cannot change name of view column ...".
+-- Drop first to make this migration safe/idempotent across deployments.
+DROP VIEW IF EXISTS public.business_listings_view CASCADE;
+
 CREATE OR REPLACE VIEW public.business_listings_view
 WITH (security_invoker = true) AS
 SELECT
@@ -50,7 +55,6 @@ SELECT
   b.business_email,
   b.rating,
   b.review_count,
-  b.super_star_count,
   b.is_verified,
   b.created_at AS business_created_at,
   b.updated_at AS business_updated_at,
