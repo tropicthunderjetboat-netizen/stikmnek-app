@@ -412,7 +412,7 @@ const AdminPanel: React.FC = () => {
       const { data, error } = await supabase
         .from('business_photos')
         .select('*')
-        .or(`pending_id.eq.${pendingId},submission_pending_id.eq.${pendingId}`)
+        .or(`pending_id.eq.${pendingId},submission_pending_id.eq.${pendingId},business_id.eq.${pendingId}`)
         .order('created_at', { ascending: true });
       if (error) return;
       if (data && data.length > 0) {

@@ -119,8 +119,14 @@ async function replacePendingBusinessPhotos(args: {
   meta.photoCount = valid.length;
 
   // Best-effort delete; ignore schema mismatches.
-  if (args.debugLabel) console.log(label, 'delete existing (pending_id)', { pendingId });
-  const delByPending = await args.supabase.from('business_photos').delete().eq('pending_id', pendingId);
+  // Delete any prior photo rows for this submission under BOTH key styles:
+  // - current schema: `pending_id = pending_businesses.id`
+  // - legacy schema: some deployments stored `pending_businesses.id` in `business_id`
+  if (args.debugLabel) console.log(label, 'delete existing (pending_id or legacy business_id)', { pendingId });
+  const delByPending = await args.supabase
+    .from('business_photos')
+    .delete()
+    .or(`pending_id.eq.${pendingId},business_id.eq.${pendingId}`);
   if (delByPending.error && String(delByPending.error.message || '').toLowerCase().includes('pending_id')) {
     warnings.push('pending_id column not available (legacy schema) — falling back to business_id cleanup');
     if (args.debugLabel) console.log(label, 'delete fallback (business_id)', { pendingId, err: delByPending.error.message });
