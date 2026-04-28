@@ -34,6 +34,10 @@ const AdminUserManager = React.lazy(() => import('./AdminUserManager'));
 const EmailReceiptManager = React.lazy(() => import('./EmailReceiptManager'));
 const EmailNotificationCenter = React.lazy(() => import('./EmailNotificationCenter'));
 
+// #region agent log
+fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68da6b'},body:JSON.stringify({sessionId:'68da6b',runId:'pre-fix',hypothesisId:'H5',location:'AdminPanel.tsx:module',message:'AdminPanel module evaluated',data:{ts:Date.now()},timestamp:Date.now()})}).catch(()=>{});
+// #endregion agent log
+
 function AdminTabFallback() {
   return (
     <div className="flex justify-center py-16" role="status" aria-live="polite">

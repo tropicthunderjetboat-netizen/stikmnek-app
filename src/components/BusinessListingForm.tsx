@@ -904,6 +904,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         filePath: photo.filePath,
         isMain: index === 0,
       }));
+
+      // #region agent log
+      fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68da6b'},body:JSON.stringify({sessionId:'68da6b',runId:'pre-fix',hypothesisId:'H6',location:'BusinessListingForm.tsx:handleSubmit',message:'ListingForm submit photo payload prepared',data:{photoCount:Array.isArray(photoData)?photoData.length:0,hasMissingFilePath:Array.isArray(photoData)?photoData.some((p:any)=>!p?.filePath):null,firstUrlPrefix:Array.isArray(photoData)&&photoData[0]?.url?String(photoData[0].url).slice(0,32):null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
       // For no-discount listings, set dealPrice = originalPrice
       const finalOriginalPrice = form.originalPrice ? Number(form.originalPrice) : 0;
       const finalDealPrice = form.dealPrice ? Number(form.dealPrice) : finalOriginalPrice;
