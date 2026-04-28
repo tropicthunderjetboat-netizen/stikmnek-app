@@ -34,10 +34,6 @@ const AdminUserManager = React.lazy(() => import('./AdminUserManager'));
 const EmailReceiptManager = React.lazy(() => import('./EmailReceiptManager'));
 const EmailNotificationCenter = React.lazy(() => import('./EmailNotificationCenter'));
 
-// #region agent log
-fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68da6b'},body:JSON.stringify({sessionId:'68da6b',runId:'pre-fix',hypothesisId:'H5',location:'AdminPanel.tsx:module',message:'AdminPanel module evaluated',data:{ts:Date.now()},timestamp:Date.now()})}).catch(()=>{});
-// #endregion agent log
-
 function AdminTabFallback() {
   return (
     <div className="flex justify-center py-16" role="status" aria-live="polite">
@@ -360,9 +356,6 @@ const AdminPanel: React.FC = () => {
     setLoadingRpcPhotos(true);
     try {
       const { data, error } = await supabase.rpc('get_business_photos_for_admin');
-      // #region agent log
-      fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68da6b'},body:JSON.stringify({sessionId:'68da6b',runId:'pre-fix',hypothesisId:'H3',location:'AdminPanel.tsx:loadPhotosFromAdminRpc',message:'Admin RPC get_business_photos_for_admin result',data:{pendingBusinessesCount:Array.isArray(businesses)?businesses.length:null,rpcError: error ? {message:(error as any).message,code:(error as any).code} : null,returnedCount:Array.isArray(data)?data.length:null,sampleRowIds:Array.isArray(data)?(data as any[]).slice(0,3).map((r)=>r?.id):null},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion agent log
       if (error) throw error;
       const allPhotos = (Array.isArray(data) ? (data as BusinessPhoto[]) : []);
       const grouped = groupPhotosByBusinessId(allPhotos);
@@ -448,9 +441,6 @@ const AdminPanel: React.FC = () => {
         .select('*')
         .or(`pending_id.eq.${pendingId},submission_pending_id.eq.${pendingId},business_id.eq.${pendingId}`)
         .order('created_at', { ascending: true });
-      // #region agent log
-      fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68da6b'},body:JSON.stringify({sessionId:'68da6b',runId:'pre-fix',hypothesisId:'H4',location:'AdminPanel.tsx:loadPhotosForPendingId',message:'Admin per-card business_photos query result',data:{pendingId:String(pendingId),queryError:error?{message:(error as any).message,code:(error as any).code}:null,returnedCount:Array.isArray(data)?data.length:null,keys:Array.isArray(data)?(data as any[]).slice(0,5).map((r)=>({id:r?.id,pending_id:r?.pending_id,submission_pending_id:r?.submission_pending_id,business_id:r?.business_id,status:r?.status})) : null},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion agent log
       if (error) return;
       if (data && data.length > 0) {
         const list = data as BusinessPhoto[];
@@ -1265,21 +1255,6 @@ const AdminPanel: React.FC = () => {
                 Pending Business Approvals
               </h3>
               <div className="flex items-center gap-3 text-sm flex-wrap">
-                {import.meta.env.DEV && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // #region agent log
-                      fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68da6b'},body:JSON.stringify({sessionId:'68da6b',runId:'pre-fix',hypothesisId:'H7',location:'AdminPanel.tsx:debugPing',message:'Admin debug ping',data:{pendingCount:pendingBusinesses.length,hasRpcPhotoMapKeys:Object.keys(rpcPhotoMap||{}).length,hasBusinessPhotosKeys:Object.keys(businessPhotos||{}).length},timestamp:Date.now()})}).catch(()=>{});
-                      // #endregion agent log
-                      toast.info('Debug ping sent (DEV only)');
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-medium hover:bg-slate-100 transition-colors"
-                    title="DEV: writes a debug log line"
-                  >
-                    Debug ping
-                  </button>
-                )}
                 <button
                   onClick={() => loadPending(true)}
                   disabled={loadingPending}
