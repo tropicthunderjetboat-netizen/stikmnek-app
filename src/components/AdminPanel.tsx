@@ -1230,6 +1230,21 @@ const AdminPanel: React.FC = () => {
                 Pending Business Approvals
               </h3>
               <div className="flex items-center gap-3 text-sm flex-wrap">
+                {import.meta.env.DEV && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // #region agent log
+                      fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68da6b'},body:JSON.stringify({sessionId:'68da6b',runId:'pre-fix',hypothesisId:'H7',location:'AdminPanel.tsx:debugPing',message:'Admin debug ping',data:{pendingCount:pendingBusinesses.length,hasRpcPhotoMapKeys:Object.keys(rpcPhotoMap||{}).length,hasBusinessPhotosKeys:Object.keys(businessPhotos||{}).length},timestamp:Date.now()})}).catch(()=>{});
+                      // #endregion agent log
+                      toast.info('Debug ping sent (DEV only)');
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-medium hover:bg-slate-100 transition-colors"
+                    title="DEV: writes a debug log line"
+                  >
+                    Debug ping
+                  </button>
+                )}
                 <button
                   onClick={() => loadPending(true)}
                   disabled={loadingPending}
