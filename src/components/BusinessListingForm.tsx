@@ -36,6 +36,10 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
   trimBusinessDescriptionHtmlForStorage,
 } from '@/lib/businessDescriptionHtml';
+import {
+  validateListingSubmissionOnboarding,
+  localizedListingSubmitValidationFeedback,
+} from '@/lib/businessOnboardingValidation';
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 
 
@@ -78,11 +82,6 @@ function addDays(dateStr: string, days: number): string {
 
 function todayStr(): string {
   return new Date().toISOString().split('T')[0];
-}
-
-function isValidListingImageUrl(url: string): boolean {
-  const u = url.trim();
-  return u.length > 0 && /^https?:\/\//i.test(u);
 }
 
 function truncateForSubmissionLog(s: string, max: number): string {
@@ -758,124 +757,40 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     const titleForSubmit = embeddedEdit
       ? (form.name?.trim() || embeddedEdit.listingTitle?.trim())
       : form.name?.trim();
-    if (!titleForSubmit) {
-      toast.error(
-        language === 'en'
-          ? 'Please enter a title for this deal or listing.'
-          : language === 'fr'
-            ? 'Veuillez indiquer un titre pour cette offre.'
-            : 'Putem titel blong dil ia.',
-      );
-      return;
-    }
 
-    if (!hasMeaningfulDescriptionContent(form.description)) {
-      const msg =
-        language === 'en'
-          ? 'Please add a description with real detail (not only empty formatting).'
-          : 'Veuillez ajouter une description avec du contenu réel.';
-      setFieldErrors({ description: msg });
-      toast.error(msg);
-      return;
-    }
-
-    const descPlainLen = plainTextFromHtml(form.description).length;
-    if (descPlainLen > BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX) {
-      const msg =
-        language === 'en'
-          ? `Description must be ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} characters or fewer (plain text).`
-          : `La description doit comporter au plus ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} caractères (texte brut).`;
-      setFieldErrors({ description: msg });
-      toast.error(msg);
-      return;
-    }
-
+    // ─── New + embedded listing: shared rules in `@/lib/businessOnboardingValidation` ───
+    // (description, photo URL, flat vs tiered pricing). i18n for toasts / `fieldErrors` below.
     const mainImageUrl = photos.length > 0 ? String(photos[0].url || '').trim() : '';
-    if (!isValidListingImageUrl(mainImageUrl)) {
-      const msg =
-        language === 'en'
-          ? 'Add at least one photo and wait for upload to finish (a valid image URL is required).'
-          : 'Ajoutez au moins une photo et attendez la fin du téléchargement.';
-      setFieldErrors({ photos: msg });
-      toast.error(msg);
+    const listingValidation = validateListingSubmissionOnboarding({
+      title: titleForSubmit ?? '',
+      descriptionHtml: form.description,
+      category: form.category,
+      mainImageUrl,
+      flatPricing: categoryUsesTieredPricing(form.category)
+        ? null
+        : {
+            originalPrice: form.originalPrice,
+            dealPrice: form.dealPrice,
+            discountPercent: form.discountPercent,
+          },
+      pricingTiers: categoryUsesTieredPricing(form.category) ? pricingTiers : null,
+    });
+
+    if (!listingValidation.valid) {
+      const { fieldErrors: nextErrors, toastMessage } = localizedListingSubmitValidationFeedback(
+        listingValidation.errors,
+        form.description,
+        language,
+      );
+      setFieldErrors(nextErrors);
+      toast.error(toastMessage);
       return;
     }
 
     let tiersPayload: unknown[] | null = null;
     if (categoryUsesTieredPricing(form.category)) {
-      const { data, error: tierErr } = validatePricingTiersForSubmit(pricingTiers);
-      if (tierErr) {
-        setFieldErrors({ pricing: tierErr });
-        toast.error(tierErr);
-        return;
-      }
-      if (!data || !Array.isArray(data) || data.length === 0) {
-        const msg =
-          language === 'en'
-            ? 'Add at least one complete pricing tier (label and valid standard / StikmNek prices).'
-            : 'Ajoutez au moins un palier de prix complet (libellé et prix valides).';
-        setFieldErrors({ pricing: msg });
-        toast.error(msg);
-        return;
-      }
-      tiersPayload = data;
-    } else {
-      const origPrice = Number(form.originalPrice);
-      if (!Number.isFinite(origPrice) || origPrice <= 0) {
-        const msg =
-          language === 'en'
-            ? 'Enter your standard price in VT (must be greater than 0).'
-            : 'Indiquez votre prix standard en VT (supérieur à 0).';
-        setFieldErrors({ pricing: msg });
-        toast.error(msg);
-        return;
-      }
-
-      const hasDiscount = Boolean(form.discountPercent?.trim());
-      let dealNum: number;
-      if (hasDiscount) {
-        const pct = Number(form.discountPercent);
-        if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) {
-          const msg =
-            language === 'en'
-              ? 'Discount must be between 1% and 99%.'
-              : 'La remise doit être entre 1% et 99%.';
-          setFieldErrors({ pricing: msg });
-          toast.error(msg);
-          return;
-        }
-        dealNum = Number(form.dealPrice);
-        if (!Number.isFinite(dealNum) || dealNum <= 0) {
-          const msg =
-            language === 'en'
-              ? 'Enter a valid discounted price (or adjust discount %).'
-              : 'Entrez un prix promotionnel valide.';
-          setFieldErrors({ pricing: msg });
-          toast.error(msg);
-          return;
-        }
-        if (dealNum >= origPrice) {
-          const msg =
-            language === 'en'
-              ? 'With a discount set, the StikmNek price must be less than your standard price.'
-              : 'Avec une remise, le prix StikmNek doit être inférieur au prix standard.';
-          setFieldErrors({ pricing: msg });
-          toast.error(msg);
-          return;
-        }
-      } else {
-        dealNum = origPrice;
-      }
-
-      if (!Number.isFinite(dealNum) || dealNum <= 0 || dealNum > origPrice) {
-        const msg =
-          language === 'en'
-            ? 'Invalid pricing: listed price must be positive and not greater than your standard price.'
-            : 'Prix invalide : le prix affiché doit être positif et ne pas dépasser le prix standard.';
-        setFieldErrors({ pricing: msg });
-        toast.error(msg);
-        return;
-      }
+      const { data } = validatePricingTiersForSubmit(pricingTiers);
+      tiersPayload = data ?? null;
     }
 
     if (embeddedEdit) {

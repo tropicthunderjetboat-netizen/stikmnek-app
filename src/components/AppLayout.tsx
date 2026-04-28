@@ -127,8 +127,13 @@ const AppLayout: React.FC = () => {
       return;
     }
 
-    // Business onboarding screen — do not bounce to dashboard until profile row exists
-    if (role === 'business' && currentView === 'business-dashboard' && businessOwnerHasBusinessRow === false) {
+    // Business onboarding: only redirect off the hub when we *know* there is no `businesses` row (`false`).
+    // `null` = lookup failed or in-flight — do not send owners to complete-business-profile (avoids false positives).
+    if (
+      role === 'business' &&
+      currentView === 'business-dashboard' &&
+      businessOwnerHasBusinessRow === false
+    ) {
       setCurrentView('complete-business-profile');
       return;
     }
@@ -164,6 +169,7 @@ const AppLayout: React.FC = () => {
     const role = userProfile?.role || user.type || 'tourist';
     if (role !== 'business') return;
     if (userProfileLoadError) return;
+    // Unknown row status: wait for a definitive true/false (do not hard-redirect to profile setup).
     if (businessOwnerHasBusinessRow === null) return;
 
     if (businessOwnerHasBusinessRow === false && currentView !== 'complete-business-profile') {

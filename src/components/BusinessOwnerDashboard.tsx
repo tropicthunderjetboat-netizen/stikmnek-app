@@ -31,11 +31,14 @@ import {
 } from '@/lib/pricingTiers';
 import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 import {
-  hasMeaningfulDescriptionContent,
   plainTextFromHtml,
   BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX,
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
+import {
+  validateListingSubmissionOnboarding,
+  localizedListingSubmitValidationFeedback,
+} from '@/lib/businessOnboardingValidation';
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import {
   businessHoursFromProfileRow,
@@ -1037,45 +1040,44 @@ const BusinessOwnerDashboard: React.FC = () => {
   const handleSubmitBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Only name and description are required
-    if (!submitForm.name.trim() || !hasMeaningfulDescriptionContent(submitForm.description)) {
-      toast.error('Please fill in the required fields (business name and description)');
-      return;
-    }
+    // Same rules as `BusinessListingForm` (`validateListingSubmissionOnboarding` + i18n toasts).
+    // Resubmit keeps this compact form + `resubmit_pending_business`; new listings use `<BusinessListingForm />`.
+    const mainImageUrl = String(
+      (submitPhotos.length > 0 ? submitPhotos[0].url : submitForm.image) || '',
+    ).trim();
 
-    const submitDescPlainLen = plainTextFromHtml(submitForm.description).length;
-    if (submitDescPlainLen > BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX) {
-      toast.error(
-        language === 'en'
-          ? `Description must be ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} characters or fewer (plain text).`
-          : `La description doit comporter au plus ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} caractères (texte brut).`,
+    const listingValidation = validateListingSubmissionOnboarding({
+      title: submitForm.name.trim(),
+      descriptionHtml: submitForm.description,
+      category: submitForm.category,
+      mainImageUrl,
+      flatPricing: categoryUsesTieredPricing(submitForm.category)
+        ? null
+        : {
+            originalPrice: submitForm.originalPrice,
+            dealPrice: submitForm.dealPrice,
+            discountPercent: submitForm.discountPercent,
+          },
+      pricingTiers: categoryUsesTieredPricing(submitForm.category) ? pricingTiers : null,
+    });
+
+    if (!listingValidation.valid) {
+      const { toastMessage } = localizedListingSubmitValidationFeedback(
+        listingValidation.errors,
+        submitForm.description,
+        language,
       );
+      toast.error(toastMessage);
       return;
     }
 
-    // If discount fields are provided, validate them
     const hasDiscountFields = submitForm.originalPrice || submitForm.discountPercent;
     let origPrice = 0;
     let dlPrice = 0;
 
     if (hasDiscountFields) {
-      const pct = Number(submitForm.discountPercent);
       origPrice = Number(submitForm.originalPrice);
-
-      if (submitForm.discountPercent && (isNaN(pct) || pct <= 0 || pct >= 100)) {
-        toast.error('Discount must be between 1% and 99%');
-        return;
-      }
-      if (submitForm.originalPrice && (isNaN(origPrice) || origPrice <= 0)) {
-        toast.error('Please enter a valid original price greater than 0');
-        return;
-      }
-
       dlPrice = Number(submitForm.dealPrice);
-      if (origPrice > 0 && dlPrice > 0 && dlPrice >= origPrice) {
-        toast.error('Deal price should be less than the original price');
-        return;
-      }
     } else {
       origPrice = Number(submitForm.originalPrice) || 0;
       dlPrice = Number(submitForm.dealPrice) || 0;
@@ -1083,12 +1085,8 @@ const BusinessOwnerDashboard: React.FC = () => {
 
     let tiersPayload: unknown[] | null = null;
     if (categoryUsesTieredPricing(submitForm.category)) {
-      const { data, error: tierErr } = validatePricingTiersForSubmit(pricingTiers);
-      if (tierErr) {
-        toast.error(tierErr);
-        return;
-      }
-      tiersPayload = data;
+      const { data } = validatePricingTiersForSubmit(pricingTiers);
+      tiersPayload = data ?? null;
     }
 
     setLoading(true);
@@ -1100,7 +1098,6 @@ const BusinessOwnerDashboard: React.FC = () => {
       await Promise.race([
         (async () => {
       const normalizedWebsite = normalizeWebsiteForStorage(submitForm.website) ?? null;
-      const mainImageUrl = submitPhotos.length > 0 ? submitPhotos[0].url : submitForm.image;
 
       // Calculate discount valid until from duration
       const selectedDuration = DURATION_OPTIONS.find(d => d.value === submitForm.listingDuration);
@@ -1625,7 +1622,8 @@ const BusinessOwnerDashboard: React.FC = () => {
     if (!user) return null;
     const isResubmit = !!resubmitSubmission;
 
-    // Standardize "New Listing" with the public List a Business form.
+    // New listings: `BusinessListingForm` (shared validation + field errors). Rejected resubmits: compact
+    // legacy form + `handleSubmitBusiness` — rules aligned via `validateListingSubmissionOnboarding` in both paths.
     if (!isResubmit) {
       return (
         <Suspense

@@ -267,6 +267,11 @@ interface AppContextType {
   businessOwnerHasBusinessRow: boolean | null;
   /** True if this owner has a pending_businesses submission (awaiting review). */
   businessOwnerHasPendingSubmission: boolean;
+  /**
+   * Last `refreshBusinessOwnerRowStatus` attempt counter: 0 = idle or last run succeeded;
+   * 1–3 while retrying; 3 = all retries failed (row unknown — `businessOwnerHasBusinessRow` stays null).
+   */
+  businessOwnerRowLookupRetryCount: number;
   refreshBusinessOwnerRowStatus: () => Promise<void>;
   /** Set when user_profiles could not be loaded (network/Supabase); avoids gating loops on null profile. */
   userProfileLoadError: string | null;
@@ -309,6 +314,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [dataLoaded, setDataLoaded] = useState(false);
   const [businessOwnerHasBusinessRow, setBusinessOwnerHasBusinessRow] = useState<boolean | null>(null);
   const [businessOwnerHasPendingSubmission, setBusinessOwnerHasPendingSubmission] = useState(false);
+  /** Bumps to cancel in-flight owner-row lookups when user/session changes (see `refreshBusinessOwnerRowStatus`). */
+  const businessOwnerRowFetchGenRef = useRef(0);
+  /** Attempt index for the current refresh (1-based); 0 after success; 3 after exhausted retries. */
+  const [businessOwnerRowLookupRetryCount, setBusinessOwnerRowLookupRetryCount] = useState(0);
   const [userProfileLoadError, setUserProfileLoadError] = useState<string | null>(null);
 
   // Geolocation state
@@ -1307,6 +1316,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCart(null);
     setCurrentView('home');
     setSidebarOpen(false);
+    businessOwnerRowFetchGenRef.current += 1;
+    setBusinessOwnerRowLookupRetryCount(0);
     setBusinessOwnerHasBusinessRow(null);
     setBusinessOwnerHasPendingSubmission(false);
 
@@ -1689,30 +1700,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const uid = user?.id;
     const utype = user?.type;
     if (!uid || utype !== 'business') {
+      businessOwnerRowFetchGenRef.current += 1;
+      setBusinessOwnerRowLookupRetryCount(0);
       setBusinessOwnerHasBusinessRow(null);
       setBusinessOwnerHasPendingSubmission(false);
       return;
     }
-    try {
-      const [bizRes, pendRes] = await Promise.all([
-        supabase.from('businesses').select('id').eq('owner_id', uid).limit(1),
-        supabase
-          .from('pending_businesses')
-          .select('id')
-          .eq('owner_id', uid)
-          .eq('status', 'pending')
-          .limit(1),
-      ]);
-      if (bizRes.error) throw bizRes.error;
-      if (pendRes.error) throw pendRes.error;
-      setBusinessOwnerHasBusinessRow((bizRes.data?.length ?? 0) > 0);
-      setBusinessOwnerHasPendingSubmission((pendRes.data?.length ?? 0) > 0);
-    } catch (e) {
-      console.warn('[refreshBusinessOwnerRowStatus]', e);
-      setBusinessOwnerHasBusinessRow(false);
-      setBusinessOwnerHasPendingSubmission(false);
+
+    const gen = ++businessOwnerRowFetchGenRef.current;
+    const backoffMs = [1000, 2000, 4000] as const;
+    const userEmail = user?.email ?? null;
+
+    setBusinessOwnerRowLookupRetryCount(0);
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (gen !== businessOwnerRowFetchGenRef.current) return;
+      setBusinessOwnerRowLookupRetryCount(attempt + 1);
+
+      try {
+        const [bizRes, pendRes] = await Promise.all([
+          supabase.from('businesses').select('id').eq('owner_id', uid).limit(1),
+          supabase
+            .from('pending_businesses')
+            .select('id')
+            .eq('owner_id', uid)
+            .eq('status', 'pending')
+            .limit(1),
+        ]);
+        if (gen !== businessOwnerRowFetchGenRef.current) return;
+        if (bizRes.error) throw bizRes.error;
+        if (pendRes.error) throw pendRes.error;
+        setBusinessOwnerHasBusinessRow((bizRes.data?.length ?? 0) > 0);
+        setBusinessOwnerHasPendingSubmission((pendRes.data?.length ?? 0) > 0);
+        setBusinessOwnerRowLookupRetryCount(0);
+        return;
+      } catch (e: unknown) {
+        if (gen !== businessOwnerRowFetchGenRef.current) return;
+
+        const errObj = e as { message?: string; code?: string; details?: string; hint?: string };
+        console.error('[refreshBusinessOwnerRowStatus] attempt failed', {
+          context: 'refreshBusinessOwnerRowStatus',
+          attempt: attempt + 1,
+          maxAttempts: 3,
+          userId: uid,
+          userEmail,
+          message: errObj?.message ?? (e instanceof Error ? e.message : String(e)),
+          code: errObj?.code,
+          details: errObj?.details,
+          hint: errObj?.hint,
+        });
+
+        if (attempt < 2) {
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, backoffMs[attempt]);
+          });
+        }
+      }
     }
-  }, [user?.id, user?.type]);
+
+    if (gen !== businessOwnerRowFetchGenRef.current) return;
+    console.error('[refreshBusinessOwnerRowStatus] all attempts failed — owner row / pending unknown', {
+      context: 'refreshBusinessOwnerRowStatus',
+      userId: uid,
+      userEmail,
+      attempts: 3,
+      backoffMsDelays: [...backoffMs],
+    });
+    setBusinessOwnerHasBusinessRow(null);
+    setBusinessOwnerRowLookupRetryCount(3);
+  }, [user?.id, user?.type, user?.email]);
 
   useEffect(() => {
     void refreshBusinessOwnerRowStatus();
@@ -1773,6 +1829,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         retryUserProfileFetch,
         businessOwnerHasBusinessRow,
         businessOwnerHasPendingSubmission,
+        businessOwnerRowLookupRetryCount,
         refreshBusinessOwnerRowStatus,
         userProfileLoadError,
         touristOnboardingResume,

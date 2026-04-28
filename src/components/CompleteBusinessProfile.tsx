@@ -11,6 +11,17 @@ import PhotoUploader, { type UploadedPhoto } from '@/components/PhotoUploader';
 import LocationMapPicker from '@/components/LocationMapPicker';
 import WebsiteUrlInput from '@/components/WebsiteUrlInput';
 import { parseLatLngFromMapUrl, normalizeWebsiteForStorage } from '@/lib/urlHelpers';
+import { validateBusinessProfileOnboarding } from '@/lib/businessOnboardingValidation';
+
+/** Maps `validateBusinessProfileOnboarding` error keys → local `errors` state keys used by this form. */
+const PROFILE_VALIDATION_KEY_TO_FORM: Record<string, string> = {
+  businessName: 'businessName',
+  ownerName: 'ownerName',
+  email: 'businessEmail',
+  phone: 'businessPhone',
+  whatsapp: 'whatsappNumber',
+  address: 'address',
+};
 
 const CompleteBusinessProfile: React.FC = () => {
   const {
@@ -60,22 +71,36 @@ const CompleteBusinessProfile: React.FC = () => {
     setAddress((userProfile.business_location || '').trim());
   }, [userProfile, user]);
 
-  const validate = () => {
-    const e: Record<string, string> = {};
-    if (!businessName.trim()) e.businessName = 'Required';
-    if (!ownerName.trim()) e.ownerName = 'Required';
-    if (!businessEmail.trim() || !businessEmail.includes('@')) e.businessEmail = 'Valid email required';
-    if (!businessPhone.trim()) e.businessPhone = 'Required';
-    if (!whatsappNumber.trim()) e.whatsappNumber = 'Required';
-    if (!address.trim()) e.address = 'Required';
-    setErrors(e);
-    return Object.keys(e).length === 0;
+  /**
+   * Client-side profile validation (on submit only).
+   * Rules live in `@/lib/businessOnboardingValidation` so listing/dashboard flows stay aligned.
+   */
+  const runProfileValidation = (): boolean => {
+    const { valid, errors: validationErrors } = validateBusinessProfileOnboarding({
+      businessName,
+      ownerName,
+      email: businessEmail,
+      phone: businessPhone,
+      whatsapp: whatsappNumber,
+      address,
+    });
+    if (valid) {
+      setErrors({});
+      return true;
+    }
+    const next: Record<string, string> = {};
+    for (const [key, message] of Object.entries(validationErrors)) {
+      const formKey = PROFILE_VALIDATION_KEY_TO_FORM[key];
+      if (formKey && message) next[formKey] = message;
+    }
+    setErrors(next);
+    return false;
   };
 
   const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     if (!user?.id) return;
-    if (!validate()) {
+    if (!runProfileValidation()) {
       toast.error(
         language === 'en' ? 'Please fix the errors below.' : language === 'fr' ? 'Corrigez les erreurs ci-dessous.' : 'Fiksem ol erro',
       );
