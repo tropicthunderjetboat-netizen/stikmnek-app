@@ -1528,10 +1528,15 @@ Deno.serve(async (req) => {
         if (insertedOff?.id) newOfferingId = String(insertedOff.id);
       }
 
+      // Support both schema variants:
+      // - current: `pending_id` links photos to a moderation submission
+      // - legacy: some deployments stored `pending_businesses.id` in `business_id`
+      const pendingPhotoMatch = `pending_id.eq.${pendingId},business_id.eq.${pendingId}`;
+
       const { error: rejErr } = await supabase
         .from('business_photos')
         .update({ business_id: liveBusinessId, pending_id: null })
-        .eq('pending_id', pendingId)
+        .or(pendingPhotoMatch)
         .eq('status', 'rejected');
 
       if (rejErr) {
@@ -1553,7 +1558,7 @@ Deno.serve(async (req) => {
       const { error: photoErr } = await supabase
         .from('business_photos')
         .update(approvedPhotoPatch)
-        .eq('pending_id', pendingId)
+        .or(pendingPhotoMatch)
         .neq('status', 'rejected');
 
       if (photoErr) {
