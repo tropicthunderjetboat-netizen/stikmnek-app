@@ -42,6 +42,38 @@ function trimPendingDescription(input: unknown): string {
   return s.length <= PENDING_DESCRIPTION_MAX_CHARS ? s : s.slice(0, PENDING_DESCRIPTION_MAX_CHARS);
 }
 
+type DbErrorShape = { message?: string; code?: string; details?: string; hint?: string } | null | undefined;
+function dbErrorForLog(err: DbErrorShape): Record<string, unknown> | null {
+  if (!err) return null;
+  return {
+    message: typeof err.message === 'string' ? err.message : String(err.message ?? ''),
+    code: typeof err.code === 'string' ? err.code : null,
+    details: typeof err.details === 'string' ? err.details : null,
+    hint: typeof err.hint === 'string' ? err.hint : null,
+  };
+}
+
+function truncateForLog(value: unknown, max = 400): string {
+  const s = String(value ?? '');
+  if (s.length <= max) return s;
+  return `${s.slice(0, max)}… (${s.length} chars)`;
+}
+
+/** Safe logging view: strips huge HTML/base64 and only logs photo keys. */
+function payloadForLog(body: Record<string, unknown>): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...body };
+  if (typeof next.description === 'string') next.description = truncateForLog(next.description, 800);
+  if (typeof next.fileBase64 === 'string') next.fileBase64 = '[omitted]';
+  if (Array.isArray(next.photos)) {
+    next.photos = (next.photos as Record<string, unknown>[]).map((p) => ({
+      url: typeof p?.url === 'string' ? truncateForLog(p.url, 160) : p?.url,
+      filePath: typeof p?.filePath === 'string' ? truncateForLog(p.filePath, 160) : p?.filePath,
+      isMain: p?.isMain,
+    }));
+  }
+  return next;
+}
+
 /**
  * Robust pending photo attachment across schema variants.
  *
@@ -619,7 +651,13 @@ async function sendAdminDecisionNotificationEmail(params: {
 }
 
 Deno.serve(async (req) => {
-  console.log('Manage Business Triggered:', req.method);
+  const requestId = crypto.randomUUID();
+  const startMs = Date.now();
+  console.log('[manage-business] request start', {
+    requestId,
+    method: req.method,
+    url: req.url,
+  });
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: getSafeCorsHeaders(req) });
   }
@@ -662,9 +700,22 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const action = body?.action;
+    const debug = Boolean((body as Record<string, unknown>)?.debug);
 
     if (!action) {
-      return errorResponse(req, 'Missing action');
+      console.error('[manage-business] missing action', { requestId, userId: authUser.id });
+      return errorResponse(req, 'Missing action', 400, { requestId, reason: 'missing_action' });
+    }
+
+    if (debug || action === 'resubmit_pending_business') {
+      console.log('[manage-business] action begin', {
+        requestId,
+        action,
+        userId: authUser.id,
+        email: authUser.email ?? null,
+        debug,
+        payload: payloadForLog(body as Record<string, unknown>),
+      });
     }
 
     // ─── HEALTH ───
@@ -901,7 +952,7 @@ Deno.serve(async (req) => {
       try {
         const userId = authUser.id;
         const pendingId = body.pendingId;
-        if (!pendingId) return errorResponse(req, 'Missing pendingId', 400);
+        if (!pendingId) return errorResponse(req, 'Missing pendingId', 400, { requestId, action, reason: 'missing_pending_id' });
 
         const { data: existing, error: fetchErr } = await supabase
           .from('pending_businesses')
@@ -910,8 +961,51 @@ Deno.serve(async (req) => {
           .eq('owner_id', userId)
           .single();
 
-        if (fetchErr || !existing) return errorResponse(req, 'Submission not found or access denied', 404);
-        if (existing.status !== 'rejected') return errorResponse(req, 'Only rejected submissions can be resubmitted', 400);
+        if (fetchErr || !existing) {
+          console.error('[manage-business][resubmit] fetch pending row failed', {
+            requestId,
+            pendingId,
+            userId,
+            err: dbErrorForLog(fetchErr as any),
+          });
+          return errorResponse(req, 'Submission not found or access denied', 404, {
+            requestId,
+            action,
+            reason: 'pending_not_found_or_denied',
+            ...(debug ? { dbError: dbErrorForLog(fetchErr as any) } : {}),
+          });
+        }
+        if (existing.status !== 'rejected') {
+          return errorResponse(req, 'Only rejected submissions can be resubmitted', 400, {
+            requestId,
+            action,
+            reason: 'invalid_status',
+            status: existing.status,
+          });
+        }
+
+        const diag: Record<string, unknown> = {};
+        if (debug) {
+          const missing: string[] = [];
+          const name = String(body.name ?? existing.name ?? '').trim();
+          const category = String(body.category ?? existing.category ?? '').trim();
+          const desc = String(body.description ?? existing.description ?? '').trim();
+          const image = String(body.image ?? existing.image ?? '').trim();
+          if (!name) missing.push('name');
+          if (!category) missing.push('category');
+          if (!desc) missing.push('description');
+          if (!image) missing.push('image');
+
+          const photosRaw = Array.isArray(body.photos) ? (body.photos as any[]) : [];
+          const ready = photosRaw.filter((p) => typeof p?.url === 'string' && String(p.url).trim());
+          const noFilePath = ready.filter((p) => !p?.filePath || !String(p.filePath).trim()).length;
+          diag.requiredMissing = missing;
+          diag.photos = { provided: photosRaw.length, withUrl: ready.length, missingFilePath: noFilePath };
+          if (missing.length > 0) {
+            diag.warning =
+              'Some required fields are missing/empty. Client-side validation should prevent this; check payload construction.';
+          }
+        }
 
         const updates: Record<string, any> = {
           name: body.name ?? existing.name,
@@ -947,7 +1041,12 @@ Deno.serve(async (req) => {
 
         if (updateErr) {
           console.error('[manage-business] resubmit update error:', updateErr);
-          return errorResponse(req, 'Resubmit failed: ' + updateErr.message, 500);
+          return errorResponse(req, 'Resubmit failed: ' + updateErr.message, 500, {
+            requestId,
+            action,
+            reason: 'pending_update_failed',
+            ...(debug ? { dbError: dbErrorForLog(updateErr as any), diag } : {}),
+          });
         }
 
         const photos = Array.isArray(body.photos) ? body.photos : [];
@@ -961,7 +1060,12 @@ Deno.serve(async (req) => {
           });
           if (photoErr) {
             console.error('[manage-business] resubmit photo insert error:', photoErr);
-            return errorResponse(req, 'Resubmit succeeded but photo save failed: ' + photoErr.message, 500);
+            return errorResponse(req, 'Resubmit succeeded but photo save failed: ' + photoErr.message, 500, {
+              requestId,
+              action,
+              reason: 'photo_attach_failed',
+              ...(debug ? { attachment: { mode, warnings, meta }, diag } : {}),
+            });
           }
           if (body?.debug) {
             console.log('[manage-business][photos][resubmit_pending_business] result', {
@@ -973,10 +1077,28 @@ Deno.serve(async (req) => {
           }
         }
 
-        return jsonResponse(req, { success: true, business: updated });
+        if (debug) {
+          console.log('[manage-business][resubmit] success', {
+            requestId,
+            pendingId,
+            userId,
+            elapsedMs: Date.now() - startMs,
+          });
+        }
+        return jsonResponse(req, { success: true, business: updated, ...(debug ? { requestId, diag } : {}) });
       } catch (err: any) {
-        console.error('[manage-business] resubmit error:', err);
-        return errorResponse(req, 'Resubmit failed: ' + (err?.message || String(err)), 500);
+        const msg = err?.message || String(err);
+        console.error('[manage-business][resubmit] unexpected error', {
+          requestId,
+          message: msg,
+          stack: typeof err?.stack === 'string' ? err.stack : null,
+        });
+        return errorResponse(req, 'Resubmit failed: ' + msg, 500, {
+          requestId,
+          action,
+          reason: 'unexpected_exception',
+          ...(debug ? { stack: typeof err?.stack === 'string' ? err.stack : null } : {}),
+        });
       }
     }
 
@@ -2040,8 +2162,16 @@ Deno.serve(async (req) => {
 
     return errorResponse(req, 'Unknown action: ' + action, 400);
   } catch (err) {
-    console.error('[manage-business] error:', err);
     const msg = err instanceof Error ? err.message : String(err ?? 'Internal server error');
-    return errorResponse(req, msg || 'Internal server error', 500);
+    console.error('[manage-business] error', {
+      requestId,
+      message: msg,
+      stack: err instanceof Error ? err.stack : null,
+      elapsedMs: Date.now() - startMs,
+    });
+    return errorResponse(req, msg || 'Internal server error', 500, {
+      requestId,
+      reason: 'top_level_exception',
+    });
   }
 });
