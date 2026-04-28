@@ -373,6 +373,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
   const [pricingTiers, setPricingTiers] = useState<PricingTierInput[]>([]);
   /** Inline validation for submit (images, description, pricing). */
   const [fieldErrors, setFieldErrors] = useState<{
+    title?: string;
     description?: string;
     photos?: string;
     pricing?: string;
@@ -1236,16 +1237,23 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {language === 'en'
-                  ? 'Deal / listing title *'
+                  ? 'Deal / listing title'
                   : language === 'fr'
-                    ? 'Titre de l’offre *'
-                    : 'Titel blong dil *'}
+                    ? 'Titre de l’offre'
+                    : 'Titel blong dil'}
+                <span className="text-red-600 font-semibold" aria-hidden> *</span>
               </label>
               <input
                 type="text"
                 value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                onChange={(e) => {
+                  setFieldErrors((fe) => ({ ...fe, title: undefined }));
+                  setForm({ ...form, name: e.target.value });
+                }}
+                aria-invalid={!!fieldErrors.title}
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                  fieldErrors.title ? 'border-red-400 ring-2 ring-red-100' : 'border-gray-200'
+                }`}
                 placeholder={
                   language === 'en'
                     ? 'e.g. Reef Explorer Semi-Sub Tour – Port Vila'
@@ -1254,6 +1262,12 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                       : 'ex. Semi-sub tua – Port Vila'
                 }
               />
+              {fieldErrors.title && (
+                <p className="text-sm text-red-600 mt-1.5 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                  {fieldErrors.title}
+                </p>
+              )}
               <p className="text-[11px] text-gray-500 mt-1">
                 {language === 'en'
                   ? 'This is the name tourists see for this deal. Save to update your live listing.'
@@ -1264,11 +1278,15 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {language === 'en' ? 'Category *' : 'Catégorie *'}
+                {language === 'en' ? 'Category' : 'Catégorie'}
+                <span className="text-red-600 font-semibold" aria-hidden> *</span>
               </label>
               <select
                 value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                onChange={(e) => {
+                  setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                  setForm({ ...form, category: e.target.value });
+                }}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
               >
                 <option value="dining">Dining</option>
@@ -1283,20 +1301,23 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {language === 'en' ? 'Description *' : 'Description *'}
+              {language === 'en' ? 'Description' : 'Description'}
+              <span className="text-red-600 font-semibold" aria-hidden> *</span>
             </label>
-            <LazyBusinessDescriptionEditor
-              value={form.description}
-              onChange={(html) => {
-                setFieldErrors((fe) => ({ ...fe, description: undefined }));
-                setForm({ ...form, description: html });
-              }}
-              placeholder={
-                language === 'en'
-                  ? 'Describe your business and what makes it special...'
-                  : 'Décrivez votre entreprise...'
-              }
-            />
+            <div className={fieldErrors.description ? 'rounded-xl ring-2 ring-red-100 border border-red-200 overflow-hidden' : ''}>
+              <LazyBusinessDescriptionEditor
+                value={form.description}
+                onChange={(html) => {
+                  setFieldErrors((fe) => ({ ...fe, description: undefined }));
+                  setForm({ ...form, description: html });
+                }}
+                placeholder={
+                  language === 'en'
+                    ? 'Describe your business and what makes it special...'
+                    : 'Décrivez votre entreprise...'
+                }
+              />
+            </div>
             <div className="flex items-center justify-end mt-1">
               <span
                 className={`text-[11px] font-medium ${
@@ -1727,22 +1748,25 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           {/* Photo Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              {language === 'en' ? 'Business Photos *' : 'Photos de l\'entreprise *'}
+              {language === 'en' ? 'Business photos' : 'Photos de l\'entreprise'}
+              <span className="text-red-600 font-semibold" aria-hidden> *</span>
             </label>
             <p className="text-xs text-gray-500 mb-2">
               {language === 'en'
                 ? 'At least one photo is required. The first photo is used as the cover image.'
                 : 'Au moins une photo est requise. La première sert d’image de couverture.'}
             </p>
-            <PhotoUploader
-              photos={photos}
-              onPhotosChange={(next) => {
-                setFieldErrors((fe) => ({ ...fe, photos: undefined }));
-                setPhotos(next);
-              }}
-              maxPhotos={5}
-              userId={user?.id || ''}
-            />
+            <div className={fieldErrors.photos ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
+              <PhotoUploader
+                photos={photos}
+                onPhotosChange={(next) => {
+                  setFieldErrors((fe) => ({ ...fe, photos: undefined }));
+                  setPhotos(next);
+                }}
+                maxPhotos={5}
+                userId={user?.id || ''}
+              />
+            </div>
             {fieldErrors.photos && (
               <p className="text-sm text-red-600 mt-2 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />

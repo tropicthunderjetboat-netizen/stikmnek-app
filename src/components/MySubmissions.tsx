@@ -41,6 +41,14 @@ export interface Submission {
   listingSource?: 'pending' | 'live';
   /** Real `business_offerings.id` when `listingSource === 'live'`. */
   offeringId?: string | null;
+  /** From `pending_businesses` / RPC — used for resubmit prefill & tiered pricing. */
+  pricing_tiers?: unknown;
+  map_url?: string | null;
+  website?: string | null;
+  whatsapp_number?: string | null;
+  discount_valid_from?: string | null;
+  discount_valid_until?: string | null;
+  updated_at?: string | null;
 }
 
 type LiveEdgeItem = {

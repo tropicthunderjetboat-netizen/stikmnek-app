@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
 import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
 import { toast } from 'sonner';
 import { businesses as localBusinesses, categories, type Business, type Category } from '@/data/businesses';
@@ -8,7 +8,7 @@ import {
   Store, Edit3, BarChart3, MessageSquare, Image, Power,
   Save, X, ChevronRight, TrendingUp, Users, DollarSign,
   Eye, Clock, Star, Send, Upload, Plus, Loader2,
-  CheckCircle, XCircle, AlertCircle, FileText, ArrowUpRight,
+  CheckCircle, XCircle, AlertCircle, AlertTriangle, FileText, ArrowUpRight,
   ArrowDownRight, Calendar, MapPin, Phone, Mail, Tag, Trash2,
   RefreshCw, ShieldCheck, History, ArrowRight, Info, ClipboardList,
   BellRing, ChevronDown, LayoutDashboard, Menu, ArrowLeft,
@@ -39,6 +39,12 @@ import {
   validateListingSubmissionOnboarding,
   localizedListingSubmitValidationFeedback,
 } from '@/lib/businessOnboardingValidation';
+import { photoRowsToUploadedPhotos } from '@/lib/fetchApprovedPhotosForOffering';
+import {
+  mergeResubmitListingPrefill,
+  fetchResubmitProfileAndOffering,
+  fetchPendingSubmissionGalleryPhotos,
+} from '@/lib/resubmitPrefill';
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import OnboardingSteps, { type OnboardingStepNumber } from './OnboardingSteps';
 import {
@@ -403,6 +409,12 @@ const BusinessOwnerDashboard: React.FC = () => {
   // Submit form photo state
   const [submitPhotos, setSubmitPhotos] = useState<UploadedPhoto[]>([]);
   const [pricingTiers, setPricingTiers] = useState<PricingTierInput[]>([]);
+  const [submitFieldErrors, setSubmitFieldErrors] = useState<{
+    title?: string;
+    description?: string;
+    photos?: string;
+    pricing?: string;
+  }>({});
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -423,43 +435,50 @@ const BusinessOwnerDashboard: React.FC = () => {
     listingDuration: '1_month',
   });
 
-  // Pre-fill form when resubmitting a rejected submission (once per submission)
-  const lastResubmitIdRef = useRef<string | null>(null);
+  /** Pre-fill resubmit from pending row + linked profile/offering + `business_photos`. */
+  const resubmitPrefillGenRef = useRef(0);
   useEffect(() => {
-    if (resubmitSubmission && activeTab === 'submit' && lastResubmitIdRef.current !== resubmitSubmission.id) {
-      lastResubmitIdRef.current = resubmitSubmission.id;
-      const s = resubmitSubmission;
-      const orig = Number(s.original_price) || 0;
-      const deal = Number(s.deal_price) || 0;
-      const pct = orig > 0 && deal > 0 ? Math.round((1 - deal / orig) * 100) : 0;
-      setSubmitForm({
-        name: s.name || '',
-        category: s.category || 'dining',
-        description: s.description || '',
-        discount: s.discount || '',
-        originalPrice: orig > 0 ? String(orig) : '',
-        discountPercent: pct > 0 ? String(pct) : '',
-        dealPrice: deal > 0 ? String(deal) : '',
-        location: s.location || '',
-        phone: s.phone || '',
-        email: s.email || '',
-        hours: s.hours || '',
-        image: s.image || '',
-        whatsappNumber: s.whatsapp_number || '',
-        mapUrl: s.map_url || '',
-        website: s.website || '',
-        discountValidFrom: s.discount_valid_from ? s.discount_valid_from.split('T')[0] : todayStr(),
-        listingDuration: '1_month',
-      });
-      setSubmitPhotos([]);
-      setPricingTiers(pricingTiersFromDb(s.pricing_tiers));
+    if (!resubmitSubmission) {
+      setPricingTiers([]);
+      return;
     }
-    if (!resubmitSubmission) lastResubmitIdRef.current = null;
-  }, [resubmitSubmission, activeTab]);
+    if (activeTab !== 'submit') return;
 
-  useEffect(() => {
-    if (!resubmitSubmission) setPricingTiers([]);
-  }, [resubmitSubmission]);
+    const sid = String(resubmitSubmission.id ?? '').trim();
+    if (!sid) return;
+
+    const gen = ++resubmitPrefillGenRef.current;
+    setSubmitFieldErrors({});
+
+    const pending = resubmitSubmission as Record<string, unknown>;
+    const sync = mergeResubmitListingPrefill({ pending, profile: null, offering: null });
+    setSubmitForm(sync.form);
+    setPricingTiers(sync.pricingTiers);
+    setSubmitPhotos([]);
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [{ profile, offering }, photoRows] = await Promise.all([
+          fetchResubmitProfileAndOffering(supabase, pending),
+          fetchPendingSubmissionGalleryPhotos(supabase, sid),
+        ]);
+        if (cancelled || gen !== resubmitPrefillGenRef.current) return;
+        const merged = mergeResubmitListingPrefill({ pending, profile, offering });
+        setSubmitForm(merged.form);
+        setPricingTiers(merged.pricingTiers);
+        if (photoRows.length > 0) {
+          setSubmitPhotos(photoRowsToUploadedPhotos(photoRows, SUPABASE_URL));
+        }
+      } catch (e) {
+        console.warn('[Dashboard] resubmit prefill enrichment failed:', e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resubmitSubmission, activeTab]);
 
   useEffect(() => {
     if (!categoryUsesTieredPricing(submitForm.category)) setPricingTiers([]);
@@ -1073,6 +1092,7 @@ const BusinessOwnerDashboard: React.FC = () => {
 
   const handleSubmitBusiness = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitFieldErrors({});
 
     // Same rules as `BusinessListingForm` (`validateListingSubmissionOnboarding` + i18n toasts).
     // Resubmit keeps this compact form + `resubmit_pending_business`; new listings use `<BusinessListingForm />`.
@@ -1096,11 +1116,12 @@ const BusinessOwnerDashboard: React.FC = () => {
     });
 
     if (!listingValidation.valid) {
-      const { toastMessage } = localizedListingSubmitValidationFeedback(
+      const { fieldErrors: nextErr, toastMessage } = localizedListingSubmitValidationFeedback(
         listingValidation.errors,
         submitForm.description,
         language,
       );
+      setSubmitFieldErrors(nextErr);
       toast.error(toastMessage);
       return;
     }
@@ -1180,6 +1201,7 @@ const BusinessOwnerDashboard: React.FC = () => {
         if (resubmitData?.success) {
           toast.success('Listing resubmitted for approval!');
           setResubmitSubmission(null);
+          setSubmitFieldErrors({});
           setSubmitForm({ name: '', category: 'dining', description: '', discount: '', originalPrice: '', discountPercent: '', dealPrice: '', location: '', phone: '', email: '', hours: '', image: '', whatsappNumber: '', mapUrl: '', website: '', discountValidFrom: todayStr(), listingDuration: '1_month' });
           setSubmitPhotos([]);
           setPricingTiers([]);
@@ -1687,12 +1709,43 @@ const BusinessOwnerDashboard: React.FC = () => {
             {/* Business Name & Category */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Business Name *</label>
-                <input type="text" value={submitForm.name} onChange={(e) => setSubmitForm({ ...submitForm, name: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="e.g. Paradise Beach Bar" />
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {language === 'en' ? 'Deal / listing title' : language === 'fr' ? 'Titre de l’offre' : 'Titel blong dil'}
+                  <span className="text-red-600 font-semibold" aria-hidden> *</span>
+                </label>
+                <input
+                  type="text"
+                  value={submitForm.name}
+                  onChange={(e) => {
+                    setSubmitFieldErrors((fe) => ({ ...fe, title: undefined }));
+                    setSubmitForm({ ...submitForm, name: e.target.value });
+                  }}
+                  aria-invalid={!!submitFieldErrors.title}
+                  className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                    submitFieldErrors.title ? 'border-red-400 ring-2 ring-red-100' : 'border-gray-200'
+                  }`}
+                  placeholder="e.g. Paradise Beach Bar"
+                />
+                {submitFieldErrors.title && (
+                  <p className="text-sm text-red-600 mt-1.5 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                    {submitFieldErrors.title}
+                  </p>
+                )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Category *</label>
-                <select value={submitForm.category} onChange={(e) => setSubmitForm({ ...submitForm, category: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white">
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {language === 'en' ? 'Category' : language === 'fr' ? 'Catégorie' : 'Kategori'}
+                  <span className="text-red-600 font-semibold" aria-hidden> *</span>
+                </label>
+                <select
+                  value={submitForm.category}
+                  onChange={(e) => {
+                    setSubmitFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                    setSubmitForm({ ...submitForm, category: e.target.value });
+                  }}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                >
                   <option value="dining">Dining</option>
                   <option value="activities">Activities</option>
                   <option value="tours">Tours</option>
@@ -1705,12 +1758,26 @@ const BusinessOwnerDashboard: React.FC = () => {
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Description *</label>
-              <LazyBusinessDescriptionEditor
-                value={submitForm.description}
-                onChange={(html) => setSubmitForm({ ...submitForm, description: html })}
-                placeholder="Describe your business and what makes it special..."
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                {language === 'en' ? 'Description' : language === 'fr' ? 'Description' : 'Description'}
+                <span className="text-red-600 font-semibold" aria-hidden> *</span>
+              </label>
+              <div className={submitFieldErrors.description ? 'rounded-xl ring-2 ring-red-100 border border-red-200 overflow-hidden' : ''}>
+                <LazyBusinessDescriptionEditor
+                  value={submitForm.description}
+                  onChange={(html) => {
+                    setSubmitFieldErrors((fe) => ({ ...fe, description: undefined }));
+                    setSubmitForm({ ...submitForm, description: html });
+                  }}
+                  placeholder="Describe your business and what makes it special..."
+                />
+              </div>
+              {submitFieldErrors.description && (
+                <p className="text-sm text-red-600 mt-1.5 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                  {submitFieldErrors.description}
+                </p>
+              )}
               <div className="flex items-center justify-end mt-1">
                 <span
                   className={`text-[11px] font-medium ${
@@ -1727,34 +1794,59 @@ const BusinessOwnerDashboard: React.FC = () => {
             </div>
 
             {/* ─── Pricing & Discount (PricingDiscountFields component) ─── */}
-            <PricingDiscountFields
-              originalPrice={submitForm.originalPrice}
-              discountPercent={submitForm.discountPercent}
-              onOriginalPriceChange={(val) => setSubmitForm(prev => ({ ...prev, originalPrice: val }))}
-              onDiscountPercentChange={(val) => setSubmitForm(prev => ({ ...prev, discountPercent: val }))}
-              onCalculatedValues={(dealPrice, discountLabel) => {
-                setSubmitForm(prev => ({ ...prev, dealPrice, discount: discountLabel }));
-              }}
-              showValidity={true}
-              discountValidFrom={submitForm.discountValidFrom}
-              listingDuration={submitForm.listingDuration}
-              onDiscountValidFromChange={(val) => setSubmitForm(prev => ({ ...prev, discountValidFrom: val }))}
-              onListingDurationChange={(val) => setSubmitForm(prev => ({ ...prev, listingDuration: val }))}
-              showExtras={true}
-              mapUrl={submitForm.mapUrl}
-              website={submitForm.website}
-              onMapUrlChange={(val) => setSubmitForm(prev => ({ ...prev, mapUrl: val }))}
-              onWebsiteChange={(val) => setSubmitForm(prev => ({ ...prev, website: val }))}
-              language={language}
-            />
+            <div className={submitFieldErrors.pricing && !categoryUsesTieredPricing(submitForm.category) ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
+              <PricingDiscountFields
+                originalPrice={submitForm.originalPrice}
+                discountPercent={submitForm.discountPercent}
+                onOriginalPriceChange={(val) => {
+                  setSubmitFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                  setSubmitForm(prev => ({ ...prev, originalPrice: val }));
+                }}
+                onDiscountPercentChange={(val) => {
+                  setSubmitFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                  setSubmitForm(prev => ({ ...prev, discountPercent: val }));
+                }}
+                onCalculatedValues={(dealPrice, discountLabel) => {
+                  setSubmitForm(prev => ({ ...prev, dealPrice, discount: discountLabel }));
+                }}
+                showValidity={true}
+                discountValidFrom={submitForm.discountValidFrom}
+                listingDuration={submitForm.listingDuration}
+                onDiscountValidFromChange={(val) => setSubmitForm(prev => ({ ...prev, discountValidFrom: val }))}
+                onListingDurationChange={(val) => setSubmitForm(prev => ({ ...prev, listingDuration: val }))}
+                showExtras={true}
+                mapUrl={submitForm.mapUrl}
+                website={submitForm.website}
+                onMapUrlChange={(val) => setSubmitForm(prev => ({ ...prev, mapUrl: val }))}
+                onWebsiteChange={(val) => setSubmitForm(prev => ({ ...prev, website: val }))}
+                language={language}
+              />
+            </div>
+            {submitFieldErrors.pricing && !categoryUsesTieredPricing(submitForm.category) && (
+              <p className="text-sm text-red-600 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                {submitFieldErrors.pricing}
+              </p>
+            )}
 
             {categoryUsesTieredPricing(submitForm.category) && (
-              <PricingTiersEditor
-                tiers={pricingTiers}
-                onChange={setPricingTiers}
-                language={language}
-                discountPercent={tierDiscountPercent}
-              />
+              <div className={submitFieldErrors.pricing ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
+                <PricingTiersEditor
+                  tiers={pricingTiers}
+                  onChange={(t) => {
+                    setSubmitFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                    setPricingTiers(t);
+                  }}
+                  language={language}
+                  discountPercent={tierDiscountPercent}
+                />
+              </div>
+            )}
+            {submitFieldErrors.pricing && categoryUsesTieredPricing(submitForm.category) && (
+              <p className="text-sm text-red-600 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                {submitFieldErrors.pricing}
+              </p>
             )}
 
             {/* Location & Hours */}
@@ -1787,8 +1879,37 @@ const BusinessOwnerDashboard: React.FC = () => {
 
             {/* Photos */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Business Photos</label>
-              <PhotoUploader photos={submitPhotos} onPhotosChange={setSubmitPhotos} maxPhotos={5} maxSizeMB={5} userId={user.id} label="Upload photos of your business" sublabel="Drag & drop or click. PNG, JPG up to 5MB. First photo = main image." />
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {language === 'en' ? 'Business photos' : language === 'fr' ? 'Photos' : 'Foto'}
+                <span className="text-red-600 font-semibold" aria-hidden> *</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                {language === 'en'
+                  ? 'At least one photo or cover image is required. Previous uploads are restored when available.'
+                  : language === 'fr'
+                    ? 'Au moins une photo ou une image de couverture est requise. Les envois précédents sont restaurés si possible.'
+                    : 'Wan foto o kava i nidim. Ol foto bifo i save kam bake.'}
+              </p>
+              <div className={submitFieldErrors.photos ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
+                <PhotoUploader
+                  photos={submitPhotos}
+                  onPhotosChange={(next) => {
+                    setSubmitFieldErrors((fe) => ({ ...fe, photos: undefined }));
+                    setSubmitPhotos(next);
+                  }}
+                  maxPhotos={5}
+                  maxSizeMB={5}
+                  userId={user.id}
+                  label="Upload photos of your business"
+                  sublabel="Drag & drop or click. PNG, JPG up to 5MB. First photo = main image."
+                />
+              </div>
+              {submitFieldErrors.photos && (
+                <p className="text-sm text-red-600 mt-2 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                  {submitFieldErrors.photos}
+                </p>
+              )}
             </div>
 
             {/* Submit Button */}

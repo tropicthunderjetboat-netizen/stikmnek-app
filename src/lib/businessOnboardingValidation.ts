@@ -444,7 +444,7 @@ export function localizedListingSubmitValidationFeedback(
   descriptionHtml: string,
   language: string,
 ): {
-  fieldErrors: { description?: string; photos?: string; pricing?: string };
+  fieldErrors: { title?: string; description?: string; photos?: string; pricing?: string };
   toastMessage: string;
 } {
   const key = firstListingValidationErrorKey(errors);
@@ -452,14 +452,15 @@ export function localizedListingSubmitValidationFeedback(
   const overDescMax = plainLen > BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX;
 
   if (key === 'title') {
+    const msg =
+      language === 'en'
+        ? 'Please enter a title for this deal or listing.'
+        : language === 'fr'
+          ? 'Veuillez indiquer un titre pour cette offre.'
+          : 'Putem titel blong dil ia.';
     return {
-      fieldErrors: {},
-      toastMessage:
-        language === 'en'
-          ? 'Please enter a title for this deal or listing.'
-          : language === 'fr'
-            ? 'Veuillez indiquer un titre pour cette offre.'
-            : 'Putem titel blong dil ia.',
+      fieldErrors: { title: errors.title ?? msg },
+      toastMessage: errors.title ?? msg,
     };
   }
   if (key === 'description') {
