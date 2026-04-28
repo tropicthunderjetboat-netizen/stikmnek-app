@@ -98,6 +98,9 @@ interface BusinessPhoto {
   id: string;
   business_id: string | null;
   pending_id?: string | null;
+  /** Set for moderation rows; kept after approve so admin can group by `pending_businesses.id`. */
+  submission_pending_id?: string | null;
+  offering_id?: string | null;
   url: string;
   file_path: string;
   uploaded_by: string;
@@ -313,13 +316,19 @@ const AdminPanel: React.FC = () => {
     } catch (err) { console.error('[Admin] Direct fallback failed:', err); }
   }, []);
 
+  /** Index each photo under every id admins use to open a card (pending row, live profile, or stable submission link). */
   const groupPhotosByBusinessId = useCallback((photos: BusinessPhoto[]) => {
     const grouped: Record<string, BusinessPhoto[]> = {};
     for (const photo of photos) {
-      const key = String(photo.pending_id ?? photo.business_id ?? '');
-      if (!key) continue;
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(photo);
+      const keys = new Set<string>();
+      if (photo.pending_id) keys.add(String(photo.pending_id));
+      if (photo.submission_pending_id) keys.add(String(photo.submission_pending_id));
+      if (photo.business_id) keys.add(String(photo.business_id));
+      for (const key of keys) {
+        if (!key) continue;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(photo);
+      }
     }
     return grouped;
   }, []);
@@ -387,15 +396,7 @@ const AdminPanel: React.FC = () => {
         .order('created_at', { ascending: true });
       if (error) return;
       if (data && data.length > 0) {
-        const grouped: Record<string, BusinessPhoto[]> = {};
-        for (const photo of data) {
-          const p = photo as BusinessPhoto;
-          const key = String(p.pending_id ?? p.business_id ?? '');
-          if (!key) continue;
-          if (!grouped[key]) grouped[key] = [];
-          grouped[key].push(p);
-        }
-        setBusinessPhotos(grouped);
+        setBusinessPhotos(groupPhotosByBusinessId(data as BusinessPhoto[]));
       }
     } catch (err) {
       console.error('[Admin] Direct photo fallback failed:', err);
@@ -411,7 +412,7 @@ const AdminPanel: React.FC = () => {
       const { data, error } = await supabase
         .from('business_photos')
         .select('*')
-        .eq('pending_id', pendingId)
+        .or(`pending_id.eq.${pendingId},submission_pending_id.eq.${pendingId}`)
         .order('created_at', { ascending: true });
       if (error) return;
       if (data && data.length > 0) {
@@ -433,9 +434,11 @@ const AdminPanel: React.FC = () => {
     if (pendingBusinesses.length === 0) return;
     pendingBusinesses.forEach(biz => {
       const key = String(biz.id);
-      if (!businessPhotos[key]?.length) loadPhotosForPendingId(key);
+      if (!businessPhotos[key]?.length && !rpcPhotoMap[key]?.length) {
+        void loadPhotosForPendingId(key);
+      }
     });
-  }, [pendingIdsKey, loadPhotosForPendingId]);
+  }, [pendingIdsKey, loadPhotosForPendingId, businessPhotos, rpcPhotoMap]);
 
   // Explicitly refresh admin photos from RPC whenever pending list changes
   useEffect(() => {
@@ -1266,8 +1269,14 @@ const AdminPanel: React.FC = () => {
             {pendingBusinesses.length > 0 ? (
               <div className="space-y-4">
                 {pendingBusinesses.map(biz => {
-                  const photos = (rpcPhotoMap[String(biz.id)] || businessPhotos[String(biz.id)] || [])
-                    .filter(p => String(p.business_id) === String(biz.id))
+                  const raw = rpcPhotoMap[String(biz.id)] || businessPhotos[String(biz.id)] || [];
+                  const seen = new Set<string>();
+                  const photos = raw
+                    .filter(p => {
+                      if (seen.has(p.id)) return false;
+                      seen.add(p.id);
+                      return true;
+                    })
                     .sort((a, b) => {
                       if (a.is_main && !b.is_main) return -1;
                       if (!a.is_main && b.is_main) return 1;
