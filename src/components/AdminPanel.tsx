@@ -337,6 +337,25 @@ const AdminPanel: React.FC = () => {
     return grouped;
   }, []);
 
+  /** Union photo rows from several keyed buckets (RPC map vs edge/direct map can diverge — empty `[]` is truthy in JS). */
+  const unionPhotosForKeys = useCallback((maps: Record<string, BusinessPhoto[]>[], keys: string[]) => {
+    const seen = new Set<string>();
+    const out: BusinessPhoto[] = [];
+    const keyList = keys.filter(Boolean);
+    for (const m of maps) {
+      for (const k of keyList) {
+        const list = m[k];
+        if (!Array.isArray(list)) continue;
+        for (const p of list) {
+          if (!p?.id || seen.has(p.id)) continue;
+          seen.add(p.id);
+          out.push(p);
+        }
+      }
+    }
+    return out;
+  }, []);
+
   const loadPhotosFromAdminRpc = useCallback(async (businesses: PendingBusiness[]) => {
     setLoadingRpcPhotos(true);
     try {
@@ -371,6 +390,7 @@ const AdminPanel: React.FC = () => {
       if (!error && data?.photos && Array.isArray(data.photos)) {
         const grouped = groupPhotosByBusinessId(data.photos as BusinessPhoto[]);
         setBusinessPhotos(grouped);
+        setRpcPhotoMap(grouped);
         return;
       }
     } catch (err) {
@@ -386,12 +406,17 @@ const AdminPanel: React.FC = () => {
       if (!error && data && Array.isArray(data)) {
         const grouped = groupPhotosByBusinessId(data as BusinessPhoto[]);
         setBusinessPhotos(grouped);
+        setRpcPhotoMap(grouped);
       } else if (businesses.length > 0) {
         setBusinessPhotos({});
+        setRpcPhotoMap({});
       }
     } catch (err) {
       console.warn('[Admin] Direct photo load failed:', err);
-      if (businesses.length > 0) setBusinessPhotos({});
+      if (businesses.length > 0) {
+        setBusinessPhotos({});
+        setRpcPhotoMap({});
+      }
     }
   };
 
@@ -403,7 +428,9 @@ const AdminPanel: React.FC = () => {
         .order('created_at', { ascending: true });
       if (error) return;
       if (data && data.length > 0) {
-        setBusinessPhotos(groupPhotosByBusinessId(data as BusinessPhoto[]));
+        const grouped = groupPhotosByBusinessId(data as BusinessPhoto[]);
+        setBusinessPhotos(grouped);
+        setRpcPhotoMap(grouped);
       }
     } catch (err) {
       console.error('[Admin] Direct photo fallback failed:', err);
@@ -426,9 +453,15 @@ const AdminPanel: React.FC = () => {
       // #endregion agent log
       if (error) return;
       if (data && data.length > 0) {
+        const list = data as BusinessPhoto[];
+        const pid = String(pendingId);
         setBusinessPhotos(prev => ({
           ...prev,
-          [String(pendingId)]: data as BusinessPhoto[],
+          [pid]: list,
+        }));
+        setRpcPhotoMap(prev => ({
+          ...prev,
+          [pid]: list,
         }));
       }
     } catch (err) {
@@ -914,7 +947,7 @@ const AdminPanel: React.FC = () => {
       if (data?.error) throw new Error(data.error);
 
       // Update local state
-      setBusinessPhotos(prev => {
+      const patchMap = (prev: Record<string, BusinessPhoto[]>) => {
         const updated = { ...prev };
         for (const bizId of Object.keys(updated)) {
           updated[bizId] = updated[bizId].map(p =>
@@ -922,7 +955,9 @@ const AdminPanel: React.FC = () => {
           );
         }
         return updated;
-      });
+      };
+      setBusinessPhotos(patchMap);
+      setRpcPhotoMap(patchMap);
 
       toast.success(`Photo ${decision === 'approved' ? 'approved' : 'rejected'}!`);
     } catch (err: any) {
@@ -1296,12 +1331,7 @@ const AdminPanel: React.FC = () => {
                 {pendingBusinesses.map(biz => {
                   const keyPending = String(biz.id);
                   const keyProfile = biz.business_id ? String(biz.business_id) : '';
-                  const raw =
-                    rpcPhotoMap[keyPending] ||
-                    (keyProfile ? rpcPhotoMap[keyProfile] : undefined) ||
-                    businessPhotos[keyPending] ||
-                    (keyProfile ? businessPhotos[keyProfile] : undefined) ||
-                    [];
+                  const raw = unionPhotosForKeys([rpcPhotoMap, businessPhotos], [keyPending, keyProfile]);
                   const seen = new Set<string>();
                   const photos = raw
                     .filter(p => {
