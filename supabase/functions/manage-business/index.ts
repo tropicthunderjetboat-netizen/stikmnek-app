@@ -43,6 +43,111 @@ function trimPendingDescription(input: unknown): string {
 }
 
 /**
+ * Robust pending photo attachment across schema variants.
+ *
+ * `business_photos` has had multiple schemas:
+ * - Legacy: `business_id` (uuid NOT NULL), and some deployments stored `pending_businesses.id` there.
+ * - Current: XOR parent (`business_id` OR `pending_id`) with FKs and a CHECK (see 20260421140000).
+ *
+ * This function:
+ * - Deletes existing pending rows using the best available key
+ * - Inserts with `pending_id` when supported
+ * - Falls back to legacy `business_id = pendingId` when needed
+ */
+async function replacePendingBusinessPhotos(args: {
+  supabase: SupabaseServiceClient;
+  pendingId: string;
+  userId: string;
+  photos: Array<{ url?: string; filePath?: string | null; isMain?: boolean | null }>;
+  /** When set, include structured logs + return diagnostics in `meta`. */
+  debugLabel?: string;
+}): Promise<{
+  inserted: number;
+  mode: 'pending_id' | 'legacy_business_id';
+  warnings: string[];
+  meta: Record<string, unknown>;
+  error: { message: string } | null;
+}> {
+  const pendingId = String(args.pendingId || '').trim();
+  const userId = String(args.userId || '').trim();
+  const warnings: string[] = [];
+  const meta: Record<string, unknown> = {};
+  const label = args.debugLabel ? `[manage-business][photos][${args.debugLabel}]` : '[manage-business][photos]';
+  if (!pendingId || !userId) {
+    if (args.debugLabel) console.log(label, 'skip: missing pendingId or userId');
+    return { inserted: 0, mode: 'pending_id', warnings, meta, error: null };
+  }
+
+  const valid = (args.photos || []).filter((p) => typeof p?.url === 'string' && p.url.trim());
+  if (valid.length === 0) {
+    if (args.debugLabel) console.log(label, 'skip: no valid photos');
+    return { inserted: 0, mode: 'pending_id', warnings, meta, error: null };
+  }
+
+  meta.photoCount = valid.length;
+
+  // Best-effort delete; ignore schema mismatches.
+  if (args.debugLabel) console.log(label, 'delete existing (pending_id)', { pendingId });
+  const delByPending = await args.supabase.from('business_photos').delete().eq('pending_id', pendingId);
+  if (delByPending.error && String(delByPending.error.message || '').toLowerCase().includes('pending_id')) {
+    warnings.push('pending_id column not available (legacy schema) — falling back to business_id cleanup');
+    if (args.debugLabel) console.log(label, 'delete fallback (business_id)', { pendingId, err: delByPending.error.message });
+    await args.supabase.from('business_photos').delete().eq('business_id', pendingId);
+  }
+
+  // Preferred (current) schema.
+  const preferred = valid.map((p, i) => ({
+    pending_id: pendingId,
+    url: String(p.url || '').trim(),
+    file_path: p.filePath ?? null,
+    uploaded_by: userId,
+    is_main: p.isMain ?? i === 0,
+    status: 'pending',
+  }));
+  if (args.debugLabel) console.log(label, 'insert attempt (pending_id)', { pendingId, count: preferred.length });
+  const prefRes = await args.supabase.from('business_photos').insert(preferred);
+  if (!prefRes.error) {
+    meta.insertMethod = 'pending_id';
+    return { inserted: preferred.length, mode: 'pending_id', warnings, meta, error: null };
+  }
+
+  const msg = String(prefRes.error.message || '');
+  const lower = msg.toLowerCase();
+  const noPendingIdColumn =
+    lower.includes('pending_id') && (lower.includes('does not exist') || lower.includes('column'));
+  const businessIdNotNull =
+    lower.includes('null value in column') && lower.includes('business_id') && lower.includes('not-null');
+
+  // Legacy fallback.
+  if (noPendingIdColumn || businessIdNotNull) {
+    if (noPendingIdColumn) warnings.push('pending_id insert failed (missing column) — using legacy business_id = pendingId');
+    if (businessIdNotNull) warnings.push('pending_id insert failed (business_id NOT NULL) — using legacy business_id = pendingId');
+    if (args.debugLabel) console.log(label, 'insert fallback (legacy business_id)', { pendingId, err: msg });
+    const legacy = valid.map((p, i) => ({
+      business_id: pendingId,
+      url: String(p.url || '').trim(),
+      file_path: p.filePath ?? null,
+      uploaded_by: userId,
+      is_main: p.isMain ?? i === 0,
+      status: 'pending',
+    }));
+    const legacyRes = await args.supabase.from('business_photos').insert(legacy);
+    if (!legacyRes.error) {
+      meta.insertMethod = 'legacy_business_id';
+      return { inserted: legacy.length, mode: 'legacy_business_id', warnings, meta, error: null };
+    }
+    const legacyMsg = String(legacyRes.error.message || msg);
+    if (args.debugLabel) console.log(label, 'insert fallback failed', { pendingId, err: legacyMsg });
+    meta.insertMethod = 'legacy_business_id';
+    return { inserted: 0, mode: 'legacy_business_id', warnings, meta, error: { message: legacyMsg } };
+  }
+
+  if (args.debugLabel) console.log(label, 'insert failed (no fallback matched)', { pendingId, err: msg });
+  meta.insertMethod = 'pending_id';
+  return { inserted: 0, mode: 'pending_id', warnings, meta, error: { message: msg || 'Failed to attach pending photos' } };
+}
+
+/**
  * Resolve the authenticated user from the JWT in the request.
  * Never use `body.userId` for caller identity.
  */
@@ -572,6 +677,52 @@ Deno.serve(async (req) => {
       return jsonResponse(req, { categories: CATEGORIES });
     }
 
+    // ─── DIAGNOSE_BUSINESS_PHOTOS ─── (admin only)
+    // Provides a safe, non-destructive schema compatibility report for `business_photos`.
+    if (action === 'diagnose_business_photos') {
+      const denied = await assertAdmin(supabase, authUser.id, req);
+      if (denied) return denied;
+
+      const report: Record<string, unknown> = {
+        success: true,
+        now: new Date().toISOString(),
+        checks: {},
+        warnings: [] as string[],
+      };
+
+      // 1) pending_id column existence check (via PostgREST select)
+      const pendingIdProbe = await supabase.from('business_photos').select('pending_id').limit(1);
+      (report.checks as any).pending_id_column = pendingIdProbe.error ? false : true;
+      if (pendingIdProbe.error) {
+        const msg = String(pendingIdProbe.error.message || '');
+        (report.checks as any).pending_id_probe_error = msg;
+        if (msg.toLowerCase().includes('pending_id')) {
+          (report.warnings as string[]).push('`pending_id` column not available (legacy business_photos schema).');
+        }
+      }
+
+      // 2) business_id column existence check
+      const businessIdProbe = await supabase.from('business_photos').select('business_id').limit(1);
+      (report.checks as any).business_id_column = businessIdProbe.error ? false : true;
+      if (businessIdProbe.error) {
+        (report.checks as any).business_id_probe_error = String(businessIdProbe.error.message || '');
+      }
+
+      // 3) pending_id FK sanity: optional check for a caller-provided pendingId
+      const pendingId = String(body?.pendingId ?? body?.pending_id ?? '').trim();
+      if (pendingId) {
+        const exists = await supabase
+          .from('pending_businesses')
+          .select('id')
+          .eq('id', pendingId)
+          .maybeSingle();
+        (report.checks as any).pending_businesses_row_exists = Boolean(exists.data?.id);
+        if (exists.error) (report.checks as any).pending_businesses_row_error = exists.error.message;
+      }
+
+      return jsonResponse(req, report);
+    }
+
     // ─── SUBMIT_BUSINESS ───
     // Always INSERT a new pending_businesses row (multiple listings per owner). No upsert / in-place update here.
     if (action === 'submit_business') {
@@ -623,19 +774,18 @@ Deno.serve(async (req) => {
       };
 
       const attachPhotosForPending = async (pendingRowId: string) => {
-        const photos = body.photos || [];
-        await supabase.from('business_photos').delete().eq('pending_id', pendingRowId);
-        if (photos.length === 0) return null;
-        const photoRecords = photos.map((p: any, i: number) => ({
-          pending_id: pendingRowId,
-          url: p.url || '',
-          file_path: p.filePath || null,
-          uploaded_by: userId,
-          is_main: p.isMain ?? i === 0,
-          status: 'pending',
-        }));
-        const { error: photosErr } = await supabase.from('business_photos').insert(photoRecords);
-        return photosErr;
+        const photos = Array.isArray(body.photos) ? body.photos : [];
+        const { error, mode, warnings, meta } = await replacePendingBusinessPhotos({
+          supabase,
+          pendingId: pendingRowId,
+          userId,
+          photos,
+          debugLabel: body?.debug ? 'submit_business' : undefined,
+        });
+        if (body?.debug) {
+          console.log('[manage-business][photos][submit_business] result', { pendingRowId, mode, warnings, meta });
+        }
+        return error ? ({ message: error.message } as any) : null;
       };
 
       const record = {
@@ -726,7 +876,11 @@ Deno.serve(async (req) => {
         }
       }
 
-      await supabase.from('business_photos').delete().eq('pending_id', String(pendingId));
+      // Best-effort cleanup across schema variants (ignore legacy differences).
+      const delByPending = await supabase.from('business_photos').delete().eq('pending_id', String(pendingId));
+      if (delByPending.error && String(delByPending.error.message || '').toLowerCase().includes('pending_id')) {
+        await supabase.from('business_photos').delete().eq('business_id', String(pendingId));
+      }
       const { error: delErr } = await supabase
         .from('pending_businesses')
         .delete()
@@ -796,21 +950,26 @@ Deno.serve(async (req) => {
           return errorResponse(req, 'Resubmit failed: ' + updateErr.message, 500);
         }
 
-        const photos = (body.photos || []).filter((p: any) => p?.url);
+        const photos = Array.isArray(body.photos) ? body.photos : [];
         if (photos.length > 0) {
-          await supabase.from('business_photos').delete().eq('pending_id', pendingId);
-          const photoRecords = photos.map((p: any, i: number) => ({
-            pending_id: pendingId,
-            url: p.url,
-            file_path: p.filePath || null,
-            uploaded_by: userId,
-            is_main: p.isMain ?? i === 0,
-            status: 'pending',
-          }));
-          const { error: insertErr } = await supabase.from('business_photos').insert(photoRecords);
-          if (insertErr) {
-            console.error('[manage-business] resubmit photo insert error:', insertErr);
-            return errorResponse(req, 'Resubmit succeeded but photo save failed: ' + insertErr.message, 500);
+          const { error: photoErr, mode, warnings, meta } = await replacePendingBusinessPhotos({
+            supabase,
+            pendingId: String(pendingId),
+            userId,
+            photos,
+            debugLabel: body?.debug ? 'resubmit_pending_business' : undefined,
+          });
+          if (photoErr) {
+            console.error('[manage-business] resubmit photo insert error:', photoErr);
+            return errorResponse(req, 'Resubmit succeeded but photo save failed: ' + photoErr.message, 500);
+          }
+          if (body?.debug) {
+            console.log('[manage-business][photos][resubmit_pending_business] result', {
+              pendingId,
+              mode,
+              warnings,
+              meta,
+            });
           }
         }
 
@@ -952,23 +1111,25 @@ Deno.serve(async (req) => {
       const validPhotos = photos.filter((p: any) => !!p?.url);
       if (validPhotos.length === 0) return jsonResponse(req, { success: true, inserted: 0 });
 
-      // Replace existing rows for this pending listing to avoid duplicates on retries.
-      await supabase.from('business_photos').delete().eq('pending_id', pendingId);
-
-      const photoRecords = validPhotos.map((p: any, i: number) => ({
-        pending_id: pendingId,
-        url: p.url,
-        file_path: p.filePath || null,
-        uploaded_by: userId,
-        is_main: p.isMain ?? i === 0,
-        status: 'pending',
-      }));
-      const { error: insertErr } = await supabase.from('business_photos').insert(photoRecords);
-      if (insertErr) {
-        console.error('[manage-business] attach_pending_photos insert error:', insertErr);
-        return errorResponse(req, 'Failed to attach photos: ' + insertErr.message, 500);
+      const { inserted, error: photoErr, mode, warnings, meta } = await replacePendingBusinessPhotos({
+        supabase,
+        pendingId: String(pendingId),
+        userId,
+        photos: validPhotos,
+        debugLabel: body?.debug ? 'attach_pending_photos' : undefined,
+      });
+      if (photoErr) {
+        console.error('[manage-business] attach_pending_photos insert error:', photoErr);
+        return errorResponse(req, 'Failed to attach photos: ' + photoErr.message, 500);
       }
-      return jsonResponse(req, { success: true, inserted: photoRecords.length });
+      if (body?.debug) {
+        console.log('[manage-business][photos][attach_pending_photos] result', { pendingId, inserted, mode, warnings, meta });
+      }
+      return jsonResponse(req, {
+        success: true,
+        inserted,
+        ...(body?.debug ? { attachment: { mode, warnings, meta } } : {}),
+      });
     }
 
     // ─── GET_PENDING_EDITS ───
