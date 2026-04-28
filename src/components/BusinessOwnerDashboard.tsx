@@ -1167,6 +1167,10 @@ const BusinessOwnerDashboard: React.FC = () => {
         isMain: index === 0,
       }));
 
+      // #region agent log
+      fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68da6b'},body:JSON.stringify({sessionId:'68da6b',runId:'pre-fix',hypothesisId:'H1',location:'BusinessOwnerDashboard.tsx:handleSubmitBusiness',message:'Resubmit/submit photo payload prepared',data:{resubmitPendingId:resubmitSubmission?.id?String(resubmitSubmission.id):null,photoCount:Array.isArray(photoData)?photoData.length:0,hasMissingFilePath:Array.isArray(photoData)?photoData.some((p:any)=>!p?.filePath):null,firstUrlPrefix:Array.isArray(photoData)&&photoData[0]?.url?String(photoData[0].url).slice(0,32):null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
+
       // ─── RESUBMIT: Edit & resubmit a rejected submission ───
       if (resubmitSubmission?.id) {
         const { data: resubmitData, error: resubmitErr } = await invokeEdgeFunctionWithRetry(
@@ -1197,6 +1201,9 @@ const BusinessOwnerDashboard: React.FC = () => {
           { maxRetries: 2, label: 'resubmit', logPrefix: '[Dashboard]' },
         );
         const errMsg = resubmitData?.error || resubmitErr?.message || 'Resubmit failed';
+        // #region agent log
+        fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68da6b'},body:JSON.stringify({sessionId:'68da6b',runId:'pre-fix',hypothesisId:'H2',location:'BusinessOwnerDashboard.tsx:resubmit_pending_business',message:'Resubmit response received',data:{pendingId:String(resubmitSubmission.id),ok:Boolean(resubmitData?.success)&&!resubmitErr&&!resubmitData?.error,hasError:Boolean(resubmitErr||resubmitData?.error),errorMsg:typeof errMsg==='string'?errMsg:String(errMsg)},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion agent log
         if (resubmitErr || resubmitData?.error) throw new Error(typeof errMsg === 'string' ? errMsg : 'Resubmit failed');
         if (resubmitData?.success) {
           toast.success('Listing resubmitted for approval!');

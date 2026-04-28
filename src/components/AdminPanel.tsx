@@ -337,6 +337,9 @@ const AdminPanel: React.FC = () => {
     setLoadingRpcPhotos(true);
     try {
       const { data, error } = await supabase.rpc('get_business_photos_for_admin');
+      // #region agent log
+      fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68da6b'},body:JSON.stringify({sessionId:'68da6b',runId:'pre-fix',hypothesisId:'H3',location:'AdminPanel.tsx:loadPhotosFromAdminRpc',message:'Admin RPC get_business_photos_for_admin result',data:{pendingBusinessesCount:Array.isArray(businesses)?businesses.length:null,rpcError: error ? {message:(error as any).message,code:(error as any).code} : null,returnedCount:Array.isArray(data)?data.length:null,sampleRowIds:Array.isArray(data)?(data as any[]).slice(0,3).map((r)=>r?.id):null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
       if (error) throw error;
       const allPhotos = (Array.isArray(data) ? (data as BusinessPhoto[]) : []);
       const grouped = groupPhotosByBusinessId(allPhotos);
@@ -414,6 +417,9 @@ const AdminPanel: React.FC = () => {
         .select('*')
         .or(`pending_id.eq.${pendingId},submission_pending_id.eq.${pendingId},business_id.eq.${pendingId}`)
         .order('created_at', { ascending: true });
+      // #region agent log
+      fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'68da6b'},body:JSON.stringify({sessionId:'68da6b',runId:'pre-fix',hypothesisId:'H4',location:'AdminPanel.tsx:loadPhotosForPendingId',message:'Admin per-card business_photos query result',data:{pendingId:String(pendingId),queryError:error?{message:(error as any).message,code:(error as any).code}:null,returnedCount:Array.isArray(data)?data.length:null,keys:Array.isArray(data)?(data as any[]).slice(0,5).map((r)=>({id:r?.id,pending_id:r?.pending_id,submission_pending_id:r?.submission_pending_id,business_id:r?.business_id,status:r?.status})) : null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
       if (error) return;
       if (data && data.length > 0) {
         setBusinessPhotos(prev => ({
@@ -563,7 +569,7 @@ const AdminPanel: React.FC = () => {
 
       throw new Error('No response from server');
     } catch (err: unknown) {
-      const fromBody = tryReadEdgeFunctionJsonError(err);
+      const fromBody = await tryReadEdgeFunctionJsonError(err);
       const errMsg =
         fromBody ||
         (err instanceof Error ? err.message : String(err ?? 'Unknown error'));
@@ -1707,7 +1713,7 @@ const AdminPanel: React.FC = () => {
                   )}
                 </h3>
                 <button
-                  onClick={loadPendingEdits}
+                  onClick={() => loadPendingEdits(true)}
                   disabled={loadingEdits}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
