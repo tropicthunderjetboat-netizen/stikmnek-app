@@ -40,6 +40,7 @@ import {
   localizedListingSubmitValidationFeedback,
 } from '@/lib/businessOnboardingValidation';
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
+import OnboardingSteps, { type OnboardingStepNumber } from './OnboardingSteps';
 import {
   businessHoursFromProfileRow,
   effectiveProfileBusinessId,
@@ -329,7 +330,17 @@ async function buildApprovedUnifiedFromProfiles(
 type DashboardTab = 'overview' | 'submissions' | 'edit' | 'analytics' | 'reviews' | 'photos' | 'submit' | 'emails';
 
 const BusinessOwnerDashboard: React.FC = () => {
-  const { user, userProfile, language, dbBusinesses, dbReviews, setCurrentView, signOut, refreshBusinesses } = useAppContext();
+  const {
+    user,
+    userProfile,
+    language,
+    dbBusinesses,
+    dbReviews,
+    setCurrentView,
+    signOut,
+    refreshBusinesses,
+    businessOwnerHasBusinessRow,
+  } = useAppContext();
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -754,6 +765,29 @@ const BusinessOwnerDashboard: React.FC = () => {
   const pendingOnlyBusinesses = unifiedBusinesses.filter(b => b._source === 'pending');
   const hasApprovedBusinesses = approvedOnlyBusinesses.length > 0;
   const hasAnyBusinesses = unifiedBusinesses.length > 0;
+
+  /** True when at least one approved row is an offering (`business_offerings`), not only a profile stub. */
+  const hasApprovedListingOffering = useMemo(
+    () =>
+      approvedOnlyBusinesses.some(
+        (b) => String(b.id) !== String(b._profileBusinessId ?? ''),
+      ),
+    [approvedOnlyBusinesses],
+  );
+
+  /** First-time path: no live offering yet; only Overview + Submit (matches profile / first listing flow). */
+  const showBusinessOnboardingStepper = useMemo(() => {
+    if (ownerDataLoading) return false;
+    if (hasApprovedListingOffering) return false;
+    return activeTab === 'overview' || activeTab === 'submit';
+  }, [ownerDataLoading, hasApprovedListingOffering, activeTab]);
+
+  const businessOnboardingStepperState = useMemo(() => {
+    const hasRow = businessOwnerHasBusinessRow === true;
+    const completedSteps: number[] = [1, ...(hasRow ? [2] : [])];
+    const currentStep: OnboardingStepNumber = hasRow ? 3 : 2;
+    return { completedSteps, currentStep };
+  }, [businessOwnerHasBusinessRow]);
 
   const selectedBusiness = unifiedBusinesses.find(b => b.id === selectedBusinessId) || (hasAnyBusinesses ? unifiedBusinesses[0] : null);
   const selectedIsApproved = selectedBusiness?._source === 'approved';
@@ -1877,6 +1911,29 @@ const BusinessOwnerDashboard: React.FC = () => {
                 }}
               />
             )}
+
+            {/* First listing onboarding — hidden once a live offering exists; uses `businessOwnerHasBusinessRow` + offerings. */}
+            <div
+              className={`transition-[max-height,opacity,margin,padding] duration-300 ease-out motion-reduce:transition-none ${
+                showBusinessOnboardingStepper
+                  ? 'mb-6 max-h-[min(28rem,100vh)] opacity-100'
+                  : 'pointer-events-none mb-0 max-h-0 overflow-hidden opacity-0 py-0'
+              }`}
+              aria-hidden={!showBusinessOnboardingStepper}
+            >
+              <div
+                className={`rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50/90 to-teal-50/70 shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-300 ${
+                  showBusinessOnboardingStepper ? 'p-3 sm:p-4' : 'p-0'
+                }`}
+              >
+                <OnboardingSteps
+                  currentStep={businessOnboardingStepperState.currentStep}
+                  completedSteps={businessOnboardingStepperState.completedSteps}
+                  variant="compact"
+                  language={language}
+                />
+              </div>
+            </div>
 
             {/* No Businesses Empty State — only show on non-overview tabs */}
             {!hasAnyBusinesses && !ownerDataLoading && activeTab !== 'overview' && activeTab !== 'submit' && activeTab !== 'submissions' && activeTab !== 'emails' && (

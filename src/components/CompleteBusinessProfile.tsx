@@ -12,6 +12,7 @@ import LocationMapPicker from '@/components/LocationMapPicker';
 import WebsiteUrlInput from '@/components/WebsiteUrlInput';
 import { parseLatLngFromMapUrl, normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 import { validateBusinessProfileOnboarding } from '@/lib/businessOnboardingValidation';
+import OnboardingSteps from '@/components/OnboardingSteps';
 
 /** Maps `validateBusinessProfileOnboarding` error keys → local `errors` state keys used by this form. */
 const PROFILE_VALIDATION_KEY_TO_FORM: Record<string, string> = {
@@ -262,6 +263,15 @@ const CompleteBusinessProfile: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-4">
+            <div className="mb-6 border-b border-emerald-100/90 pb-6 sm:mb-8 sm:pb-8">
+              <OnboardingSteps
+                currentStep={2}
+                completedSteps={[1]}
+                variant="default"
+                language={language}
+              />
+            </div>
+
             <div>
               <Label htmlFor="cbp-business-name">
                 {language === 'en' ? 'Business name' : language === 'fr' ? "Nom de l'entreprise" : 'Nem blong bisnis'}
