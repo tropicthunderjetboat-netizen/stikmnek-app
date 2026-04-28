@@ -1294,7 +1294,14 @@ const AdminPanel: React.FC = () => {
             {pendingBusinesses.length > 0 ? (
               <div className="space-y-4">
                 {pendingBusinesses.map(biz => {
-                  const raw = rpcPhotoMap[String(biz.id)] || businessPhotos[String(biz.id)] || [];
+                  const keyPending = String(biz.id);
+                  const keyProfile = biz.business_id ? String(biz.business_id) : '';
+                  const raw =
+                    rpcPhotoMap[keyPending] ||
+                    (keyProfile ? rpcPhotoMap[keyProfile] : undefined) ||
+                    businessPhotos[keyPending] ||
+                    (keyProfile ? businessPhotos[keyProfile] : undefined) ||
+                    [];
                   const seen = new Set<string>();
                   const photos = raw
                     .filter(p => {

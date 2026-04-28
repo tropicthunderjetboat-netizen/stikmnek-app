@@ -236,7 +236,11 @@ export async function fetchPendingSubmissionGalleryPhotos(
   const { data, error } = await client
     .from('business_photos')
     .select('id, url, file_path, is_main, created_at, status')
-    .eq('pending_id', pid);
+    // Support multiple schema/linking variants:
+    // - current: `pending_id` links to pending_businesses.id
+    // - stable admin link: `submission_pending_id` preserved after approval
+    // - legacy: some deployments stored pending_businesses.id in `business_id`
+    .or(`pending_id.eq.${pid},submission_pending_id.eq.${pid},business_id.eq.${pid}`);
 
   if (error) {
     console.warn('[resubmitPrefill] gallery fetch:', error.message);
