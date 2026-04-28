@@ -6,6 +6,16 @@
  * both work when only one is listed (reduces browser CORS failures after domain changes).
  */
 
+/** Vercel preview deployments (*.vercel.app hostnames that include the project name). */
+function isStikmnekVercelPreviewOrigin(origin: string): boolean {
+  try {
+    const h = new URL(origin).hostname.toLowerCase();
+    return h.endsWith('.vercel.app') && h.includes('stikmnek');
+  } catch {
+    return false;
+  }
+}
+
 function originMatchesAllowList(origin: string, allowed: string[]): boolean {
   const o = origin.trim();
   if (!o) return false;
@@ -65,6 +75,14 @@ export function getSafeCorsHeaders(req: Request): Record<string, string> {
     return base;
   }
   if (origin && originMatchesAllowList(origin, allowed)) {
+    base['Access-Control-Allow-Origin'] = origin;
+  } else if (
+    origin &&
+    isStikmnekVercelPreviewOrigin(origin) &&
+    allowed.some((a) => /stikmnek\.com/i.test(a))
+  ) {
+    // Production allowlist is set, but the request is from a team Vercel preview — echo Origin so
+    // browser credentialed calls (Authorization + cookies) pass CORS.
     base['Access-Control-Allow-Origin'] = origin;
   } else {
     base['Access-Control-Allow-Origin'] = allowed[0]!;

@@ -202,9 +202,11 @@ const AdminPanel: React.FC = () => {
           console.log('[Admin]' + (label ? ' ' + label : '') + ' Retry ' + attempt + '/' + maxRetries + ' after ' + delay + 'ms...');
           await new Promise(r => setTimeout(r, delay));
         }
+        const auth = await getEdgeAuthHeaders();
+        const mergedHeaders = { ...(headers ?? {}), ...auth };
         const result = await supabase.functions.invoke(fnName, {
           body,
-          ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
+          ...(Object.keys(mergedHeaders).length > 0 ? { headers: mergedHeaders } : {}),
         });
 
         // Check if the error is a rate-limit (429) or other HTTP error
@@ -378,6 +380,7 @@ const AdminPanel: React.FC = () => {
     // Fallback: Edge Function
     try {
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_all_photos', userId: user?.id },
       });
       if (!error && data?.photos && Array.isArray(data.photos)) {
@@ -498,7 +501,10 @@ const AdminPanel: React.FC = () => {
         return;
       }
       // Strategy 2: Edge Function
-      const { data, error } = await supabase.functions.invoke('manage-business', { body: { action: 'get_pending_edits', userId: user.id, isAdmin: true } });
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: { action: 'get_pending_edits', userId: user.id, isAdmin: true },
+      });
       if (!error && data?.edits && Array.isArray(data.edits)) {
         const pendingOnly = data.edits.filter((e: PendingEdit) => e.status === 'pending');
         setPendingEdits(pendingOnly);
@@ -521,7 +527,10 @@ const AdminPanel: React.FC = () => {
   const handleReviewEdit = async (editId: string, decision: 'approved' | 'rejected') => {
     setProcessingEditId(editId);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-business', { body: { action: 'review_edit', userId: user?.id, editId, decision, adminNotes: editAdminNotes[editId] || '' } });
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: { action: 'review_edit', userId: user?.id, editId, decision, adminNotes: editAdminNotes[editId] || '' },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setPendingEdits(prev => prev.filter(e => e.id !== editId));
@@ -658,6 +667,7 @@ const AdminPanel: React.FC = () => {
       const validUntil = validUntilDate.toISOString().split('T')[0];
 
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: {
           action: 'admin_create_business',
           userId: user?.id,
@@ -842,6 +852,7 @@ const AdminPanel: React.FC = () => {
       // profile (single-offer model) and can overwrite previous deals. We only use it as a fallback for
       // rejections, not approvals.
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: {
           action: 'review_business',
           userId: user?.id,
@@ -909,6 +920,7 @@ const AdminPanel: React.FC = () => {
     setRepairingId(pendingId);
     try {
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'repair_approved_submission', userId: user?.id, pendingId },
       });
       if (error) throw error;
@@ -930,6 +942,7 @@ const AdminPanel: React.FC = () => {
     try {
       const action = decision === 'approved' ? 'approve_photo' : 'reject_photo';
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action, userId: user?.id, photoId },
       });
 

@@ -90,6 +90,7 @@ function submissionFromLiveOffering(
 async function fetchLiveSubmissionsForOwner(userId: string): Promise<Submission[]> {
   try {
     const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('manage-business', {
+      headers: await getEdgeAuthHeaders(),
       body: { action: 'get_owner_offerings_live', userId },
     });
     if (edgeErr) {
@@ -662,6 +663,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
 
     try {
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_pending', userId: user.id },
       });
 

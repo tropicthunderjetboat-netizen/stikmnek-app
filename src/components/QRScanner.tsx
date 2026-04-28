@@ -6,7 +6,7 @@ import {
   partyFromValidityApi,
   type PartyCounts,
 } from '@/lib/redemptionSavings';
-import { supabase } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   Camera, X, CheckCircle, XCircle, Loader2, ScanLine,
@@ -539,6 +539,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
     if (rows.length === 0) {
       const { data: mbData, error: mbErr } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_owner_businesses', userId: user.id },
       });
 

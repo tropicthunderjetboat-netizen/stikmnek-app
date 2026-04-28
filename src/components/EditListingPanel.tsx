@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Business } from '@/data/businesses';
 
-import { supabase } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   Edit3, X, RotateCcw, Eye, Clock, Phone, MapPin,
@@ -228,6 +228,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
     setLoadingEdits(true);
     try {
       const { data } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_pending_edits', userId: user.id, businessId: profileId },
       });
       if (data?.edits) setPendingEdits(data.edits);
@@ -356,6 +357,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
       }
 
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'submit_edit', userId: user.id, businessId: profileId, changes },
       });
       if (error) throw error;
@@ -387,7 +389,8 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
     setDeleting(true);
     try {
       const { data, error } = await supabase.functions.invoke('manage-business', {
-        body: { action: 'delete_own_business', businessId: profileId },
+        headers: await getEdgeAuthHeaders(),
+        body: { action: 'delete_own_business', businessId: profileId, userId: user.id },
       });
       const res = data as { success?: boolean; error?: string } | null | undefined;
       if (error) {
