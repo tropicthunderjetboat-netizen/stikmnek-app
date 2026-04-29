@@ -10,6 +10,7 @@
     "functions:deploy": "supabase functions deploy",
     "functions:deploy:api": "supabase functions deploy --use-api -j 4",
     "functions:list": "supabase functions list",
+    "functions:deploy:manage-business": "supabase functions deploy manage-business",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",

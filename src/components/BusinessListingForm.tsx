@@ -1037,7 +1037,22 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               { maxRetries: 2, label: 'attach_pending_photos', logPrefix: '[BusinessForm]' },
             );
             if (attachErr || attachData?.error) {
-              throw new Error(await formatEdgeInvokeFailure(null, attachData, attachErr));
+              const detail = await formatEdgeInvokeFailure(null, attachData, attachErr);
+              // Listing row already exists; if we only throw, the user often retries and creates duplicates.
+              // Best-effort rollback (requires RLS allowing owners to delete their own pending row).
+              try {
+                const { error: delErr } = await supabase
+                  .from('pending_businesses')
+                  .delete()
+                  .eq('id', String(directData.id))
+                  .eq('owner_id', user.id);
+                if (delErr) {
+                  console.warn('[BusinessForm] Could not roll back pending row after photo attach failure:', delErr);
+                }
+              } catch (rollbackEx) {
+                console.warn('[BusinessForm] Rollback exception after photo attach failure:', rollbackEx);
+              }
+              throw new Error(detail);
             }
           } catch (photoEx) {
             throw photoEx;

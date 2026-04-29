@@ -8,6 +8,10 @@
  * Optional: SENDGRID_FROM_EMAIL (default stikmnek@gmail.com if unset), SENDGRID_FROM_NAME, APP_BASE_URL (default https://www.stikmnek.com).
  * CORS: set CORS_ALLOWED_ORIGINS (comma-separated origins) in Edge Function secrets.
  * If unset, Access-Control-Allow-Origin is *. If set, request Origin must match an entry (see getSafeCorsHeaders).
+ *
+ * DEPLOY (important): This file imports `../_shared/cors.ts` and `./purge-user.ts`. Pasting only this file
+ * into the Supabase Dashboard does NOT update those modules — CORS fixes will not apply and the bundle can break.
+ * From the repo root run: `npm run functions:deploy:manage-business` (or `supabase functions deploy manage-business`).
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
