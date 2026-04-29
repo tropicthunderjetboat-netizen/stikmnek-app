@@ -1,6 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getPhotoDisplayUrl } from '@/lib/utils';
-import { legacyUntaggedPhotoBelongsToOffering } from '@/lib/offeringPhotoPartition';
+import {
+  legacyUntaggedPhotoBelongsToOffering,
+  supplementUntaggedPhotosForRecentNewestOffering,
+} from '@/lib/offeringPhotoPartition';
 import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
 
 type PhotoRow = {
@@ -76,6 +79,10 @@ export async function fetchApprovedPhotosForOffering(
         rows = list.filter((p) =>
           legacyUntaggedPhotoBelongsToOffering(p.created_at, oid, ordered),
         );
+        if (rows.length === 0) {
+          const extra = supplementUntaggedPhotosForRecentNewestOffering(list, oid, ordered);
+          if (extra.length > 0) rows = extra;
+        }
       }
     } else {
       rows = [];

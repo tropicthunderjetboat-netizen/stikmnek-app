@@ -37,7 +37,10 @@ import {
   primaryEmbeddedOffering,
   primaryOfferingDescriptionHtml,
 } from '@/data/businesses';
-import { legacyUntaggedPhotoBelongsToOffering } from '@/lib/offeringPhotoPartition';
+import {
+  legacyUntaggedPhotoBelongsToOffering,
+  supplementUntaggedPhotosForRecentNewestOffering,
+} from '@/lib/offeringPhotoPartition';
 import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
@@ -325,7 +328,7 @@ const BusinessDetail: React.FC = () => {
             .order('created_at', { ascending: true });
           if (!cancelled && !oErr && rows?.length) {
             const ordered = rows as OfferingCreatedRow[];
-            const match = legacy.data.find((row) => {
+            let match = legacy.data.find((row) => {
               const r = row as { created_at?: string };
               return legacyUntaggedPhotoBelongsToOffering(
                 String(r.created_at || ''),
@@ -333,6 +336,16 @@ const BusinessDetail: React.FC = () => {
                 ordered,
               );
             });
+            if (!match) {
+              const extra = supplementUntaggedPhotosForRecentNewestOffering(
+                legacy.data as { created_at: string }[],
+                effectiveBiz.id,
+                ordered,
+              );
+              if (extra.length > 0) {
+                match = extra[0] as { url?: string; file_path?: string };
+              }
+            }
             first = match as { url?: string; file_path?: string } | undefined;
           }
         } else {

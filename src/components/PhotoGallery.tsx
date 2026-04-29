@@ -3,7 +3,10 @@ import { supabase } from '@/lib/supabase';
 import { ChevronLeft, ChevronRight, X, Expand, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { getPhotoDisplayUrl } from '@/lib/utils';
 import { SUPABASE_URL } from '@/lib/supabase';
-import { legacyUntaggedPhotoBelongsToOffering } from '@/lib/offeringPhotoPartition';
+import {
+  legacyUntaggedPhotoBelongsToOffering,
+  supplementUntaggedPhotosForRecentNewestOffering,
+} from '@/lib/offeringPhotoPartition';
 import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
 
 interface BusinessPhoto {
@@ -126,6 +129,14 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
                   approvedOnly = list.filter((p) =>
                     legacyUntaggedPhotoBelongsToOffering(p.created_at, oid, ordered),
                   );
+                  if (approvedOnly.length === 0) {
+                    const extra = supplementUntaggedPhotosForRecentNewestOffering(
+                      list,
+                      oid,
+                      ordered,
+                    );
+                    if (extra.length > 0) approvedOnly = extra;
+                  }
                 }
               } else {
                 approvedOnly = [];

@@ -130,7 +130,7 @@ async function replacePendingBusinessPhotos(args: {
   const delByPending = await args.supabase
     .from('business_photos')
     .delete()
-    .or(`pending_id.eq.${pendingId},business_id.eq.${pendingId}`);
+    .or(`pending_id.eq.${pendingId},business_id.eq.${pendingId},submission_pending_id.eq.${pendingId}`);
   if (delByPending.error && String(delByPending.error.message || '').toLowerCase().includes('pending_id')) {
     warnings.push('pending_id column not available (legacy schema) — falling back to business_id cleanup');
     if (args.debugLabel) console.log(label, 'delete fallback (business_id)', { pendingId, err: delByPending.error.message });
@@ -1541,7 +1541,9 @@ Deno.serve(async (req) => {
       // Support both schema variants:
       // - current: `pending_id` links photos to a moderation submission
       // - legacy: some deployments stored `pending_businesses.id` in `business_id`
-      const pendingPhotoMatch = `pending_id.eq.${pendingId},business_id.eq.${pendingId}`;
+      // - `submission_pending_id` keeps the same pending uuid after `pending_id` is cleared on approve
+      //   (still matchable in a single UPDATE before the pending row is deleted).
+      const pendingPhotoMatch = `pending_id.eq.${pendingId},business_id.eq.${pendingId},submission_pending_id.eq.${pendingId}`;
 
       const { error: rejErr } = await supabase
         .from('business_photos')
@@ -1735,10 +1737,9 @@ Deno.serve(async (req) => {
       };
       if (inserted?.id) relinkPatch.offering_id = String(inserted.id);
 
-      const { error: relinkErr } = await supabase
-        .from('business_photos')
-        .update(relinkPatch)
-        .eq('pending_id', String(pendingId));
+      const pid = String(pendingId);
+      const relinkMatch = `pending_id.eq.${pid},submission_pending_id.eq.${pid},business_id.eq.${pid}`;
+      const { error: relinkErr } = await supabase.from('business_photos').update(relinkPatch).or(relinkMatch);
       if (relinkErr) {
         console.error('[manage-business] repair_approved_submission photos:', relinkErr);
         // Non-fatal: offering exists; return success but warn
