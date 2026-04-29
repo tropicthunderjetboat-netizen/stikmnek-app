@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense } fr
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as hardcodedBusinesses, Business } from '@/data/businesses';
 
+import { FunctionsFetchError } from '@supabase/supabase-js';
 import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
@@ -354,7 +355,7 @@ const AdminPanel: React.FC = () => {
     return out;
   }, []);
 
-  const loadPhotosFromAdminRpc = useCallback(async (businesses: PendingBusiness[]) => {
+  const loadPhotosFromAdminRpc = useCallback(async (_businesses: PendingBusiness[]) => {
     setLoadingRpcPhotos(true);
     try {
       const { data, error } = await supabase.rpc('get_business_photos_for_admin');
@@ -363,19 +364,19 @@ const AdminPanel: React.FC = () => {
       const grouped = groupPhotosByBusinessId(allPhotos);
       setRpcPhotoMap(grouped);
       setBusinessPhotos(grouped);
-      return true;
+      return { ok: true as const, count: allPhotos.length };
     } catch (err) {
       console.warn('[Admin] get_business_photos_for_admin RPC failed:', err);
-      return false;
+      return { ok: false as const, count: 0 };
     } finally {
       setLoadingRpcPhotos(false);
     }
   }, [groupPhotosByBusinessId]);
 
   const loadAllPhotos = async (businesses: PendingBusiness[]) => {
-    // REQUIRED path: explicit RPC call
-    const rpcOk = await loadPhotosFromAdminRpc(businesses);
-    if (rpcOk) return;
+    // Prefer admin RPC; if it errors or returns no rows, still try edge + direct (legacy keys / RLS drift).
+    const rpc = await loadPhotosFromAdminRpc(businesses);
+    if (rpc.ok && rpc.count > 0) return;
 
     // Fallback: Edge Function
     try {
@@ -892,8 +893,15 @@ const AdminPanel: React.FC = () => {
 
       // Owner decision emails are sent from the `manage-business` edge function (SendGrid + service role)
       // so the browser never calls `send-email` here (avoids duplicate mail and JWT/RS256 invoke issues).
-    } catch (err: any) {
-      const msg = rpcErrorMsg || err?.message || 'Unknown error';
+    } catch (err: unknown) {
+      let msg = rpcErrorMsg || (err instanceof Error ? err.message : 'Unknown error');
+      if (err instanceof FunctionsFetchError) {
+        const inner = err.context;
+        const innerMsg = inner instanceof Error ? inner.message : String(inner ?? '');
+        msg =
+          'Could not reach the server (often CORS from a Vercel preview). Deploy the latest `manage-business` edge function from this repo (includes CORS for *.vercel.app), or add your preview origin to Supabase CORS_ALLOWED_ORIGINS. ' +
+          (innerMsg ? `(${innerMsg})` : '');
+      }
       toast.error('Failed to process review: ' + msg);
     } finally {
       setProcessingId(null);
