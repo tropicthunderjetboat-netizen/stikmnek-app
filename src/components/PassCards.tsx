@@ -5,6 +5,8 @@ import { t } from '@/data/translations';
 import { Check, Zap, Crown, Star, CreditCard, Lock, ShieldCheck, Users, Baby, Calendar, Share2, Gift, Sparkles, Loader2, PartyPopper, Info } from 'lucide-react';
 
 import { usePassConfig, PassConfig } from '@/hooks/usePassConfig';
+import DealsPricingCard from '@/components/DealsPricingCard';
+import { BASE_PRICE_AUD, MAX_PARTY_SIZE } from '@/data/pricing';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
@@ -810,6 +812,10 @@ const PassCards: React.FC = () => {
             </div>
           )}
 
+          <div className="max-w-xl mx-auto mb-10">
+            <DealsPricingCard language={passI18nLang} />
+          </div>
+
           <div className="grid grid-cols-1 gap-8 max-w-lg mx-auto">
             {(activePasses[0] ? [activePasses[0]] : []).map((pass) => {
               const passName = language === 'fr' ? pass.nameFr : language === 'bi' ? pass.nameBi : pass.name;
@@ -920,10 +926,25 @@ const PassCards: React.FC = () => {
                       </div>
                     )}
 
-                    <div className="flex items-baseline gap-1 mb-3">
-                      <span className="text-4xl font-extrabold text-gray-900">${pass.price}</span>
-                      <span className="text-gray-400 text-sm">{passPeriod}</span>
-                    </div>
+                    {pass.type === 'dynamic' ? (
+                      <div className="text-center mb-3">
+                        <p className="text-lg font-bold text-gray-900">
+                          {language === 'fr' ? `À partir de ${BASE_PRICE_AUD} $ AUD` : `From A$${BASE_PRICE_AUD}`}
+                          <span className="text-sm font-normal text-gray-600 ml-0 sm:ml-2 block sm:inline mt-1 sm:mt-0">
+                            {language === 'fr'
+                              ? `Jusqu'à ${MAX_PARTY_SIZE} personnes (6 ans et +)`
+                              : language === 'bi'
+                                ? `Antap long ${MAX_PARTY_SIZE} man (6+)`
+                                : `Up to ${MAX_PARTY_SIZE} people (ages 6+)`}
+                          </span>
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-baseline gap-1 mb-3">
+                        <span className="text-4xl font-extrabold text-gray-900">${pass.price}</span>
+                        <span className="text-gray-400 text-sm">{passPeriod}</span>
+                      </div>
+                    )}
 
                     {/* Share Bonus Badge - prominent callout */}
                     {hasBonus && !shared && (
