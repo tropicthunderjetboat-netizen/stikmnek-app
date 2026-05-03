@@ -72,6 +72,8 @@ interface ValidityResult {
     expiresAt: string;
     purchasedAt: string;
     maxPeople?: number | null;
+    /** Same as maxPeople when set — ages 6+ capacity (from verify-redemption). */
+    partySize?: number | null;
     totalPartySize?: number;
     headcountAgainstPass?: number;
   };
@@ -1229,49 +1231,103 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const renderValiditySuccess = () => {
     if (!validityResult?.success) return null;
     const tierConfig = getPassTierConfig(validityResult.pass?.type || '');
+    const pass = validityResult.pass;
+    const passStatus = String(pass?.status ?? '');
+    const isExpired = passStatus === 'date_range_expired' || passStatus === 'expired';
+    const isActive = passStatus === 'active';
+    const passCap =
+      typeof pass?.partySize === 'number' && pass.partySize > 0
+        ? pass.partySize
+        : typeof pass?.maxPeople === 'number' && pass.maxPeople > 0
+          ? pass.maxPeople
+          : null;
+    const childrenPolicyNote =
+      'Children under 6 may accompany this group for free.';
 
     return (
       <div className="space-y-4 -mx-5 -mt-5">
-        {/* Status Banner */}
-        <div className={`relative px-6 pt-8 pb-6 overflow-hidden ${
-          validityResult.canRedeem
-            ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600'
-            : 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-600'
-        }`}>
-          <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 -mr-10 -mt-10" />
-          <div className="relative text-center">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white flex items-center justify-center shadow-xl">
-              {validityResult.canRedeem
-                ? <BadgeCheck className="w-10 h-10 text-emerald-500" />
-                : <AlertTriangle className="w-10 h-10 text-amber-500" />
-              }
+        {/* High-contrast pass status — outdoor / mobile merchant view */}
+        <div className="px-4 pt-4 sm:px-5 sm:pt-5">
+          {isExpired ? (
+            <div
+              className="rounded-xl border-4 border-red-900 bg-[#ef4444] px-4 py-5 sm:px-6 sm:py-6 text-center text-white shadow-xl"
+              role="status"
+            >
+              <div className="text-3xl sm:text-4xl font-black tracking-tight leading-none">✗ EXPIRED</div>
+              {passCap != null && (
+                <>
+                  <p className="mt-4 text-xl sm:text-2xl font-bold leading-tight">
+                    PASS CAPACITY: {passCap} PEOPLE (AGES 6+)
+                  </p>
+                  <p className="mt-3 text-sm sm:text-base font-medium leading-snug opacity-95 px-1">
+                    {childrenPolicyNote}
+                  </p>
+                </>
+              )}
             </div>
-            <h3 className="text-2xl font-extrabold text-white mb-1">
-              {validityResult.canRedeem ? 'Eligible for Redemption' : 'Not Eligible Right Now'}
-            </h3>
-            <p className="text-white/80 text-sm font-medium">
-              {validityResult.canRedeem
-                ? 'Pass and voucher are both valid'
-                : validityResult.pass?.message || 'See details below'}
-            </p>
+          ) : isActive ? (
+            <div
+              className="rounded-xl border-4 border-emerald-900 bg-[#10b981] px-4 py-5 sm:px-6 sm:py-6 text-center text-white shadow-xl"
+              role="status"
+            >
+              <div className="text-3xl sm:text-4xl font-black tracking-tight leading-none">✓ VALID</div>
+              {passCap != null && (
+                <>
+                  <p className="mt-4 text-2xl sm:text-3xl font-black leading-tight tracking-tight">
+                    VALID FOR {passCap} PEOPLE
+                  </p>
+                  <p className="mt-3 text-sm sm:text-base font-medium leading-snug opacity-95 px-1">
+                    {childrenPolicyNote}
+                  </p>
+                </>
+              )}
+            </div>
+          ) : (
+            <div
+              className="rounded-xl border-4 border-amber-900 bg-amber-500 px-4 py-5 sm:px-6 sm:py-6 text-center text-black shadow-xl"
+              role="status"
+            >
+              <div className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">⚠ NOT VALID</div>
+              <p className="mt-2 text-sm sm:text-base font-bold leading-snug">
+                {pass?.message || 'This pass cannot be used right now.'}
+              </p>
+              {passCap != null && (
+                <p className="mt-4 text-lg sm:text-xl font-extrabold leading-tight">
+                  Pass covers up to {passCap} people (ages 6+)
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Redemption eligibility (separate from calendar validity) */}
+        <div
+          className={`mx-4 sm:mx-5 rounded-xl border-2 px-4 py-3 sm:px-5 ${
+            validityResult.canRedeem
+              ? 'border-emerald-700 bg-emerald-50'
+              : 'border-amber-700 bg-amber-50'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            {validityResult.canRedeem ? (
+              <BadgeCheck className="w-6 h-6 text-emerald-700 flex-shrink-0 mt-0.5" />
+            ) : (
+              <AlertTriangle className="w-6 h-6 text-amber-700 flex-shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0 text-left">
+              <p className={`text-sm sm:text-base font-extrabold ${validityResult.canRedeem ? 'text-emerald-900' : 'text-amber-900'}`}>
+                {validityResult.canRedeem ? 'Eligible for redemption' : 'Not eligible to redeem yet'}
+              </p>
+              <p className={`text-xs sm:text-sm font-semibold mt-1 leading-snug ${validityResult.canRedeem ? 'text-emerald-800' : 'text-amber-900'}`}>
+                {validityResult.canRedeem
+                  ? 'Pass checks passed for this scan — you can proceed if the deal applies.'
+                  : pass?.message || 'See voucher and details below.'}
+              </p>
+            </div>
           </div>
         </div>
 
         <div className="px-5 space-y-4">
-          {validityResult.pass?.maxPeople != null && validityResult.pass.maxPeople > 0 && (
-            <div
-              className="rounded-2xl border-4 border-black bg-yellow-300 px-5 py-6 text-center shadow-lg"
-              role="status"
-            >
-              <p className="text-xs font-black uppercase tracking-widest text-black mb-2">Pass capacity</p>
-              <p className="text-3xl sm:text-4xl font-black text-black leading-tight">
-                VALID FOR {validityResult.pass.maxPeople} PEOPLE
-              </p>
-              <p className="text-sm font-semibold text-gray-900 mt-4">
-                Note: Children under 6 may accompany this group for free.
-              </p>
-            </div>
-          )}
 
           {/* Tourist Identity Card */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">

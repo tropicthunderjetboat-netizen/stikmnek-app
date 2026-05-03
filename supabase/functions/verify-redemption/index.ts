@@ -520,6 +520,8 @@ Deno.serve(async (req) => {
           expiresAt: pass.expires_at,
           purchasedAt: pass.purchased_at,
           maxPeople: passMaxPeople,
+          /** Same as maxPeople — people ages 6+ this pass covers (merchant display). */
+          partySize: passMaxPeople,
           totalPartySize,
           headcountAgainstPass,
         },
@@ -545,6 +547,7 @@ Deno.serve(async (req) => {
             error: message,
             status: passStatus,
             maxPeople: passMaxPeople,
+            partySize: passMaxPeople,
             totalPartySize,
             headcountAgainstPass,
           },

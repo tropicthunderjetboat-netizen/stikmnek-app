@@ -13,6 +13,8 @@ import {
   passInclusiveCalendarDays,
   validUntilDayOffset,
   addCalendarDaysIso,
+  clampPartySize,
+  MAX_PARTY_SIZE,
 } from '@/data/pricing';
 
 /** Local calendar YYYY-MM-DD */
@@ -247,6 +249,8 @@ const PaymentCheckout: React.FC = () => {
   const cardNumberRef = useRef<HTMLInputElement>(null);
   const expiryRef = useRef<HTMLInputElement>(null);
   const cvvRef = useRef<HTMLInputElement>(null);
+  /** Previous `cart.partySize` for oversize → capped sync (keep warning visible after cap). */
+  const prevCartPartySizeRef = useRef<number | null>(null);
 
   /**
    * Stable idempotency key for pass purchase retries (same cart pass type).
@@ -269,13 +273,43 @@ const PaymentCheckout: React.FC = () => {
     return passPurchaseIdempotencyKeyRef.current;
   }
 
-  const [partySize, setPartySize] = useState(() => cart?.partySize ?? 1);
+  const [partySize, setPartySize] = useState(() => clampPartySize(cart?.partySize ?? 1));
   const [isExtended, setIsExtended] = useState(() => cart?.isExtended ?? false);
+  const [showGroupSizeWarning, setShowGroupSizeWarning] = useState(
+    () => cart != null && Number(cart.partySize) > MAX_PARTY_SIZE,
+  );
+
+  const handlePartySizeChange = (value: number) => {
+    if (!cart) return;
+    if (value > MAX_PARTY_SIZE) {
+      setShowGroupSizeWarning(true);
+      setPartySize(MAX_PARTY_SIZE);
+      setCart({ ...cart, partySize: MAX_PARTY_SIZE, isExtended: cart.isExtended });
+    } else {
+      setShowGroupSizeWarning(false);
+      setPartySize(value);
+      setCart({ ...cart, partySize: value, isExtended: cart.isExtended });
+    }
+  };
 
   useEffect(() => {
     if (!cart) return;
-    setPartySize(cart.partySize);
+    const raw = Number(cart.partySize);
+    const clamped = clampPartySize(Number.isFinite(raw) ? raw : 1);
+    const prev = prevCartPartySizeRef.current;
+    prevCartPartySizeRef.current = raw;
+
+    setPartySize(clamped);
     setIsExtended(cart.isExtended);
+
+    if (raw > MAX_PARTY_SIZE) {
+      setShowGroupSizeWarning(true);
+      if (clamped !== raw) {
+        setCart({ ...cart, partySize: clamped, isExtended: cart.isExtended });
+      }
+    } else if (!(prev != null && prev > MAX_PARTY_SIZE && raw <= MAX_PARTY_SIZE)) {
+      setShowGroupSizeWarning(false);
+    }
   }, [cart?.partySize, cart?.isExtended]);
 
   const passLabel = 'StikmNek Pass';
@@ -592,7 +626,7 @@ const PaymentCheckout: React.FC = () => {
                       <label className="block text-sm font-semibold text-gray-700 mb-2">People (ages 6+)</label>
                       <select
                         value={partySize}
-                        onChange={(e) => setPartySize(Number(e.target.value))}
+                        onChange={(e) => handlePartySizeChange(Number(e.target.value))}
                         className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                       >
                         {[1, 2, 3, 4, 5, 6].map((n) => (
@@ -627,12 +661,39 @@ const PaymentCheckout: React.FC = () => {
                     </div>
                   </div>
 
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3.5 mt-4">
+                    <div className="flex items-start gap-2.5">
+                      <span className="text-lg flex-shrink-0 mt-0.5" role="img" aria-label="Information">
+                        ℹ️
+                      </span>
+                      <p className="text-sm text-blue-900 leading-relaxed">
+                        <span className="font-semibold">Children under 6 are FREE!</span>{' '}
+                        {`They don't count toward your party size and can accompany your group at no extra cost.`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {showGroupSizeWarning && (
+                    <div className="bg-amber-50 border-l-4 border-amber-500 rounded-r-lg p-4 mt-3 mb-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-xl flex-shrink-0" aria-hidden="true">
+                          ⚠️
+                        </span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-amber-900 text-sm sm:text-base">
+                            Group Size Limit Reached
+                          </p>
+                          <p className="text-sm text-amber-800 mt-1">
+                            Maximum {MAX_PARTY_SIZE} people per voucher. For groups larger than {MAX_PARTY_SIZE}, please purchase a second voucher after completing this one.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
                     <p className="text-sm font-bold text-emerald-900">
                       Total: A${priceAud.toFixed(2)} AUD
-                    </p>
-                    <p className="text-xs text-emerald-800 mt-2 leading-relaxed">
-                      With {partySize} {partySize === 1 ? 'person' : 'people'}, you could save over ${savingsAnchorAmount}—this pass pays for itself!
                     </p>
                   </div>
 
@@ -934,6 +995,25 @@ const PaymentCheckout: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {partySize >= 1 && (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-4 rounded-r-lg mb-6 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl shrink-0" aria-hidden>
+                        💰
+                      </span>
+                      <div>
+                        <p className="text-base sm:text-lg font-semibold text-gray-900 leading-snug">
+                          With {partySize} {partySize === 1 ? 'person' : 'people'}, you could save over
+                          <span className="text-blue-700 font-bold"> ${savingsAnchorAmount}</span> on a single meal or tour
+                        </p>
+                        <p className="text-sm text-gray-700 mt-1">
+                          This pass pays for itself immediately!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Pay with Card Button */}
                 <button
