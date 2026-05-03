@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { getPassDisplayTitle, type PassProductId } from '@/data/pricing';
+import { getPassDisplayTitle } from '@/data/pricing';
+import type { PassProductId } from '@/data/passCatalog';
 import { QrCode, X, Calendar, Shield, Ticket, Copy, Check, ChevronUp } from 'lucide-react';
 
 const FloatingPassButton: React.FC = () => {
@@ -46,9 +47,15 @@ const FloatingPassButton: React.FC = () => {
       border: 'border-fuchsia-200',
       shadow: 'shadow-fuchsia-300/50',
     },
+    dynamic: {
+      gradient: 'from-teal-500 to-emerald-600',
+      bg: 'bg-teal-50',
+      border: 'border-teal-200',
+      shadow: 'shadow-teal-300/50',
+    },
   };
 
-  const colors = passColors[user.pass] || passColors.extended_group_adventure;
+  const colors = passColors[user.pass] || passColors.dynamic;
   const passTitle = getPassDisplayTitle(user.pass, language);
 
   /** QR encodes only the pass UUID — verify-redemption loads holder name + validity from DB. */

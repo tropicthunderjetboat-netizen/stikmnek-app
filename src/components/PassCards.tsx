@@ -7,10 +7,8 @@ import { Check, Zap, Crown, Star, CreditCard, Lock, ShieldCheck, Users, Baby, Ca
 import { usePassConfig, PassConfig } from '@/hooks/usePassConfig';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { PASS_PRODUCTS } from '@/data/pricing';
 import {
   getPassTripGuidance,
-  recommendedPassFromUserProfile,
   buildPassStayMismatchMessage,
 } from '@/lib/passRecommendation';
 
@@ -396,15 +394,8 @@ const PassCards: React.FC = () => {
   }, [user?.id, userProfile, refreshUserProfile]);
   const tripGuidance = useMemo(() => {
     if (!userProfile) return null;
-    const products = Object.values(PASS_PRODUCTS);
-    return getPassTripGuidance(userProfile, products);
+    return getPassTripGuidance(userProfile);
   }, [userProfile]);
-
-  /** Adults + children only — infants never counted (see `recommendedPassFromUserProfile`). */
-  const recommendedPassType = useMemo(
-    () => recommendedPassFromUserProfile(userProfile),
-    [userProfile],
-  );
 
   const passI18nLang: 'en' | 'fr' | 'bi' = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
 
@@ -772,7 +763,7 @@ const PassCards: React.FC = () => {
           <div className="text-center mb-14">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-50 border border-teal-100 text-teal-700 text-sm font-semibold mb-4">
               <Users className="w-4 h-4" />
-              {language === 'en' ? 'Group & Family Passes' : language === 'fr' ? 'Pass Groupe & Famille' : 'Grup & Famili Pas'}
+              {language === 'en' ? 'Tourist Pass' : language === 'fr' ? 'Pass touriste' : 'Turis Pas'}
             </div>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-3">
               {t('pass.title', language)}
@@ -819,13 +810,13 @@ const PassCards: React.FC = () => {
             </div>
           )}
 
-          <div className={`grid grid-cols-1 ${activePasses.length === 2 ? 'md:grid-cols-2' : activePasses.length >= 3 ? 'md:grid-cols-3' : 'md:grid-cols-1'} gap-8 max-w-5xl mx-auto`}>
-            {activePasses.map((pass) => {
+          <div className="grid grid-cols-1 gap-8 max-w-lg mx-auto">
+            {(activePasses[0] ? [activePasses[0]] : []).map((pass) => {
               const passName = language === 'fr' ? pass.nameFr : language === 'bi' ? pass.nameBi : pass.name;
               const passPeriod = language === 'fr' ? pass.periodFr : language === 'bi' ? pass.periodBi : pass.period;
               const color = `from-${pass.colorFrom} to-${pass.colorTo}`;
               const shadow = `shadow-${pass.shadowColor}`;
-              const isCurrentUserPass = user?.pass === pass.type && Boolean(user?.passId);
+              const isCurrentUserPass = Boolean(user?.passId);
               const shared = isCurrentUserPass ? Boolean(user?.shareBonusApplied) : isShared(pass.id);
               const isSharing = sharingPassId === pass.id;
               const bonus = pass.shareBonus;
@@ -834,7 +825,7 @@ const PassCards: React.FC = () => {
               const hasBonusDays = bonus.extraDays > 0;
               const hasBonusPeople = bonus.extraPeople > 0 || bonus.extraKids > 0;
               const hasBonus = hasBonusDays || hasBonusPeople;
-              const isRecommended = recommendedPassType != null && pass.type === recommendedPassType;
+              const isRecommended = false;
               const arrival = String(userProfile?.expected_arrival_date ?? '').slice(0, 10);
               const departure = String(userProfile?.expected_departure_date ?? '').slice(0, 10);
               const stayMismatchMsg =
@@ -1042,9 +1033,9 @@ const PassCards: React.FC = () => {
                     )}
 
                     <button
-                      onClick={() => purchasePass(pass.type)}
+                      onClick={() => purchasePass()}
                       className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                        user?.pass === pass.type
+                        isCurrentUserPass
                           ? 'bg-green-50 text-green-700 border border-green-200 cursor-default'
                           : isRecommended
                             ? `bg-gradient-to-r ${color} text-white hover:opacity-90 shadow-lg ${shadow}`
@@ -1059,7 +1050,7 @@ const PassCards: React.FC = () => {
                       ) : (
                         <>
                           <CreditCard className="w-4 h-4" />
-                          {language === 'en' ? 'Buy Now' : language === 'fr' ? 'Acheter' : 'Baem Nao'}
+                          {language === 'en' ? 'Purchase Pass' : language === 'fr' ? 'Acheter un pass' : 'Baem Pas'}
                         </>
                       )}
                     </button>

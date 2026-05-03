@@ -2,8 +2,11 @@
  * Trip guidance + party-size recommendation helpers for pass purchase UI.
  */
 import type { UserProfile } from '@/contexts/AppContext';
-import type { PassProductConfig, PassProductId } from '@/data/pricing';
+import type { PassProductId } from '@/data/passCatalog';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
+
+const DYNAMIC_MAX_PARTY = 6;
+const DYNAMIC_MAX_TRIP_DAYS = 14;
 
 export interface PassTripGuidance {
   /** Inclusive calendar days between arrival and departure (1 if dates missing). */
@@ -20,45 +23,15 @@ function clampInt(n: unknown, fallback: number): number {
   return Math.max(0, Math.floor(x));
 }
 
-type CapacityMode = 'base' | 'share';
-
-function peopleAfterShare(p: PassProductConfig): number {
-  return p.shareBonus?.totalPeopleAfterShare ?? (p.basePeople + (p.shareBonus?.extraPeople || 0));
-}
-
-function daysAfterShare(p: PassProductConfig): number {
-  return p.shareBonus?.totalDaysAfterShare ?? (p.baseDays + (p.shareBonus?.extraDays || 0));
-}
-
-function capsForMode(pass: PassProductConfig, mode: CapacityMode): { people: number; days: number } {
-  if (mode === 'base') {
-    return { people: Math.max(1, pass.basePeople), days: Math.max(1, pass.baseDays) };
-  }
-  return {
-    people: Math.max(1, peopleAfterShare(pass)),
-    days: Math.max(1, daysAfterShare(pass)),
-  };
-}
-
-function coversTrip(
-  pass: PassProductConfig,
-  mode: CapacityMode,
-  totalPeople: number,
-  totalDays: number,
-): boolean {
-  const { people, days } = capsForMode(pass, mode);
-  return totalPeople <= people && totalDays <= days;
-}
-
 /**
  * Feasibility for guidance / support hint uses **adults + children only** (infants excluded).
+ * Dynamic passes cover up to 6 people (ages 6+) and up to 14 calendar days.
  */
 export function getPassTripGuidance(
   userProfile: UserProfile,
-  passProducts: PassProductConfig[],
   _opts?: { language?: 'en' | 'fr' | 'bi' },
 ): PassTripGuidance | null {
-  if (!userProfile || !passProducts || passProducts.length === 0) return null;
+  if (!userProfile) return null;
 
   const adults = clampInt(userProfile.num_adults, 1);
   const children = clampInt(userProfile.num_children, 0);
@@ -69,14 +42,12 @@ export function getPassTripGuidance(
   const tripDays =
     arrival && departure ? inclusiveCalendarDaysBetween(arrival, departure) ?? 1 : 1;
 
-  const canCoverWithShare = passProducts.some((p) =>
-    coversTrip(p, 'share', partyCountExInfants, tripDays),
-  );
+  const canCover = partyCountExInfants <= DYNAMIC_MAX_PARTY && tripDays <= DYNAMIC_MAX_TRIP_DAYS;
 
   return {
     tripDays,
     partyCountExInfants,
-    showSupportHint: !canCoverWithShare,
+    showSupportHint: !canCover,
   };
 }
 
@@ -91,24 +62,15 @@ function clampPartyCount(n: unknown): number {
 /**
  * Recommended pass tier from headcount (**adults + children**). Infants are ignored.
  */
-export function recommendedPassForPartySize(adults: unknown, children: unknown): PassProductId {
-  const a = clampPartyCount(adults);
-  const c = clampPartyCount(children);
-  const n = Math.max(1, a + c);
-  if (n <= 4) return 'family_explorer';
-  if (n <= 6) return 'extended_group_adventure';
-  if (n <= 8) return 'ultimate_crew_experience';
-  return 'mega_group_experience';
+export function recommendedPassForPartySize(_adults: unknown, _children: unknown): PassProductId {
+  return 'dynamic';
 }
 
-/**
- * Same rules as {@link recommendedPassForPartySize}, reading only profile fields (no infants).
- */
+/** Legacy hook — dynamic model uses a single pass product. */
 export function recommendedPassFromUserProfile(
-  profile: Pick<UserProfile, 'num_adults' | 'num_children'> | null | undefined,
+  _profile: Pick<UserProfile, 'num_adults' | 'num_children'> | null | undefined,
 ): PassProductId | null {
-  if (!profile) return null;
-  return recommendedPassForPartySize(profile.num_adults, profile.num_children);
+  return 'dynamic';
 }
 
 /**

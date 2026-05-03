@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { getBasePeople, getShareBonusTotalPeople, getPassDisplayTitle, type PassProductId } from '@/data/pricing';
+import { getBasePeople, getShareBonusTotalPeople, getPassDisplayTitle } from '@/data/pricing';
+import type { PassProductId } from '@/data/passCatalog';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { supabase } from '@/lib/supabase';
 import { QrCode, Calendar, Shield, Ticket, Copy, Check } from 'lucide-react';
@@ -115,6 +116,7 @@ const QRCodeDisplay: React.FC = () => {
   }
 
   const passColors: Record<PassProductId, string> = {
+    dynamic: 'from-teal-500 to-emerald-600',
     family_explorer: 'from-sky-500 to-blue-600',
     extended_group_adventure: 'from-teal-500 to-emerald-600',
     ultimate_crew_experience: 'from-orange-500 to-amber-600',
@@ -122,6 +124,7 @@ const QRCodeDisplay: React.FC = () => {
   };
 
   const passBgColors: Record<PassProductId, string> = {
+    dynamic: 'bg-teal-50 border-teal-200',
     family_explorer: 'bg-sky-50 border-sky-200',
     extended_group_adventure: 'bg-teal-50 border-teal-200',
     ultimate_crew_experience: 'bg-orange-50 border-orange-200',
@@ -131,7 +134,7 @@ const QRCodeDisplay: React.FC = () => {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Header */}
-      <div className={`bg-gradient-to-r ${passColors[user.pass] || passColors.extended_group_adventure} p-5 text-white`}>
+      <div className={`bg-gradient-to-r ${passColors[user.pass] || passColors.dynamic} p-5 text-white`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
@@ -152,7 +155,7 @@ const QRCodeDisplay: React.FC = () => {
 
       {/* QR Code */}
       <div className="p-6 flex flex-col items-center">
-        <div className={`p-4 rounded-2xl border-2 ${passBgColors[user.pass] || passBgColors.extended_group_adventure} mb-4`}>
+        <div className={`p-4 rounded-2xl border-2 ${passBgColors[user.pass] || passBgColors.dynamic} mb-4`}>
           {qrCodeUrl ? (
             <img
               src={qrCodeUrl}

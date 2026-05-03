@@ -110,6 +110,7 @@ function maskEmailForLog(email: string): string {
 /** StikmNek branded pass names (accepts legacy DB `pass_type` or semantic product id). */
 function passTypeToBrandDisplay(passType: unknown): string {
   const db = normalizePassTypeToDb(String(passType ?? ''));
+  if (db === 'dynamic') return 'StikmNek Pass';
   if (db === 'daily') return 'Family Explorer Pass';
   if (db === 'weekly') return 'Extended Group Adventure Pass';
   if (db === 'monthly') return 'Ultimate Crew Experience Pass';
@@ -194,6 +195,13 @@ function shareBonusPromoText(passType: unknown): { headline: string; body: strin
     return {
       headline: 'Unlock more value (free upgrade)',
       body: `${base} You’ll unlock +5 extra days on your Mega Group pass.`,
+    };
+  }
+  if (t === 'dynamic') {
+    return {
+      headline: 'Share StikmNek with your crew',
+      body:
+        `Log into your dashboard and click “Share App” to spread the word. New StikmNek Pass pricing is based on your group size and trip length at purchase time.`,
     };
   }
   return {

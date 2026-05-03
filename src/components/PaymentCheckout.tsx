@@ -4,30 +4,16 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Shield, Lock, Check, Loader2,
-  Zap, Star, Crown, ChevronRight, Calendar, CalendarRange, Info,
-  Users, CreditCard, AlertCircle, CheckCircle
+  ChevronRight, Calendar, CalendarRange, Info,
+  Users, CreditCard, AlertCircle, CheckCircle, Ticket,
 } from 'lucide-react';
 
-import { PASS_PRODUCTS, PASS_PRODUCT_ORDER, type PassProductId } from '@/data/pricing';
-
-type LucideIcon = typeof Zap;
-
-type CheckoutPassRow = {
-  price: number;
-  days: number;
-  label: string;
-  icon: LucideIcon;
-  color: string;
-  shadow: string;
-  group: string;
-};
-
-const CHECKOUT_PASS_UI: Record<PassProductId, { icon: LucideIcon; color: string; shadow: string }> = {
-  family_explorer: { icon: Zap, color: 'from-sky-500 to-blue-600', shadow: 'shadow-sky-200' },
-  extended_group_adventure: { icon: Star, color: 'from-teal-500 to-emerald-600', shadow: 'shadow-teal-200' },
-  ultimate_crew_experience: { icon: Crown, color: 'from-orange-500 to-amber-600', shadow: 'shadow-orange-200' },
-  mega_group_experience: { icon: Crown, color: 'from-fuchsia-600 to-purple-700', shadow: 'shadow-fuchsia-200' },
-};
+import {
+  calculatePassPrice,
+  passInclusiveCalendarDays,
+  validUntilDayOffset,
+  addCalendarDaysIso,
+} from '@/data/pricing';
 
 /** Local calendar YYYY-MM-DD */
 function dateOnlyLocal(d = new Date()): string {
@@ -58,25 +44,6 @@ function latestPassStartDateUtc(now = new Date()): string {
   d.setUTCDate(d.getUTCDate() + 30);
   return d.toISOString().split('T')[0];
 }
-
-const PASSES = Object.fromEntries(
-  PASS_PRODUCT_ORDER.map((id) => {
-    const p = PASS_PRODUCTS[id];
-    const ui = CHECKOUT_PASS_UI[id];
-    return [
-      id,
-      {
-        price: p.priceAUD,
-        days: p.baseDays,
-        label: p.title,
-        icon: ui.icon,
-        color: ui.color,
-        shadow: ui.shadow,
-        group: `Up to ${p.basePeople} people`,
-      } satisfies CheckoutPassRow,
-    ];
-  }),
-) as Record<PassProductId, CheckoutPassRow>;
 
 /**
  * Ensures the Supabase SDK has a valid, fresh access token before Edge invokes.
@@ -290,7 +257,7 @@ const PaymentCheckout: React.FC = () => {
 
   useEffect(() => {
     passPurchaseIdempotencyKeyRef.current = null;
-  }, [cart?.passType]);
+  }, [cart?.partySize, cart?.isExtended]);
 
   function getOrCreatePassPurchaseIdempotencyKey(): string {
     if (!passPurchaseIdempotencyKeyRef.current) {
@@ -302,39 +269,26 @@ const PaymentCheckout: React.FC = () => {
     return passPurchaseIdempotencyKeyRef.current;
   }
 
-  const selectedPass = cart ? PASSES[cart.passType] : null;
+  const [partySize, setPartySize] = useState(() => cart?.partySize ?? 1);
+  const [isExtended, setIsExtended] = useState(() => cart?.isExtended ?? false);
 
-  /** When the user’s active pass already has the share bonus and matches the cart pass type, show boosted people/days (same rules as pricing / extend-pass). */
-  const checkoutPassStats = useMemo(() => {
-    if (!cart?.passType) {
-      return { days: 1, groupLabel: 'Up to 4 people', bonusForThisProduct: false };
-    }
-    const pt = cart.passType;
-    const product = PASS_PRODUCTS[pt];
-    // Bonus can be active on an existing pass OR pre-unlocked before purchase.
-    const bonusForThisProduct = Boolean((user?.shareBonusApplied && user?.pass === pt) || user?.shareBonusUnlocked);
-    const days = bonusForThisProduct
-      ? product.shareBonus.totalDaysAfterShare ??
-        product.baseDays + (product.shareBonus.extraDays || 0)
-      : product.baseDays;
-    const people = bonusForThisProduct
-      ? user?.passPeopleCount ?? product.shareBonus.totalPeopleAfterShare
-      : product.basePeople;
-    return {
-      days,
-      groupLabel: `Up to ${people} people`,
-      bonusForThisProduct,
-    };
-  }, [cart?.passType, user?.shareBonusApplied, user?.shareBonusUnlocked, user?.pass, user?.passPeopleCount]);
+  useEffect(() => {
+    if (!cart) return;
+    setPartySize(cart.partySize);
+    setIsExtended(cart.isExtended);
+  }, [cart?.partySize, cart?.isExtended]);
+
+  const passLabel = 'StikmNek Pass';
+  const priceAud = useMemo(() => calculatePassPrice(partySize, isExtended), [partySize, isExtended]);
+  const daysCount = passInclusiveCalendarDays(isExtended);
+  const groupLabel = `Up to ${partySize} people (ages 6+)`;
 
   const endDate = useMemo(() => {
-    if (!selectedPass || !startDate) return '';
-    const start = new Date(startDate);
-    start.setDate(start.getDate() + checkoutPassStats.days);
-    return start.toISOString().split('T')[0];
-  }, [startDate, selectedPass, checkoutPassStats.days]);
+    if (!startDate) return '';
+    return addCalendarDaysIso(startDate, validUntilDayOffset(isExtended));
+  }, [startDate, isExtended]);
 
-  const daysCount = checkoutPassStats.days;
+  const savingsAnchorAmount = partySize * 10;
   const cardType = detectCardType(cardNumber);
 
   const formatDate = (dateStr: string) => {
@@ -345,7 +299,7 @@ const PaymentCheckout: React.FC = () => {
 
   if (!user) return null;
 
-  if (!cart || !selectedPass) {
+  if (!cart) {
     return (
       <div className="min-h-screen bg-gray-50 pt-20 pb-16">
         <div className="max-w-lg mx-auto px-4 text-center pt-20">
@@ -440,7 +394,9 @@ const PaymentCheckout: React.FC = () => {
 
       const invokeBody = {
         action: 'purchase_pass' as const,
-        passType: cart.passType,
+        passType: 'dynamic',
+        partySize,
+        isExtended,
         startDate: payStartDate,
         cardNumber: cardNumber.replace(/\s/g, ''),
         cardExpiry,
@@ -504,7 +460,7 @@ const PaymentCheckout: React.FC = () => {
         const paymentResultData = {
           receiptNumber: data.receiptNumber,
           passType: data.passType,
-          passLabel: data.passLabel || selectedPass.label,
+          passLabel: data.passLabel || passLabel,
           amount: data.amount,
           currency: data.currency || 'AUD',
           paymentMethod: data.paymentMethod || 'card',
@@ -513,7 +469,9 @@ const PaymentCheckout: React.FC = () => {
           validUntil: data.validUntil,
           days: data.days,
           shareBonusApplied: Boolean(data.shareBonusApplied),
-          group: data.group || checkoutPassStats.groupLabel,
+          group: data.group || groupLabel,
+          partySize,
+          isExtended,
           sessionId: data.sessionId,
           completedAt: new Date().toISOString(),
           cardLast4: data.cardLast4,
@@ -560,7 +518,8 @@ const PaymentCheckout: React.FC = () => {
   };
 
 
-  const Icon = selectedPass.icon;
+  const Icon = Ticket;
+  const passCardGradient = 'from-teal-500 to-emerald-600';
   const currentStepIndex = step === 'dates' ? 0 : step === 'payment' ? 1 : step === 'success' ? 2 : 2;
 
   return (
@@ -621,32 +580,60 @@ const PaymentCheckout: React.FC = () => {
                     <div className="text-sm text-teal-800">
                       <p className="font-semibold mb-1">How it works</p>
                       <p className="text-teal-700">
-                        {checkoutPassStats.bonusForThisProduct ? (
-                          <>
-                            Your <strong>Share Bonus</strong> is already applied. Choose your start date and your <strong>{selectedPass.label}</strong> will be valid for <strong>{daysCount} day{daysCount > 1 ? 's' : ''}</strong> for <strong>{checkoutPassStats.groupLabel}</strong>.
-                            The end date is automatically calculated.
-                          </>
-                        ) : (
-                          <>
-                            Choose your start date and your <strong>{selectedPass.label}</strong> will be valid for <strong>{daysCount} day{daysCount > 1 ? 's' : ''}</strong> for <strong>{checkoutPassStats.groupLabel}</strong>.
-                            The end date is automatically calculated.
-                          </>
-                        )}
+                        Choose how many people (ages 6+) are covered, pick <strong>24-Hour</strong> or <strong>14-Day</strong> access, then your start date.
+                        Your <strong>{passLabel}</strong> will be valid for <strong>{daysCount} calendar day{daysCount > 1 ? 's' : ''}</strong> for <strong>{groupLabel}</strong>.
+                        Children under 6 may travel with you for free (not counted toward this limit).
                       </p>
-                      {!checkoutPassStats.bonusForThisProduct && (
-                        <p className="text-teal-700 mt-2 font-medium">
-                          Share the app (from the Passes page or after purchase) to unlock bonus extra people and/or extra days.
-                        </p>
-                      )}
                     </div>
                   </div>
 
-                  {/* Group Info */}
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
-                    <Users className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <div className="text-sm text-blue-800">
-                      <span className="font-semibold">Group Size:</span> {checkoutPassStats.groupLabel}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">People (ages 6+)</label>
+                      <select
+                        value={partySize}
+                        onChange={(e) => setPartySize(Number(e.target.value))}
+                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                      >
+                        {[1, 2, 3, 4, 5, 6].map((n) => (
+                          <option key={n} value={n}>
+                            {n} {n === 1 ? 'person' : 'people'}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+                    <div>
+                      <span className="block text-sm font-semibold text-gray-700 mb-2">Pass duration</span>
+                      <div className="flex rounded-xl border-2 border-gray-200 overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setIsExtended(false)}
+                          className={`flex-1 py-3 text-sm font-semibold transition-colors ${
+                            !isExtended ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          24-Hour
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsExtended(true)}
+                          className={`flex-1 py-3 text-sm font-semibold transition-colors ${
+                            isExtended ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          14-Day
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
+                    <p className="text-sm font-bold text-emerald-900">
+                      Total: A${priceAud.toFixed(2)} AUD
+                    </p>
+                    <p className="text-xs text-emerald-800 mt-2 leading-relaxed">
+                      With {partySize} {partySize === 1 ? 'person' : 'people'}, you could save over ${savingsAnchorAmount}—this pass pays for itself!
+                    </p>
                   </div>
 
                   {/* Start Date Picker */}
@@ -690,7 +677,9 @@ const PaymentCheckout: React.FC = () => {
                       </div>
                     </div>
                     <p className="text-xs text-gray-400 mt-1.5">
-                      Automatically set to {daysCount} day{daysCount > 1 ? 's' : ''} after your start date
+                      {isExtended
+                        ? `14-day pass: valid through the end date shown (inclusive).`
+                        : `24-hour pass: same calendar day start and end.`}
                     </p>
                   </div>
 
@@ -961,7 +950,7 @@ const PaymentCheckout: React.FC = () => {
                   ) : (
                     <>
                       <Lock className="w-5 h-5" />
-                      Pay A${selectedPass.price}.00 with Card
+                      Pay A${priceAud.toFixed(2)} with Card
                     </>
                   )}
                 </button>
@@ -1000,7 +989,7 @@ const PaymentCheckout: React.FC = () => {
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
                 <p className="text-gray-500 mb-6">
-                  Your {selectedPass.label} is now active. Redirecting to your receipt...
+                  Your {passLabel} is now active. Redirecting to your receipt...
                 </p>
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 border border-green-200 text-sm text-green-700 font-medium">
                   <CreditCard className="w-4 h-4" />
@@ -1038,25 +1027,22 @@ const PaymentCheckout: React.FC = () => {
 
               <div className="p-5">
                 {/* Pass Card */}
-                <div className={`relative bg-gradient-to-br ${selectedPass.color} rounded-xl p-5 text-white mb-5 overflow-hidden`}>
+                <div className={`relative bg-gradient-to-br ${passCardGradient} rounded-xl p-5 text-white mb-5 overflow-hidden`}>
                   <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
                   <div className="relative">
                     <div className="flex items-center gap-2 mb-3">
                       <Icon className="w-5 h-5" />
                       <span className="text-sm font-medium text-white/80">StikmNek</span>
                     </div>
-                    <h4 className="text-lg font-bold">{selectedPass.label}</h4>
+                    <h4 className="text-lg font-bold">{passLabel}</h4>
                     <div className="flex items-center gap-2 mt-2">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/20 text-white text-xs font-semibold">
                         <Users className="w-3 h-3" />
-                        {checkoutPassStats.groupLabel}
+                        {groupLabel}
                       </span>
                     </div>
                     <p className="text-sm text-white/70 mt-2">
-                      {daysCount} day{daysCount > 1 ? 's' : ''} of unlimited deals
-                      {checkoutPassStats.bonusForThisProduct && (
-                        <span className="block text-xs text-white/60 mt-1">Includes Share Bonus</span>
-                      )}
+                      {daysCount} calendar day{daysCount > 1 ? 's' : ''} of unlimited deals
                     </p>
                   </div>
                 </div>
@@ -1090,8 +1076,8 @@ const PaymentCheckout: React.FC = () => {
                 {/* Price Breakdown */}
                 <div className="space-y-3 mb-5">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">{selectedPass.label}</span>
-                    <span className="font-medium text-gray-900">A${selectedPass.price}.00</span>
+                    <span className="text-gray-500">{passLabel}</span>
+                    <span className="font-medium text-gray-900">A${priceAud.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Processing fee</span>
@@ -1103,7 +1089,7 @@ const PaymentCheckout: React.FC = () => {
                   </div>
                   <div className="border-t border-gray-100 pt-3 flex justify-between">
                     <span className="font-bold text-gray-900">Total</span>
-                    <span className="text-xl font-extrabold text-gray-900">A${selectedPass.price}.00 <span className="text-sm font-semibold text-gray-500">AUD</span></span>
+                    <span className="text-xl font-extrabold text-gray-900">A${priceAud.toFixed(2)} <span className="text-sm font-semibold text-gray-500">AUD</span></span>
                   </div>
                 </div>
 

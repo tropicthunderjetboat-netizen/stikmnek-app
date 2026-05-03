@@ -1,162 +1,108 @@
 /**
- * StikmNek Pricing & Product Definitions
- * ─────────────────────────────────────
- * Pass products are keyed by PassProductId (semantic). DB column `passes.pass_type`
- * uses legacy strings — map with passCatalog helpers.
+ * StikmNek dynamic pass pricing (single product model).
+ * Legacy DB `pass_type` values (daily/weekly/…) remain for existing rows — see `passCatalog.ts`.
+ *
+ * Formula: BASE + (partySize - 1) * GUEST_FEE + (isExtended ? EXTEND : 0)
+ * — Keep in sync with `supabase/functions/_shared/pricingDynamic.ts`.
  */
 
 import {
-  type PassProductId,
-  type DbPassType,
   passProductIdFromDb,
-  toDbPassType,
+  type DbPassType,
+  type PassProductId,
   PASS_PRODUCT_ORDER,
+  toDbPassType,
 } from '@/data/passCatalog';
 
-export type { PassProductId, DbPassType };
+export type { DbPassType, PassProductId };
 export { passProductIdFromDb, toDbPassType, PASS_PRODUCT_ORDER };
 
-export const SUPERSTAR_PRICE_AUD = 5;
+export const BASE_PRICE_AUD = 15;
+export const GUEST_FEE_AUD = 5;
+export const EXTEND_FEE_AUD = 10;
+export const MIN_PARTY_SIZE = 1;
+export const MAX_PARTY_SIZE = 6;
 
-export interface ShareBonusConfig {
-  extraPeople: number;
-  extraDays: number;
-  totalPeopleAfterShare: number;
-  totalDaysAfterShare?: number;
-  description: string;
-  descriptionFr: string;
-  descriptionBi: string;
+export function clampPartySize(n: number): number {
+  if (!Number.isFinite(n)) return MIN_PARTY_SIZE;
+  const x = Math.floor(n);
+  return Math.min(MAX_PARTY_SIZE, Math.max(MIN_PARTY_SIZE, x));
 }
 
-export interface PassProductConfig {
-  /** Canonical app identifier */
-  id: PassProductId;
-  title: string;
-  titleFr: string;
-  titleBi: string;
-  priceAUD: number;
-  baseDays: number;
-  basePeople: number;
-  shareBonus: ShareBonusConfig;
+export function calculatePassPrice(partySize: number, isExtended: boolean): number {
+  const p = clampPartySize(partySize);
+  return BASE_PRICE_AUD + (p - 1) * GUEST_FEE_AUD + (isExtended ? EXTEND_FEE_AUD : 0);
 }
 
-export const FAMILY_EXPLORER_PASS: PassProductConfig = {
-  id: 'family_explorer',
-  title: 'Family Explorer Pass',
-  titleFr: 'Pass Explorateur Familial',
-  titleBi: 'Famili Eksplora Pas',
-  priceAUD: 15,
-  baseDays: 1,
-  basePeople: 4,
-  shareBonus: {
-    extraPeople: 2,
-    extraDays: 0,
-    totalPeopleAfterShare: 6,
-    description: 'Share the app to add 2 more people FREE!',
-    descriptionFr: 'Partagez l\'app pour ajouter 2 personnes gratuitement !',
-    descriptionBi: 'Serem app blong ademap 2 moa man fri!',
-  },
-};
-
-export const EXTENDED_GROUP_ADVENTURE_PASS: PassProductConfig = {
-  id: 'extended_group_adventure',
-  title: 'Extended Group Adventure Pass',
-  titleFr: 'Pass Aventure Groupe Étendu',
-  titleBi: 'Grup Advenija Pas',
-  priceAUD: 45,
-  baseDays: 6,
-  basePeople: 4,
-  shareBonus: {
-    extraPeople: 2,
-    extraDays: 1,
-    totalPeopleAfterShare: 6,
-    totalDaysAfterShare: 7,
-    description: 'Share the app to get +2 people AND a free 7th day!',
-    descriptionFr: 'Partagez l\'app pour +2 personnes ET un 7e jour gratuit !',
-    descriptionBi: 'Serem app blong kasem +2 man mo wan fri 7th dei!',
-  },
-};
-
-export const ULTIMATE_CREW_EXPERIENCE_PASS: PassProductConfig = {
-  id: 'ultimate_crew_experience',
-  title: 'Ultimate Crew Experience Pass',
-  titleFr: 'Pass Expérience Ultime Équipe',
-  titleBi: 'Ultimet Kru Eksperiens Pas',
-  priceAUD: 99,
-  baseDays: 6,
-  basePeople: 7,
-  shareBonus: {
-    extraPeople: 1,
-    extraDays: 1,
-    totalPeopleAfterShare: 8,
-    totalDaysAfterShare: 7,
-    description: 'Share the app to get +1 person AND a free 7th day!',
-    descriptionFr: 'Partagez l\'app pour +1 personne ET un 7e jour gratuit !',
-    descriptionBi: 'Serem app blong kasem +1 man mo wan fri 7th dei!',
-  },
-};
-
-export const MEGA_GROUP_EXPERIENCE_PASS: PassProductConfig = {
-  id: 'mega_group_experience',
-  title: 'Mega Group Experience Pass',
-  titleFr: 'Pass Expérience Méga Groupe',
-  titleBi: 'Mega Grup Eksperiens Pas',
-  priceAUD: 199,
-  baseDays: 7,
-  basePeople: 20,
-  shareBonus: {
-    extraPeople: 0,
-    extraDays: 5,
-    totalPeopleAfterShare: 20,
-    totalDaysAfterShare: 12,
-    description: 'Share the app to unlock 5 extra days FREE!',
-    descriptionFr: 'Partagez l\'app pour débloquer 5 jours supplémentaires gratuits !',
-    descriptionBi: 'Serem app blong anlokem 5 moa fri dei!',
-  },
-};
-
-export const PASS_PRODUCTS: Record<PassProductId, PassProductConfig> = {
-  family_explorer: FAMILY_EXPLORER_PASS,
-  extended_group_adventure: EXTENDED_GROUP_ADVENTURE_PASS,
-  ultimate_crew_experience: ULTIMATE_CREW_EXPERIENCE_PASS,
-  mega_group_experience: MEGA_GROUP_EXPERIENCE_PASS,
-};
-
-/** Ordered list for UI (cards, checkout). */
-export const PASS_PRODUCTS_IN_ORDER: PassProductConfig[] = PASS_PRODUCT_ORDER.map((id) => PASS_PRODUCTS[id]);
-
-/** @deprecated Use PassProductId — same union, semantic names */
-export type PassType = PassProductId;
-
-export function getPassTitle(passId: PassProductId, lang: 'en' | 'fr' | 'bi' = 'en'): string {
-  const p = PASS_PRODUCTS[passId];
-  if (!p) return passId;
-  return lang === 'fr' ? p.titleFr : lang === 'bi' ? p.titleBi : p.title;
+/** Inclusive calendar span: 24-hour = 1 day; extended = 14 days. */
+export function passInclusiveCalendarDays(isExtended: boolean): number {
+  return isExtended ? 14 : 1;
 }
 
-/**
- * Display title for DB legacy key, semantic id, or unknown string.
- */
+/** Offset from start date to `valid_until` (inclusive). */
+export function validUntilDayOffset(isExtended: boolean): number {
+  return passInclusiveCalendarDays(isExtended) - 1;
+}
+
+export function addCalendarDaysIso(startDateIso: string, dayOffset: number): string {
+  const d = new Date(startDateIso + 'T00:00:00');
+  d.setDate(d.getDate() + dayOffset);
+  return d.toISOString().split('T')[0];
+}
+
 export function getPassDisplayTitle(
   raw: string | null | undefined,
   lang: 'en' | 'fr' | 'bi' = 'en',
 ): string {
-  if (raw == null || String(raw).trim() === '') {
+  const id = passProductIdFromDb(String(raw ?? ''));
+  if (id === 'dynamic' || String(raw ?? '').toLowerCase().trim() === 'dynamic') {
     return lang === 'fr' ? 'Pass StikmNek' : lang === 'bi' ? 'StikmNek Pas' : 'StikmNek Pass';
   }
-  const id = passProductIdFromDb(String(raw));
-  if (id) return getPassTitle(id, lang);
+  const legacyTitles: Record<string, { en: string; fr: string; bi: string }> = {
+    family_explorer: {
+      en: 'Family Explorer Pass',
+      fr: 'Pass Explorateur Familial',
+      bi: 'Famili Eksplora Pas',
+    },
+    extended_group_adventure: {
+      en: 'Extended Group Adventure Pass',
+      fr: 'Pass Aventure Groupe Étendu',
+      bi: 'Grup Advenija Pas',
+    },
+    ultimate_crew_experience: {
+      en: 'Ultimate Crew Experience Pass',
+      fr: 'Pass Expérience Ultime Équipe',
+      bi: 'Ultimet Kru Eksperiens Pas',
+    },
+    mega_group_experience: {
+      en: 'Mega Group Experience Pass',
+      fr: 'Pass Expérience Méga Groupe',
+      bi: 'Mega Grup Eksperiens Pas',
+    },
+    daily: { en: 'Family Explorer Pass', fr: 'Pass Explorateur Familial', bi: 'Famili Eksplora Pas' },
+    weekly: { en: 'Extended Group Adventure Pass', fr: 'Pass Aventure Groupe Étendu', bi: 'Grup Advenija Pas' },
+    monthly: { en: 'Ultimate Crew Experience Pass', fr: 'Pass Expérience Ultime Équipe', bi: 'Ultimet Kru Eksperiens Pas' },
+    mega_group: { en: 'Mega Group Experience Pass', fr: 'Pass Expérience Méga Groupe', bi: 'Mega Grup Eksperiens Pas' },
+  };
+  const key = (id ?? String(raw ?? '')).toLowerCase().trim();
+  const row = legacyTitles[key];
+  if (row) return lang === 'fr' ? row.fr : lang === 'bi' ? row.bi : row.en;
   return lang === 'fr' ? 'Pass StikmNek' : lang === 'bi' ? 'StikmNek Pas' : 'StikmNek Pass';
 }
 
-export function getPassPrice(passId: PassProductId): number {
-  return PASS_PRODUCTS[passId]?.priceAUD ?? 0;
+export function getPassTitle(_passId: PassProductId, lang: 'en' | 'fr' | 'bi' = 'en'): string {
+  return getPassDisplayTitle('dynamic', lang);
 }
 
-export function getBasePeople(passId: PassProductId): number {
-  return PASS_PRODUCTS[passId]?.basePeople ?? 4;
+/** @deprecated Catalog removed — use {@link calculatePassPrice}. */
+export function getPassPrice(_passId: PassProductId): number {
+  return calculatePassPrice(MIN_PARTY_SIZE, false);
 }
 
-export function getShareBonusTotalPeople(passId: PassProductId): number {
-  return PASS_PRODUCTS[passId]?.shareBonus.totalPeopleAfterShare ?? 6;
+export function getBasePeople(_passId: PassProductId): number {
+  return MAX_PARTY_SIZE;
+}
+
+export function getShareBonusTotalPeople(_passId: PassProductId): number {
+  return MAX_PARTY_SIZE;
 }

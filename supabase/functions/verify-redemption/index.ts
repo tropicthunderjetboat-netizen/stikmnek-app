@@ -424,16 +424,21 @@ Deno.serve(async (req) => {
     const party = partyFromProfileRow(profile);
     const totalPartySize = totalPartyPax(party);
     const passMaxPeople = resolvePassMaxPeople(pass as { max_people?: unknown });
+    const passTypeStr = String((pass as { pass_type?: unknown }).pass_type ?? '');
+    /** Dynamic passes: capacity applies to ages 6+ (adults + children); infants free. Legacy passes: all pax. */
+    const headcountAgainstPass =
+      passTypeStr === 'dynamic' ? party.adults + party.children : totalPartySize;
 
     // ─── Party size vs pass capacity (max_people) — server-side enforcement ───
-    // Savings math uses adults+children (+ infants for tiers). The same headcount must
-    // not exceed the pass purchase limit (share bonus included in max_people at buy time).
-    if (canRedeem && passMaxPeople !== null && totalPartySize > passMaxPeople) {
+    if (canRedeem && passMaxPeople !== null && headcountAgainstPass > passMaxPeople) {
       passStatus = 'party_exceeds_pass_capacity';
       canRedeem = false;
       message =
-        `Party size (${totalPartySize}) exceeds this pass capacity (max ${passMaxPeople}). ` +
-        'The tourist should reduce group size in their profile or purchase a pass with a higher limit.';
+        passTypeStr === 'dynamic'
+          ? `People ages 6+ in profile (${headcountAgainstPass}) exceed this pass (${passMaxPeople} max). ` +
+            'Children under 6 may accompany the group for free. Reduce adults/children in profile or buy a larger pass.'
+          : `Party size (${totalPartySize}) exceeds this pass capacity (max ${passMaxPeople}). ` +
+            'The tourist should reduce group size in their profile or purchase a pass with a higher limit.';
     }
 
     const touristName =
@@ -516,6 +521,7 @@ Deno.serve(async (req) => {
           purchasedAt: pass.purchased_at,
           maxPeople: passMaxPeople,
           totalPartySize,
+          headcountAgainstPass,
         },
         voucher: null,
         redemptionHistory: {
@@ -540,6 +546,7 @@ Deno.serve(async (req) => {
             status: passStatus,
             maxPeople: passMaxPeople,
             totalPartySize,
+            headcountAgainstPass,
           },
           200
         );

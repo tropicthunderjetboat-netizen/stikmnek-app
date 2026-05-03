@@ -29,6 +29,7 @@ function getSafeCorsHeaders(req: Request): Record<string, string> {
 
 // Share bonus: extra people and extra days per pass type (matches src/data/pricing.ts)
 const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = {
+  dynamic: { extraPeople: 0, extraDays: 0 },
   daily: { extraPeople: 2, extraDays: 0 },
   weekly: { extraPeople: 2, extraDays: 1 },
   monthly: { extraPeople: 1, extraDays: 1 },

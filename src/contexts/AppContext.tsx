@@ -12,11 +12,11 @@ import {
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
 import type { ViewMode } from '@/utils/viewModes';
-import type { PassProductId } from '@/data/pricing';
-import { PASS_PRODUCTS, passProductIdFromDb } from '@/data/pricing';
+import type { PassProductId } from '@/data/passCatalog';
+import { passProductIdFromDb } from '@/data/passCatalog';
 
 export type { ViewMode };
-export type { PassProductId };
+export type { PassProductId } from '@/data/passCatalog';
 
 // ═══════════════════════════════════════════════════════════════
 // ADMIN EMAILS: These always get 'admin' role regardless of DB
@@ -95,8 +95,8 @@ export interface User {
 }
 
 export interface CartItem {
-  passType: PassProductId;
-  price: number;
+  partySize: number;
+  isExtended: boolean;
 }
 
 export interface DBReview {
@@ -228,7 +228,7 @@ interface AppContextType {
   toggleFavorite: (id: string) => void;
   cart: CartItem | null;
   setCart: (item: CartItem | null) => void;
-  purchasePass: (passType: PassProductId) => void;
+  purchasePass: () => void;
   selectedBusiness: Business | null;
   setSelectedBusiness: React.Dispatch<React.SetStateAction<Business | null>>;
   showAuth: boolean;
@@ -1421,18 +1421,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   // PURCHASE PASS
   // ═══════════════════════════════════════════════════════════
-  const purchasePass = useCallback(async (passType: PassProductId) => {
+  const purchasePass = useCallback(async () => {
     if (!user) {
       setShowAuth(true);
       setAuthMode('signup-tourist');
       return;
     }
-    if (user.pass === passType) {
-      toast.info('You already have this pass active!');
+    if (user.passId) {
+      toast.info('You already have an active pass!');
       return;
     }
-    const price = PASS_PRODUCTS[passType]?.priceAUD ?? 0;
-    setCart({ passType, price });
+    setCart({ partySize: 1, isExtended: false });
     setCurrentView('checkout');
   }, [user, setCurrentView]);
 

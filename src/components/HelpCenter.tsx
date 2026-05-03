@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { PASS_PRODUCTS_IN_ORDER } from '@/data/pricing';
+import { BASE_PRICE_AUD, EXTEND_FEE_AUD, GUEST_FEE_AUD, MAX_PARTY_SIZE, calculatePassPrice } from '@/data/pricing';
 import {
   HelpCircle, Book, Store, Shield, Users, ChevronDown, ChevronRight,
   Search, ArrowLeft, MapPin, CreditCard, QrCode, Star, Camera,
@@ -35,21 +35,21 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
     }
   }, [initialSection]);
 
-  /** Keeps Help Center copy aligned with `PASS_PRODUCTS` / PassCards checkout. */
-  const passProductSummary = useMemo(
-    () => PASS_PRODUCTS_IN_ORDER.map((p) => `${p.title} ($${p.priceAUD} AUD)`).join('; '),
-    [],
-  );
+  const passProductSummary = useMemo(() => {
+    const minP = calculatePassPrice(1, false);
+    const maxP = calculatePassPrice(MAX_PARTY_SIZE, true);
+    return `StikmNek Pass from $${minP} to $${maxP} AUD (1–${MAX_PARTY_SIZE} people ages 6+, 24-hour or 14-day)`;
+  }, []);
 
   const howItWorksSteps = useMemo(() => {
-    const min = PASS_PRODUCTS_IN_ORDER[0]?.priceAUD ?? 15;
-    const max = PASS_PRODUCTS_IN_ORDER[PASS_PRODUCTS_IN_ORDER.length - 1]?.priceAUD ?? 199;
+    const min = BASE_PRICE_AUD;
+    const max = calculatePassPrice(MAX_PARTY_SIZE, true);
     return [
       { step: '1', title: 'Create an Account', desc: 'Sign up as a tourist or business owner' },
       {
         step: '2',
         title: 'Choose Your Pass',
-        desc: `Open Passes, pick a pass that fits your group and trip (four options from $${min} to $${max} AUD), choose a start date, and pay with PayPal.`,
+        desc: `Open Passes, set people (ages 6+, up to ${MAX_PARTY_SIZE}), choose 24-hour or 14-day access, pick a start date, and pay (from $${min} AUD; +$${GUEST_FEE_AUD} per extra person; +$${EXTEND_FEE_AUD} for 14-day). PayPal or card where enabled.`,
       },
       { step: '3', title: 'Browse Deals', desc: 'Explore dining, tours, activities, spa, shopping, and accommodation on Deals and Map' },
       { step: '4', title: 'Show Your QR Code', desc: 'Present your pass QR code at a partner business; staff scan it in StikmNek' },
@@ -66,7 +66,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       },
       {
         question: 'How do I purchase a pass?',
-        answer: `Open Passes in the top menu, choose the pass that fits your group and trip (${passProductSummary}), pick a start date, and complete payment through PayPal. Your pass coverage follows the dates shown for that product. Prices are in AUD.`,
+        answer: `Open Passes in the top menu, set your group size and 24-hour or 14-day duration (${passProductSummary}), pick a start date, and complete payment (card or PayPal where enabled). Your pass coverage follows the dates shown at checkout. Prices are in AUD.`,
         icon: <CreditCard className="w-4 h-4" />,
       },
       {

@@ -71,6 +71,9 @@ interface ValidityResult {
     validUntil: string;
     expiresAt: string;
     purchasedAt: string;
+    maxPeople?: number | null;
+    totalPartySize?: number;
+    headcountAgainstPass?: number;
   };
   voucher: {
     businessName: string;
@@ -126,6 +129,17 @@ function formatOfferDiscountLine(listing: OwnerListingOffer): string {
 // ═══ PASS TIER STYLING ═══
 const getPassTierConfig = (passType: string) => {
   const pid = passProductIdFromDb(passType);
+  if (pid === 'dynamic' || String(passType).toLowerCase() === 'dynamic') {
+    return {
+      gradient: 'from-teal-500 to-emerald-600',
+      bg: 'bg-teal-50',
+      border: 'border-teal-200',
+      text: 'text-teal-800',
+      badge: 'bg-gradient-to-r from-teal-500 to-emerald-600',
+      icon: <Ticket className="w-4 h-4" />,
+      label: getPassDisplayTitle('dynamic', 'en'),
+    };
+  }
   if (pid === 'family_explorer') {
     return { gradient: 'from-sky-500 to-blue-600', bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-800', badge: 'bg-gradient-to-r from-sky-500 to-blue-600', icon: <Zap className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
   }
@@ -1244,6 +1258,21 @@ const QRScanner: React.FC<QRScannerProps> = ({
         </div>
 
         <div className="px-5 space-y-4">
+          {validityResult.pass?.maxPeople != null && validityResult.pass.maxPeople > 0 && (
+            <div
+              className="rounded-2xl border-4 border-black bg-yellow-300 px-5 py-6 text-center shadow-lg"
+              role="status"
+            >
+              <p className="text-xs font-black uppercase tracking-widest text-black mb-2">Pass capacity</p>
+              <p className="text-3xl sm:text-4xl font-black text-black leading-tight">
+                VALID FOR {validityResult.pass.maxPeople} PEOPLE
+              </p>
+              <p className="text-sm font-semibold text-gray-900 mt-4">
+                Note: Children under 6 may accompany this group for free.
+              </p>
+            </div>
+          )}
+
           {/* Tourist Identity Card */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <div className="flex items-center gap-4">
@@ -1609,7 +1638,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                   <span className="text-sm font-extrabold text-emerald-900">Valid pass</span>
                 </div>
                 <p className="text-xs text-emerald-800">
-                  {verifiedForOfferFlow.tourist?.name} · {getPassDisplayTitle(verifiedForOfferFlow.pass?.type || 'extended_group_adventure', 'en')}
+                  {verifiedForOfferFlow.tourist?.name} · {getPassDisplayTitle(verifiedForOfferFlow.pass?.type || 'dynamic', 'en')}
                 </p>
                 {(() => {
                   const p = partyFromValidityApi(verifiedForOfferFlow.party);
