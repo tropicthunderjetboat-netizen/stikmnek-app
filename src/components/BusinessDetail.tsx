@@ -67,6 +67,7 @@ const BusinessDetail: React.FC = () => {
     language, selectedBusiness, setCurrentView, setSelectedBusiness,
     favorites, toggleFavorite, user, userProfile, setShowAuth, setAuthMode,
     dbReviews, checkReviewSubmissionAllowed,
+    purchasePass,
   } = useAppContext();
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -421,7 +422,7 @@ const BusinessDetail: React.FC = () => {
             ? 'Vous avez besoin d’un pass actif pour demander une réservation et bénéficier des réductions !'
             : 'Yu nidim aktiv pas blong askem bukin mo kasem diskaon!',
       );
-      setCurrentView('passes');
+      void purchasePass();
       return;
     }
     setShowBookingModal(true);

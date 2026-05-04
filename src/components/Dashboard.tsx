@@ -18,7 +18,7 @@ type DashboardTab = 'overview' | 'analytics';
 const Dashboard: React.FC = () => {
   const {
     language, user, favorites, redemptions, setSelectedBusiness, setCurrentView, dbBusinesses,
-    refreshRedemptions,
+    refreshRedemptions, purchasePass,
   } = useAppContext();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
 
@@ -245,7 +245,11 @@ const Dashboard: React.FC = () => {
                   ) : (
                     <div className="p-8 text-center">
                       <p className="text-gray-400 mb-4">{t('dash.nopass', language)}</p>
-                      <button onClick={() => setCurrentView('passes')} className="px-6 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => void purchasePass()}
+                        className="px-6 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors"
+                      >
                         {t('hero.cta', language)}
                       </button>
                     </div>

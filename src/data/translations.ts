@@ -144,6 +144,23 @@ export const translations: Record<string, Record<Language, string>> = {
   },
   'passFlow.duration_short': { en: '1-day', fr: '1 jour', bi: 'wan-dei' },
   'passFlow.duration_extended': { en: '14-day', fr: '14 jours', bi: '14-dei' },
+  'passFlow.redirecting': {
+    en: 'Taking you to checkout…',
+    fr: 'Redirection vers le paiement…',
+    bi: 'Go long checkout…',
+  },
+  'passFlow.home_skip_title': { en: 'Your pass', fr: 'Votre pass', bi: 'Pas blong yu' },
+  'passFlow.home_skip_desc': {
+    en: 'Continue to secure checkout. Party size and pass length use your profile — change them anytime before you pay.',
+    fr: 'Poursuivre vers le paiement sécurisé. Taille du groupe et durée d’après votre profil — modifiables avant paiement.',
+    bi: 'Go long sef checkout. Grup mo taem i blong profil blong yu — yu ken senis eni taem bifo pem.',
+  },
+  'passFlow.home_skip_cta': { en: 'Continue to checkout', fr: 'Aller au paiement', bi: 'Go long checkout' },
+  'passFlow.home_passes_info_link': {
+    en: 'Full pass details & pricing',
+    fr: 'Détails et tarifs du pass',
+    bi: 'Ful infomesen mo praes',
+  },
 
   // Business
   'biz.featured': { en: 'Featured Deals', fr: 'Offres en vedette', bi: 'Fitjad Dils' },

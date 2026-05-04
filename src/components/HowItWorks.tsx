@@ -1,11 +1,12 @@
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
 import { t } from '@/data/translations';
 import type { Language } from '@/data/translations';
 import { Ticket, QrCode, MapPin, Smile } from 'lucide-react';
 
 const HowItWorks: React.FC = () => {
-  const { language, setCurrentView } = useAppContext();
+  const { language, setCurrentView, user, purchasePass } = useAppContext();
   const lang: Language = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
 
   const steps = [
@@ -75,7 +76,11 @@ const HowItWorks: React.FC = () => {
 
         <div className="text-center mt-12">
           <button
-            onClick={() => setCurrentView('passes')}
+            type="button"
+            onClick={() => {
+              if (shouldOpenCheckoutInsteadOfPassesPage(user)) void purchasePass();
+              else setCurrentView('passes');
+            }}
             className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200 hover:shadow-xl"
           >
             {language === 'en' ? 'Start Saving Today' : language === 'fr' ? 'Commencez à économiser aujourd\'hui' : 'Stat Sevem Tede'}

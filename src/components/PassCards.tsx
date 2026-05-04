@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { useAppContext, defaultPassCartFromProfile } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
+import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
 import { Check, Zap, Crown, Star, CreditCard, Lock, ShieldCheck, Users, Baby, Calendar, Share2, Gift, Sparkles, Loader2, PartyPopper, Info } from 'lucide-react';
 
 import { usePassConfig, PassConfig } from '@/hooks/usePassConfig';
@@ -13,6 +15,11 @@ import {
   getPassTripGuidance,
   buildPassStayMismatchMessage,
 } from '@/lib/passRecommendation';
+
+export interface PassCardsProps {
+  /** Home layout: short CTA for signed-in buyers instead of the full marketing funnel. */
+  embeddedOnHome?: boolean;
+}
 
 const KNOW_BEFORE_KEYS = ['pass.know_bullet_1', 'pass.know_bullet_2', 'pass.know_bullet_3', 'pass.know_bullet_4'] as const;
 const KNOW_BEFORE_ICONS = [Share2, Users, Share2, Calendar] as const;
@@ -385,7 +392,8 @@ function buildPassShareContent(pass: PassConfig, language: ShareLang): { title: 
 
 
 // ─── Main PassCards Component ───
-const PassCards: React.FC = () => {
+const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
+  const navigate = useNavigate();
   const { language, purchasePass, user, userProfile, refreshUserPass, refreshUserProfile, setCurrentView } = useAppContext();
 
   const { activePasses } = usePassConfig();
@@ -698,7 +706,32 @@ const PassCards: React.FC = () => {
     setCurrentView('deals');
   }, [setCurrentView, refreshUserPass]);
 
-
+  if (embeddedOnHome && shouldOpenCheckoutInsteadOfPassesPage(user)) {
+    return (
+      <section className="py-14 bg-gradient-to-b from-white to-teal-50/40" id="passes">
+        <div className="max-w-lg mx-auto px-4 text-center">
+          <h2 className="text-2xl font-black text-gray-900 mb-2">{t('passFlow.home_skip_title', language)}</h2>
+          <p className="text-sm text-muted-foreground mb-6 leading-relaxed">{t('passFlow.home_skip_desc', language)}</p>
+          <button
+            type="button"
+            onClick={() => void purchasePass()}
+            className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-sm hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200"
+          >
+            {t('passFlow.home_skip_cta', language)}
+          </button>
+          <div className="mt-5">
+            <button
+              type="button"
+              onClick={() => navigate('/passes?info=1')}
+              className="text-sm text-teal-700 font-semibold hover:underline"
+            >
+              {t('passFlow.home_passes_info_link', language)}
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <>

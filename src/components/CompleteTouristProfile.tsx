@@ -7,9 +7,9 @@ const CompleteTouristProfile: React.FC = () => {
   const {
     user,
     userProfile,
+    purchasePass,
     language,
     refreshUserProfile,
-    setCurrentView,
     userProfileLoadError,
     retryUserProfileFetch,
     touristOnboardingResume,
@@ -81,7 +81,7 @@ const CompleteTouristProfile: React.FC = () => {
               userProfile={userProfile}
               onSuccess={async () => {
                 await refreshUserProfile();
-                setCurrentView('passes');
+                void purchasePass();
               }}
             />
 
@@ -89,10 +89,10 @@ const CompleteTouristProfile: React.FC = () => {
               <ArrowRight className="w-5 h-5 text-teal-700 mt-0.5" />
               <p className="text-sm text-teal-800">
                 {language === 'en'
-                  ? 'Next, we’ll suggest the best pass for your trip.'
+                  ? 'Next, you’ll go to secure checkout — pass options use your profile (change anytime before paying).'
                   : language === 'fr'
-                    ? 'Ensuite, nous vous suggérerons le meilleur pass pour votre séjour.'
-                    : 'Biaen, bae mifala i soem best pas blong trip blong yu.'}
+                    ? 'Ensuite, passage au paiement sécurisé — le pass s’appuie sur votre profil (modifiable avant paiement).'
+                    : 'Biaen, yu go long checkout — pas i blong profil blong yu (yu ken senis bifo pem).'}
               </p>
             </div>
           </div>

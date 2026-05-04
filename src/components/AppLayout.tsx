@@ -13,6 +13,7 @@ import CategoryShowcase from './CategoryShowcase';
 import FeaturedLeaderboard from './FeaturedLeaderboard';
 import BusinessGrid from './BusinessGrid';
 import PassCards from './PassCards';
+import PassesEntryGate from './PassesEntryGate';
 import ReviewsSection from './ReviewsSection';
 import ListYourBusinessCta from './ListYourBusinessCta';
 import Footer from './Footer';
@@ -236,7 +237,7 @@ const AppLayout: React.FC = () => {
       case 'passes':
         return (
           <div className="pt-16">
-            <PassCards />
+            <PassesEntryGate />
           </div>
         );
       case 'dashboard':
@@ -277,7 +278,7 @@ const AppLayout: React.FC = () => {
             <HowItWorks />
             <CategoryShowcase />
             <FeaturedLeaderboard />
-            <PassCards />
+            <PassCards embeddedOnHome />
             <MapView />
             <ReviewsSection />
             <ListYourBusinessCta />

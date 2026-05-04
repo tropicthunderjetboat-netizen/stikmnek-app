@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -187,6 +188,7 @@ const CardBrandIcon: React.FC<{ brand: string; className?: string }> = ({ brand,
 };
 
 const PaymentCheckout: React.FC = () => {
+  const navigate = useNavigate();
   const { user, userProfile, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass, language } =
     useAppContext();
   const checkoutLang: Language = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
@@ -348,7 +350,8 @@ const PaymentCheckout: React.FC = () => {
           <h2 className="text-xl font-bold text-gray-900 mb-3">No Pass Selected</h2>
           <p className="text-gray-500 mb-6">Please select a pass to purchase first.</p>
           <button
-            onClick={() => setCurrentView('passes')}
+            type="button"
+            onClick={() => navigate('/passes?info=1')}
             className="px-6 py-3 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors"
           >
             View Passes
@@ -566,7 +569,8 @@ const PaymentCheckout: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Button */}
         <button
-          onClick={() => setCurrentView('passes')}
+          type="button"
+          onClick={() => navigate('/passes?info=1')}
           className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
