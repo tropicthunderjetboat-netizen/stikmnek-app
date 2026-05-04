@@ -63,9 +63,13 @@ const SHARE_BONUSES: Record<PassProductId, ShareBonusRow> = {
     extraDays: 7,
     extraPeople: 0,
     extraKids: 0,
-    description: 'Share the app after purchase to unlock a 2nd week FREE (14 days total on Holiday Pass).',
+    description: 'Unlock a free 2nd week on your Holiday Pass — 14 days of deals total.',
   },
 };
+
+/** Body copy for the Holiday Pass share card (pre-share). */
+const HOLIDAY_SHARE_CARD_BODY =
+  "You've purchased 7 days. Share now to unlock your 2nd week FREE (14 days total)!";
 
 /** LocalStorage keys for share CTA — covers legacy `weekly` receipts and semantic ids. */
 function passShareStorageKeys(raw: string): string[] {
@@ -238,11 +242,14 @@ type ShareBonusApplied = { days: number; people: number; kids: number };
 const ShareCTA: React.FC<{
   passType: string;
   userId: string;
+  isHolidayPass: boolean;
+  shareBonusAlreadyApplied: boolean;
   onBonusApplied?: (bonus: ShareBonusApplied) => void;
-}> = ({ passType, userId, onBonusApplied }) => {
+}> = ({ passType, userId, isHolidayPass, shareBonusAlreadyApplied, onBonusApplied }) => {
   const { language } = useAppContext();
   const productId = passProductIdFromDb(passType);
   const [shareState, setShareState] = useState<'idle' | 'sharing' | 'success' | 'already-claimed' | 'error'>(() => {
+    if (shareBonusAlreadyApplied) return 'already-claimed';
     try {
       const stored = localStorage.getItem('stikmnek-shared-passes');
       if (stored) {
@@ -254,8 +261,14 @@ const ShareCTA: React.FC<{
   });
   const [retrying, setRetrying] = useState(false);
 
+  useEffect(() => {
+    if (shareBonusAlreadyApplied && shareState !== 'success') {
+      setShareState('already-claimed');
+    }
+  }, [shareBonusAlreadyApplied, shareState]);
+
   const bonus = productId ? SHARE_BONUSES[productId] : undefined;
-  if (!bonus) return null;
+  if (!isHolidayPass || !bonus) return null;
 
   const hasBonus = bonus.extraDays > 0 || bonus.extraPeople > 0 || bonus.extraKids > 0;
   if (!hasBonus) return null;
@@ -453,6 +466,7 @@ const ShareCTA: React.FC<{
   };
 
   const isCompleted = shareState === 'success' || shareState === 'already-claimed';
+  const celebratedPostShare = shareState === 'success';
 
   return (
     <div className={`mt-6 rounded-2xl overflow-hidden border transition-all duration-500 ${
@@ -476,12 +490,22 @@ const ShareCTA: React.FC<{
           </div>
           <div>
             <h3 className="text-white font-bold text-base">
-              {isCompleted ? 'Share Bonus Unlocked!' : 'Unlock Your Share Bonus!'}
+              {isCompleted
+                ? celebratedPostShare
+                  ? 'Share Bonus Unlocked!'
+                  : shareBonusAlreadyApplied
+                    ? 'Full discount window active'
+                    : 'Share bonus'
+                : 'Unlock Your Share Bonus!'}
             </h3>
             <p className="text-white/80 text-xs">
               {isCompleted
-                ? 'Your pass has been extended. Enjoy!'
-                : 'Share StikmNek with friends and earn free extras'}
+                ? celebratedPostShare
+                  ? 'Your pass has been extended. Enjoy!'
+                  : shareBonusAlreadyApplied
+                    ? 'Your receipt shows the full calendar range, including any bonus days from checkout.'
+                    : 'This share bonus was already applied to your pass.'
+                : '7-day Holiday Pass — add a free 2nd week when you share'}
             </p>
           </div>
         </div>
@@ -525,8 +549,12 @@ const ShareCTA: React.FC<{
 
         <p className={`text-sm mb-4 ${isCompleted ? 'text-emerald-700' : 'text-gray-600'}`}>
           {isCompleted
-            ? 'Thanks for sharing! Your bonus has been applied to your pass.'
-            : bonus.description}
+            ? celebratedPostShare
+              ? 'Thanks for sharing! Your bonus has been applied to your pass.'
+              : shareBonusAlreadyApplied
+                ? 'You already have the longest discount window for this purchase. Open your pass anytime to see valid dates.'
+                : 'You have already claimed the share bonus for this pass.'
+            : HOLIDAY_SHARE_CARD_BODY}
         </p>
 
         {/* Share button or success state */}
@@ -686,13 +714,6 @@ const PaymentConfirmation: React.FC = () => {
     payment?.receiptNumber,
     payment?.passType,
   ]);
-
-  const displayDayCount = React.useMemo(() => {
-    if (!payment) return 0;
-    const fromDates = inclusiveCalendarDaysBetween(payment.validFrom, payment.validUntil);
-    if (fromDates != null) return fromDates;
-    return payment.days ?? 0;
-  }, [payment?.validFrom, payment?.validUntil, payment?.days]);
 
   // After pass purchase: prompt tourists to complete demographic profile (once)
   useEffect(() => {
@@ -858,6 +879,56 @@ const PaymentConfirmation: React.FC = () => {
   const validFromDate = payment.validFrom ? new Date(payment.validFrom) : null;
   const validUntilDate = payment.validUntil ? new Date(payment.validUntil) : null;
 
+  const vfStr = payment.validFrom ? String(payment.validFrom).slice(0, 10) : '';
+  const vuStr = payment.validUntil ? String(payment.validUntil).slice(0, 10) : '';
+  const truthSpanDays =
+    inclusiveCalendarDaysBetween(vfStr || undefined, vuStr || undefined) ?? payment.days ?? 0;
+
+  const isHolidayPass = Boolean(payment.isExtended);
+  const showHolidayFirstWeekOnly = isHolidayPass && !shareBonusApplied;
+
+  /** Receipt + discount card: before post-purchase share, show the paid first week only (masks DB if valid_until spans >7 days without share_bonus_applied). */
+  const receiptDiscountUntilStr =
+    showHolidayFirstWeekOnly && truthSpanDays > 7 && vfStr
+      ? addDaysToDate(vfStr, 6)
+      : vuStr;
+
+  const receiptDiscountUntilDate =
+    receiptDiscountUntilStr && /^\d{4}-\d{2}-\d{2}$/.test(receiptDiscountUntilStr)
+      ? new Date(`${receiptDiscountUntilStr}T12:00:00`)
+      : validUntilDate;
+
+  const receiptDiscountDayCount = showHolidayFirstWeekOnly
+    ? Math.min(7, truthSpanDays > 0 ? truthSpanDays : 7)
+    : truthSpanDays;
+
+  const passDurationMainText = (() => {
+    if (!isHolidayPass) {
+      return truthSpanDays <= 1 ? '24 hours' : `${truthSpanDays} day${truthSpanDays === 1 ? '' : 's'}`;
+    }
+    if (shareBonusApplied) {
+      if (truthSpanDays >= 14) return '14 days (including bonus)';
+      if (truthSpanDays > 7) return `${truthSpanDays} days (including bonus)`;
+      return `${truthSpanDays} day${truthSpanDays === 1 ? '' : 's'} (including bonus)`;
+    }
+    return '7 days';
+  })();
+
+  const passDurationSubline = (() => {
+    if (!isHolidayPass) return null;
+    if (shareBonusApplied) return 'Includes bonus days from your share (or from checkout).';
+    return 'Your purchase includes a full 7-day deal window. Share below to stack a free 2nd week (14 days total).';
+  })();
+
+  const receiptHeaderHolidayLine =
+    isHolidayPass && !shareBonusApplied
+      ? '7-day deal access included · share below for a free 2nd week (14 days total)'
+      : isHolidayPass && shareBonusApplied
+        ? truthSpanDays >= 14
+          ? '14-day discount window (including share bonus)'
+          : 'Extended discount window (including share bonus)'
+        : null;
+
   const formatDateShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const formatDateLong = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
 
@@ -887,7 +958,7 @@ ITEM DETAILS
 ─────────────────────────────────────
 Pass: ${passLabel}
 Group: ${passGroup}
-Duration: ${displayDayCount || '?'} day(s)
+Duration: ${passDurationMainText}
 Valid for: ${peopleCount} people
 Share Bonus Applied: ${shareBonusApplied ? 'Yes' : 'No'}
 
@@ -895,7 +966,7 @@ Share Bonus Applied: ${shareBonusApplied ? 'Yes' : 'No'}
 DISCOUNT VALIDITY PERIOD
 ─────────────────────────────────────
 Valid From: ${validFromDate ? formatDateLong(validFromDate) : 'N/A'}
-Valid Until: ${validUntilDate ? formatDateLong(validUntilDate) : formatDateLong(expiryDate)}
+Valid Until: ${receiptDiscountUntilDate ? formatDateLong(receiptDiscountUntilDate) : formatDateLong(expiryDate)}
 
 ─────────────────────────────────────
 PAYMENT DETAILS
@@ -1041,6 +1112,11 @@ Enjoy your deals in Vanuatu!
                       {passGroup}
                     </p>
                   )}
+                  {receiptHeaderHolidayLine && (
+                    <p className="text-white/85 text-[11px] mt-1.5 font-semibold leading-snug max-w-[14rem] sm:max-w-none">
+                      {receiptHeaderHolidayLine}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="text-right">
@@ -1070,11 +1146,16 @@ Enjoy your deals in Vanuatu!
             </div>
 
             {/* ═══ DISCOUNT VALIDITY DATE RANGE ═══ */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200">
+            <div className="p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 ring-1 ring-teal-100/80">
               <div className="flex items-center gap-2 mb-3">
                 <CalendarRange className="w-5 h-5 text-teal-600" />
                 <span className="text-sm font-bold text-teal-800">Discount Validity Period</span>
               </div>
+              {showHolidayFirstWeekOnly && (
+                <p className="text-[11px] font-semibold text-teal-700 mb-2 -mt-1">
+                  Showing your included first week of deal access (7 days)
+                </p>
+              )}
               <div className="flex items-center gap-3">
                 <div className="flex-1 bg-white rounded-lg p-3 border border-teal-200 shadow-sm">
                   <p className="text-[10px] text-gray-400 font-semibold uppercase">Valid From</p>
@@ -1084,14 +1165,16 @@ Enjoy your deals in Vanuatu!
                 </div>
                 <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
                   <div className="px-3 py-1 rounded-full bg-teal-600 text-white text-[10px] font-bold shadow-sm">
-                    {displayDayCount || '?'} day{displayDayCount > 1 ? 's' : ''}
+                    {receiptDiscountDayCount || '?'} day{receiptDiscountDayCount !== 1 ? 's' : ''}
                   </div>
                   <div className="w-8 h-0.5 bg-teal-300 rounded-full" />
                 </div>
                 <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200 shadow-sm">
                   <p className="text-[10px] text-gray-400 font-semibold uppercase">Valid Until</p>
                   <p className="text-sm font-bold text-gray-900 mt-0.5">
-                    {validUntilDate ? formatDateShort(validUntilDate) : formatDateShort(expiryDate)}
+                    {receiptDiscountUntilDate
+                      ? formatDateShort(receiptDiscountUntilDate)
+                      : formatDateShort(expiryDate)}
                   </p>
                 </div>
               </div>
@@ -1123,15 +1206,15 @@ Enjoy your deals in Vanuatu!
                 <p className="text-xs text-gray-400">{completedDate.toLocaleTimeString()}</p>
               </div>
 
-              <div className="p-4 rounded-xl bg-gray-50">
+              <div className="p-4 rounded-xl bg-gray-50 ring-1 ring-teal-100/60">
                 <div className="flex items-center gap-2 mb-2">
-                  <Clock className="w-4 h-4 text-gray-400" />
-                  <span className="text-xs text-gray-400 font-medium">Pass Duration</span>
+                  <Clock className="w-4 h-4 text-teal-600" />
+                  <span className="text-xs text-gray-500 font-semibold">Pass Duration</span>
                 </div>
                 <p className="text-sm font-semibold text-gray-900">
-                  {displayDayCount || '?'} day{displayDayCount > 1 ? 's' : ''}
-                  {shareBonusApplied && (
-                    <span className="block text-xs font-medium text-emerald-600 mt-0.5">Includes Share Bonus days</span>
+                  {passDurationMainText}
+                  {passDurationSubline && (
+                    <span className="block text-xs font-medium text-teal-700 mt-1 leading-snug">{passDurationSubline}</span>
                   )}
                 </p>
               </div>
@@ -1240,6 +1323,8 @@ Enjoy your deals in Vanuatu!
           <ShareCTA
             passType={payment.passType}
             userId={user.id}
+            isHolidayPass={isHolidayPass}
+            shareBonusAlreadyApplied={shareBonusApplied}
             onBonusApplied={handleShareBonusApplied}
           />
         )}
