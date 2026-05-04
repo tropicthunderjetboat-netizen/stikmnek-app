@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { calculatePassPrice, MAX_PARTY_SIZE } from '@/data/pricing';
-import type { PassProductId } from '@/data/passCatalog';
+import { passProductIdFromDb, type PassProductId } from '@/data/passCatalog';
 
 export interface PassFeature {
   id: string;
@@ -57,26 +57,9 @@ const EMPTY_SHARE: ShareBonus = {
   descriptionBi: '',
 };
 
-/** Migrate stored admin config or URLs that still use legacy DB pass_type strings. */
+/** Normalize legacy DB / semantic pass strings to the single StikmNek Pass product. */
 function passProductIdFromLegacyOrId(raw: string): PassProductId | null {
-  const k = String(raw).toLowerCase().trim();
-  if (k === 'dynamic') return 'dynamic';
-  const legacy: Record<string, PassProductId> = {
-    daily: 'family_explorer',
-    weekly: 'extended_group_adventure',
-    monthly: 'ultimate_crew_experience',
-    mega_group: 'mega_group_experience',
-  };
-  if (legacy[k]) return legacy[k];
-  const semantic: PassProductId[] = [
-    'dynamic',
-    'family_explorer',
-    'extended_group_adventure',
-    'ultimate_crew_experience',
-    'mega_group_experience',
-  ];
-  if (semantic.includes(k as PassProductId)) return k as PassProductId;
-  return null;
+  return passProductIdFromDb(raw);
 }
 
 export const PASS_NAMES: Record<PassProductId, { en: string; fr: string; bi: string; short: string }> = {
@@ -85,30 +68,6 @@ export const PASS_NAMES: Record<PassProductId, { en: string; fr: string; bi: str
     fr: 'Pass StikmNek',
     bi: 'StikmNek Pas',
     short: 'StikmNek',
-  },
-  family_explorer: {
-    en: 'Family Explorer Pass',
-    fr: 'Pass Explorateur Familial',
-    bi: 'Famili Eksplora Pas',
-    short: 'Family Explorer',
-  },
-  extended_group_adventure: {
-    en: 'Extended Group Adventure Pass',
-    fr: 'Pass Aventure Groupe Étendu',
-    bi: 'Grup Advenija Pas',
-    short: 'Group Adventure',
-  },
-  ultimate_crew_experience: {
-    en: 'Ultimate Crew Experience Pass',
-    fr: 'Pass Expérience Ultime Équipe',
-    bi: 'Ultimet Kru Eksperiens Pas',
-    short: 'Crew Experience',
-  },
-  mega_group_experience: {
-    en: 'Mega Group Experience Pass',
-    fr: 'Pass Expérience Méga Groupe',
-    bi: 'Mega Grup Eksperiens Pas',
-    short: 'Mega Group',
   },
 };
 
@@ -141,7 +100,7 @@ const DEFAULT_PASSES: PassConfig[] = [
     icon: 'star',
     features: [
       { id: 'f1', text: '1–6 people (ages 6+)', textFr: '1–6 personnes (6 ans et +)', textBi: '1–6 man (6+)' },
-      { id: 'f2', text: '24-hour or 14-day coverage', textFr: '24 h ou 14 jours', textBi: '24 owa o 14 dei' },
+      { id: 'f2', text: '24-hour day pass or 7-day holiday pass', textFr: 'Pass 24 h ou pass vacances 7 jours', textBi: '24 owa o 7 dei holiday pas' },
       { id: 'f3', text: 'QR code redemptions', textFr: 'Utilisations QR code', textBi: 'QR kod' },
       { id: 'f4', text: 'Map & savings tracker', textFr: 'Carte et suivi', textBi: 'Map mo save' },
     ],
@@ -156,13 +115,20 @@ const DEFAULT_PASSES: PassConfig[] = [
     kids: 0,
     totalPeople: MAX_PARTY_SIZE,
     baseDays: 1,
-    fullDays: 14,
-    shareBonus: { ...EMPTY_SHARE },
+    fullDays: 7,
+    shareBonus: {
+      extraDays: 7,
+      extraPeople: 0,
+      extraKids: 0,
+      description: 'Share the app after purchase to unlock a 2nd week FREE (14 days total on Holiday Pass).',
+      descriptionFr: 'Partagez l’app après l’achat pour une 2e semaine GRATUITE (14 jours au total).',
+      descriptionBi: 'Serem app afta bai blong fri wik tu (14 dei long total).',
+    },
   },
 ];
 
 const STORAGE_KEY = 'stikmnek-pass-config';
-const CONFIG_VERSION = 7;
+const CONFIG_VERSION = 8;
 const VERSION_KEY = 'stikmnek-pass-config-version';
 
 function loadFromStorage(): PassConfig[] {

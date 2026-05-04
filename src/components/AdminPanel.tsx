@@ -1970,9 +1970,9 @@ const AdminPanel: React.FC = () => {
                   <h4 className="text-sm font-semibold text-gray-700 mb-2">Pass Type Distribution</h4>
                   <div className="space-y-2">
                     {[
-                      { label: 'Daily', pct: 25, color: 'bg-sky-500' },
-                      { label: 'Weekly', pct: 55, color: 'bg-teal-500' },
-                      { label: 'Monthly', pct: 20, color: 'bg-orange-500' },
+                      { label: '24-hour day pass', pct: 35, color: 'bg-sky-500' },
+                      { label: '7-day holiday pass', pct: 55, color: 'bg-teal-500' },
+                      { label: '14-day (share bonus)', pct: 10, color: 'bg-orange-500' },
                     ].map((item, i) => (
                       <div key={i}>
                         <div className="flex justify-between text-xs mb-1">

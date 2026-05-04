@@ -121,6 +121,15 @@ export function defaultPassCartFromProfile(
   else if (authShort || profShort) isExtended = false;
   else isExtended = inferIsExtendedPassFromTripDates(profile);
 
+  if (profile) {
+    const adults = profile.num_adults ?? 0;
+    const children = profile.num_children ?? 0;
+    const combined = adults + children;
+    if (combined > 0) {
+      return { partySize: clampPartySize(combined), isExtended };
+    }
+  }
+
   const rawMetaParty = authMetadata?.party_size ?? profile?.party_size;
   const metaPartyN =
     typeof rawMetaParty === 'number'
@@ -135,11 +144,7 @@ export function defaultPassCartFromProfile(
   if (!profile) {
     return { partySize: 1, isExtended };
   }
-  const adults = profile.num_adults ?? 0;
-  const children = profile.num_children ?? 0;
-  const combined = adults + children;
-  const partySize = clampPartySize(combined > 0 ? combined : 1);
-  return { partySize, isExtended };
+  return { partySize: 1, isExtended };
 }
 
 export interface DBReview {

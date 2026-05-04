@@ -12,6 +12,7 @@ import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
 import {
   calculatePassPriceAud,
+  dynamicPassInclusiveDays,
   parsePartySizeAndExtended,
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
@@ -281,12 +282,24 @@ Deno.serve(async (req) => {
       const { partySize, isExtended } = parsed;
       const amount = calculatePassPriceAud(partySize, isExtended);
       const passTypeDb: DbPassType = 'dynamic';
-      const shareBonusApplied = false;
+
+      let grantSecondWeek = false;
+      if (isExtended) {
+        const { data: profRow, error: profErr } = await supabase
+          .from('user_profiles')
+          .select('share_bonus_unlocked')
+          .eq('user_id', authUser.id)
+          .maybeSingle();
+        if (profErr) console.error('process-card-payment: profile share flag', profErr);
+        grantSecondWeek = !!(profRow as { share_bonus_unlocked?: boolean } | null)?.share_bonus_unlocked;
+      }
+
       const maxPeople = partySize;
       const validFrom = startDate;
-      const validUntil = addDays(startDate, validUntilOffsetDays(isExtended));
+      const validUntil = addDays(startDate, validUntilOffsetDays(isExtended, grantSecondWeek));
       const expiresAt = endOfDayDate(validUntil);
-      const inclusiveDays = isExtended ? 14 : 1;
+      const inclusiveDays = dynamicPassInclusiveDays(isExtended, grantSecondWeek);
+      const shareBonusApplied = isExtended && grantSecondWeek;
       const receiptNumber = body?.receiptNumber ?? `STK-${Date.now().toString(36).toUpperCase()}`;
 
       // ─── Idempotency: payment_transaction_id / client idempotency key (stored in payment_session_id) ───
@@ -423,6 +436,14 @@ Deno.serve(async (req) => {
           reason: 'pass_insert_failed',
           postgresCode: insertErr.code ?? null,
         });
+      }
+
+      if (grantSecondWeek) {
+        const { error: clrErr } = await supabase
+          .from('user_profiles')
+          .update({ share_bonus_unlocked: false, updated_at: new Date().toISOString() })
+          .eq('user_id', authUser.id);
+        if (clrErr) console.error('process-card-payment: clear share_bonus_unlocked', clrErr);
       }
 
       return jsonResponse(req, {

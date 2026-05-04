@@ -306,6 +306,7 @@ const PaymentCheckout: React.FC = () => {
   const [showGroupSizeWarning, setShowGroupSizeWarning] = useState(
     () => cart != null && Number(cart.partySize) > MAX_PARTY_SIZE,
   );
+  const [showPartyEditor, setShowPartyEditor] = useState(false);
 
   const handlePartySizeChange = (value: number) => {
     if (!cart) return;
@@ -331,16 +332,17 @@ const PaymentCheckout: React.FC = () => {
     let nextParty = cart.partySize;
     let nextExtended = cart.isExtended;
 
-    const hasExplicitPartySize =
+    const adults = userProfile.num_adults ?? 0;
+    const children = userProfile.num_children ?? 0;
+    const combined = adults + children;
+    if (combined > 0) {
+      nextParty = clampPartySize(combined);
+    } else if (
       userProfile.party_size != null &&
       Number.isFinite(Number(userProfile.party_size)) &&
-      Number(userProfile.party_size) >= 1;
-
-    if (!hasExplicitPartySize) {
-      const adults = userProfile.num_adults ?? 0;
-      const children = userProfile.num_children ?? 0;
-      const suggested = clampPartySize(Math.max(1, adults + children));
-      if (suggested > nextParty) nextParty = suggested;
+      Number(userProfile.party_size) >= 1
+    ) {
+      nextParty = clampPartySize(Number(userProfile.party_size));
     }
 
     if (userProfile.preferred_pass_duration !== 'short' && inferIsExtendedPassFromTripDates(userProfile)) {
@@ -382,7 +384,17 @@ const PaymentCheckout: React.FC = () => {
   const priceAud = useMemo(() => calculatePassPrice(partySize, isExtended), [partySize, isExtended]);
   const priceShortOption = useMemo(() => calculatePassPrice(partySize, false), [partySize]);
   const priceExtendedOption = useMemo(() => calculatePassPrice(partySize, true), [partySize]);
-  const daysCount = passInclusiveCalendarDays(isExtended);
+
+  const profilePartyCount = useMemo(() => {
+    const a = userProfile?.num_adults ?? 0;
+    const c = userProfile?.num_children ?? 0;
+    const combined = a + c;
+    return combined > 0 ? clampPartySize(combined) : 0;
+  }, [userProfile?.num_adults, userProfile?.num_children]);
+
+  const grantSecondWeekPreview = Boolean(user?.shareBonusUnlocked) && isExtended;
+  const daysCount = passInclusiveCalendarDays(isExtended, grantSecondWeekPreview);
+  const extendedCalendarDays = passInclusiveCalendarDays(true, false);
   const groupLabel = `Up to ${partySize} people (ages 6+)`;
 
   const tripInclusiveDays = useMemo(() => {
@@ -393,8 +405,6 @@ const PaymentCheckout: React.FC = () => {
   }, [userProfile?.expected_arrival_date, userProfile?.expected_departure_date]);
 
   const tripNights = tripInclusiveDays != null ? Math.max(0, tripInclusiveDays - 1) : null;
-
-  const extendedCalendarDays = passInclusiveCalendarDays(true);
 
   const coverageUi = useMemo(() => {
     const cal = daysCount;
@@ -434,7 +444,7 @@ const PaymentCheckout: React.FC = () => {
       summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
       paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
     };
-  }, [isExtended, tripNights, daysCount, checkoutLang]);
+  }, [isExtended, tripNights, daysCount, checkoutLang, grantSecondWeekPreview]);
 
   const profilePartySummary =
     userProfile != null
@@ -447,10 +457,10 @@ const PaymentCheckout: React.FC = () => {
 
   const endDate = useMemo(() => {
     if (!startDate) return '';
-    return addCalendarDaysIso(startDate, validUntilDayOffset(isExtended));
-  }, [startDate, isExtended]);
+    const g = Boolean(user?.shareBonusUnlocked) && isExtended;
+    return addCalendarDaysIso(startDate, validUntilDayOffset(isExtended, g));
+  }, [startDate, isExtended, user?.shareBonusUnlocked]);
 
-  const savingsAnchorAmount = partySize * 10;
   const cardType = detectCardType(cardNumber);
 
   const formatDate = (dateStr: string) => {
@@ -771,35 +781,68 @@ const PaymentCheckout: React.FC = () => {
                       {t('checkout.section_pass_group', checkoutLang)}
                     </h4>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">People (ages 6+)</label>
-                    <select
-                      value={partySize}
-                      onChange={(e) => handlePartySizeChange(Number(e.target.value))}
-                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                    >
-                      {[1, 2, 3, 4, 5, 6].map((n) => (
-                        <option key={n} value={n}>
-                          {n} {n === 1 ? 'person' : 'people'}
-                        </option>
-                      ))}
-                    </select>
+                    {!showPartyEditor && profilePartyCount > 0 ? (
+                      <div className="flex items-center justify-between gap-3 rounded-xl border-2 border-teal-100 bg-teal-50/40 px-4 py-3">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">
+                            {t('checkout.party_summary_label', checkoutLang)}
+                          </p>
+                          <p className="text-sm font-bold text-gray-900 mt-0.5">
+                            {t('checkout.party_summary_line', checkoutLang).replace('__N__', String(partySize))}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowPartyEditor(true)}
+                          className="text-sm font-semibold text-teal-700 hover:text-teal-900 px-3 py-1.5 rounded-lg border border-teal-200 bg-white shrink-0"
+                        >
+                          {t('checkout.party_edit', checkoutLang)}
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-sm font-semibold text-gray-700">People (ages 6+)</label>
+                          {profilePartyCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowPartyEditor(false)}
+                              className="text-xs font-semibold text-teal-600 hover:text-teal-800"
+                            >
+                              {t('checkout.party_done', checkoutLang)}
+                            </button>
+                          )}
+                        </div>
+                        <select
+                          value={partySize}
+                          onChange={(e) => handlePartySizeChange(Number(e.target.value))}
+                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                        >
+                          {[1, 2, 3, 4, 5, 6].map((n) => (
+                            <option key={n} value={n}>
+                              {n} {n === 1 ? 'person' : 'people'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   <div>
-                    <span className="block text-sm font-semibold text-gray-700 mb-2">Pass duration</span>
+                    <span className="block text-sm font-semibold text-gray-700 mb-2">{t('checkout.plan_pick_title', checkoutLang)}</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <button
                         type="button"
                         onClick={() => handleDurationChange(false)}
                         className={`text-left rounded-xl border-2 p-4 transition-all ${
                           !isExtended
-                            ? 'border-teal-600 bg-teal-50/80 ring-1 ring-teal-200 shadow-sm'
+                            ? 'border-teal-600 bg-teal-50/80 ring-2 ring-teal-300 shadow-md'
                             : 'border-gray-200 bg-white hover:border-teal-200'
                         }`}
                       >
-                        <p className="text-sm font-bold text-gray-900">{t('checkout.option_day_title', checkoutLang)}</p>
+                        <p className="text-sm font-extrabold text-gray-900">{t('checkout.plan_day_title', checkoutLang)}</p>
                         <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                          {t('checkout.option_day_desc', checkoutLang)}
+                          {t('checkout.plan_day_sub', checkoutLang)}
                         </p>
                         <p className="text-lg font-extrabold text-teal-700 mt-3">
                           A${priceShortOption.toFixed(2)}{' '}
@@ -811,12 +854,12 @@ const PaymentCheckout: React.FC = () => {
                         onClick={() => handleDurationChange(true)}
                         className={`text-left rounded-xl border-2 p-4 transition-all ${
                           isExtended
-                            ? 'border-teal-600 bg-teal-50/80 ring-1 ring-teal-200 shadow-sm'
+                            ? 'border-teal-600 bg-teal-50/80 ring-2 ring-teal-300 shadow-md'
                             : 'border-gray-200 bg-white hover:border-teal-200'
                         }`}
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-bold text-gray-900">{t('checkout.option_extended_title', checkoutLang)}</p>
+                          <p className="text-sm font-extrabold text-gray-900">{t('checkout.plan_holiday_title', checkoutLang)}</p>
                           {tripNights != null && tripNights >= 1 && (
                             <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
                               {t('checkout.option_extended_badge', checkoutLang).replace('__NIGHTS__', String(tripNights))}
@@ -824,15 +867,15 @@ const PaymentCheckout: React.FC = () => {
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                          {t('checkout.option_extended_desc', checkoutLang).replace(
-                            '__CAL__',
-                            String(extendedCalendarDays),
-                          )}
+                          {t('checkout.plan_holiday_sub', checkoutLang)}
+                        </p>
+                        <p className="mt-2 text-[11px] font-bold text-emerald-900 leading-snug bg-emerald-100/90 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+                          {t('checkout.share_second_week_unlock', checkoutLang)}
                         </p>
                         <p className="text-lg font-extrabold text-teal-700 mt-3">
                           A${priceExtendedOption.toFixed(2)}{' '}
                           <span className="text-xs font-normal text-gray-500">
-                            (+A${EXTEND_FEE_AUD.toFixed(0)} vs 1-day)
+                            (+A${EXTEND_FEE_AUD.toFixed(0)} vs day pass)
                           </span>
                         </p>
                       </button>
@@ -1209,12 +1252,9 @@ const PaymentCheckout: React.FC = () => {
                       </span>
                       <div>
                         <p className="text-base sm:text-lg font-semibold text-gray-900 leading-snug">
-                          {(partySize === 1
-                            ? t('checkout.savings_before_one', checkoutLang)
-                            : t('checkout.savings_before_many', checkoutLang).replace('__COUNT__', String(partySize))
-                          ).trimEnd()}
-                          <span className="text-blue-700 font-bold">A${savingsAnchorAmount}</span>
-                          {t('checkout.savings_after_amount', checkoutLang)}
+                          {t('checkout.savings_anchor_v2', checkoutLang)
+                            .replace('__COUNT__', String(partySize))
+                            .replace('__PASS__', priceAud.toFixed(0))}
                         </p>
                         <p className="text-sm text-gray-700 mt-1">{t('checkout.savings_subline', checkoutLang)}</p>
                       </div>

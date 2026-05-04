@@ -6,6 +6,7 @@ import {
   partyFromValidityApi,
   type PartyCounts,
 } from '@/lib/redemptionSavings';
+import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
@@ -141,18 +142,6 @@ const getPassTierConfig = (passType: string) => {
       icon: <Ticket className="w-4 h-4" />,
       label: getPassDisplayTitle('dynamic', 'en'),
     };
-  }
-  if (pid === 'family_explorer') {
-    return { gradient: 'from-sky-500 to-blue-600', bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-800', badge: 'bg-gradient-to-r from-sky-500 to-blue-600', icon: <Zap className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
-  }
-  if (pid === 'extended_group_adventure') {
-    return { gradient: 'from-teal-500 to-emerald-600', bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-800', badge: 'bg-gradient-to-r from-teal-500 to-emerald-600', icon: <Star className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
-  }
-  if (pid === 'ultimate_crew_experience') {
-    return { gradient: 'from-orange-500 to-amber-600', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', badge: 'bg-gradient-to-r from-orange-500 to-amber-600', icon: <Crown className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
-  }
-  if (pid === 'mega_group_experience') {
-    return { gradient: 'from-fuchsia-600 to-purple-700', bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-900', badge: 'bg-gradient-to-r from-fuchsia-600 to-purple-700', icon: <Crown className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
   }
   const type = (passType || '').toLowerCase();
   if (type.includes('gold') || type.includes('premium') || type.includes('vip')) {
@@ -1241,6 +1230,13 @@ const QRScanner: React.FC<QRScannerProps> = ({
         : typeof pass?.maxPeople === 'number' && pass.maxPeople > 0
           ? pass.maxPeople
           : null;
+    const passValidityCalendarDays =
+      pass?.validFrom && pass?.validUntil
+        ? inclusiveCalendarDaysBetween(
+            String(pass.validFrom).slice(0, 10),
+            String(pass.validUntil).slice(0, 10),
+          )
+        : null;
     const childrenPolicyNote =
       'Children under 6 may accompany this group for free.';
 
@@ -1276,6 +1272,11 @@ const QRScanner: React.FC<QRScannerProps> = ({
                   <p className="mt-4 text-2xl sm:text-3xl font-black leading-tight tracking-tight">
                     VALID FOR {passCap} PEOPLE
                   </p>
+                  {passValidityCalendarDays != null && (
+                    <p className="mt-2 text-lg sm:text-xl font-black tracking-wide uppercase">
+                      {passValidityCalendarDays}-DAY DISCOUNT WINDOW
+                    </p>
+                  )}
                   <p className="mt-3 text-sm sm:text-base font-medium leading-snug opacity-95 px-1">
                     {childrenPolicyNote}
                   </p>

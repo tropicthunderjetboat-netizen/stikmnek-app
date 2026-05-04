@@ -117,24 +117,16 @@ const QRCodeDisplay: React.FC = () => {
 
   const passColors: Record<PassProductId, string> = {
     dynamic: 'from-teal-500 to-emerald-600',
-    family_explorer: 'from-sky-500 to-blue-600',
-    extended_group_adventure: 'from-teal-500 to-emerald-600',
-    ultimate_crew_experience: 'from-orange-500 to-amber-600',
-    mega_group_experience: 'from-fuchsia-600 to-purple-700',
   };
 
   const passBgColors: Record<PassProductId, string> = {
     dynamic: 'bg-teal-50 border-teal-200',
-    family_explorer: 'bg-sky-50 border-sky-200',
-    extended_group_adventure: 'bg-teal-50 border-teal-200',
-    ultimate_crew_experience: 'bg-orange-50 border-orange-200',
-    mega_group_experience: 'bg-fuchsia-50 border-fuchsia-200',
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Header */}
-      <div className={`bg-gradient-to-r ${passColors[user.pass] || passColors.dynamic} p-5 text-white`}>
+      <div className={`bg-gradient-to-r ${passColors[user.pass] ?? passColors.dynamic} p-5 text-white`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
@@ -155,7 +147,7 @@ const QRCodeDisplay: React.FC = () => {
 
       {/* QR Code */}
       <div className="p-6 flex flex-col items-center">
-        <div className={`p-4 rounded-2xl border-2 ${passBgColors[user.pass] || passBgColors.dynamic} mb-4`}>
+        <div className={`p-4 rounded-2xl border-2 ${passBgColors[user.pass] ?? passBgColors.dynamic} mb-4`}>
           {qrCodeUrl ? (
             <img
               src={qrCodeUrl}

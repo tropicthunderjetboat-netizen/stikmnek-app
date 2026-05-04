@@ -34,14 +34,25 @@ export function calculatePassPrice(partySize: number, isExtended: boolean): numb
   return BASE_PRICE_AUD + (p - 1) * GUEST_FEE_AUD + (isExtended ? EXTEND_FEE_AUD : 0);
 }
 
-/** Inclusive calendar span: 24-hour = 1 day; extended = 14 days. */
-export function passInclusiveCalendarDays(isExtended: boolean): number {
-  return isExtended ? 14 : 1;
+/**
+ * Inclusive calendar span: day pass = 1; holiday (+A$10) = 7;
+ * if user already unlocked Share before purchase, holiday becomes 14 at checkout.
+ */
+export function passInclusiveCalendarDays(
+  isExtended: boolean,
+  grantSecondWeekFromPrepurchaseShare = false,
+): number {
+  if (!isExtended) return 1;
+  if (grantSecondWeekFromPrepurchaseShare) return 14;
+  return 7;
 }
 
 /** Offset from start date to `valid_until` (inclusive). */
-export function validUntilDayOffset(isExtended: boolean): number {
-  return passInclusiveCalendarDays(isExtended) - 1;
+export function validUntilDayOffset(
+  isExtended: boolean,
+  grantSecondWeekFromPrepurchaseShare = false,
+): number {
+  return passInclusiveCalendarDays(isExtended, grantSecondWeekFromPrepurchaseShare) - 1;
 }
 
 /** Calendar add in UTC so YYYY-MM-DD does not shift a day in positive-offset timezones. */
@@ -55,42 +66,9 @@ export function addCalendarDaysIso(startDateIso: string, dayOffset: number): str
 }
 
 export function getPassDisplayTitle(
-  raw: string | null | undefined,
+  _raw: string | null | undefined,
   lang: 'en' | 'fr' | 'bi' = 'en',
 ): string {
-  const id = passProductIdFromDb(String(raw ?? ''));
-  if (id === 'dynamic' || String(raw ?? '').toLowerCase().trim() === 'dynamic') {
-    return lang === 'fr' ? 'Pass StikmNek' : lang === 'bi' ? 'StikmNek Pas' : 'StikmNek Pass';
-  }
-  const legacyTitles: Record<string, { en: string; fr: string; bi: string }> = {
-    family_explorer: {
-      en: 'Family Explorer Pass',
-      fr: 'Pass Explorateur Familial',
-      bi: 'Famili Eksplora Pas',
-    },
-    extended_group_adventure: {
-      en: 'Extended Group Adventure Pass',
-      fr: 'Pass Aventure Groupe Étendu',
-      bi: 'Grup Advenija Pas',
-    },
-    ultimate_crew_experience: {
-      en: 'Ultimate Crew Experience Pass',
-      fr: 'Pass Expérience Ultime Équipe',
-      bi: 'Ultimet Kru Eksperiens Pas',
-    },
-    mega_group_experience: {
-      en: 'Mega Group Experience Pass',
-      fr: 'Pass Expérience Méga Groupe',
-      bi: 'Mega Grup Eksperiens Pas',
-    },
-    daily: { en: 'Family Explorer Pass', fr: 'Pass Explorateur Familial', bi: 'Famili Eksplora Pas' },
-    weekly: { en: 'Extended Group Adventure Pass', fr: 'Pass Aventure Groupe Étendu', bi: 'Grup Advenija Pas' },
-    monthly: { en: 'Ultimate Crew Experience Pass', fr: 'Pass Expérience Ultime Équipe', bi: 'Ultimet Kru Eksperiens Pas' },
-    mega_group: { en: 'Mega Group Experience Pass', fr: 'Pass Expérience Méga Groupe', bi: 'Mega Grup Eksperiens Pas' },
-  };
-  const key = (id ?? String(raw ?? '')).toLowerCase().trim();
-  const row = legacyTitles[key];
-  if (row) return lang === 'fr' ? row.fr : lang === 'bi' ? row.bi : row.en;
   return lang === 'fr' ? 'Pass StikmNek' : lang === 'bi' ? 'StikmNek Pas' : 'StikmNek Pass';
 }
 

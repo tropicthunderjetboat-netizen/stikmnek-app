@@ -83,10 +83,10 @@ const PASS_COLORS: Record<DbPassType, string> = {
 
 const PASS_LABELS: Record<DbPassType, string> = {
   dynamic: getPassDisplayTitle('dynamic', 'en'),
-  daily: getPassDisplayTitle('daily', 'en'),
-  weekly: getPassDisplayTitle('weekly', 'en'),
-  monthly: getPassDisplayTitle('monthly', 'en'),
-  mega_group: getPassDisplayTitle('mega_group', 'en'),
+  daily: 'Archived pass (db: daily)',
+  weekly: 'Archived pass (db: weekly)',
+  monthly: 'Archived pass (db: monthly)',
+  mega_group: 'Archived pass (db: mega_group)',
 };
 
 /** Reference “from” prices for admin copy; dynamic passes use variable pricing at checkout. */

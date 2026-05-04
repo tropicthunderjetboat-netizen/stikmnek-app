@@ -3,7 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import {
   CheckCircle, Download, Printer, ArrowRight, Receipt,
-  Calendar, CreditCard, Hash, Clock, Shield, Zap, Star, Crown, Ticket, Copy, Check, Mail, Loader2,
+  Calendar, CreditCard, Hash, Clock, Shield, Ticket, Copy, Check, Mail, Loader2,
   CalendarRange, Users, Share2, Gift, Baby, Sparkles, PartyPopper
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -50,28 +50,21 @@ const FALLBACK_PASS_PRODUCT: PassProductId = 'dynamic';
 
 const LEGACY_BASE_PEOPLE: Record<PassProductId, number> = {
   dynamic: MAX_PARTY_SIZE,
-  family_explorer: 4,
-  extended_group_adventure: 4,
-  ultimate_crew_experience: 7,
-  mega_group_experience: 20,
 };
 
 const PASS_GROUPS: Record<PassProductId, string> = {
   dynamic: `Up to ${MAX_PARTY_SIZE} people (ages 6+)`,
-  family_explorer: 'Up to 4 people',
-  extended_group_adventure: 'Up to 4 people',
-  ultimate_crew_experience: 'Up to 7 people',
-  mega_group_experience: 'Up to 20 people',
 };
 
 type ShareBonusRow = { extraDays: number; extraPeople: number; extraKids: number; description: string };
 
 const SHARE_BONUSES: Record<PassProductId, ShareBonusRow> = {
-  dynamic: { extraDays: 0, extraPeople: 0, extraKids: 0, description: '' },
-  family_explorer: { extraDays: 0, extraPeople: 2, extraKids: 0, description: 'Share the app to add 2 more people FREE!' },
-  extended_group_adventure: { extraDays: 1, extraPeople: 2, extraKids: 0, description: 'Share for +2 people AND a free 7th day!' },
-  ultimate_crew_experience: { extraDays: 1, extraPeople: 1, extraKids: 0, description: 'Share for +1 person AND a free 7th day!' },
-  mega_group_experience: { extraDays: 5, extraPeople: 0, extraKids: 0, description: 'Share to unlock 5 extra days FREE!' },
+  dynamic: {
+    extraDays: 7,
+    extraPeople: 0,
+    extraKids: 0,
+    description: 'Share the app after purchase to unlock a 2nd week FREE (14 days total on Holiday Pass).',
+  },
 };
 
 /** LocalStorage keys for share CTA — covers legacy `weekly` receipts and semantic ids. */
@@ -854,18 +847,10 @@ const PaymentConfirmation: React.FC = () => {
 
   const passIcons: Record<PassProductId, React.ReactNode> = {
     dynamic: <Ticket className="w-6 h-6" />,
-    family_explorer: <Zap className="w-6 h-6" />,
-    extended_group_adventure: <Star className="w-6 h-6" />,
-    ultimate_crew_experience: <Crown className="w-6 h-6" />,
-    mega_group_experience: <Crown className="w-6 h-6" />,
   };
 
   const passColors: Record<PassProductId, string> = {
     dynamic: 'from-teal-500 to-emerald-600',
-    family_explorer: 'from-sky-500 to-blue-600',
-    extended_group_adventure: 'from-teal-500 to-emerald-600',
-    ultimate_crew_experience: 'from-orange-500 to-amber-600',
-    mega_group_experience: 'from-fuchsia-600 to-purple-700',
   };
 
   const expiryDate = new Date(payment.expiresAt);

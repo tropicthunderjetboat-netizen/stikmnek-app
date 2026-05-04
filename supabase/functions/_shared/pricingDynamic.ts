@@ -9,8 +9,8 @@ export const EXTEND_FEE_AUD = 10;
 export const MIN_PARTY_SIZE = 1;
 export const MAX_PARTY_SIZE = 6;
 
-/** Inclusive calendar days: 24-hour pass = 1 day; extended = 14 days. */
-export const DYNAMIC_PASS_SPAN_DAYS = { standard: 1, extended: 14 } as const;
+/** Inclusive calendar days: day pass = 1; holiday = 7; +share = 14. */
+export const DYNAMIC_PASS_SPAN_DAYS = { standard: 1, extended: 7, extendedWithShare: 14 } as const;
 
 export function clampPartySize(n: unknown): number {
   const x = Math.floor(Number(n));
@@ -28,13 +28,22 @@ export function calculatePassPriceAud(partySize: number, isExtended: boolean): n
   return BASE_PRICE_AUD + (p - 1) * GUEST_FEE_AUD + (isExtended ? EXTEND_FEE_AUD : 0);
 }
 
+/** Inclusive span for dynamic pass (Option A: 7+7). */
+export function dynamicPassInclusiveDays(isExtended: boolean, grantSecondWeekFromPrepurchaseShare: boolean): number {
+  if (!isExtended) return DYNAMIC_PASS_SPAN_DAYS.standard;
+  if (grantSecondWeekFromPrepurchaseShare) return DYNAMIC_PASS_SPAN_DAYS.extendedWithShare;
+  return DYNAMIC_PASS_SPAN_DAYS.extended;
+}
+
 /**
  * Days to add to valid_from to reach valid_until (inclusive range).
- * 1 calendar day → offset 0; 14 inclusive days → offset 13.
+ * 1 calendar day → offset 0; 7 inclusive → 6; 14 inclusive → 13.
  */
-export function validUntilOffsetDays(isExtended: boolean): number {
-  const span = isExtended ? DYNAMIC_PASS_SPAN_DAYS.extended : DYNAMIC_PASS_SPAN_DAYS.standard;
-  return span - 1;
+export function validUntilOffsetDays(
+  isExtended: boolean,
+  grantSecondWeekFromPrepurchaseShare = false,
+): number {
+  return dynamicPassInclusiveDays(isExtended, grantSecondWeekFromPrepurchaseShare) - 1;
 }
 
 export function parsePartySizeAndExtended(body: Record<string, unknown>): {

@@ -7,6 +7,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { inclusiveCalendarDaySpanUtc } from '../_shared/passSpan.ts';
 
 /**
  * CORS: set CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
@@ -27,19 +28,39 @@ function getSafeCorsHeaders(req: Request): Record<string, string> {
   return base;
 }
 
-// Share bonus: extra people and extra days per pass type (matches src/data/pricing.ts)
-const SHARE_BONUS: Record<string, { extraPeople: number; extraDays: number }> = {
-  dynamic: { extraPeople: 0, extraDays: 0 },
-  daily: { extraPeople: 2, extraDays: 0 },
-  weekly: { extraPeople: 2, extraDays: 1 },
-  monthly: { extraPeople: 1, extraDays: 1 },
-  mega_group: { extraPeople: 0, extraDays: 5 },
-};
+/** Option A: Holiday Pass (7 active days) → +7 calendar days from current `valid_until` (14 total). */
+function shareBonusForPassRow(pass: {
+  pass_type?: string | null;
+  valid_from?: string | null;
+  valid_until?: string | null;
+}): { extraPeople: number; extraDays: number } {
+  const pt = String(pass.pass_type ?? '').toLowerCase();
+  if (pt === 'dynamic') {
+    const from = String(pass.valid_from ?? '').slice(0, 10);
+    const to = String(pass.valid_until ?? '').slice(0, 10);
+    if (!from || !to) return { extraPeople: 0, extraDays: 0 };
+    const span = inclusiveCalendarDaySpanUtc(from, to);
+    if (span <= 1) return { extraPeople: 0, extraDays: 0 };
+    if (span >= 14) return { extraPeople: 0, extraDays: 0 };
+    if (span >= 7) return { extraPeople: 0, extraDays: 7 };
+    return { extraPeople: 0, extraDays: 0 };
+  }
+  const LEGACY: Record<string, { extraPeople: number; extraDays: number }> = {
+    daily: { extraPeople: 2, extraDays: 0 },
+    weekly: { extraPeople: 2, extraDays: 1 },
+    monthly: { extraPeople: 1, extraDays: 1 },
+    mega_group: { extraPeople: 0, extraDays: 5 },
+  };
+  return LEGACY[pt] ?? { extraPeople: 0, extraDays: 0 };
+}
 
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+function addCalendarDaysUtc(dateStr: string, dayOffset: number): string {
+  const raw = String(dateStr ?? '').slice(0, 10);
+  const parts = raw.split('-').map((s) => Number(s, 10));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return raw;
+  const [y, m, d] = parts;
+  const ms = Date.UTC(y, m - 1, d + dayOffset);
+  return new Date(ms).toISOString().slice(0, 10);
 }
 
 function endOfDayISO(dateStr: string): string {
@@ -99,7 +120,7 @@ Deno.serve(async (req) => {
 
     const { data: passes, error: fetchErr } = await supabase
       .from('passes')
-      .select('id, pass_type, valid_until, expires_at, max_people, share_bonus_applied')
+      .select('id, pass_type, valid_from, valid_until, expires_at, max_people, share_bonus_applied')
       .eq('user_id', userId)
       .eq('active', true)
       .gte('valid_until', today)
@@ -139,7 +160,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const bonus = SHARE_BONUS[pass.pass_type] ?? { extraPeople: 0, extraDays: 0 };
+    const bonus = shareBonusForPassRow(pass);
     if (bonus.extraPeople === 0 && bonus.extraDays === 0) {
       return jsonResponse({ success: true, bonus: { days: 0, people: 0, kids: 0 } });
     }
@@ -147,7 +168,7 @@ Deno.serve(async (req) => {
     const currentMax = typeof pass.max_people === 'number' ? pass.max_people : 4;
     const newMaxPeople = currentMax + bonus.extraPeople;
     const validUntil = pass.valid_until ?? today;
-    const newValidUntil = bonus.extraDays > 0 ? addDays(validUntil, bonus.extraDays) : validUntil;
+    const newValidUntil = bonus.extraDays > 0 ? addCalendarDaysUtc(validUntil, bonus.extraDays) : validUntil;
     const newExpiresAt = endOfDayISO(newValidUntil);
 
     const updates: Record<string, any> = {

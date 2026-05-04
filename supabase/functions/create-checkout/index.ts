@@ -98,12 +98,12 @@ Deno.serve(async (req) => {
       intent: 'CAPTURE',
       purchase_units: [
         {
-          reference_id: `pass_dynamic_${partySize}p_${isExtended ? '14d' : '1d'}_${startDate}`,
+          reference_id: `pass_dynamic_${partySize}p_${isExtended ? '7d' : '1d'}_${startDate}`,
           amount: {
             currency_code: 'AUD',
             value: amount.toFixed(2),
           },
-          description: `StikmNek Pass — ${partySize} pax (${isExtended ? '14d' : '24h'}) from ${startDate}`,
+          description: `StikmNek Pass — ${partySize} pax (${isExtended ? '7d' : '24h'}) from ${startDate}`,
         },
       ],
       application_context: {
