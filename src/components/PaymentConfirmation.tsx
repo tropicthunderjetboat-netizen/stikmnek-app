@@ -54,7 +54,7 @@ const LEGACY_BASE_PEOPLE: Record<PassProductId, number> = {
 };
 
 const PASS_GROUPS: Record<PassProductId, string> = {
-  dynamic: `Up to ${MAX_PARTY_SIZE} people (ages 6+)`,
+  dynamic: `A$15 first guest + A$5/extra (ages 6+, max ${MAX_PARTY_SIZE} per pass)`,
 };
 
 type ShareBonusRow = { extraDays: number; extraPeople: number; extraKids: number; description: string };
@@ -696,7 +696,7 @@ const PaymentConfirmation: React.FC = () => {
       }
       if (user.passPeopleCount != null && user.passPeopleCount !== prev.peopleCount) {
         next.peopleCount = user.passPeopleCount;
-        next.group = `Up to ${user.passPeopleCount} people`;
+        next.group = `${user.passPeopleCount} guests (ages 6+) · A$15 first + A$5/extra`;
         changed = true;
       }
       if (!changed) return prev;
@@ -777,7 +777,7 @@ const PaymentConfirmation: React.FC = () => {
         validUntil: newValidUntil,
         shareBonusApplied: true,
         days: spanDays ?? (prev.days ?? 0) + (bonus.days ?? 0),
-        group: `Up to ${newPeople} people`,
+        group: `${newPeople} guests (ages 6+) · A$15 first + A$5/extra`,
       };
       try {
         localStorage.setItem('lastPayment', JSON.stringify(updated));

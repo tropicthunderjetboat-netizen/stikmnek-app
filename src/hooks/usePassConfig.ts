@@ -99,7 +99,12 @@ const DEFAULT_PASSES: PassConfig[] = [
     shadowColor: 'teal-200',
     icon: 'star',
     features: [
-      { id: 'f1', text: '1–6 people (ages 6+)', textFr: '1–6 personnes (6 ans et +)', textBi: '1–6 man (6+)' },
+      {
+        id: 'f1',
+        text: 'Covers up to 6 people per pass',
+        textFr: 'Jusqu’à 6 personnes par pass',
+        textBi: 'Kasem antap 6 man long wan pas',
+      },
       { id: 'f2', text: '24-hour day pass or 7-day holiday pass', textFr: 'Pass 24 h ou pass vacances 7 jours', textBi: '24 owa o 7 dei holiday pas' },
       { id: 'f3', text: 'QR code redemptions', textFr: 'Utilisations QR code', textBi: 'QR kod' },
       { id: 'f4', text: 'Map & savings tracker', textFr: 'Carte et suivi', textBi: 'Map mo save' },
@@ -128,7 +133,7 @@ const DEFAULT_PASSES: PassConfig[] = [
 ];
 
 const STORAGE_KEY = 'stikmnek-pass-config';
-const CONFIG_VERSION = 8;
+const CONFIG_VERSION = 9;
 const VERSION_KEY = 'stikmnek-pass-config-version';
 
 function loadFromStorage(): PassConfig[] {

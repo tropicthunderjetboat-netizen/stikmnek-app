@@ -16,6 +16,8 @@ import {
   addCalendarDaysIso,
   clampPartySize,
   MAX_PARTY_SIZE,
+  BASE_PRICE_AUD,
+  GUEST_FEE_AUD,
   EXTEND_FEE_AUD,
 } from '@/data/pricing';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
@@ -395,7 +397,15 @@ const PaymentCheckout: React.FC = () => {
   const grantSecondWeekPreview = Boolean(user?.shareBonusUnlocked) && isExtended;
   const daysCount = passInclusiveCalendarDays(isExtended, grantSecondWeekPreview);
   const extendedCalendarDays = passInclusiveCalendarDays(true, false);
-  const groupLabel = `Up to ${partySize} people (ages 6+)`;
+  const groupLabel = useMemo(() => {
+    if (checkoutLang === 'fr') {
+      return `${partySize} voyageur${partySize > 1 ? 's' : ''} (6 ans et +) · ${BASE_PRICE_AUD} $ + ${GUEST_FEE_AUD} $/invité supp.`;
+    }
+    if (checkoutLang === 'bi') {
+      return `${partySize} man (6+) · A$${BASE_PRICE_AUD} + A$${GUEST_FEE_AUD}/narafala`;
+    }
+    return `${partySize} guests (ages 6+) · A$${BASE_PRICE_AUD} first + A$${GUEST_FEE_AUD}/extra`;
+  }, [partySize, checkoutLang]);
 
   const tripInclusiveDays = useMemo(() => {
     const a = normalizeDateOnly(userProfile?.expected_arrival_date);

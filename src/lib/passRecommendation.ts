@@ -25,7 +25,7 @@ function clampInt(n: unknown, fallback: number): number {
 
 /**
  * Feasibility for guidance / support hint uses **adults + children only** (infants excluded).
- * Dynamic passes cover up to 6 people (ages 6+) and up to 14 calendar days.
+ * Dynamic passes allow up to 6 paying guests per pass (ages 6+); trip length guidance uses up to 14 calendar days.
  */
 export function getPassTripGuidance(
   userProfile: UserProfile,

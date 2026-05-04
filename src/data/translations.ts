@@ -49,9 +49,9 @@ export const translations: Record<string, Record<Language, string>> = {
     bi: 'Kostomem yor travel long fleksibel pricing',
   },
   'pass.build_how_desc': {
-    en: 'On Passes, set your group (ages 6+, up to 6), pick a 24-hour day pass or 7-day holiday pass, and checkout — your total updates instantly.',
-    fr: 'Dans Passes, définissez votre groupe (6 ans et +, jusqu’à 6), choisissez 24 h ou 7 jours, puis payez — le total se met à jour instantanément.',
-    bi: 'Long Pas, setem grup (6+, kasem 6), jusum 24 owa o 7 dei, mo pei — total i apdet stretwe.',
+    en: 'On Passes, pricing starts at A$15 for the first guest plus A$5 per additional guest (ages 6+), up to 6 per pass. Pick a 24-hour or 7-day holiday plan and checkout — your total updates instantly.',
+    fr: 'Dans Passes, les prix commencent à 15 $ AUD pour la 1re personne + 5 $ par invité supplémentaire (6 ans et +), jusqu’à 6 par pass. Choisissez 24 h ou 7 jours, puis payez — le total se met à jour instantanément.',
+    bi: 'Long Pas, praes i stat long A$15 long fes man + A$5 long evri narafala (6+), kasem 6 long wan pas. Jusum 24 owa o 7 dei, mo pei — total i apdet stretwe.',
   },
 
   // Checkout (pricing summary + conversion)
@@ -238,9 +238,9 @@ export const translations: Record<string, Record<Language, string>> = {
     bi: 'Long bigfala grup o lon taem, wan pas i no save stret — askem support o tingbaot moa pas.',
   },
   'passFlow.checkout_preview': {
-    en: 'Checkout will open for up to {party} people · {duration} pass (you can change before paying).',
-    fr: 'Le paiement s’ouvrira pour jusqu’à {party} personnes · pass {duration} (modifiable avant paiement).',
-    bi: 'Checkout bae open blong kasem {party} pipol · pas {duration} (yu ken senis bifo pem).',
+    en: 'Checkout will use {party} guests (ages 6+) · {duration} — starting at A$15 + A$5 per extra guest (edit before paying).',
+    fr: 'Le paiement utilisera {party} voyageurs (6 ans et +) · {duration} — à partir de 15 $ + 5 $ par invité supplémentaire (modifiable avant paiement).',
+    bi: 'Checkout bae yusum {party} man (6+) · {duration} — stat long A$15 + A$5 long narafala (yu ken senis bifo pem).',
   },
   'passFlow.duration_short': { en: '1-day', fr: '1 jour', bi: 'wan-dei' },
   'passFlow.duration_extended': { en: 'whole-trip', fr: 'tout le séjour', bi: 'ful-trip' },

@@ -8,7 +8,7 @@ import { Check, Zap, Crown, Star, CreditCard, Lock, ShieldCheck, Users, Baby, Ca
 
 import { usePassConfig, PassConfig } from '@/hooks/usePassConfig';
 import DealsPricingCard from '@/components/DealsPricingCard';
-import { BASE_PRICE_AUD, MAX_PARTY_SIZE } from '@/data/pricing';
+import { BASE_PRICE_AUD, GUEST_FEE_AUD, EXTEND_FEE_AUD } from '@/data/pricing';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
@@ -882,10 +882,32 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
                       passI18nLang,
                     )
                   : null;
-              // Calculate group display
+              // Calculate group display (legacy config rows)
               const groupLabel = pass.totalPeople
                 ? (language === 'en' ? `${pass.totalPeople} people` : language === 'fr' ? `${pass.totalPeople} personnes` : `${pass.totalPeople} man`)
                 : (language === 'en' ? `${pass.adults} adults & ${pass.kids} kids` : language === 'fr' ? `${pass.adults} adultes et ${pass.kids} enfants` : `${pass.adults} bigman mo ${pass.kids} pikinini`);
+
+              const flexibleGroupPill =
+                language === 'en'
+                  ? 'Flexible group size'
+                  : language === 'fr'
+                    ? 'Taille de groupe flexible'
+                    : 'Grup we i fleksibel';
+
+              const previewExtended = Boolean(checkoutPreview?.isExtended);
+              const firstPersonAud = previewExtended ? BASE_PRICE_AUD + EXTEND_FEE_AUD : BASE_PRICE_AUD;
+              const extraGuestSubline =
+                language === 'en'
+                  ? `+A$${GUEST_FEE_AUD} per additional guest (ages 6+)`
+                  : language === 'fr'
+                    ? `+${GUEST_FEE_AUD} $ AUD par invité supplémentaire (6 ans et +)`
+                    : `+A$${GUEST_FEE_AUD} long evri narafala man (6+)`;
+              const firstPersonHeadline =
+                language === 'en'
+                  ? `A$${firstPersonAud} for the first person`
+                  : language === 'fr'
+                    ? `${firstPersonAud} $ AUD pour la 1re personne`
+                    : `A$${firstPersonAud} long fes man`;
 
               const daysLabel = shared && hasBonusDays
                 ? `${pass.fullDays} ${language === 'en' ? 'days' : language === 'fr' ? 'jours' : 'dei'}`
@@ -906,6 +928,30 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
                     return groupLabel;
                   })()
                 : null;
+
+              const durationPillLabel =
+                shared && hasBonusDays
+                  ? daysLabel
+                  : pass.type === 'dynamic' && previewExtended
+                    ? language === 'en'
+                      ? '7 days'
+                      : language === 'fr'
+                        ? '7 jours'
+                        : '7 dei'
+                    : pass.type === 'dynamic' && !previewExtended
+                      ? language === 'en'
+                        ? '24 hours'
+                        : language === 'fr'
+                          ? '24 h'
+                          : '24 owa'
+                      : daysLabel;
+
+              const peoplePillLabel =
+                pass.type === 'dynamic'
+                  ? shared && hasBonusPeople && bonusPeopleLabel
+                    ? bonusPeopleLabel
+                    : flexibleGroupPill
+                  : bonusPeopleLabel || groupLabel;
 
               return (
                 <div
@@ -942,7 +988,7 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
                           : 'bg-gray-100 text-gray-700'
                       }`}>
                         <Users className="w-3.5 h-3.5" />
-                        {bonusPeopleLabel || groupLabel}
+                        {peoplePillLabel}
                         {shared && hasBonusPeople && <Sparkles className="w-3 h-3 text-emerald-500" />}
                       </div>
                       <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
@@ -951,7 +997,7 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
                           : 'bg-gray-100 text-gray-700'
                       }`}>
                         <Calendar className="w-3.5 h-3.5" />
-                        {daysLabel}
+                        {durationPillLabel}
                         {shared && hasBonusDays && <Sparkles className="w-3 h-3 text-emerald-500" />}
                       </div>
                     </div>
@@ -964,17 +1010,18 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
                     )}
 
                     {pass.type === 'dynamic' ? (
-                      <div className="text-center mb-3">
-                        <p className="text-lg font-bold text-gray-900">
-                          {language === 'fr' ? `À partir de ${BASE_PRICE_AUD} $ AUD` : `From A$${BASE_PRICE_AUD}`}
-                          <span className="text-sm font-normal text-gray-600 ml-0 sm:ml-2 block sm:inline mt-1 sm:mt-0">
-                            {language === 'fr'
-                              ? `Jusqu'à ${MAX_PARTY_SIZE} personnes (6 ans et +)`
-                              : language === 'bi'
-                                ? `Antap long ${MAX_PARTY_SIZE} man (6+)`
-                                : `Up to ${MAX_PARTY_SIZE} people (ages 6+)`}
-                          </span>
-                        </p>
+                      <div className="text-center mb-3 space-y-1">
+                        <p className="text-lg font-extrabold text-gray-900 tracking-tight">{firstPersonHeadline}</p>
+                        <p className="text-sm font-semibold text-gray-700">{extraGuestSubline}</p>
+                        {previewExtended && (
+                          <p className="text-[11px] text-teal-700 font-medium leading-snug">
+                            {language === 'en'
+                              ? `Includes +A$${EXTEND_FEE_AUD} whole-trip add-on (7-day holiday pass).`
+                              : language === 'fr'
+                                ? `Inclut la prolongation « tout le séjour » (+${EXTEND_FEE_AUD} $ AUD, pass vacances 7 jours).`
+                                : `I stap insaed long +A$${EXTEND_FEE_AUD} blong holiday pas 7 dei.`}
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-baseline gap-1 mb-3">
