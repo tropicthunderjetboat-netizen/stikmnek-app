@@ -1,10 +1,11 @@
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getBasePeople, getShareBonusTotalPeople, getPassDisplayTitle } from '@/data/pricing';
 import type { PassProductId } from '@/data/passCatalog';
-import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
+import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 import { supabase } from '@/lib/supabase';
-import { QrCode, Calendar, Shield, Ticket, Copy, Check } from 'lucide-react';
+import { toast } from 'sonner';
+import { QrCode, Calendar, Shield, Ticket, Copy, Check, Share2, Loader2 } from 'lucide-react';
 
 function toDateOnly(v: unknown): string | null {
   if (v == null) return null;
@@ -14,8 +15,9 @@ function toDateOnly(v: unknown): string | null {
 }
 
 const QRCodeDisplay: React.FC = () => {
-  const { user, language } = useAppContext();
+  const { user, language, refreshUserPass } = useAppContext();
   const [copied, setCopied] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
   /** Fresh row from DB so QR + dates update after extend-pass even if context lags. */
   const [passRow, setPassRow] = useState<{
     validFrom: string | null;
@@ -97,10 +99,98 @@ const QRCodeDisplay: React.FC = () => {
     return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encoded}&color=0d9488&bgcolor=ffffff&margin=8`;
   }, [qrPayload]);
 
-  const passDurationDays = useMemo(() => {
-    if (!validFrom || !validUntil) return null;
-    return inclusiveCalendarDaysBetween(validFrom, validUntil);
-  }, [validFrom, validUntil]);
+  const passMask = useMemo(
+    () =>
+      getHolidayPassMaskDisplay({
+        validFrom,
+        validUntil,
+        shareBonusApplied: shareApplied,
+        isExtendedPass: null,
+      }),
+    [validFrom, validUntil, shareApplied],
+  );
+
+  const displayValidUntil = passMask.showFirstWeekOnly ? passMask.displayUntilDateStr : validUntil;
+  const displayPeriodDays = passMask.displayDayCount;
+
+  const fmtShort = useCallback(
+    (ds: string | null) => {
+      if (!ds) return '-';
+      const loc = language === 'fr' ? 'fr-FR' : 'en-US';
+      return new Date(`${ds.slice(0, 10)}T12:00:00`).toLocaleDateString(loc, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    },
+    [language],
+  );
+
+  const handleUnlockSecondWeek = useCallback(async () => {
+    if (!user?.id || shareBusy) return;
+    setShareBusy(true);
+    try {
+      let shareSucceeded = false;
+      const shareData = {
+        title: 'StikmNek',
+        text: "You've purchased 7 days. Share now to unlock your 2nd week FREE (14 days total)!",
+        url: typeof window !== 'undefined' ? window.location.origin : '',
+      };
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+          shareSucceeded = true;
+        } catch (e: unknown) {
+          const name = e && typeof e === 'object' && 'name' in e ? String((e as { name?: string }).name) : '';
+          if (name === 'AbortError') {
+            setShareBusy(false);
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+            shareSucceeded = true;
+            toast.success('Link copied — claiming bonus…');
+          } catch {
+            toast.error('Could not share or copy link.');
+            return;
+          }
+        }
+      } else {
+        try {
+          await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+          shareSucceeded = true;
+          toast.success('Link copied — claiming bonus…');
+        } catch {
+          toast.error('Could not copy link.');
+          return;
+        }
+      }
+      if (!shareSucceeded) return;
+
+      const { data, error } = await supabase.functions.invoke('extend-pass', {
+        body: {
+          user_id: user.id,
+          share_proof: `qr_${Date.now()}_display`,
+          platform: 'qr-display',
+        },
+      });
+      if (error) {
+        toast.error(typeof error.message === 'string' ? error.message : 'Could not apply bonus');
+        return;
+      }
+      if ((data as { already_claimed?: boolean })?.already_claimed) {
+        toast.info('Share bonus already applied.');
+        await refreshUserPass();
+        return;
+      }
+      if ((data as { success?: boolean })?.success) {
+        toast.success('Second week unlocked!');
+        await refreshUserPass();
+      }
+    } finally {
+      setShareBusy(false);
+    }
+  }, [user?.id, shareBusy, refreshUserPass]);
 
   const handleCopyCode = () => {
     if (qrPayload) {
@@ -183,21 +273,49 @@ const QRCodeDisplay: React.FC = () => {
               <span className="text-sm text-gray-600">Valid Period</span>
             </div>
             <span className="text-sm font-bold text-gray-900 text-right">
-              {validFrom
-                ? new Date(validFrom + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                : '-'}
+              {fmtShort(validFrom)}
               {' – '}
-              {validUntil
-                ? new Date(validUntil + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                : '-'}
-              {passDurationDays != null && (
+              {fmtShort(displayValidUntil)}
+              {displayPeriodDays > 0 && (
                 <span className="block text-xs font-semibold text-teal-700 mt-0.5">
-                  {passDurationDays} day{passDurationDays !== 1 ? 's' : ''} total
-                  {shareApplied ? ' · Share bonus included' : ''}
+                  {displayPeriodDays} day{displayPeriodDays !== 1 ? 's' : ''}
+                  {passMask.showFirstWeekOnly
+                    ? ' · Share below for 14 days total'
+                    : shareApplied
+                      ? ' · Share bonus included'
+                      : ' total'}
                 </span>
               )}
             </span>
           </div>
+
+          {passMask.isHolidayPass && passMask.showFirstWeekOnly && (
+            <div className="p-3 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
+              <p className="text-xs font-semibold text-amber-900 mb-2">
+                {language === 'fr'
+                  ? 'Partagez pour débloquer la 2e semaine gratuite (14 jours au total).'
+                  : "You've got 7 days of deals — share to unlock your 2nd week FREE."}
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleUnlockSecondWeek()}
+                disabled={shareBusy}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold hover:from-amber-600 hover:to-orange-600 disabled:opacity-60"
+              >
+                {shareBusy ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {language === 'fr' ? 'Partage…' : 'Sharing…'}
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-4 h-4" />
+                    {language === 'fr' ? 'Partager et débloquer' : 'Share & unlock 2nd week'}
+                  </>
+                )}
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
             <div className="flex items-center gap-2">

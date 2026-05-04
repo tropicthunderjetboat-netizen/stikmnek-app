@@ -1,32 +1,33 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getPassDisplayTitle } from '@/data/pricing';
 import type { PassProductId } from '@/data/passCatalog';
 import { t } from '@/data/translations';
 import { businesses as localBusinesses } from '@/data/businesses';
+import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 import {
   Ticket, Heart, History, QrCode, Calendar, ChevronRight, Wifi,
   LayoutDashboard, TrendingUp, BarChart3,
-  MapPin, Star, Zap, Target, Clock, Flame, Sparkles,
+  MapPin, Star, Zap, Target, Clock, Flame, Users, Share2, Loader2, Pencil,
 } from 'lucide-react';
 
 import QRCodeDisplay from './QRCodeDisplay';
-import ProfilePassPreferencesForm from '@/components/ProfilePassPreferencesForm';
 
 type DashboardTab = 'overview' | 'analytics';
 
 const Dashboard: React.FC = () => {
   const {
-    language, user, favorites, redemptions, setSelectedBusiness, setCurrentView, dbBusinesses,
-    refreshRedemptions, purchasePass,
+    language, user, userProfile, favorites, redemptions, setSelectedBusiness, setCurrentView, dbBusinesses,
+    refreshRedemptions, purchasePass, refreshUserPass,
   } = useAppContext();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+  const [shareBusy, setShareBusy] = useState(false);
 
   useEffect(() => {
     void refreshRedemptions();
   }, [refreshRedemptions]);
-
-  if (!user) return null;
 
   const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
   const favBizs = allBusinesses.filter(b => favorites.includes(b.id));
@@ -108,6 +109,106 @@ const Dashboard: React.FC = () => {
     overview: { en: 'Overview', fr: 'Aperçu', bi: 'Ovaviu' },
     analytics: { en: 'My Analytics', fr: 'Mes analyses', bi: 'Analitiks blong mi' },
   };
+
+  const holidayPassUi = useMemo(
+    () =>
+      getHolidayPassMaskDisplay({
+        validFrom: user?.passValidFrom,
+        validUntil: user?.passValidUntil,
+        shareBonusApplied: user?.shareBonusApplied,
+        isExtendedPass: null,
+      }),
+    [user?.passValidFrom, user?.passValidUntil, user?.shareBonusApplied],
+  );
+
+  const displayPassExpiryLabel =
+    user && holidayPassUi.showFirstWeekOnly
+      ? holidayPassUi.displayUntilDateStr || user.passExpiry
+      : user?.passExpiry;
+
+  const fmtPassDate = useCallback(
+    (isoDate: string | null | undefined) => {
+      if (!isoDate) return '-';
+      const d = String(isoDate).slice(0, 10);
+      const loc = language === 'fr' ? 'fr-FR' : 'en-US';
+      return new Date(`${d}T12:00:00`).toLocaleDateString(loc, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    },
+    [language],
+  );
+
+  const handleUnlockSecondWeek = useCallback(async () => {
+    if (!user?.id || shareBusy) return;
+    setShareBusy(true);
+    try {
+      let shareSucceeded = false;
+      const shareData = {
+        title: 'StikmNek',
+        text: "You've purchased 7 days. Share now to unlock your 2nd week FREE (14 days total)!",
+        url: typeof window !== 'undefined' ? window.location.origin : '',
+      };
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+          shareSucceeded = true;
+        } catch (e: unknown) {
+          const name = e && typeof e === 'object' && 'name' in e ? String((e as { name?: string }).name) : '';
+          if (name === 'AbortError') {
+            setShareBusy(false);
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+            shareSucceeded = true;
+            toast.success('Link copied — claiming bonus…');
+          } catch {
+            toast.error('Could not share or copy link.');
+            return;
+          }
+        }
+      } else {
+        try {
+          await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+          shareSucceeded = true;
+          toast.success('Link copied — claiming bonus…');
+        } catch {
+          toast.error('Could not copy link.');
+          return;
+        }
+      }
+      if (!shareSucceeded) return;
+
+      const { data, error } = await supabase.functions.invoke('extend-pass', {
+        body: {
+          user_id: user!.id,
+          share_proof: `dash_${Date.now()}_passcard`,
+          platform: 'dashboard',
+        },
+      });
+      if (error) {
+        toast.error(typeof error.message === 'string' ? error.message : 'Could not apply bonus');
+        return;
+      }
+      if ((data as { already_claimed?: boolean })?.already_claimed) {
+        toast.info('Share bonus already applied.');
+        await refreshUserPass();
+        return;
+      }
+      if ((data as { success?: boolean })?.success) {
+        toast.success('Second week unlocked!');
+        await refreshUserPass();
+      }
+    } finally {
+      setShareBusy(false);
+    }
+  }, [user?.id, shareBusy, refreshUserPass]);
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20 pb-16">
@@ -208,27 +309,83 @@ const Dashboard: React.FC = () => {
                             <QrCode className="w-6 h-6 text-white/80" />
                           </div>
                           <h4 className="text-2xl font-bold mb-1 leading-snug">{user.pass ? getPassDisplayTitle(user.pass, language) : ''}</h4>
+                          {holidayPassUi.isHolidayPass && (
+                            <p className="text-xs font-bold text-white/90 mb-1">
+                              {holidayPassUi.showFirstWeekOnly
+                                ? language === 'fr'
+                                  ? '7 jours inclus · partagez pour 14 jours au total'
+                                  : language === 'bi'
+                                    ? '7 dei i stap insaed · share blong 14 dei'
+                                    : '7 days included · share for 14 days total'
+                                : language === 'fr'
+                                  ? `${holidayPassUi.truthSpanDays} jours (bonus inclus)`
+                                  : language === 'bi'
+                                    ? `${holidayPassUi.truthSpanDays} dei (bonus)`
+                                    : `${holidayPassUi.truthSpanDays} days (bonus included)`}
+                            </p>
+                          )}
                           <div className="flex items-center gap-4 text-sm text-white/80">
-                            <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{language === 'en' ? 'Expires: ' : 'Expire: '}{user.passExpiry}</span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {language === 'en' ? 'Expires: ' : language === 'fr' ? 'Expire le : ' : 'Expire: '}
+                              {fmtPassDate(displayPassExpiryLabel ?? null)}
+                            </span>
                           </div>
                           {(user.passValidFrom || user.passValidUntil) && (
-                            <div className="mt-3 p-3 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20">
+                            <div className="mt-3 p-3 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20 ring-1 ring-white/10">
                               <p className="text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1.5">
                                 {language === 'en' ? 'Discount Validity Period' : language === 'fr' ? 'Période de validité' : 'Taem blong Diskount'}
                               </p>
+                              {holidayPassUi.showFirstWeekOnly && (
+                                <p className="text-[10px] font-semibold text-white/85 mb-1.5">
+                                  {language === 'en'
+                                    ? 'Showing your first week (7 days). Share to unlock week 2.'
+                                    : language === 'fr'
+                                      ? '1re semaine affichée (7 j.). Partagez pour la 2e.'
+                                      : 'Fes wik 7 dei. Share blong wik 2.'}
+                                </p>
+                              )}
                               <div className="flex items-center gap-3 text-sm">
                                 <div className="flex-1">
                                   <p className="text-[10px] text-white/60">{language === 'en' ? 'Valid From' : language === 'fr' ? 'Valide du' : 'Stat'}</p>
-                                  <p className="font-bold text-white">{user.passValidFrom ? new Date(user.passValidFrom + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</p>
+                                  <p className="font-bold text-white">{fmtPassDate(user.passValidFrom)}</p>
                                 </div>
                                 <div className="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-bold">
                                   {language === 'en' ? 'to' : language === 'fr' ? 'au' : 'go'}
                                 </div>
                                 <div className="flex-1 text-right">
                                   <p className="text-[10px] text-white/60">{language === 'en' ? 'Valid Until' : language === 'fr' ? 'Valide jusqu\'au' : 'Finis'}</p>
-                                  <p className="font-bold text-white">{user.passValidUntil ? new Date(user.passValidUntil + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</p>
+                                  <p className="font-bold text-white">
+                                    {fmtPassDate(
+                                      holidayPassUi.showFirstWeekOnly
+                                        ? holidayPassUi.displayUntilDateStr
+                                        : user.passValidUntil,
+                                    )}
+                                  </p>
                                 </div>
                               </div>
+                            </div>
+                          )}
+                          {holidayPassUi.isHolidayPass && holidayPassUi.showFirstWeekOnly && (
+                            <div className="mt-3">
+                              <button
+                                type="button"
+                                onClick={() => void handleUnlockSecondWeek()}
+                                disabled={shareBusy}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/20 hover:bg-white/30 border border-white/30 text-white text-sm font-bold backdrop-blur-sm disabled:opacity-60 transition-colors"
+                              >
+                                {shareBusy ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    {language === 'fr' ? 'Partage…' : 'Sharing…'}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Share2 className="w-4 h-4" />
+                                    {language === 'fr' ? 'Partager — 2e semaine gratuite' : 'Share — unlock 2nd week FREE'}
+                                  </>
+                                )}
+                              </button>
                             </div>
                           )}
                           <div className="mt-3 flex items-center gap-2">
@@ -312,18 +469,47 @@ const Dashboard: React.FC = () => {
                   <QRCodeDisplay />
                 )}
 
-                {/* Savings quick glance → analytics */}
+                {/* Travel party — profile drives checkout party size */}
                 {user.type === 'tourist' && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="p-5 border-b border-gray-100">
                       <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-amber-500" />
-                        {t('dash.pass_prefs_title', language)}
+                        <Users className="w-5 h-5 text-teal-600" />
+                        {language === 'en'
+                          ? 'Your travel party'
+                          : language === 'fr'
+                            ? 'Votre groupe de voyage'
+                            : 'Grup blong travel'}
                       </h3>
                     </div>
                     <div className="p-5">
-                      <p className="text-xs text-muted-foreground mb-4">{t('dash.pass_prefs_sub', language)}</p>
-                      <ProfilePassPreferencesForm />
+                      <p className="text-xs text-gray-500 mb-4">
+                        {language === 'en'
+                          ? 'Checkout uses this headcount (ages 6+) from your profile — update it anytime before you buy a pass.'
+                          : language === 'fr'
+                            ? 'Le paiement utilise ces voyageurs (6 ans et +) depuis votre profil.'
+                            : 'Checkout i yusim namba long profil blong yu (6+).'}
+                      </p>
+                      <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4 space-y-2 mb-4">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">{language === 'en' ? 'Adults' : language === 'fr' ? 'Adultes' : 'Adult'}</span>
+                          <span className="font-bold text-gray-900">{userProfile?.num_adults ?? '—'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">
+                            {language === 'en' ? 'Children (6+)' : language === 'fr' ? 'Enfants (6+)' : 'Pikinini (6+)'}
+                          </span>
+                          <span className="font-bold text-gray-900">{userProfile?.num_children ?? '—'}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentView('complete-profile')}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        {language === 'en' ? 'Edit profile' : language === 'fr' ? 'Modifier le profil' : 'Edit profil'}
+                      </button>
                     </div>
                   </div>
                 )}

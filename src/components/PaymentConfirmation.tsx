@@ -19,6 +19,7 @@ import {
 import TouristProfileForm from '@/components/TouristProfileForm';
 import PostPurchasePassPreferencesDialog from '@/components/PostPurchasePassPreferencesDialog';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
+import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 
 function passPrefsPromptStorageKey(receiptNumber: string): string {
   return `pass_prefs_prompt_v1_${receiptNumber}`;
@@ -879,28 +880,22 @@ const PaymentConfirmation: React.FC = () => {
   const validFromDate = payment.validFrom ? new Date(payment.validFrom) : null;
   const validUntilDate = payment.validUntil ? new Date(payment.validUntil) : null;
 
-  const vfStr = payment.validFrom ? String(payment.validFrom).slice(0, 10) : '';
-  const vuStr = payment.validUntil ? String(payment.validUntil).slice(0, 10) : '';
-  const truthSpanDays =
-    inclusiveCalendarDaysBetween(vfStr || undefined, vuStr || undefined) ?? payment.days ?? 0;
-
-  const isHolidayPass = Boolean(payment.isExtended);
-  const showHolidayFirstWeekOnly = isHolidayPass && !shareBonusApplied;
-
-  /** Receipt + discount card: before post-purchase share, show the paid first week only (masks DB if valid_until spans >7 days without share_bonus_applied). */
-  const receiptDiscountUntilStr =
-    showHolidayFirstWeekOnly && truthSpanDays > 7 && vfStr
-      ? addDaysToDate(vfStr, 6)
-      : vuStr;
+  const passMask = getHolidayPassMaskDisplay({
+    validFrom: payment.validFrom,
+    validUntil: payment.validUntil,
+    shareBonusApplied: payment.shareBonusApplied,
+    isExtendedPass: payment.isExtended ?? null,
+  });
+  const truthSpanDays = passMask.truthSpanDays || (payment.days ?? 0);
+  const isHolidayPass = passMask.isHolidayPass;
+  const showHolidayFirstWeekOnly = passMask.showFirstWeekOnly;
+  const receiptDiscountUntilStr = passMask.displayUntilDateStr;
+  const receiptDiscountDayCount = passMask.displayDayCount || (payment.days ?? 0);
 
   const receiptDiscountUntilDate =
     receiptDiscountUntilStr && /^\d{4}-\d{2}-\d{2}$/.test(receiptDiscountUntilStr)
       ? new Date(`${receiptDiscountUntilStr}T12:00:00`)
       : validUntilDate;
-
-  const receiptDiscountDayCount = showHolidayFirstWeekOnly
-    ? Math.min(7, truthSpanDays > 0 ? truthSpanDays : 7)
-    : truthSpanDays;
 
   const passDurationMainText = (() => {
     if (!isHolidayPass) {
