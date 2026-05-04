@@ -20,6 +20,7 @@ import TouristProfileForm from '@/components/TouristProfileForm';
 import PostPurchasePassPreferencesDialog from '@/components/PostPurchasePassPreferencesDialog';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
+import { t, type Language } from '@/data/translations';
 
 function passPrefsPromptStorageKey(receiptNumber: string): string {
   return `pass_prefs_prompt_v1_${receiptNumber}`;
@@ -64,13 +65,18 @@ const SHARE_BONUSES: Record<PassProductId, ShareBonusRow> = {
     extraDays: 7,
     extraPeople: 0,
     extraKids: 0,
-    description: 'Unlock a free 2nd week on your Holiday Pass — 14 days of deals total.',
+    description: 'Share the app after purchase for 7 extra days free — 14 days of deals on your Holiday Pass.',
   },
 };
 
-/** Body copy for the Holiday Pass share card (pre-share). */
-const HOLIDAY_SHARE_CARD_BODY =
-  "You've purchased 7 days. Share now to unlock your 2nd week FREE (14 days total)!";
+function toPassLang(language: string | undefined): Language {
+  return language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+}
+
+function bonusDaysPillLabel(lang: Language, days: number): string {
+  if (days === 7) return t('share.holiday_pill_days', lang);
+  return t('share.extra_days_pill_n', lang).replace('__N__', String(days));
+}
 
 /** LocalStorage keys for share CTA — covers legacy `weekly` receipts and semantic ids. */
 function passShareStorageKeys(raw: string): string[] {
@@ -248,6 +254,7 @@ const ShareCTA: React.FC<{
   onBonusApplied?: (bonus: ShareBonusApplied) => void;
 }> = ({ passType, userId, isHolidayPass, shareBonusAlreadyApplied, onBonusApplied }) => {
   const { language } = useAppContext();
+  const passLang = toPassLang(language);
   const productId = passProductIdFromDb(passType);
   const [shareState, setShareState] = useState<'idle' | 'sharing' | 'success' | 'already-claimed' | 'error'>(() => {
     if (shareBonusAlreadyApplied) return 'already-claimed';
@@ -285,7 +292,7 @@ const ShareCTA: React.FC<{
 
   const formatBonusParts = (bd: number, bp: number, bk: number): string => {
     const parts: string[] = [];
-    if (bd > 0) parts.push(`+${bd} day${bd > 1 ? 's' : ''}`);
+    if (bd > 0) parts.push(bonusDaysPillLabel(passLang, bd));
     if (bp > 0) parts.push(`+${bp} people`);
     if (bk > 0) parts.push(`+${bk} kid${bk > 1 ? 's' : ''}`);
     return parts.join(', ');
@@ -506,7 +513,7 @@ const ShareCTA: React.FC<{
                   : shareBonusAlreadyApplied
                     ? 'Your receipt shows the full calendar range, including any bonus days from checkout.'
                     : 'This share bonus was already applied to your pass.'
-                : '7-day Holiday Pass — add a free 2nd week when you share'}
+                : t('share.holiday_cta_header_sub', passLang)}
             </p>
           </div>
         </div>
@@ -523,7 +530,7 @@ const ShareCTA: React.FC<{
                 : 'bg-amber-100 text-amber-800 border border-amber-200'
             }`}>
               <Calendar className="w-3.5 h-3.5" />
-              +{bonus.extraDays} free day{bonus.extraDays > 1 ? 's' : ''}
+              {bonusDaysPillLabel(passLang, bonus.extraDays)}
             </div>
           )}
           {bonus.extraPeople > 0 && (
@@ -555,7 +562,7 @@ const ShareCTA: React.FC<{
               : shareBonusAlreadyApplied
                 ? 'You already have the longest discount window for this purchase. Open your pass anytime to see valid dates.'
                 : 'You have already claimed the share bonus for this pass.'
-            : HOLIDAY_SHARE_CARD_BODY}
+            : t('share.holiday_card_subtext', passLang)}
         </p>
 
         {/* Share button or success state */}
@@ -909,15 +916,17 @@ const PaymentConfirmation: React.FC = () => {
     return '7 days';
   })();
 
+  const passLang = toPassLang(language);
+
   const passDurationSubline = (() => {
     if (!isHolidayPass) return null;
     if (shareBonusApplied) return 'Includes bonus days from your share (or from checkout).';
-    return 'Your purchase includes a full 7-day deal window. Share below to stack a free 2nd week (14 days total).';
+    return t('share.receipt_holiday_subline_pending', passLang);
   })();
 
   const receiptHeaderHolidayLine =
     isHolidayPass && !shareBonusApplied
-      ? '7-day deal access included · share below for a free 2nd week (14 days total)'
+      ? t('share.receipt_header_holiday_pending', passLang)
       : isHolidayPass && shareBonusApplied
         ? truthSpanDays >= 14
           ? '14-day discount window (including share bonus)'

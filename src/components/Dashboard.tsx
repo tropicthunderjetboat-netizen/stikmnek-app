@@ -140,6 +140,8 @@ const Dashboard: React.FC = () => {
     [language],
   );
 
+  const passLang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+
   const handleUnlockSecondWeek = useCallback(async () => {
     if (!user?.id || shareBusy) return;
     setShareBusy(true);
@@ -147,7 +149,7 @@ const Dashboard: React.FC = () => {
       let shareSucceeded = false;
       const shareData = {
         title: 'StikmNek',
-        text: "You've purchased 7 days. Share now to unlock your 2nd week FREE (14 days total)!",
+        text: t('share.holiday_navigator_body', passLang),
         url: typeof window !== 'undefined' ? window.location.origin : '',
       };
       if (navigator.share) {
@@ -204,7 +206,7 @@ const Dashboard: React.FC = () => {
     } finally {
       setShareBusy(false);
     }
-  }, [user?.id, shareBusy, refreshUserPass]);
+  }, [user?.id, shareBusy, refreshUserPass, passLang]);
 
   if (!user) {
     return null;
@@ -312,11 +314,7 @@ const Dashboard: React.FC = () => {
                           {holidayPassUi.isHolidayPass && (
                             <p className="text-xs font-bold text-white/90 mb-1">
                               {holidayPassUi.showFirstWeekOnly
-                                ? language === 'fr'
-                                  ? '7 jours inclus · partagez pour 14 jours au total'
-                                  : language === 'bi'
-                                    ? '7 dei i stap insaed · share blong 14 dei'
-                                    : '7 days included · share for 14 days total'
+                                ? t('share.dashboard_coverage_pill', passLang)
                                 : language === 'fr'
                                   ? `${holidayPassUi.truthSpanDays} jours (bonus inclus)`
                                   : language === 'bi'
@@ -338,11 +336,7 @@ const Dashboard: React.FC = () => {
                               </p>
                               {holidayPassUi.showFirstWeekOnly && (
                                 <p className="text-[10px] font-semibold text-white/85 mb-1.5">
-                                  {language === 'en'
-                                    ? 'Showing your first week (7 days). Share to unlock week 2.'
-                                    : language === 'fr'
-                                      ? '1re semaine affichée (7 j.). Partagez pour la 2e.'
-                                      : 'Fes wik 7 dei. Share blong wik 2.'}
+                                  {t('share.dashboard_week1_validity', passLang)}
                                 </p>
                               )}
                               <div className="flex items-center gap-3 text-sm">
@@ -377,12 +371,12 @@ const Dashboard: React.FC = () => {
                                 {shareBusy ? (
                                   <>
                                     <Loader2 className="w-4 h-4 animate-spin" />
-                                    {language === 'fr' ? 'Partage…' : 'Sharing…'}
+                                    {language === 'fr' ? 'Partage…' : language === 'bi' ? 'Serem…' : 'Sharing…'}
                                   </>
                                 ) : (
                                   <>
                                     <Share2 className="w-4 h-4" />
-                                    {language === 'fr' ? 'Partager — 2e semaine gratuite' : 'Share — unlock 2nd week FREE'}
+                                    {t('share.dashboard_unlock_button', passLang)}
                                   </>
                                 )}
                               </button>

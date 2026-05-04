@@ -143,14 +143,101 @@ export const translations: Record<string, Record<Language, string>> = {
   },
   'checkout.plan_holiday_title': { en: '7-Day Holiday Pass', fr: 'Pass vacances 7 jours', bi: 'Holiday Pas 7 Dei' },
   'checkout.plan_holiday_sub': {
-    en: 'Best for stayover visitors — 7 calendar days of deal access (+A$10). Share the app after purchase to unlock a 2nd week free.',
-    fr: 'Idéal pour les séjours — 7 jours calendaires d’accès (+10 $ AUD). Partagez l’app après achat pour une 2e semaine gratuite.',
-    bi: 'Bes blong taem yu stap — 7 kalenda dei akses (+A$10). Serem app afta bai blong fri wik tu.',
+    en: 'Best for stayover visitors — 7 calendar days of deal access (+A$10). Share the app after purchase for 7 extra days free (14 days of deals total).',
+    fr: 'Idéal pour les séjours — 7 jours calendaires d’accès (+10 $ AUD). Partagez l’app après achat pour 7 jours supplémentaires gratuits (14 jours d’offres au total).',
+    bi: 'Bes blong taem yu stap — 7 kalenda dei akses (+A$10). Serem app afta bai blong 7 dei moa blong free (14 dei long total).',
   },
   'checkout.share_second_week_unlock': {
-    en: 'Share to unlock a 2nd week FREE (14 days total)!',
-    fr: 'Partagez pour débloquer une 2e semaine GRATUITE (14 jours au total) !',
-    bi: 'Serem blong openem wan narafala wik FREE (14 dei long total)!',
+    en: 'Share this app and get 7 extra days FREE!!',
+    fr: 'Partagez l’application et obtenez 7 jours supplémentaires GRATUITS !!',
+    bi: 'Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!',
+  },
+
+  // Share bonus (7+7 Holiday Pass) — keep wording aligned across Pass card, checkout, receipts, dashboard
+  'share.holiday_banner_days': {
+    en: 'Share this app and get 7 extra days FREE!!',
+    fr: 'Partagez l’application et obtenez 7 jours supplémentaires GRATUITS !!',
+    bi: 'Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!',
+  },
+  'share.holiday_banner_days_n': {
+    en: 'Share this app and get __N__ extra days FREE!!',
+    fr: 'Partagez l’application et obtenez __N__ jours supplémentaires GRATUITS !!',
+    bi: 'Sherem olgeta ap ia mo kasem __N__ dei moa BLONG FREE!!',
+  },
+  'share.holiday_banner_combo': {
+    en: 'Share this app — +__PEOPLE__ people FREE & 7 extra days FREE!!',
+    fr: 'Partagez l’app — +__PEOPLE__ personnes gratuites et 7 jours supplémentaires GRATUITS !!',
+    bi: 'Sherem ap — +__PEOPLE__ man fri mo 7 dei moa BLONG FREE!!',
+  },
+  'share.holiday_banner_people_only': {
+    en: 'Share this app and unlock +__PEOPLE__ extra guests FREE!',
+    fr: 'Partagez l’app et débloquez +__PEOPLE__ invités supplémentaires GRATUITS !',
+    bi: 'Sherem ap mo anlokem +__PEOPLE__ narafala man fri!',
+  },
+  'share.holiday_pill_days': {
+    en: '7 extra days free',
+    fr: '7 jours gratuits',
+    bi: '7 dei blong free',
+  },
+  'share.extra_days_pill_n': {
+    en: '__N__ extra days free',
+    fr: '__N__ jours gratuits',
+    bi: '__N__ dei blong free',
+  },
+  'share.holiday_card_subtext': {
+    en: 'Unlock your bonus week! Share with friends to get 7 extra days free on your Holiday Pass.',
+    fr: 'Débloquez votre semaine bonus ! Partagez avec des amis pour obtenir 7 jours supplémentaires gratuits sur votre pass vacances.',
+    bi: 'Anlokem bonus wik! Sherem wetem ol frend blong kasem 7 dei moa blong free long Holiday Pas blong yu.',
+  },
+  'share.holiday_cta_header_sub': {
+    en: '7+7 Holiday Pass — share the app for 7 extra days FREE!',
+    fr: 'Pass vacances 7+7 — partagez l’app pour 7 jours supplémentaires GRATUITS !',
+    bi: 'Holiday pas 7+7 — sherem ap blong 7 dei moa BLONG FREE!',
+  },
+  'share.holiday_navigator_body': {
+    en: 'Share this app and get 7 extra days FREE!!',
+    fr: 'Partagez l’application et obtenez 7 jours supplémentaires GRATUITS !!',
+    bi: 'Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!',
+  },
+  'share.qr_holiday_prompt': {
+    en: 'You’ve got 7 days of deals — share this app for 7 extra days FREE on your Holiday Pass!',
+    fr: 'Vous avez 7 jours d’offres — partagez l’app pour 7 jours supplémentaires GRATUITS sur votre pass vacances !',
+    bi: 'Yu gat 7 dei blong dils — sherem ap ia blong 7 dei moa BLONG FREE long Holiday Pas!',
+  },
+  'share.dashboard_unlock_button': {
+    en: 'Share app — 7 extra days FREE',
+    fr: 'Partager l’app — 7 jours gratuits',
+    bi: 'Sherem ap — 7 dei blong free',
+  },
+  'share.dashboard_coverage_pill': {
+    en: '7 days included · share for 7 extra days free (14 days total)',
+    fr: '7 jours inclus · partagez pour 7 jours gratuits en plus (14 j. au total)',
+    bi: '7 dei i stap insaed · sherem blong 7 dei moa blong free (14 dei)',
+  },
+  'share.dashboard_week1_validity': {
+    en: 'First week shown (7 days). Share this app for 7 extra days free!',
+    fr: '1re semaine affichée (7 j.). Partagez l’app pour 7 jours gratuits en plus !',
+    bi: 'Fes wik 7 dei i soem. Sherem ap ia blong 7 dei moa blong free!',
+  },
+  'share.qr_unlock_button': {
+    en: 'Share app — 7 extra days FREE',
+    fr: 'Partager l’app — 7 jours gratuits',
+    bi: 'Sherem ap — 7 dei blong free',
+  },
+  'share.qr_period_bonus_hint': {
+    en: ' · Share app for 7 extra days free (14 days total)',
+    fr: ' · Partagez l’app pour 7 jours gratuits en plus (14 j. au total)',
+    bi: ' · Sherem ap blong 7 dei moa blong free (14 dei)',
+  },
+  'share.receipt_holiday_subline_pending': {
+    en: 'Your purchase includes a week of deal access. Share below for 7 extra days free (14 days of deals total).',
+    fr: 'Votre achat inclut une semaine d’accès aux offres. Partagez ci-dessous pour 7 jours supplémentaires gratuits (14 jours d’offres au total).',
+    bi: 'Bai blong yu i gat wan wik blong dils. Sherem daun blong 7 dei moa blong free (14 dei long total).',
+  },
+  'share.receipt_header_holiday_pending': {
+    en: '7-day deal access · share for 7 extra days free (14 days total)',
+    fr: '7 jours d’offres · partagez pour 7 jours gratuits en plus (14 j. au total)',
+    bi: '7 dei dils · sherem blong 7 dei moa blong free (14 dei)',
   },
   'checkout.savings_anchor_v2': {
     en: 'With __COUNT__ people, you\'ll save more than the cost of this pass (A$__PASS__) on your very first meal or tour!',

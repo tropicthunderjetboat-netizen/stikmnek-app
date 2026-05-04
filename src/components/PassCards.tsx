@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAppContext, defaultPassCartFromProfile } from '@/contexts/AppContext';
-import { t } from '@/data/translations';
+import { t, type Language } from '@/data/translations';
 import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
 import { Check, Zap, Crown, Star, CreditCard, Lock, ShieldCheck, Users, Baby, Calendar, Share2, Gift, Sparkles, Loader2, PartyPopper, Info } from 'lucide-react';
 
@@ -19,6 +19,24 @@ import {
 export interface PassCardsProps {
   /** Home layout: short CTA for signed-in buyers instead of the full marketing funnel. */
   embeddedOnHome?: boolean;
+}
+
+function toLanguage(lang: string): Language {
+  return lang === 'fr' ? 'fr' : lang === 'bi' ? 'bi' : 'en';
+}
+
+function bonusDaysPillText(lang: Language, days: number): string {
+  if (days === 7) return t('share.holiday_pill_days', lang);
+  return t('share.extra_days_pill_n', lang).replace('__N__', String(days));
+}
+
+function holidayShareBannerText(lang: Language, people: number, days: number): string {
+  if (people > 0 && days > 0) {
+    return t('share.holiday_banner_combo', lang).replace('__PEOPLE__', String(people));
+  }
+  if (people > 0) return t('share.holiday_banner_people_only', lang).replace('__PEOPLE__', String(people));
+  if (days === 7) return t('share.holiday_banner_days', lang);
+  return t('share.holiday_banner_days_n', lang).replace('__N__', String(days));
 }
 
 const KNOW_BEFORE_KEYS = ['pass.know_bullet_1', 'pass.know_bullet_2', 'pass.know_bullet_3', 'pass.know_bullet_4'] as const;
@@ -121,7 +139,7 @@ const CelebrationOverlay: React.FC<{ show: boolean; passName: string; bonusDays:
               {bonusDays > 0 && (
                 <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 text-emerald-800 font-bold text-sm animate-badge-pop" style={{ animationDelay: '0.3s' }}>
                   <Calendar className="w-4 h-4" />
-                  +{bonusDays} {language === 'en' ? 'free day' : language === 'fr' ? 'jour gratuit' : 'fri dei'}
+                  {bonusDaysPillText(toLanguage(language), bonusDays)}
                 </div>
               )}
               {bonusPeople > 0 && (
@@ -351,7 +369,7 @@ function buildPassShareContent(pass: PassConfig, language: ShareLang): { title: 
   if (language === 'fr') {
     const text =
       `Découvrez StikmNek — votre guide des réductions et bons plans au Vanuatu ! Restaurants, activités, commerces : avantages exclusifs pour les détenteurs de pass.\n\n` +
-      `Bonus de partage : partagez l'application avec vos proches pour débloquer GRATUITEMENT des places supplémentaires sur votre pass groupe et/ou un jour de réductions en plus. ` +
+      `Bonus de partage : partagez l’application avec vos proches pour débloquer GRATUITEMENT des places supplémentaires sur votre pass groupe et/ou 7 jours supplémentaires gratuits sur le pass vacances. ` +
       `Avec le ${name} : ${bonusDesc}\n\n` +
       `Ouvrir StikmNek : ${url}`;
     return {
@@ -365,7 +383,7 @@ function buildPassShareContent(pass: PassConfig, language: ShareLang): { title: 
   if (language === 'bi') {
     const text =
       `Lukim StikmNek — gaid blong diskaun mo gudfala prais long Vanuatu! Res, aktiviti, bisnis lokal: yu save kasem spesel save wetem pas.\n\n` +
-      `Bonus blong serem: serem app wetem ol pren blong yu blong anlokem fri moa man long grup pas mo o wan ekstra dei blong diskaun. ` +
+      `Bonus blong serem: serem app wetem ol pren blong yu blong anlokem fri moa man long grup pas mo o 7 dei moa blong free long holiday pas. ` +
       `Long ${name}: ${bonusDesc}\n\n` +
       `Op StikmNek: ${url}`;
     return {
@@ -378,7 +396,7 @@ function buildPassShareContent(pass: PassConfig, language: ShareLang): { title: 
 
   const text =
     `Check out StikmNek — your guide to discounts and deals across Vanuatu! Restaurants, activities, and local businesses offer exclusive savings for pass holders.\n\n` +
-    `Share Bonus: share the app with friends to unlock FREE extra people on your group pass and/or an extra day of discounts — at no extra cost. ` +
+    `Share Bonus: share the app with friends to unlock FREE extra people on your group pass and/or 7 extra days free on your Holiday Pass — at no extra cost. ` +
     `For the ${name}: ${bonusDesc}\n\n` +
     `Get the app: ${url}`;
 
@@ -1035,11 +1053,7 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
                       <div className="mb-5 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200">
                         <Gift className="w-4 h-4 text-amber-600 flex-shrink-0" />
                         <span className="text-sm font-bold text-amber-800">
-                          {bonus.extraPeople > 0 && bonus.extraDays > 0
-                            ? (language === 'en' ? `Share to get +${bonus.extraPeople} people FREE & +${bonus.extraDays} day!` : language === 'fr' ? `Partagez pour +${bonus.extraPeople} personnes gratuites et +${bonus.extraDays} jour !` : `Serem blong kasem +${bonus.extraPeople} man fri mo +${bonus.extraDays} dei!`)
-                            : bonus.extraPeople > 0
-                              ? (language === 'en' ? `Share to get +${bonus.extraPeople} people FREE!` : language === 'fr' ? `Partagez pour +${bonus.extraPeople} personnes gratuites !` : `Serem blong kasem +${bonus.extraPeople} man fri!`)
-                              : (language === 'en' ? `Share to get +${bonus.extraDays} free day!` : language === 'fr' ? `Partagez pour +${bonus.extraDays} jour gratuit !` : `Serem blong kasem +${bonus.extraDays} fri dei!`)}
+                          {holidayShareBannerText(passI18nLang, bonus.extraPeople, bonus.extraDays)}
                         </span>
                       </div>
                     )}
@@ -1084,7 +1098,7 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
                                   shared ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                                 }`}>
                                   <Calendar className="w-3 h-3" />
-                                  +{bonus.extraDays} {language === 'en' ? 'free day' : language === 'fr' ? 'jour gratuit' : 'fri dei'}
+                                  {bonusDaysPillText(passI18nLang, bonus.extraDays)}
                                 </span>
                               )}
                               {bonus.extraPeople > 0 && (
@@ -1104,6 +1118,11 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
                                 </span>
                               )}
                             </div>
+                            {!shared && hasBonusDays && (
+                              <p className="text-xs text-amber-900/90 leading-snug mt-2 font-medium">
+                                {t('share.holiday_card_subtext', passI18nLang)}
+                              </p>
+                            )}
                           </div>
                         </div>
                         {!shared && (

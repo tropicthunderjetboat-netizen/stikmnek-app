@@ -125,15 +125,15 @@ const DEFAULT_PASSES: PassConfig[] = [
       extraDays: 7,
       extraPeople: 0,
       extraKids: 0,
-      description: 'Share the app after purchase to unlock a 2nd week FREE (14 days total on Holiday Pass).',
-      descriptionFr: 'Partagez l’app après l’achat pour une 2e semaine GRATUITE (14 jours au total).',
-      descriptionBi: 'Serem app afta bai blong fri wik tu (14 dei long total).',
+      description: 'Share the app after purchase for 7 extra days free — 14 days of deals on your Holiday Pass.',
+      descriptionFr: 'Partagez l’app après l’achat pour 7 jours supplémentaires gratuits — 14 jours d’offres au total sur votre pass vacances.',
+      descriptionBi: 'Serem app afta bai blong 7 dei moa blong free — 14 dei long dils long Holiday Pas blong yu.',
     },
   },
 ];
 
 const STORAGE_KEY = 'stikmnek-pass-config';
-const CONFIG_VERSION = 9;
+const CONFIG_VERSION = 10;
 const VERSION_KEY = 'stikmnek-pass-config-version';
 
 function loadFromStorage(): PassConfig[] {

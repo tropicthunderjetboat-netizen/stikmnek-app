@@ -5,6 +5,7 @@ import type { PassProductId } from '@/data/passCatalog';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { t, type Language } from '@/data/translations';
 import { QrCode, Calendar, Shield, Ticket, Copy, Check, Share2, Loader2 } from 'lucide-react';
 
 function toDateOnly(v: unknown): string | null {
@@ -14,8 +15,13 @@ function toDateOnly(v: unknown): string | null {
   return m ? m[1] : null;
 }
 
+function toPassLang(language: string | undefined): Language {
+  return language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+}
+
 const QRCodeDisplay: React.FC = () => {
   const { user, language, refreshUserPass } = useAppContext();
+  const passLang = toPassLang(language);
   const [copied, setCopied] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   /** Fresh row from DB so QR + dates update after extend-pass even if context lags. */
@@ -133,7 +139,7 @@ const QRCodeDisplay: React.FC = () => {
       let shareSucceeded = false;
       const shareData = {
         title: 'StikmNek',
-        text: "You've purchased 7 days. Share now to unlock your 2nd week FREE (14 days total)!",
+        text: t('share.holiday_navigator_body', passLang),
         url: typeof window !== 'undefined' ? window.location.origin : '',
       };
       if (navigator.share) {
@@ -190,7 +196,7 @@ const QRCodeDisplay: React.FC = () => {
     } finally {
       setShareBusy(false);
     }
-  }, [user?.id, shareBusy, refreshUserPass]);
+  }, [user?.id, shareBusy, refreshUserPass, language]);
 
   const handleCopyCode = () => {
     if (qrPayload) {
@@ -280,7 +286,7 @@ const QRCodeDisplay: React.FC = () => {
                 <span className="block text-xs font-semibold text-teal-700 mt-0.5">
                   {displayPeriodDays} day{displayPeriodDays !== 1 ? 's' : ''}
                   {passMask.showFirstWeekOnly
-                    ? ' · Share below for 14 days total'
+                    ? t('share.qr_period_bonus_hint', passLang)
                     : shareApplied
                       ? ' · Share bonus included'
                       : ' total'}
@@ -292,9 +298,7 @@ const QRCodeDisplay: React.FC = () => {
           {passMask.isHolidayPass && passMask.showFirstWeekOnly && (
             <div className="p-3 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
               <p className="text-xs font-semibold text-amber-900 mb-2">
-                {language === 'fr'
-                  ? 'Partagez pour débloquer la 2e semaine gratuite (14 jours au total).'
-                  : "You've got 7 days of deals — share to unlock your 2nd week FREE."}
+                {t('share.qr_holiday_prompt', passLang)}
               </p>
               <button
                 type="button"
@@ -305,12 +309,12 @@ const QRCodeDisplay: React.FC = () => {
                 {shareBusy ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    {language === 'fr' ? 'Partage…' : 'Sharing…'}
+                    {language === 'fr' ? 'Partage…' : language === 'bi' ? 'Serem…' : 'Sharing…'}
                   </>
                 ) : (
                   <>
                     <Share2 className="w-4 h-4" />
-                    {language === 'fr' ? 'Partager et débloquer' : 'Share & unlock 2nd week'}
+                    {t('share.qr_unlock_button', passLang)}
                   </>
                 )}
               </button>
