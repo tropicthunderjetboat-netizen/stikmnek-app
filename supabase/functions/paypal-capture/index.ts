@@ -4,6 +4,9 @@
  * Captures a PayPal order and creates the pass in the database.
  * Requires: PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET in Supabase Edge Function secrets.
  * Optional: PAYPAL_MODE=sandbox (default) or live. (Also accepts PAYPAL_SANDBOX=true/false.)
+ *
+ * Debugging: Supabase Dashboard → Edge Functions → paypal-capture → Logs (this CLI may not expose `functions logs`).
+ * Verify secrets: PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_MODE (sandbox vs live).
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -206,6 +209,17 @@ Deno.serve(async (req) => {
 
     const mode = (Deno.env.get('PAYPAL_MODE') ?? Deno.env.get('PAYPAL_SANDBOX') ?? 'sandbox').toString().toLowerCase();
     const sandbox = mode !== 'live' && mode !== 'production' && mode !== 'false';
+    console.log('[paypal-capture] request', {
+      userId: user.id,
+      paypalOrderId: String(paypalOrderId).slice(0, 8) + '…',
+      partySize,
+      isExtended,
+      startDate,
+      expectedAmount,
+      paypalMode: sandbox ? 'sandbox' : 'live',
+      ts: new Date().toISOString(),
+    });
+
     const base = sandbox ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
     const accessToken = await getPayPalAccessToken(sandbox);
 
@@ -244,13 +258,27 @@ Deno.serve(async (req) => {
     const captureJson = (await captureRes.json().catch(() => ({}))) as Record<string, unknown>;
     const capturedAud = capturedAmountFromPayPalCapture(captureJson);
     if (capturedAud == null || Math.abs(capturedAud - expectedAmount) > 0.02) {
-      console.error('[paypal-capture] amount mismatch', { capturedAud, expectedAmount });
+      console.error('[paypal-capture] amount mismatch', {
+        capturedAud,
+        expectedAmount,
+        partySize,
+        isExtended,
+        paypalOrderId: String(paypalOrderId).slice(0, 12) + '…',
+      });
       return errorResponse('Captured PayPal amount does not match pass price. Order not completed.', 400, {
         reason: 'paypal_amount_mismatch',
         expectedAmount,
         capturedAud,
       });
     }
+
+    console.log('[paypal-capture] capture_ok', {
+      expectedAmount,
+      capturedAud,
+      partySize,
+      isExtended,
+      ts: new Date().toISOString(),
+    });
 
     const passTypeDb: DbPassType = 'dynamic';
     const amount = expectedAmount;

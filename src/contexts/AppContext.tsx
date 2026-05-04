@@ -14,6 +14,7 @@ import { errorLogger } from '@/lib/errorLogger';
 import type { ViewMode } from '@/utils/viewModes';
 import type { PassProductId } from '@/data/passCatalog';
 import { passProductIdFromDb } from '@/data/passCatalog';
+import { clampPartySize, MAX_PARTY_SIZE } from '@/data/pricing';
 
 export type { ViewMode };
 export type { PassProductId } from '@/data/passCatalog';
@@ -69,6 +70,10 @@ export interface UserProfile {
   post_pass_profile_completed?: boolean;
   /** If true, user has unlocked Share Bonus before buying a pass; consumed on purchase. */
   share_bonus_unlocked?: boolean;
+  /** Checkout default group size (1–6); column `user_profiles.party_size` (nullable). */
+  party_size?: number | null;
+  /** Checkout default pass length; column `user_profiles.preferred_pass_duration` enum. */
+  preferred_pass_duration?: 'short' | 'extended' | null;
   created_at: string;
   updated_at: string;
 }
@@ -97,6 +102,37 @@ export interface User {
 export interface CartItem {
   partySize: number;
   isExtended: boolean;
+}
+
+/** Initial checkout cart: profile / auth metadata, then adults+children (ages 6+), else 1 guest. */
+export function defaultPassCartFromProfile(
+  profile: UserProfile | null,
+  authMetadata?: Record<string, unknown> | null,
+): CartItem {
+  const metaExt =
+    profile?.preferred_pass_duration === 'extended' ||
+    authMetadata?.preferred_pass_duration === 'extended';
+  const isExtended = !!metaExt;
+
+  const rawMetaParty = authMetadata?.party_size ?? profile?.party_size;
+  const metaPartyN =
+    typeof rawMetaParty === 'number'
+      ? rawMetaParty
+      : typeof rawMetaParty === 'string'
+        ? parseInt(String(rawMetaParty), 10)
+        : NaN;
+  if (Number.isFinite(metaPartyN) && metaPartyN >= 1 && metaPartyN <= MAX_PARTY_SIZE) {
+    return { partySize: clampPartySize(metaPartyN), isExtended };
+  }
+
+  if (!profile) {
+    return { partySize: 1, isExtended };
+  }
+  const adults = profile.num_adults ?? 0;
+  const children = profile.num_children ?? 0;
+  const combined = adults + children;
+  const partySize = clampPartySize(combined > 0 ? combined : 1);
+  return { partySize, isExtended };
 }
 
 export interface DBReview {
@@ -1431,9 +1467,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast.info('You already have an active pass!');
       return;
     }
-    setCart({ partySize: 1, isExtended: false });
+    let authMeta: Record<string, unknown> | null = null;
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      authMeta = (authUser?.user_metadata ?? null) as Record<string, unknown> | null;
+    } catch {
+      authMeta = null;
+    }
+    setCart(defaultPassCartFromProfile(userProfile, authMeta));
     setCurrentView('checkout');
-  }, [user, setCurrentView]);
+  }, [user, userProfile, setCurrentView]);
 
   const refreshUserProfile = useCallback(async () => {
     if (!user?.id) return;

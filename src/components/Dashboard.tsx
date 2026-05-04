@@ -7,10 +7,11 @@ import { businesses as localBusinesses } from '@/data/businesses';
 import {
   Ticket, Heart, History, QrCode, Calendar, ChevronRight, Wifi,
   LayoutDashboard, TrendingUp, BarChart3,
-  MapPin, Star, Zap, Target, Clock, Flame,
+  MapPin, Star, Zap, Target, Clock, Flame, Sparkles,
 } from 'lucide-react';
 
 import QRCodeDisplay from './QRCodeDisplay';
+import ProfilePassPreferencesForm from '@/components/ProfilePassPreferencesForm';
 
 type DashboardTab = 'overview' | 'analytics';
 
@@ -312,6 +313,21 @@ const Dashboard: React.FC = () => {
                 )}
 
                 {/* Savings quick glance → analytics */}
+                {user.type === 'tourist' && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-5 border-b border-gray-100">
+                      <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-amber-500" />
+                        {t('dash.pass_prefs_title', language)}
+                      </h3>
+                    </div>
+                    <div className="p-5">
+                      <p className="text-xs text-muted-foreground mb-4">{t('dash.pass_prefs_sub', language)}</p>
+                      <ProfilePassPreferencesForm />
+                    </div>
+                  </div>
+                )}
+
                 {totalSaved > 0 && (
                   <button
                     type="button"

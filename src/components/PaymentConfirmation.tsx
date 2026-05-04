@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import {
@@ -17,7 +17,12 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import TouristProfileForm from '@/components/TouristProfileForm';
+import PostPurchasePassPreferencesDialog from '@/components/PostPurchasePassPreferencesDialog';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
+
+function passPrefsPromptStorageKey(receiptNumber: string): string {
+  return `pass_prefs_prompt_v1_${receiptNumber}`;
+}
 
 interface PaymentResult {
   receiptNumber: string;
@@ -612,6 +617,7 @@ const PaymentConfirmation: React.FC = () => {
   const { user, setCurrentView, language, userProfile, refreshUserProfile, refreshUserPass, authLoading } = useAppContext();
   const [payment, setPayment] = useState<PaymentResult | null>(null);
   const [showTouristProfileModal, setShowTouristProfileModal] = useState(false);
+  const [showPassPrefsDialog, setShowPassPrefsDialog] = useState(false);
   const [copied, setCopied] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -708,6 +714,39 @@ const PaymentConfirmation: React.FC = () => {
     const done = userProfile?.post_pass_profile_completed === true;
     setShowTouristProfileModal(!done);
   }, [payment, user?.id, user?.type, userProfile?.post_pass_profile_completed, authLoading]);
+
+  const dismissPassPrefsPrompt = useCallback(() => {
+    try {
+      if (payment?.receiptNumber) {
+        localStorage.setItem(passPrefsPromptStorageKey(payment.receiptNumber), '1');
+      }
+    } catch {
+      /* ignore */
+    }
+    setShowPassPrefsDialog(false);
+  }, [payment?.receiptNumber]);
+
+  // After tourist profile flow (or if already complete): offer to save pass defaults once per receipt
+  useEffect(() => {
+    if (!payment?.receiptNumber || !user?.id || authLoading) {
+      setShowPassPrefsDialog(false);
+      return;
+    }
+    if (user.type !== 'tourist') {
+      setShowPassPrefsDialog(false);
+      return;
+    }
+    if (showTouristProfileModal) {
+      setShowPassPrefsDialog(false);
+      return;
+    }
+    try {
+      if (localStorage.getItem(passPrefsPromptStorageKey(payment.receiptNumber))) return;
+    } catch {
+      return;
+    }
+    setShowPassPrefsDialog(true);
+  }, [payment?.receiptNumber, user?.id, user?.type, authLoading, showTouristProfileModal]);
 
   const handleShareBonusApplied = React.useCallback((bonus: ShareBonusApplied) => {
     setPayment((prev) => {
@@ -956,6 +995,23 @@ Enjoy your deals in Vanuatu!
           )}
         </DialogContent>
       </Dialog>
+
+      {user?.id ? (
+        <PostPurchasePassPreferencesDialog
+          open={showPassPrefsDialog}
+          onOpenChange={(next) => {
+            if (!next) dismissPassPrefsPrompt();
+            else setShowPassPrefsDialog(true);
+          }}
+          language={language}
+          userId={user.id}
+          partySize={payment.partySize ?? 1}
+          isExtended={Boolean(payment.isExtended)}
+          onSaved={async () => {
+            await refreshUserProfile();
+          }}
+        />
+      ) : null}
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
         {/* Success Animation */}
