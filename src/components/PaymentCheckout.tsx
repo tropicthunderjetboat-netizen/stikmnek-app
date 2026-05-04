@@ -114,6 +114,22 @@ async function getInvokeErrorBody(error: any): Promise<Record<string, unknown> |
   return null;
 }
 
+/** `FunctionsFetchError`: fetch threw before HTTP — unwrap TypeError / cause for debugging. */
+function describeFunctionsFetchFailure(error: unknown): string | null {
+  if (!error || typeof error !== 'object') return null;
+  const e = error as { name?: string; context?: unknown };
+  if (e.name !== 'FunctionsFetchError') return null;
+  const ctx = e.context;
+  if (ctx != null && typeof ctx === 'object') {
+    const c = ctx as { message?: string; cause?: { message?: string } };
+    if (typeof c.message === 'string' && c.message.trim()) return c.message.trim();
+    if (c.cause && typeof c.cause.message === 'string' && c.cause.message.trim()) {
+      return c.cause.message.trim();
+    }
+  }
+  return null;
+}
+
 // ═══ CARD FORMATTING HELPERS ═══
 function formatCardNumber(value: string): string {
   const digits = value.replace(/\D/g, '').substring(0, 16);
@@ -545,7 +561,10 @@ const PaymentCheckout: React.FC = () => {
         if (serverError) {
           throw new Error(serverError);
         }
-        const errMsg = error.message || 'Payment processing failed';
+        const fetchDetail = describeFunctionsFetchFailure(error);
+        const errMsg = fetchDetail
+          ? `${error.message || 'Payment processing failed'} (${fetchDetail})`
+          : error.message || 'Payment processing failed';
         if (errMsg.includes('non-2xx')) {
           if (status === 404) throw new Error('Payment server: "process-card-payment" not found. Deploy the Edge Function in Supabase.');
           if (status === 501) throw new Error('Card payment is temporarily unavailable. Please try again later.');
