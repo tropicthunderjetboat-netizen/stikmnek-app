@@ -313,6 +313,16 @@ Deno.serve(async (req) => {
 
     if (insertErr) {
       console.error('[paypal-capture] Insert passes error:', insertErr);
+      if (
+        typeof insertErr.message === 'string' &&
+        insertErr.message.includes('passes_pass_type_check')
+      ) {
+        return errorResponse(
+          'Pass could not be saved: database needs the latest pass type update. Apply Supabase migrations (pass_type dynamic), then contact support if this persists.',
+          500,
+          { reason: 'pass_type_constraint', postgresCode: insertErr.code ?? null },
+        );
+      }
       return errorResponse('Payment captured but failed to create pass: ' + insertErr.message, 500, {
         reason: 'pass_insert_failed',
         postgresCode: insertErr.code ?? null,

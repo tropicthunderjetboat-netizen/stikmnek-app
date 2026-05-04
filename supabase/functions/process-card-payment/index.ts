@@ -364,6 +364,23 @@ Deno.serve(async (req) => {
         .single();
 
       if (insertErr) {
+        if (
+          typeof insertErr.message === 'string' &&
+          insertErr.message.includes('passes_pass_type_check')
+        ) {
+          console.error(
+            'process-card-payment: passes.pass_type does not allow `dynamic`. Apply migration 20260505180000_ensure_passes_pass_type_dynamic (or 20260504120000_add_dynamic_pass_type).',
+          );
+          return errorResponse(
+            req,
+            'Pass could not be saved: database needs the latest pass type update. Please contact support or apply Supabase migrations, then retry.',
+            500,
+            {
+              reason: 'pass_type_constraint',
+              postgresCode: insertErr.code ?? null,
+            },
+          );
+        }
         // Unique violation: concurrent insert with same idempotency key — return existing row.
         if (insertErr.code === '23505' && rawTxnId) {
           const { data: racedPass } = await supabase

@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, Shield, Lock, Check, Loader2,
   ChevronRight, Calendar, CalendarRange, Info,
-  Users, CreditCard, AlertCircle, CheckCircle, Ticket,
+  Users, CreditCard, AlertCircle, CheckCircle, Ticket, Zap,
 } from 'lucide-react';
 
 import {
@@ -394,6 +394,48 @@ const PaymentCheckout: React.FC = () => {
 
   const tripNights = tripInclusiveDays != null ? Math.max(0, tripInclusiveDays - 1) : null;
 
+  const extendedCalendarDays = passInclusiveCalendarDays(true);
+
+  const coverageUi = useMemo(() => {
+    const cal = daysCount;
+    if (!isExtended) {
+      return {
+        periodBadge: t('checkout.period_badge_one_day', checkoutLang),
+        periodSub: null as string | null,
+        endHelper: t('checkout.end_date_helper_short', checkoutLang),
+        orderDealsLine: t('checkout.order_summary_deals_short', checkoutLang),
+        summaryPrimary: t('checkout.period_badge_one_day', checkoutLang),
+        summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+        paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+      };
+    }
+    const legal = t('checkout.period_legal_extended', checkoutLang).replace('__CAL__', String(cal));
+    if (tripNights != null && tripNights >= 1) {
+      const nightsBadge = t('checkout.period_badge_trip_nights', checkoutLang).replace(
+        '__NIGHTS__',
+        String(tripNights),
+      );
+      return {
+        periodBadge: nightsBadge,
+        periodSub: legal,
+        endHelper: t('checkout.end_date_helper_extended', checkoutLang).replace('__CAL__', String(cal)),
+        orderDealsLine: t('checkout.order_summary_deals_extended', checkoutLang).replace('__CAL__', String(cal)),
+        summaryPrimary: nightsBadge,
+        summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+        paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+      };
+    }
+    return {
+      periodBadge: t('checkout.period_badge_extended_generic', checkoutLang),
+      periodSub: legal,
+      endHelper: t('checkout.end_date_helper_extended', checkoutLang).replace('__CAL__', String(cal)),
+      orderDealsLine: t('checkout.order_summary_deals_extended', checkoutLang).replace('__CAL__', String(cal)),
+      summaryPrimary: t('checkout.period_badge_extended_generic', checkoutLang),
+      summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+      paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+    };
+  }, [isExtended, tripNights, daysCount, checkoutLang]);
+
   const profilePartySummary =
     userProfile != null
       ? t('checkout.profile_party_line', checkoutLang)
@@ -724,6 +766,10 @@ const PaymentCheckout: React.FC = () => {
                     </div>
                   )}
 
+                  <div className="pt-1">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">
+                      {t('checkout.section_pass_group', checkoutLang)}
+                    </h4>
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">People (ages 6+)</label>
                     <select
@@ -771,14 +817,17 @@ const PaymentCheckout: React.FC = () => {
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="text-sm font-bold text-gray-900">{t('checkout.option_extended_title', checkoutLang)}</p>
-                          {tripNights != null && tripNights >= 2 && (
+                          {tripNights != null && tripNights >= 1 && (
                             <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
                               {t('checkout.option_extended_badge', checkoutLang).replace('__NIGHTS__', String(tripNights))}
                             </span>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                          {t('checkout.option_extended_desc', checkoutLang)}
+                          {t('checkout.option_extended_desc', checkoutLang).replace(
+                            '__CAL__',
+                            String(extendedCalendarDays),
+                          )}
                         </p>
                         <p className="text-lg font-extrabold text-teal-700 mt-3">
                           A${priceExtendedOption.toFixed(2)}{' '}
@@ -825,7 +874,12 @@ const PaymentCheckout: React.FC = () => {
                     isExtended={isExtended}
                     language={checkoutLang}
                   />
+                  </div>
 
+                  <div className="border-t border-gray-100 pt-6 mt-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-4">
+                      {t('checkout.section_dates', checkoutLang)}
+                    </h4>
                   {/* Start Date Picker */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
@@ -867,44 +921,52 @@ const PaymentCheckout: React.FC = () => {
                       </div>
                     </div>
                     <p className="text-xs text-gray-400 mt-1.5">
-                      {isExtended
-                        ? `14-day pass: valid through the end date shown (inclusive).`
-                        : `24-hour pass: same calendar day start and end.`}
+                      {coverageUi.endHelper}
                     </p>
                   </div>
 
                   {/* Date Range Preview */}
-                  <div className="mt-2 p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
-                    <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider mb-3">Your Discount Period</p>
-                    <div className="flex items-center gap-3">
+                  <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
+                    <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider mb-3">Your discount window</p>
+                    <div className="flex flex-col sm:flex-row sm:items-stretch gap-4">
                       <div className="flex-1 bg-white rounded-lg p-3 border border-teal-200 shadow-sm">
                         <p className="text-[10px] text-gray-400 font-medium uppercase">Start</p>
                         <p className="text-sm font-bold text-gray-900 mt-0.5">{formatDate(startDate)}</p>
                       </div>
-                      <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
-                        <div className="px-3 py-1 rounded-full bg-teal-600 text-white text-[10px] font-bold shadow-sm">
-                          {daysCount} day{daysCount > 1 ? 's' : ''}
+                      <div className="flex sm:flex-col items-center justify-center gap-1 flex-shrink-0 px-2">
+                        <div className="px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold shadow-sm text-center leading-snug max-w-[11rem]">
+                          {coverageUi.periodBadge}
                         </div>
-                        <div className="w-8 h-0.5 bg-teal-300 rounded-full" />
+                        {coverageUi.periodSub && (
+                          <p className="text-[10px] text-teal-800/90 text-center leading-snug max-w-[12rem] mt-1 hidden sm:block">
+                            {coverageUi.periodSub}
+                          </p>
+                        )}
                       </div>
                       <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200 shadow-sm">
                         <p className="text-[10px] text-gray-400 font-medium uppercase">End</p>
                         <p className="text-sm font-bold text-gray-900 mt-0.5">{formatDate(endDate)}</p>
                       </div>
                     </div>
+                    {coverageUi.periodSub && (
+                      <p className="text-[10px] text-teal-800/90 text-center leading-snug mt-3 sm:hidden">
+                        {coverageUi.periodSub}
+                      </p>
+                    )}
 
                     {startDate === minStartDate && (
                       <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5" />
+                        <Zap className="w-3.5 h-3.5 flex-shrink-0" />
                         Starting on the earliest available day — discounts activate right after purchase.
                       </p>
                     )}
                     {startDate > minStartDate && (
                       <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5" />
+                        <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
                         Your discounts will activate on {formatDate(startDate)}.
                       </p>
                     )}
+                  </div>
                   </div>
                 </div>
 
@@ -935,14 +997,21 @@ const PaymentCheckout: React.FC = () => {
                 </div>
 
                 {/* Date summary bar */}
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-teal-50 border border-teal-100 text-sm">
-                  <CalendarRange className="w-4 h-4 text-teal-600 flex-shrink-0" />
-                  <span className="text-teal-800">
-                    <strong>{formatDate(startDate)}</strong>
-                    <span className="mx-2 text-teal-400">to</span>
-                    <strong>{formatDate(endDate)}</strong>
-                    <span className="text-teal-500 ml-2">({daysCount} day{daysCount > 1 ? 's' : ''})</span>
-                  </span>
+                <div className="flex gap-3 p-3 rounded-xl bg-teal-50 border border-teal-100 text-sm">
+                  <CalendarRange className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-teal-800 min-w-0">
+                    <p>
+                      <strong>{formatDate(startDate)}</strong>
+                      <span className="mx-2 text-teal-400">to</span>
+                      <strong>{formatDate(endDate)}</strong>
+                    </p>
+                    <p className="text-xs text-teal-700 mt-1 leading-snug">
+                      <span className="font-semibold">{coverageUi.periodBadge}</span>
+                      {coverageUi.paymentBarSecondary ? (
+                        <span className="text-teal-600"> · {coverageUi.paymentBarSecondary}</span>
+                      ) : null}
+                    </p>
+                  </div>
                 </div>
 
                 <CheckoutPricingSummary
@@ -1259,8 +1328,8 @@ const PaymentCheckout: React.FC = () => {
                         {groupLabel}
                       </span>
                     </div>
-                    <p className="text-sm text-white/70 mt-2">
-                      {daysCount} calendar day{daysCount > 1 ? 's' : ''} of unlimited deals
+                    <p className="text-sm text-white/80 mt-2 leading-snug">
+                      {coverageUi.orderDealsLine}
                     </p>
                   </div>
                 </div>
@@ -1280,9 +1349,14 @@ const PaymentCheckout: React.FC = () => {
                       <span className="text-gray-500">Valid Until</span>
                       <span className="font-bold text-gray-900">{endDate ? formatDate(endDate) : '—'}</span>
                     </div>
-                    <div className="flex items-center justify-between text-xs pt-1 border-t border-teal-100">
-                      <span className="text-gray-500">Duration</span>
-                      <span className="font-bold text-teal-700">{daysCount} day{daysCount > 1 ? 's' : ''}</span>
+                    <div className="pt-1 border-t border-teal-100 space-y-0.5">
+                      <div className="flex items-center justify-between text-xs gap-2">
+                        <span className="text-gray-500 shrink-0">{t('checkout.summary_duration_label', checkoutLang)}</span>
+                        <span className="font-bold text-teal-700 text-right leading-snug">{coverageUi.summaryPrimary}</span>
+                      </div>
+                      {coverageUi.summarySecondary && (
+                        <p className="text-[10px] text-gray-500 text-right leading-snug">{coverageUi.summarySecondary}</p>
+                      )}
                     </div>
                   </div>
                 </div>
