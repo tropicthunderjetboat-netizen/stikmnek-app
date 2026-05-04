@@ -16,7 +16,10 @@ import {
   addCalendarDaysIso,
   clampPartySize,
   MAX_PARTY_SIZE,
+  EXTEND_FEE_AUD,
 } from '@/data/pricing';
+import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
+import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
 import CheckoutPricingSummary from '@/components/CheckoutPricingSummary';
 import { t } from '@/data/translations';
 import type { Language } from '@/data/translations';
@@ -258,6 +261,8 @@ const PaymentCheckout: React.FC = () => {
   const cvvRef = useRef<HTMLInputElement>(null);
   /** Previous `cart.partySize` for oversize → capped sync (keep warning visible after cap). */
   const prevCartPartySizeRef = useRef<number | null>(null);
+  /** One-time merge of demographics + trip length into cart when profile loads (reduces re-typing). */
+  const profileCheckoutSyncedRef = useRef(false);
 
   /**
    * Stable idempotency key for pass purchase retries (same cart pass type).
@@ -299,6 +304,44 @@ const PaymentCheckout: React.FC = () => {
     }
   };
 
+  const handleDurationChange = (nextExtended: boolean) => {
+    setIsExtended(nextExtended);
+    if (cart) setCart({ ...cart, partySize, isExtended: nextExtended });
+  };
+
+  useEffect(() => {
+    if (!cart || !userProfile || profileCheckoutSyncedRef.current) return;
+
+    let nextParty = cart.partySize;
+    let nextExtended = cart.isExtended;
+
+    const hasExplicitPartySize =
+      userProfile.party_size != null &&
+      Number.isFinite(Number(userProfile.party_size)) &&
+      Number(userProfile.party_size) >= 1;
+
+    if (!hasExplicitPartySize) {
+      const adults = userProfile.num_adults ?? 0;
+      const children = userProfile.num_children ?? 0;
+      const suggested = clampPartySize(Math.max(1, adults + children));
+      if (suggested > nextParty) nextParty = suggested;
+    }
+
+    if (userProfile.preferred_pass_duration !== 'short' && inferIsExtendedPassFromTripDates(userProfile)) {
+      nextExtended = true;
+    }
+
+    if (nextParty === cart.partySize && nextExtended === cart.isExtended) {
+      profileCheckoutSyncedRef.current = true;
+      return;
+    }
+
+    profileCheckoutSyncedRef.current = true;
+    setPartySize(nextParty);
+    setIsExtended(nextExtended);
+    setCart({ ...cart, partySize: nextParty, isExtended: nextExtended });
+  }, [cart, userProfile, setCart]);
+
   useEffect(() => {
     if (!cart) return;
     const raw = Number(cart.partySize);
@@ -321,8 +364,28 @@ const PaymentCheckout: React.FC = () => {
 
   const passLabel = 'StikmNek Pass';
   const priceAud = useMemo(() => calculatePassPrice(partySize, isExtended), [partySize, isExtended]);
+  const priceShortOption = useMemo(() => calculatePassPrice(partySize, false), [partySize]);
+  const priceExtendedOption = useMemo(() => calculatePassPrice(partySize, true), [partySize]);
   const daysCount = passInclusiveCalendarDays(isExtended);
   const groupLabel = `Up to ${partySize} people (ages 6+)`;
+
+  const tripInclusiveDays = useMemo(() => {
+    const a = normalizeDateOnly(userProfile?.expected_arrival_date);
+    const d = normalizeDateOnly(userProfile?.expected_departure_date);
+    if (!a || !d) return null;
+    return inclusiveCalendarDaysBetween(a, d);
+  }, [userProfile?.expected_arrival_date, userProfile?.expected_departure_date]);
+
+  const tripNights = tripInclusiveDays != null ? Math.max(0, tripInclusiveDays - 1) : null;
+
+  const profilePartySummary =
+    userProfile != null
+      ? t('checkout.profile_party_line', checkoutLang)
+          .replace('__ADULTS__', String(userProfile.num_adults ?? 0))
+          .replace('__CHILDREN__', String(userProfile.num_children ?? 0))
+          .replace('__INFANTS__', String(userProfile.num_infants ?? 0))
+          .replace('__PARTY__', String(partySize))
+      : null;
 
   const endDate = useMemo(() => {
     if (!startDate) return '';
@@ -334,8 +397,15 @@ const PaymentCheckout: React.FC = () => {
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+    const iso = dateStr.slice(0, 10);
+    const d = new Date(`${iso}T12:00:00Z`);
+    return d.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
   };
 
   if (!user) return null;
@@ -622,51 +692,82 @@ const PaymentCheckout: React.FC = () => {
                     <Info className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-teal-800">
                       <p className="font-semibold mb-1">How it works</p>
-                      <p className="text-teal-700">
-                        Choose how many people (ages 6+) are covered, pick <strong>24-Hour</strong> or <strong>14-Day</strong> access, then your start date.
-                        Your <strong>{passLabel}</strong> will be valid for <strong>{daysCount} calendar day{daysCount > 1 ? 's' : ''}</strong> for <strong>{groupLabel}</strong>.
-                        Children under 6 may travel with you for free (not counted toward this limit).
-                      </p>
+                      <p className="text-teal-700">{t('checkout.how_it_works_compact', checkoutLang)}</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">People (ages 6+)</label>
-                      <select
-                        value={partySize}
-                        onChange={(e) => handlePartySizeChange(Number(e.target.value))}
-                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                      >
-                        {[1, 2, 3, 4, 5, 6].map((n) => (
-                          <option key={n} value={n}>
-                            {n} {n === 1 ? 'person' : 'people'}
-                          </option>
-                        ))}
-                      </select>
+                  {profilePartySummary && (
+                    <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wide text-teal-700 mb-1.5">
+                        {t('checkout.profile_party_title', checkoutLang)}
+                      </p>
+                      <p className="text-sm text-gray-700 leading-relaxed">{profilePartySummary}</p>
                     </div>
-                    <div>
-                      <span className="block text-sm font-semibold text-gray-700 mb-2">Pass duration</span>
-                      <div className="flex rounded-xl border-2 border-gray-200 overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => setIsExtended(false)}
-                          className={`flex-1 py-3 text-sm font-semibold transition-colors ${
-                            !isExtended ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-                          }`}
-                        >
-                          24-Hour
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsExtended(true)}
-                          className={`flex-1 py-3 text-sm font-semibold transition-colors ${
-                            isExtended ? 'bg-teal-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-                          }`}
-                        >
-                          14-Day
-                        </button>
-                      </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">People (ages 6+)</label>
+                    <select
+                      value={partySize}
+                      onChange={(e) => handlePartySizeChange(Number(e.target.value))}
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    >
+                      {[1, 2, 3, 4, 5, 6].map((n) => (
+                        <option key={n} value={n}>
+                          {n} {n === 1 ? 'person' : 'people'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <span className="block text-sm font-semibold text-gray-700 mb-2">Pass duration</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(false)}
+                        className={`text-left rounded-xl border-2 p-4 transition-all ${
+                          !isExtended
+                            ? 'border-teal-600 bg-teal-50/80 ring-1 ring-teal-200 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-teal-200'
+                        }`}
+                      >
+                        <p className="text-sm font-bold text-gray-900">{t('checkout.option_day_title', checkoutLang)}</p>
+                        <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                          {t('checkout.option_day_desc', checkoutLang)}
+                        </p>
+                        <p className="text-lg font-extrabold text-teal-700 mt-3">
+                          A${priceShortOption.toFixed(2)}{' '}
+                          <span className="text-xs font-semibold text-gray-500">{t('checkout.option_total', checkoutLang)}</span>
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(true)}
+                        className={`text-left rounded-xl border-2 p-4 transition-all ${
+                          isExtended
+                            ? 'border-teal-600 bg-teal-50/80 ring-1 ring-teal-200 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-teal-200'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-bold text-gray-900">{t('checkout.option_extended_title', checkoutLang)}</p>
+                          {tripNights != null && tripNights >= 2 && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                              {t('checkout.option_extended_badge', checkoutLang).replace('__NIGHTS__', String(tripNights))}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                          {t('checkout.option_extended_desc', checkoutLang)}
+                        </p>
+                        <p className="text-lg font-extrabold text-teal-700 mt-3">
+                          A${priceExtendedOption.toFixed(2)}{' '}
+                          <span className="text-xs font-normal text-gray-500">
+                            (+A${EXTEND_FEE_AUD.toFixed(0)} vs 1-day)
+                          </span>
+                        </p>
+                      </button>
                     </div>
                   </div>
 
@@ -1154,15 +1255,11 @@ const PaymentCheckout: React.FC = () => {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-500">Valid From</span>
-                      <span className="font-bold text-gray-900">
-                        {new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
+                      <span className="font-bold text-gray-900">{formatDate(startDate)}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-500">Valid Until</span>
-                      <span className="font-bold text-gray-900">
-                        {endDate && new Date(endDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
+                      <span className="font-bold text-gray-900">{endDate ? formatDate(endDate) : '—'}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs pt-1 border-t border-teal-100">
                       <span className="text-gray-500">Duration</span>

@@ -44,10 +44,14 @@ export function validUntilDayOffset(isExtended: boolean): number {
   return passInclusiveCalendarDays(isExtended) - 1;
 }
 
+/** Calendar add in UTC so YYYY-MM-DD does not shift a day in positive-offset timezones. */
 export function addCalendarDaysIso(startDateIso: string, dayOffset: number): string {
-  const d = new Date(startDateIso + 'T00:00:00');
-  d.setDate(d.getDate() + dayOffset);
-  return d.toISOString().split('T')[0];
+  const raw = String(startDateIso ?? '').slice(0, 10);
+  const parts = raw.split('-').map((s) => Number(s, 10));
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return raw;
+  const [y, m, d] = parts;
+  const ms = Date.UTC(y, m - 1, d + dayOffset);
+  return new Date(ms).toISOString().slice(0, 10);
 }
 
 export function getPassDisplayTitle(
