@@ -767,16 +767,14 @@ const PassCards: React.FC = () => {
               <Users className="w-4 h-4" />
               {language === 'en' ? 'Tourist Pass' : language === 'fr' ? 'Pass touriste' : 'Turis Pas'}
             </div>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-3">
-              {t('pass.title', language)}
-            </h2>
-            <p className="text-gray-500 max-w-lg mx-auto text-lg">
-              {language === 'en'
-                ? 'Choose the perfect pass for your group. Share the app to unlock bonus features!'
-                : language === 'fr'
-                  ? 'Choisissez le pass parfait pour votre groupe. Partagez l\'app pour débloquer des bonus !'
-                  : 'Jusem pas we i stret blong grup blong yu. Serem app blong anlokem bonus!'}
-            </p>
+            <div className="text-center mb-6">
+              <h2 className="text-2xl md:text-3xl font-black text-gray-900">
+                {t('passSelection.title', language)}
+              </h2>
+              <p className="text-sm text-gray-600 mt-2 max-w-lg mx-auto leading-relaxed">
+                {t('passSelection.subtitle', language)}
+              </p>
+            </div>
           </div>
 
           {tripGuidance && (

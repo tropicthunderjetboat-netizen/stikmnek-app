@@ -81,7 +81,7 @@ const DealsPricingCard: React.FC<Props> = ({ language }) => {
         <p className="text-sm text-gray-600 mt-2">{copy.subtitle}</p>
         <p className="text-xs text-gray-500 mt-2 max-w-md mx-auto leading-relaxed">
           {language === 'en'
-            ? `Party size is up to ${MAX_PARTY_SIZE} people ages 6+. Choose 24-hour or 14-day coverage at checkout.`
+            ? `Party size is up to ${MAX_PARTY_SIZE} people ages 6+. Pick 24-hour or 14-day coverage at checkout.`
             : language === 'fr'
               ? `Jusqu'à ${MAX_PARTY_SIZE} personnes (6 ans et +). Choisissez 24 h ou 14 jours au paiement.`
               : `Antap long ${MAX_PARTY_SIZE} man (6+). Jusum 24 owa o 14 dei long checkout.`}

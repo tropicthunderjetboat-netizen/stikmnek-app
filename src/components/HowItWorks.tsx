@@ -1,15 +1,18 @@
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import { t } from '@/data/translations';
+import type { Language } from '@/data/translations';
 import { Ticket, QrCode, MapPin, Smile } from 'lucide-react';
 
 const HowItWorks: React.FC = () => {
   const { language, setCurrentView } = useAppContext();
+  const lang: Language = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
 
   const steps = [
     {
       icon: <Ticket className="w-7 h-7" />,
-      title: language === 'en' ? 'Get Your Pass' : language === 'fr' ? 'Obtenez votre pass' : 'Karem Pas Blong Yu',
-      desc: language === 'en' ? 'Choose a Family Explorer, Group Adventure, or Crew Experience pass for your group' : language === 'fr' ? 'Choisissez un pass Explorateur Familial, Aventure Groupe ou Expérience Équipe pour votre groupe' : 'Jusem Famili Eksplora, Grup Advenija, o Kru Eksperiens pas blong grup blong yu',
+      title: t('passSelection.title', lang),
+      desc: t('pass.build_how_desc', lang),
 
       color: 'from-sky-500 to-blue-600',
       shadow: 'shadow-sky-200',

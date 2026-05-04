@@ -36,8 +36,67 @@ export const translations: Record<string, Record<Language, string>> = {
   'cat.accommodation': { en: 'Accommodation', fr: 'Hébergement', bi: 'Ples blong slip' },
   
   // Passes
-  'pass.title': { en: 'Choose Your Pass', fr: 'Choisissez votre pass', bi: 'Jusem Pas Blong Yu' },
-  'pass.subtitle': { en: 'Unlock exclusive deals across Vanuatu', fr: 'Débloquez des offres exclusives à travers le Vanuatu', bi: 'Openem ekslusiv dils long Vanuatu' },
+  'pass.title': { en: 'Build your Pass', fr: 'Construisez votre pass', bi: 'Mekem Pasem' },
+  'pass.subtitle': {
+    en: 'Customize your adventure with flexible pricing',
+    fr: 'Personnalisez votre aventure avec une tarification flexible',
+    bi: 'Kostomem yor travel long fleksibel pricing',
+  },
+  'passSelection.title': { en: 'Build your Pass', fr: 'Construisez votre pass', bi: 'Mekem Pasem' },
+  'passSelection.subtitle': {
+    en: 'Customize your adventure with flexible pricing',
+    fr: 'Personnalisez votre aventure avec une tarification flexible',
+    bi: 'Kostomem yor travel long fleksibel pricing',
+  },
+  'pass.build_how_desc': {
+    en: 'On Passes, set your group (ages 6+, up to 6), pick 24-hour or 14-day coverage, and checkout—your total updates instantly.',
+    fr: 'Dans Passes, définissez votre groupe (6 ans et +, jusqu’à 6), choisissez 24 h ou 14 jours, puis payez — le total se met à jour instantanément.',
+    bi: 'Long Pas, setem grup (6+, kasem 6), jusum 24 owa o 14 dei, mo pei — total i apdet stretwe.',
+  },
+
+  // Checkout (pricing summary + conversion)
+  'checkout.breakdown_title': { en: 'Price breakdown', fr: 'Détail du prix', bi: 'Prais brekdaon' },
+  'checkout.base_pass_row': {
+    en: 'Base pass (1st person ages 6+)',
+    fr: 'Pass de base (1re personne, 6 ans et +)',
+    bi: 'Bes pas (fes man 6+)',
+  },
+  'checkout.extra_guests_row': {
+    en: 'Additional guests (__COUNT__ × A$__FEE__)',
+    fr: 'Invités supplémentaires (__COUNT__ × __FEE__ $ AUD)',
+    bi: 'Narafala man (__COUNT__ × A$__FEE__)',
+  },
+  'checkout.extension_row': {
+    en: '14-day pass option',
+    fr: 'Option pass 14 jours',
+    bi: 'Opsen pas 14 dei',
+  },
+  'checkout.total_row': { en: 'Total', fr: 'Total', bi: 'Total' },
+  'checkout.potential_savings': {
+    en: '💰 Potential savings: about A$__AMOUNT__+ on meals & tours — this pass can pay for itself.',
+    fr: '💰 Économies potentielles : environ __AMOUNT__ $ AUD+ sur repas et visites — ce pass peut se rentabiliser.',
+    bi: '💰 Saving we i save: kasem A$__AMOUNT__+ long kakae mo tua — dis pas i save pei bake.',
+  },
+  'checkout.savings_before_one': {
+    en: 'With 1 person, you could save over ',
+    fr: 'Avec 1 personne, vous pourriez économiser plus de ',
+    bi: 'Wet wan man, yu save kasem ',
+  },
+  'checkout.savings_before_many': {
+    en: 'With __COUNT__ people, you could save over ',
+    fr: 'Avec __COUNT__ personnes, vous pourriez économiser plus de ',
+    bi: 'Wet __COUNT__ man, yu save kasem ',
+  },
+  'checkout.savings_after_amount': {
+    en: ' on a single meal or tour',
+    fr: ' sur un repas ou une visite',
+    bi: ' long wan kakae o wan tua',
+  },
+  'checkout.savings_subline': {
+    en: 'This pass pays for itself immediately!',
+    fr: 'Ce pass se rentabilise immédiatement !',
+    bi: 'Dis pas i pei bake stret!',
+  },
   'pass.family_explorer': { en: 'Family Explorer Pass', fr: 'Pass Explorateur Familial', bi: 'Famili Eksplora Pas' },
   'pass.extended_group_adventure': { en: 'Extended Group Adventure Pass', fr: 'Pass Aventure Groupe Étendu', bi: 'Grup Advenija Pas' },
   'pass.ultimate_crew_experience': { en: 'Ultimate Crew Experience Pass', fr: 'Pass Expérience Ultime Équipe', bi: 'Ultimet Kru Eksperiens Pas' },

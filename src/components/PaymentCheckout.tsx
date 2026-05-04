@@ -16,6 +16,9 @@ import {
   clampPartySize,
   MAX_PARTY_SIZE,
 } from '@/data/pricing';
+import CheckoutPricingSummary from '@/components/CheckoutPricingSummary';
+import { t } from '@/data/translations';
+import type { Language } from '@/data/translations';
 
 /** Local calendar YYYY-MM-DD */
 function dateOnlyLocal(d = new Date()): string {
@@ -184,7 +187,9 @@ const CardBrandIcon: React.FC<{ brand: string; className?: string }> = ({ brand,
 };
 
 const PaymentCheckout: React.FC = () => {
-  const { user, userProfile, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass } = useAppContext();
+  const { user, userProfile, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass, language } =
+    useAppContext();
+  const checkoutLang: Language = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
   const [processing, setProcessing] = useState(false);
   const [step, setStep] = useState<'dates' | 'payment' | 'processing' | 'success'>('dates');
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -691,11 +696,11 @@ const PaymentCheckout: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100">
-                    <p className="text-sm font-bold text-emerald-900">
-                      Total: A${priceAud.toFixed(2)} AUD
-                    </p>
-                  </div>
+                  <CheckoutPricingSummary
+                    partySize={partySize}
+                    isExtended={isExtended}
+                    language={checkoutLang}
+                  />
 
                   {/* Start Date Picker */}
                   <div>
@@ -815,6 +820,13 @@ const PaymentCheckout: React.FC = () => {
                     <span className="text-teal-500 ml-2">({daysCount} day{daysCount > 1 ? 's' : ''})</span>
                   </span>
                 </div>
+
+                <CheckoutPricingSummary
+                  partySize={partySize}
+                  isExtended={isExtended}
+                  language={checkoutLang}
+                  showSavingsCallout={false}
+                />
 
                 {/* Payment Error */}
                 {paymentError && (
@@ -1004,12 +1016,14 @@ const PaymentCheckout: React.FC = () => {
                       </span>
                       <div>
                         <p className="text-base sm:text-lg font-semibold text-gray-900 leading-snug">
-                          With {partySize} {partySize === 1 ? 'person' : 'people'}, you could save over
-                          <span className="text-blue-700 font-bold"> ${savingsAnchorAmount}</span> on a single meal or tour
+                          {(partySize === 1
+                            ? t('checkout.savings_before_one', checkoutLang)
+                            : t('checkout.savings_before_many', checkoutLang).replace('__COUNT__', String(partySize))
+                          ).trimEnd()}
+                          <span className="text-blue-700 font-bold">A${savingsAnchorAmount}</span>
+                          {t('checkout.savings_after_amount', checkoutLang)}
                         </p>
-                        <p className="text-sm text-gray-700 mt-1">
-                          This pass pays for itself immediately!
-                        </p>
+                        <p className="text-sm text-gray-700 mt-1">{t('checkout.savings_subline', checkoutLang)}</p>
                       </div>
                     </div>
                   </div>
@@ -1153,24 +1167,14 @@ const PaymentCheckout: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Price Breakdown */}
-                <div className="space-y-3 mb-5">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">{passLabel}</span>
-                    <span className="font-medium text-gray-900">A${priceAud.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Processing fee</span>
-                    <span className="font-medium text-gray-900">A$0.00</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Tax</span>
-                    <span className="font-medium text-gray-900">A$0.00</span>
-                  </div>
-                  <div className="border-t border-gray-100 pt-3 flex justify-between">
-                    <span className="font-bold text-gray-900">Total</span>
-                    <span className="text-xl font-extrabold text-gray-900">A${priceAud.toFixed(2)} <span className="text-sm font-semibold text-gray-500">AUD</span></span>
-                  </div>
+                <div className="mb-5">
+                  <CheckoutPricingSummary
+                    partySize={partySize}
+                    isExtended={isExtended}
+                    language={checkoutLang}
+                    variant="sidebar"
+                    showSavingsCallout={step !== 'payment'}
+                  />
                 </div>
 
                 {/* Payment Method Indicator */}

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import { t } from '@/data/translations';
 import { BASE_PRICE_AUD, EXTEND_FEE_AUD, GUEST_FEE_AUD, MAX_PARTY_SIZE, calculatePassPrice } from '@/data/pricing';
 import {
   HelpCircle, Book, Store, Shield, Users, ChevronDown, ChevronRight,
@@ -41,6 +42,8 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
     return `StikmNek Pass from $${minP} to $${maxP} AUD (1–${MAX_PARTY_SIZE} people ages 6+, 24-hour or 14-day)`;
   }, []);
 
+  const helpLang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+
   const howItWorksSteps = useMemo(() => {
     const min = BASE_PRICE_AUD;
     const max = calculatePassPrice(MAX_PARTY_SIZE, true);
@@ -48,14 +51,14 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       { step: '1', title: 'Create an Account', desc: 'Sign up as a tourist or business owner' },
       {
         step: '2',
-        title: 'Choose Your Pass',
+        title: t('passSelection.title', helpLang),
         desc: `Open Passes, set people (ages 6+, up to ${MAX_PARTY_SIZE}), choose 24-hour or 14-day access, pick a start date, and pay (from $${min} AUD; +$${GUEST_FEE_AUD} per extra person; +$${EXTEND_FEE_AUD} for 14-day). PayPal or card where enabled.`,
       },
       { step: '3', title: 'Browse Deals', desc: 'Explore dining, tours, activities, spa, shopping, and accommodation on Deals and Map' },
       { step: '4', title: 'Show Your QR Code', desc: 'Present your pass QR code at a partner business; staff scan it in StikmNek' },
       { step: '5', title: 'Save Money', desc: 'Discounts follow each listing (deal price vs standard price)' },
     ];
-  }, []);
+  }, [helpLang]);
 
   const touristFAQ: FAQItem[] = useMemo(
     () => [
