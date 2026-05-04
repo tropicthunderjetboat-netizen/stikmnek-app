@@ -137,6 +137,13 @@ export const translations: Record<string, Record<Language, string>> = {
     fr: 'Pour les très grands groupes ou longs séjours, un pass peut ne pas suffire — contactez le support ou plusieurs pass.',
     bi: 'Long bigfala grup o lon taem, wan pas i no save stret — askem support o tingbaot moa pas.',
   },
+  'passFlow.checkout_preview': {
+    en: 'Checkout will open for up to {party} people · {duration} pass (you can change before paying).',
+    fr: 'Le paiement s’ouvrira pour jusqu’à {party} personnes · pass {duration} (modifiable avant paiement).',
+    bi: 'Checkout bae open blong kasem {party} pipol · pas {duration} (yu ken senis bifo pem).',
+  },
+  'passFlow.duration_short': { en: '1-day', fr: '1 jour', bi: 'wan-dei' },
+  'passFlow.duration_extended': { en: '14-day', fr: '14 jours', bi: '14-dei' },
 
   // Business
   'biz.featured': { en: 'Featured Deals', fr: 'Offres en vedette', bi: 'Fitjad Dils' },

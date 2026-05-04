@@ -15,6 +15,7 @@ import type { ViewMode } from '@/utils/viewModes';
 import type { PassProductId } from '@/data/passCatalog';
 import { passProductIdFromDb } from '@/data/passCatalog';
 import { clampPartySize, MAX_PARTY_SIZE } from '@/data/pricing';
+import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
 
 export type { ViewMode };
 export type { PassProductId } from '@/data/passCatalog';
@@ -109,10 +110,16 @@ export function defaultPassCartFromProfile(
   profile: UserProfile | null,
   authMetadata?: Record<string, unknown> | null,
 ): CartItem {
-  const metaExt =
-    profile?.preferred_pass_duration === 'extended' ||
-    authMetadata?.preferred_pass_duration === 'extended';
-  const isExtended = !!metaExt;
+  const authDur = String(authMetadata?.preferred_pass_duration ?? '').toLowerCase();
+  const authExt = authDur === 'extended';
+  const authShort = authDur === 'short';
+  const profExt = profile?.preferred_pass_duration === 'extended';
+  const profShort = profile?.preferred_pass_duration === 'short';
+
+  let isExtended = false;
+  if (authExt || profExt) isExtended = true;
+  else if (authShort || profShort) isExtended = false;
+  else isExtended = inferIsExtendedPassFromTripDates(profile);
 
   const rawMetaParty = authMetadata?.party_size ?? profile?.party_size;
   const metaPartyN =

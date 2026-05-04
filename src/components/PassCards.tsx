@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
-import { useAppContext } from '@/contexts/AppContext';
+import { useAppContext, defaultPassCartFromProfile } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { Check, Zap, Crown, Star, CreditCard, Lock, ShieldCheck, Users, Baby, Calendar, Share2, Gift, Sparkles, Loader2, PartyPopper, Info } from 'lucide-react';
 
@@ -398,6 +398,12 @@ const PassCards: React.FC = () => {
     if (!userProfile) return null;
     return getPassTripGuidance(userProfile);
   }, [userProfile]);
+
+  /** Cart defaults when opening checkout (registration + saved prefs + trip dates). */
+  const checkoutPreview = useMemo(() => {
+    if (!user?.id || !userProfile) return null;
+    return defaultPassCartFromProfile(userProfile, null);
+  }, [user?.id, userProfile]);
 
   const passI18nLang: 'en' | 'fr' | 'bi' = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
 
@@ -1049,6 +1055,19 @@ const PassCards: React.FC = () => {
                           </a>
                         )}
                       </div>
+                    )}
+
+                    {checkoutPreview && (checkoutPreview.partySize > 1 || checkoutPreview.isExtended) && (
+                      <p className="text-xs text-teal-800 bg-teal-50/90 border border-teal-100 rounded-xl px-3 py-2.5 mb-3 leading-snug">
+                        {t('passFlow.checkout_preview', language)
+                          .replace('{party}', String(checkoutPreview.partySize))
+                          .replace(
+                            '{duration}',
+                            checkoutPreview.isExtended
+                              ? t('passFlow.duration_extended', language)
+                              : t('passFlow.duration_short', language),
+                          )}
+                      </p>
                     )}
 
                     <button
