@@ -255,7 +255,13 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim();
-    const serviceKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
+    // Dashboard secret bug workaround:
+    // Some projects cannot edit/delete reserved `SUPABASE_*` secrets in the Dashboard.
+    // Prefer a non-reserved secret name for the service role key:
+    //   APP_SUPABASE_SERVICE_ROLE_KEY = <project service role key>
+    const serviceKey =
+      (Deno.env.get('APP_SUPABASE_SERVICE_ROLE_KEY') ?? '').trim() ||
+      (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
     // Dashboard secret bug workaround:
     // Some projects cannot edit/delete reserved `SUPABASE_*` secrets in the Dashboard.
     // Prefer a non-reserved secret name for the anon key (used ONLY to validate caller JWT):

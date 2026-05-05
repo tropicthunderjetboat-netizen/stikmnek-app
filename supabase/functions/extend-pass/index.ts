@@ -91,8 +91,14 @@ Deno.serve(async (req) => {
       return errorResponse('Missing Authorization header', 401);
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim();
+    // Dashboard secret bug workaround:
+    // Some projects cannot edit/delete reserved `SUPABASE_*` secrets in the Dashboard.
+    // Prefer a non-reserved secret name for the service role key:
+    //   APP_SUPABASE_SERVICE_ROLE_KEY = <project service role key>
+    const serviceKey =
+      (Deno.env.get('APP_SUPABASE_SERVICE_ROLE_KEY') ?? '').trim() ||
+      (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
     if (!supabaseUrl) {
       console.error('[extend-pass] SUPABASE_URL is missing');
       return errorResponse('Server configuration error: missing Supabase URL', 500);
