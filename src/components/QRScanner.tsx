@@ -262,6 +262,43 @@ function mergeVerifyInvokeParsed(
   return null;
 }
 
+/** One string so minified builds + ErrorLogger show full payload (objects alone print as "Object"). */
+function stringifyVerifyRedemptionClientDebug(
+  phase: string,
+  error: unknown,
+  invokeData: unknown,
+  parsed: InvokeErrorPayload | null,
+  httpStatus: number | null,
+): string {
+  const err = error as { name?: string; message?: string };
+  let dataSnippet: string | null = null;
+  try {
+    if (invokeData == null) dataSnippet = 'null';
+    else if (typeof invokeData === 'string') dataSnippet = invokeData.slice(0, 400);
+    else dataSnippet = JSON.stringify(invokeData).slice(0, 800);
+  } catch {
+    dataSnippet = 'unserializable-data';
+  }
+  let parsedSnippet: string | null = null;
+  try {
+    parsedSnippet = parsed ? JSON.stringify(parsed).slice(0, 800) : 'null';
+  } catch {
+    parsedSnippet = 'unserializable-parsed';
+  }
+  try {
+    return JSON.stringify({
+      phase,
+      httpStatus,
+      sdkErrorName: err?.name ?? null,
+      sdkErrorMessage: err?.message ?? null,
+      invokeDataSnippet: dataSnippet,
+      parsedSnippet,
+    });
+  } catch {
+    return JSON.stringify({ phase, httpStatus, note: 'stringify_verify_debug_failed' });
+  }
+}
+
 /** Parse JSON body from supabase.functions.invoke FunctionsHttpError (context Response or message). */
 async function extractFunctionsInvokeErrorBody(
   error: unknown,
@@ -495,13 +532,10 @@ const QRScanner: React.FC<QRScannerProps> = ({
         postgresCode: parsed?.postgresCode ?? null,
         uid8: user?.id ? user.id.slice(0, 8) : null,
       });
-      console.error('[QRScanner] verify_and_redeem failed', {
-        httpStatus,
-        error: parsed?.error,
-        errorCode: parsed?.errorCode,
-        reason: parsed?.reason,
-        profileError: parsed?.profileError,
-      });
+      console.error(
+        '[QRScanner] verify_and_redeem failed',
+        stringifyVerifyRedemptionClientDebug('verify_and_redeem', error, data, parsed, httpStatus),
+      );
       const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
       if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
       else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 400));
@@ -704,13 +738,10 @@ const QRScanner: React.FC<QRScannerProps> = ({
             postgresCode: parsed?.postgresCode ?? null,
             uid8: user?.id ? user.id.slice(0, 8) : null,
           });
-          console.error('[QRScanner] check_voucher_validity failed', {
-            httpStatus,
-            error: parsed?.error,
-            errorCode: parsed?.errorCode,
-            reason: parsed?.reason,
-            profileError: parsed?.profileError,
-          });
+          console.error(
+            '[QRScanner] check_voucher_validity failed',
+            stringifyVerifyRedemptionClientDebug('check_voucher_validity', error, data, parsed, httpStatus),
+          );
           const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
           if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
           else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 400));
@@ -749,13 +780,10 @@ const QRScanner: React.FC<QRScannerProps> = ({
             postgresCode: parsed?.postgresCode ?? null,
             uid8: user?.id ? user.id.slice(0, 8) : null,
           });
-          console.error('[QRScanner] redeem flow validity check failed', {
-            httpStatus,
-            error: parsed?.error,
-            errorCode: parsed?.errorCode,
-            reason: parsed?.reason,
-            profileError: parsed?.profileError,
-          });
+          console.error(
+            '[QRScanner] redeem flow validity check failed',
+            stringifyVerifyRedemptionClientDebug('redeem_flow_check_voucher_validity', error, data, parsed, httpStatus),
+          );
           const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
           if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
           else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 400));

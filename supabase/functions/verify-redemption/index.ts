@@ -325,28 +325,55 @@ Deno.serve(async (req) => {
     // NOTE: Do not use `.maybeSingle()` here — if duplicate `user_profiles` rows exist for the same
     // `user_id`, PostgREST returns PGRST116 and `profileErr` is set, which previously surfaced as a
     // misleading HTTP 403 `scanner_role` even when a valid business row exists.
-    const { data: profileRows, error: profileErr } = await supabase
-      .from('user_profiles')
-      .select('role, user_type')
-      .eq('user_id', scannerUser.id)
-      .limit(5);
+    let profileRows: { role?: unknown; user_type?: unknown }[] | null = null;
+    let profileErr: { message?: string; code?: string; details?: string; hint?: string } | null = null;
+
+    {
+      const r1 = await supabase
+        .from('user_profiles')
+        .select('role, user_type')
+        .eq('user_id', scannerUser.id)
+        .limit(5);
+      profileRows = r1.data as typeof profileRows;
+      profileErr = r1.error as typeof profileErr;
+    }
 
     if (profileErr) {
-      const pe = profileErr as { message?: string; code?: string; details?: string; hint?: string };
+      const pe = profileErr;
+      const code = String(pe?.code ?? '');
+      const msg = String(pe?.message ?? '').toLowerCase();
+      // Prod DBs that predate migration `20260403120000_user_profiles_name_full_name_user_type.sql`
+      // do not have `user_type` — PostgREST returns 42703 / "column ... does not exist".
+      const missingUserTypeColumn =
+        code === '42703' || (msg.includes('user_type') && msg.includes('does not exist'));
+      if (missingUserTypeColumn) {
+        console.warn('[verify-redemption] user_profiles.user_type missing — retrying role-only select');
+        const r2 = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('user_id', scannerUser.id)
+          .limit(5);
+        profileRows = r2.data as typeof profileRows;
+        profileErr = r2.error as typeof profileErr;
+      }
+    }
+
+    if (profileErr) {
+      const pe = profileErr;
       console.error(
         '[verify-redemption] scanner profile query failed',
         JSON.stringify({
-          code: pe.code ?? null,
-          message: pe.message ?? null,
-          details: pe.details ?? null,
-          hint: pe.hint ?? null,
+          code: pe?.code ?? null,
+          message: pe?.message ?? null,
+          details: pe?.details ?? null,
+          hint: pe?.hint ?? null,
         }),
       );
       return errorResponse('Scanner profile lookup failed', 500, {
         reason: 'scanner_profile_query_failed',
-        profileError: pe.message ?? null,
-        postgresCode: pe.code ?? null,
-        postgresMessage: pe.details ?? pe.message ?? null,
+        profileError: pe?.message ?? null,
+        postgresCode: pe?.code ?? null,
+        postgresMessage: pe?.details ?? pe?.message ?? null,
       });
     }
 
