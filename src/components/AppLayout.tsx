@@ -61,6 +61,21 @@ const TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
   'business-guide',
 ];
 
+/**
+ * Business partners without a `businesses` row yet may leave the setup form and browse
+ * the site; we only force `complete-business-profile` when they open the hub or other gated views.
+ */
+const BUSINESS_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
+  'home',
+  'deals',
+  'map',
+  'passes',
+  'business-detail',
+  'help',
+  'faq',
+  'business-guide',
+];
+
 function legalSlugFromPath(pathname: string): string | null {
   const m = pathname.match(/^\/legal\/([^/]+)\/?$/);
   return m ? decodeURIComponent(m[1]) : null;
@@ -173,7 +188,11 @@ const AppLayout: React.FC = () => {
     // Unknown row status: wait for a definitive true/false (do not hard-redirect to profile setup).
     if (businessOwnerHasBusinessRow === null) return;
 
-    if (businessOwnerHasBusinessRow === false && currentView !== 'complete-business-profile') {
+    if (
+      businessOwnerHasBusinessRow === false &&
+      currentView !== 'complete-business-profile' &&
+      !BUSINESS_BROWSE_VIEWS_WHILE_INCOMPLETE.includes(currentView)
+    ) {
       setCurrentView('complete-business-profile');
     }
   }, [
