@@ -332,10 +332,21 @@ Deno.serve(async (req) => {
       .limit(5);
 
     if (profileErr) {
-      console.error('[verify-redemption] scanner profile query failed:', profileErr);
+      const pe = profileErr as { message?: string; code?: string; details?: string; hint?: string };
+      console.error(
+        '[verify-redemption] scanner profile query failed',
+        JSON.stringify({
+          code: pe.code ?? null,
+          message: pe.message ?? null,
+          details: pe.details ?? null,
+          hint: pe.hint ?? null,
+        }),
+      );
       return errorResponse('Scanner profile lookup failed', 500, {
         reason: 'scanner_profile_query_failed',
-        profileError: profileErr.message ?? null,
+        profileError: pe.message ?? null,
+        postgresCode: pe.code ?? null,
+        postgresMessage: pe.details ?? pe.message ?? null,
       });
     }
 

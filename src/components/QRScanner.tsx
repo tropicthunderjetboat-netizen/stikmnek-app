@@ -194,6 +194,19 @@ function resolveVerifyRedemptionBackendError(
   return undefined;
 }
 
+type InvokeErrorPayload = {
+  success?: boolean;
+  error?: string;
+  errorCode?: number;
+  reason?: string;
+  postgresCode?: string | null;
+  postgresMessage?: string | null;
+  profileError?: string | null;
+  profileRole?: unknown;
+  profileUserType?: unknown;
+  duplicateProfileRows?: number | null;
+};
+
 /** Human-readable line for Edge Function failures (includes HTTP + errorCode from JSON when present). */
 function formatVerifyInvokeFailure(
   backendMsg: string | undefined,
@@ -205,17 +218,49 @@ function formatVerifyInvokeFailure(
   const code = parsed?.errorCode ?? (httpStatus ?? undefined);
   if (code != null) parts.push(`HTTP ${code}`);
   if (parsed?.reason) parts.push(`reason: ${parsed.reason}`);
+  if (typeof parsed?.postgresMessage === 'string' && parsed.postgresMessage.trim()) {
+    parts.push(`pg: ${parsed.postgresMessage.trim().slice(0, 160)}`);
+  }
+  if (typeof parsed?.profileError === 'string' && parsed.profileError.trim()) {
+    parts.push(`detail: ${parsed.profileError.trim().slice(0, 200)}`);
+  }
+  if (parsed?.reason === 'scanner_profile_query_failed' || parsed?.reason === 'scanner_role') {
+    if (parsed.profileRole != null) parts.push(`roleCol: ${String(parsed.profileRole)}`);
+    if (parsed.profileUserType != null) parts.push(`userTypeCol: ${String(parsed.profileUserType)}`);
+    if (parsed.duplicateProfileRows != null) parts.push(`dupRows: ${String(parsed.duplicateProfileRows)}`);
+  }
   return parts.length > 0 ? parts.join(' — ') : 'Edge Function request failed';
 }
 
-type InvokeErrorPayload = {
-  success?: boolean;
-  error?: string;
-  errorCode?: number;
-  reason?: string;
-  postgresCode?: string | null;
-  postgresMessage?: string | null;
-};
+// #region agent log
+/** Debug NDJSON ingest (desktop dev only reaches localhost; mobile silently no-ops). */
+function agentLogVerifyRedemption(hypothesisId: string, data: Record<string, unknown>): void {
+  fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'bf845b' },
+    body: JSON.stringify({
+      sessionId: 'bf845b',
+      hypothesisId,
+      location: 'QRScanner.tsx',
+      message: 'verify-redemption invoke failure',
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+}
+// #endregion
+
+function mergeVerifyInvokeParsed(
+  parsed: InvokeErrorPayload | null,
+  invokeData: unknown,
+): InvokeErrorPayload | null {
+  if (parsed) return parsed;
+  if (invokeData && typeof invokeData === 'object' && invokeData !== null) {
+    const o = invokeData as Record<string, unknown>;
+    if (typeof o.error === 'string' || typeof o.reason === 'string') return o as InvokeErrorPayload;
+  }
+  return null;
+}
 
 /** Parse JSON body from supabase.functions.invoke FunctionsHttpError (context Response or message). */
 async function extractFunctionsInvokeErrorBody(
@@ -437,17 +482,29 @@ const QRScanner: React.FC<QRScannerProps> = ({
       },
     });
     if (error) {
-      const parsed = await extractFunctionsInvokeErrorBody(error);
+      const parsedRaw = await extractFunctionsInvokeErrorBody(error);
+      const parsed = mergeVerifyInvokeParsed(parsedRaw, data);
       const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
       const httpStatus = getFunctionsInvokeHttpStatus(error);
+      agentLogVerifyRedemption('H1', {
+        phase: 'verify_and_redeem',
+        httpStatus,
+        reason: parsed?.reason ?? null,
+        fnError: parsed?.error ?? null,
+        profileError: parsed?.profileError ?? null,
+        postgresCode: parsed?.postgresCode ?? null,
+        uid8: user?.id ? user.id.slice(0, 8) : null,
+      });
       console.error('[QRScanner] verify_and_redeem failed', {
         httpStatus,
         error: parsed?.error,
         errorCode: parsed?.errorCode,
+        reason: parsed?.reason,
+        profileError: parsed?.profileError,
       });
       const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
       if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
-      else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280));
+      else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 400));
       setResult({
         success: false,
         error: invalidQr
@@ -634,17 +691,29 @@ const QRScanner: React.FC<QRScannerProps> = ({
           },
         });
         if (error) {
-          const parsed = await extractFunctionsInvokeErrorBody(error);
+          const parsedRaw = await extractFunctionsInvokeErrorBody(error);
+          const parsed = mergeVerifyInvokeParsed(parsedRaw, data);
           const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
           const httpStatus = getFunctionsInvokeHttpStatus(error);
+          agentLogVerifyRedemption('H1', {
+            phase: 'check_voucher_validity',
+            httpStatus,
+            reason: parsed?.reason ?? null,
+            fnError: parsed?.error ?? null,
+            profileError: parsed?.profileError ?? null,
+            postgresCode: parsed?.postgresCode ?? null,
+            uid8: user?.id ? user.id.slice(0, 8) : null,
+          });
           console.error('[QRScanner] check_voucher_validity failed', {
             httpStatus,
             error: parsed?.error,
             errorCode: parsed?.errorCode,
+            reason: parsed?.reason,
+            profileError: parsed?.profileError,
           });
           const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
           if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
-          else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280));
+          else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 400));
           setValidityResult({
             success: false,
             error: invalidQr
@@ -667,17 +736,29 @@ const QRScanner: React.FC<QRScannerProps> = ({
           },
         });
         if (error) {
-          const parsed = await extractFunctionsInvokeErrorBody(error);
+          const parsedRaw = await extractFunctionsInvokeErrorBody(error);
+          const parsed = mergeVerifyInvokeParsed(parsedRaw, data);
           const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
           const httpStatus = getFunctionsInvokeHttpStatus(error);
+          agentLogVerifyRedemption('H1', {
+            phase: 'redeem_flow_check_voucher_validity',
+            httpStatus,
+            reason: parsed?.reason ?? null,
+            fnError: parsed?.error ?? null,
+            profileError: parsed?.profileError ?? null,
+            postgresCode: parsed?.postgresCode ?? null,
+            uid8: user?.id ? user.id.slice(0, 8) : null,
+          });
           console.error('[QRScanner] redeem flow validity check failed', {
             httpStatus,
             error: parsed?.error,
             errorCode: parsed?.errorCode,
+            reason: parsed?.reason,
+            profileError: parsed?.profileError,
           });
           const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
           if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
-          else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280));
+          else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 400));
           setResult({
             success: false,
             error: invalidQr
