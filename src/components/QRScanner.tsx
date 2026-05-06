@@ -507,12 +507,17 @@ const QRScanner: React.FC<QRScannerProps> = ({
   ) => {
     const discountLine = formatOfferDiscountLine(listing);
     const preview = computeRedemptionSavingsForListing(listing, party);
+    const offeringIdForServer =
+      listing.id && listing.profileBusinessId && listing.id !== listing.profileBusinessId
+        ? listing.id
+        : undefined;
     const { data, error } = await supabase.functions.invoke('verify-redemption', {
       body: {
         action: 'verify_and_redeem',
         qrData: rawData,
         businessId: listing.profileBusinessId,
         businessName: listing.name,
+        ...(offeringIdForServer ? { offeringId: offeringIdForServer } : {}),
         discount: discountLine,
         discountLabel: discountLine,
         savedAmount: preview.savedAmount,

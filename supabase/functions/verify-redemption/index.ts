@@ -153,10 +153,10 @@ function computeTieredBookingTotals(
 
   if (usable.length === 1) {
     const t = usable[0];
-    const pax = a + ch + inf;
+    const payingPax = Math.max(1, a + ch);
     return {
-      totalStandard: pax * t.original_price_vt,
-      totalDeal: pax * t.deal_price_vt,
+      totalStandard: payingPax * t.original_price_vt,
+      totalDeal: payingPax * t.deal_price_vt,
     };
   }
 
@@ -169,7 +169,16 @@ function computeTieredBookingTotals(
 
   const tAdult = pick((l) => /adult|13\+|adulte|senior|grown/.test(l), 0);
   const tChild = pick((l) => /child|kid|enfant|pikinini|minor|2-12|5-12|6-12|7-12|school/.test(l), 1);
-  const tInfant = pick((l) => /infant|baby|b[eé]b[eé]|0-4|0–4|toddler|smol/.test(l), 2);
+  const infantTier = usable.find((t) =>
+    /infant|baby|b[eé]b[eé]|0-4|0–4|toddler|smol/.test(low(t.label)),
+  );
+  const tInfant: PricingTierInput = infantTier ?? {
+    label: '',
+    min_pax: 0,
+    max_pax: null,
+    original_price_vt: 0,
+    deal_price_vt: 0,
+  };
 
   return {
     totalStandard:
@@ -711,8 +720,28 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Prefer per-listing pricing from `business_offerings` when the client sends a UUID
+      // (QR flow); legacy rows redeem against profile `businesses` only.
+      const rawOfferingId = (body as Record<string, unknown>)?.offeringId ??
+        (body as Record<string, unknown>)?.offering_id;
+      const offeringIdCandidate =
+        typeof rawOfferingId === 'string' ? rawOfferingId.trim() : '';
+      let pricingRow: { pricing_tiers: unknown; original_price: unknown; deal_price: unknown } = bizRow;
+      let resolvedOfferingId: string | null = null;
+      if (offeringIdCandidate && PASS_ID_UUID_RE.test(offeringIdCandidate)) {
+        const { data: offRow, error: offErr } = await supabase
+          .from('business_offerings')
+          .select('id, business_id, pricing_tiers, original_price, deal_price')
+          .eq('id', offeringIdCandidate)
+          .maybeSingle();
+        if (!offErr && offRow && String((offRow as { business_id?: string }).business_id ?? '') === String(businessId)) {
+          pricingRow = offRow as typeof pricingRow;
+          resolvedOfferingId = String((offRow as { id?: string }).id ?? offeringIdCandidate);
+        }
+      }
+
       // Server-authoritative savings (ignore client savedAmount to prevent tampering)
-      const computed = computeRedemptionSavings(bizRow, party);
+      const computed = computeRedemptionSavings(pricingRow, party);
       const savedAmount = computed.savedAmount;
 
       const insertRow: Record<string, unknown> = {
@@ -721,6 +750,7 @@ Deno.serve(async (req) => {
         pass_id: pass.id,
         saved_amount: savedAmount,
       };
+      if (resolvedOfferingId) insertRow.offering_id = resolvedOfferingId;
       if (discount_label) insertRow.discount_label = discount_label;
 
       const { data: redemption, error: redErr } = await supabase

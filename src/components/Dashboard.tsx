@@ -5,6 +5,7 @@ import type { PassProductId } from '@/data/passCatalog';
 import { t } from '@/data/translations';
 import { businesses as localBusinesses } from '@/data/businesses';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
@@ -39,7 +40,7 @@ const Dashboard: React.FC = () => {
     const categoryBreakdown: Record<string, { count: number; saved: number }> = {};
 
     redemptions.forEach(r => {
-      const biz = allBusinesses.find(b => b.id === r.businessId);
+      const biz = allBusinesses.find((b) => profileBusinessIdFor(b) === r.businessId);
       if (biz) {
         if (!categoryBreakdown[biz.category]) {
           categoryBreakdown[biz.category] = { count: 0, saved: 0 };
@@ -62,7 +63,10 @@ const Dashboard: React.FC = () => {
     const topBusinesses = Object.entries(bizVisitCount)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
-      .map(([id, count]) => ({ business: allBusinesses.find(b => b.id === id), count }));
+      .map(([id, count]) => ({
+        business: allBusinesses.find((b) => profileBusinessIdFor(b) === id),
+        count,
+      }));
 
     // Streak calculation
     const dates = [...new Set(redemptions.map(r => r.date))].sort().reverse();
@@ -421,7 +425,7 @@ const Dashboard: React.FC = () => {
                   {redemptions.length > 0 ? (
                     <div className="divide-y divide-gray-100">
                       {redemptions.slice(0, 5).map((r, i) => {
-                        const biz = allBusinesses.find(b => b.id === r.businessId);
+                        const biz = allBusinesses.find((b) => profileBusinessIdFor(b) === r.businessId);
                         if (!biz) return null;
                         return (
                           <div key={i} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors cursor-pointer"

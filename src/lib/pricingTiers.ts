@@ -154,8 +154,8 @@ export function pricingTiersEqual(a: PricingTierInput[], b: PricingTierInput[]):
 
 /**
  * Booking inquiry totals from tier rows × Adults / Children / Infants.
- * Single tier: all guests use that per-person price.
- * Multiple tiers: match row labels (adult / child / infant keywords) or fall back by index.
+ * Single tier: per-person rate applies to adults + children only (infants free unless a dedicated infant tier exists in multi-tier mode).
+ * Multiple tiers: match adult / child labels; infants bill only when a row matches infant keywords (otherwise 0 VT).
  */
 export function computeTieredBookingTotals(
   tiers: PricingTierInput[],
@@ -171,10 +171,10 @@ export function computeTieredBookingTotals(
 
   if (usable.length === 1) {
     const t = usable[0];
-    const pax = a + ch + inf;
+    const payingPax = Math.max(1, a + ch);
     return {
-      totalStandard: pax * t.original_price_vt,
-      totalDeal: pax * t.deal_price_vt,
+      totalStandard: payingPax * t.original_price_vt,
+      totalDeal: payingPax * t.deal_price_vt,
     };
   }
 
@@ -187,7 +187,16 @@ export function computeTieredBookingTotals(
 
   const tAdult = pick((l) => /adult|13\+|adulte|senior|grown/.test(l), 0);
   const tChild = pick((l) => /child|kid|enfant|pikinini|minor|2-12|5-12|6-12|7-12|school/.test(l), 1);
-  const tInfant = pick((l) => /infant|baby|b[eé]b[eé]|0-4|0–4|toddler|smol/.test(l), 2);
+  const infantTier = usable.find((t) =>
+    /infant|baby|b[eé]b[eé]|0-4|0–4|toddler|smol/.test(low(t.label)),
+  );
+  const tInfant: PricingTierInput = infantTier ?? {
+    label: '',
+    min_pax: 0,
+    max_pax: null,
+    original_price_vt: 0,
+    deal_price_vt: 0,
+  };
 
   return {
     totalStandard:
