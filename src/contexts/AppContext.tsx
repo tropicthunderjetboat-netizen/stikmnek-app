@@ -98,6 +98,10 @@ export interface User {
   shareBonusUnlocked?: boolean | null;
   /** Super Star review credits (purchased, decremented on use). */
   superstarCredits?: number;
+  /** From active `passes.amount_paid` (typically AUD). */
+  passAmountPaidAud?: number | null;
+  /** From active `passes.currency` (e.g. AUD). */
+  passCurrency?: string | null;
 }
 
 export interface CartItem {
@@ -289,7 +293,7 @@ interface AppContextType {
   setSearchQuery: (q: string) => void;
   selectedCategory: string;
   setSelectedCategory: (cat: string) => void;
-  redemptions: { businessId: string; date: string; saved: number }[];
+  redemptions: { businessId: string; date: string; saved: number; offeringId: string | null }[];
   dbBusinesses: Business[];
   dbReviews: DBReview[];
   submitReview: (businessId: string, rating: number, comment: string, isSuperStar?: boolean) => Promise<void>;
@@ -356,7 +360,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [showQR, setShowQR] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [redemptions, setRedemptions] = useState<{ businessId: string; date: string; saved: number }[]>([]);
+  const [redemptions, setRedemptions] = useState<
+    { businessId: string; date: string; saved: number; offeringId: string | null }[]
+  >([]);
   const [dbBusinesses, setDbBusinesses] = useState<Business[]>([]);
   const [dbReviews, setDbReviews] = useState<DBReview[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -575,6 +581,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const peopleCount = pass.max_people ?? pass.people_count ?? null;
           const shareBonusApplied = pass.share_bonus_applied ?? false;
           // Only update if we have the same user — never clear user (prev can be null if race with setUser)
+          const paid = Number(pass.amount_paid);
+          const amountPaidAud = Number.isFinite(paid) && paid > 0 ? paid : null;
+          const cur = pass.currency != null ? String(pass.currency).trim().toUpperCase() : '';
           setUser(prev => {
             if (!prev || prev.id !== userId) return prev;
             return {
@@ -586,6 +595,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               passValidUntil: validUntil,
               passPeopleCount: peopleCount,
               shareBonusApplied,
+              passAmountPaidAud: amountPaidAud,
+              passCurrency: cur || 'AUD',
             };
           });
         }
@@ -599,16 +610,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data, error } = await supabase
         .from('redemptions')
-        .select('*')
+        .select('business_id, redeemed_at, saved_amount, offering_id')
         .eq('user_id', userId)
         .order('redeemed_at', { ascending: false });
       if (error) throw error;
       if (data) {
-        setRedemptions(data.map((r: any) => ({
-          businessId: r.business_id,
-          date: new Date(r.redeemed_at).toISOString().split('T')[0],
-          saved: Number(r.saved_amount) || 0,
-        })));
+        setRedemptions(
+          data.map((r: any) => ({
+            businessId: r.business_id,
+            date: new Date(r.redeemed_at).toISOString().split('T')[0],
+            saved: Number(r.saved_amount) || 0,
+            offeringId: r.offering_id != null ? String(r.offering_id) : null,
+          })),
+        );
       }
     } catch (err) {
       console.error('Failed to load redemptions:', err);
