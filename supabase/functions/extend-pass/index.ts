@@ -92,19 +92,17 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim();
-    // Dashboard secret bug workaround:
-    // Some projects cannot edit/delete reserved `SUPABASE_*` secrets in the Dashboard.
-    // Prefer a non-reserved secret name for the service role key:
-    //   APP_SUPABASE_SERVICE_ROLE_KEY = <project service role key>
+    // Prefer auto-injected `SUPABASE_SERVICE_ROLE_KEY`; `APP_SUPABASE_SERVICE_ROLE_KEY` only as fallback
+    // (see verify-redemption — APP_* must not override a valid reserved secret).
     const serviceKey =
-      (Deno.env.get('APP_SUPABASE_SERVICE_ROLE_KEY') ?? '').trim() ||
-      (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
+      (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim() ||
+      (Deno.env.get('APP_SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
     if (!supabaseUrl) {
       console.error('[extend-pass] SUPABASE_URL is missing');
       return errorResponse('Server configuration error: missing Supabase URL', 500);
     }
     if (!serviceKey) {
-      console.error('[extend-pass] SUPABASE_SERVICE_ROLE_KEY is missing');
+      console.error('[extend-pass] missing SUPABASE_SERVICE_ROLE_KEY (or APP_SUPABASE_SERVICE_ROLE_KEY fallback)');
       return errorResponse('Server configuration error: missing service role key', 500);
     }
     const supabase = createClient(supabaseUrl, serviceKey);

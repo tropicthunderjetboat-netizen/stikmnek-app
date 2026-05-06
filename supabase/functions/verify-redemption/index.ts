@@ -269,13 +269,14 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim();
-    // Dashboard secret bug workaround:
-    // Some projects cannot edit/delete reserved `SUPABASE_*` secrets in the Dashboard.
-    // Prefer a non-reserved secret name for the service role key:
-    //   APP_SUPABASE_SERVICE_ROLE_KEY = <project service role key>
+    // Service role key resolution:
+    // - Supabase auto-injects `SUPABASE_SERVICE_ROLE_KEY` at runtime — prefer it first so a mistaken
+    //   `APP_SUPABASE_SERVICE_ROLE_KEY` (e.g. anon key pasted) cannot override the correct key.
+    // - `APP_SUPABASE_SERVICE_ROLE_KEY` is only a fallback for rare Dashboard cases where the reserved
+    //   secret cannot be fixed and you must supply the service_role JWT manually under another name.
     const serviceKey =
-      (Deno.env.get('APP_SUPABASE_SERVICE_ROLE_KEY') ?? '').trim() ||
-      (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
+      (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim() ||
+      (Deno.env.get('APP_SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
     // Dashboard secret bug workaround:
     // Some projects cannot edit/delete reserved `SUPABASE_*` secrets in the Dashboard.
     // Prefer a non-reserved secret name for the anon key (used ONLY to validate caller JWT):
@@ -287,7 +288,7 @@ Deno.serve(async (req) => {
       (Deno.env.get('SUPABASE_ANON_KEY_PUBLIC') ?? '').trim();
     if (!supabaseUrl || !serviceKey) {
       console.error(
-        '[verify-redemption] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY — cannot read public.passes',
+        '[verify-redemption] Missing SUPABASE_URL or service role key (SUPABASE_SERVICE_ROLE_KEY / APP_SUPABASE_SERVICE_ROLE_KEY) — cannot read public.passes',
       );
       return errorResponse('Server configuration error', 500, {
         reason: 'missing_supabase_secrets',
@@ -360,6 +361,21 @@ Deno.serve(async (req) => {
 
     if (profileErr) {
       const pe = profileErr;
+      const msgFull = String(pe?.message ?? '');
+      const msgLower = msgFull.toLowerCase();
+      // Runtime-confirmed failure mode: PostgREST returns "Invalid API key" when the Edge Function
+      // `createClient(SUPABASE_URL, serviceKey)` uses a wrong/non-service key (common secret typo).
+      if (msgLower.includes('invalid api key') || msgLower.includes('invalid jwt')) {
+        console.error('[verify-redemption] DB client rejected API key (check Edge secrets)', msgFull);
+        return errorResponse(
+          'Edge Function service role key rejected by Supabase (Invalid API key). Prefer the auto-injected SUPABASE_SERVICE_ROLE_KEY; remove a wrong APP_SUPABASE_SERVICE_ROLE_KEY secret if set, or set APP_SUPABASE_SERVICE_ROLE_KEY to the real service_role JWT from Project Settings → API (same project as SUPABASE_URL).',
+          500,
+          {
+            reason: 'invalid_edge_service_role_key',
+            profileError: msgFull,
+          },
+        );
+      }
       console.error(
         '[verify-redemption] scanner profile query failed',
         JSON.stringify({

@@ -224,6 +224,9 @@ function formatVerifyInvokeFailure(
   if (typeof parsed?.profileError === 'string' && parsed.profileError.trim()) {
     parts.push(`detail: ${parsed.profileError.trim().slice(0, 200)}`);
   }
+  if (parsed?.reason === 'invalid_edge_service_role_key') {
+    parts.push('Fix: remove wrong APP_SUPABASE_SERVICE_ROLE_KEY or set it to service_role; reserved SUPABASE_SERVICE_ROLE_KEY is used first');
+  }
   if (parsed?.reason === 'scanner_profile_query_failed' || parsed?.reason === 'scanner_role') {
     if (parsed.profileRole != null) parts.push(`roleCol: ${String(parsed.profileRole)}`);
     if (parsed.profileUserType != null) parts.push(`userTypeCol: ${String(parsed.profileUserType)}`);
