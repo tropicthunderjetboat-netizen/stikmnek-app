@@ -41,6 +41,20 @@ function parsePassIdFromQrData(rawQr: string): string | null {
   return null;
 }
 
+/**
+ * AppContext treats `user_profiles.user_type` as the source of truth when it disagrees with `role`.
+ * Some business accounts historically ended up with `user_type = 'business'` but `role` still `tourist`.
+ * Redemption must follow the same rule or legitimate owners get HTTP 403 `scanner_role`.
+ */
+function resolveScannerAppRole(profile: { role?: unknown; user_type?: unknown } | null | undefined): string | null {
+  if (!profile) return null;
+  const ut = String(profile.user_type ?? '').trim().toLowerCase();
+  const r = String(profile.role ?? '').trim().toLowerCase();
+  const preferred = ut || r;
+  if (preferred === 'business' || preferred === 'admin' || preferred === 'tourist') return preferred;
+  return null;
+}
+
 function normalizeDate(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
@@ -308,18 +322,46 @@ Deno.serve(async (req) => {
     }
 
     // ─── AUTHZ: Ensure scanner is a business owner or admin ───
-    const { data: scannerProfile, error: profileErr } = await supabase
+    // NOTE: Do not use `.maybeSingle()` here — if duplicate `user_profiles` rows exist for the same
+    // `user_id`, PostgREST returns PGRST116 and `profileErr` is set, which previously surfaced as a
+    // misleading HTTP 403 `scanner_role` even when a valid business row exists.
+    const { data: profileRows, error: profileErr } = await supabase
       .from('user_profiles')
-      .select('role')
+      .select('role, user_type')
       .eq('user_id', scannerUser.id)
-      .maybeSingle();
+      .limit(5);
 
-    const scannerRole = scannerProfile?.role as string | undefined;
-    if (profileErr || !scannerRole || !['business', 'admin'].includes(scannerRole)) {
+    if (profileErr) {
+      console.error('[verify-redemption] scanner profile query failed:', profileErr);
+      return errorResponse('Scanner profile lookup failed', 500, {
+        reason: 'scanner_profile_query_failed',
+        profileError: profileErr.message ?? null,
+      });
+    }
+
+    const rowCount = profileRows?.length ?? 0;
+    const scannerProfile = (profileRows?.[0] ?? null) as { role?: unknown; user_type?: unknown } | null;
+    if (rowCount > 1) {
+      console.warn('[verify-redemption] duplicate user_profiles rows for scanner user_id:', scannerUser.id, {
+        rowCount,
+      });
+    }
+
+    if (!scannerProfile) {
+      return errorResponse('Not authorized to verify passes', 403, {
+        reason: 'scanner_no_profile',
+        scannerUserId: scannerUser.id,
+      });
+    }
+
+    const scannerRole = resolveScannerAppRole(scannerProfile);
+    if (!scannerRole || !['business', 'admin'].includes(scannerRole)) {
       return errorResponse('Not authorized to verify passes', 403, {
         reason: 'scanner_role',
         role: scannerRole ?? null,
-        profileError: profileErr?.message ?? null,
+        profileRole: scannerProfile?.role ?? null,
+        profileUserType: scannerProfile?.user_type ?? null,
+        duplicateProfileRows: rowCount > 1 ? rowCount : null,
       });
     }
 
