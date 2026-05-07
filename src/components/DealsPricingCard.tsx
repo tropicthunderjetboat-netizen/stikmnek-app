@@ -1,5 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Gift, Minus, Plus, UtensilsCrossed, Map, QrCode } from 'lucide-react';
+import {
+  ArrowRight,
+  CircleCheck,
+  Gift,
+  Lock,
+  MapPin,
+  Minus,
+  Plus,
+  Sparkles,
+  Zap,
+} from 'lucide-react';
 import {
   BASE_PRICE_AUD,
   EXTEND_FEE_AUD,
@@ -78,7 +88,7 @@ const DealsPricingCard: React.FC<Props> = ({
         {headerText}
       </p>
 
-      <div className="mt-10 space-y-10">
+      <div className="mt-8 space-y-8">
         {/* People stepper */}
         <div className="flex flex-col items-center gap-3">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -151,17 +161,17 @@ const DealsPricingCard: React.FC<Props> = ({
         {isExtended && (
           <div className="relative overflow-hidden rounded-2xl border border-violet-200/90 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 px-5 py-6 sm:px-7 sm:py-7">
             <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-violet-200/30 blur-2xl" aria-hidden />
-            <div className="relative flex flex-col items-center text-center gap-3">
+            <div className="relative flex flex-col items-center text-center gap-2.5">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-300/50">
                 <Gift className="h-7 w-7" strokeWidth={2} aria-hidden />
               </div>
-              <p className="text-xl sm:text-2xl font-black tracking-tight text-violet-950 leading-tight max-w-sm">
+              <p className="text-2xl sm:text-[1.65rem] font-black tracking-tight text-violet-950 leading-[1.15] max-w-sm">
                 {t('passPricing.holiday_headline', lang)}
               </p>
-              <p className="text-sm text-violet-900/85 leading-relaxed max-w-md">
+              <p className="text-[13px] sm:text-sm text-violet-900/80 leading-relaxed max-w-md font-medium">
                 {t('passPricing.holiday_sub', lang)}
               </p>
-              <p className="text-xs font-semibold text-violet-700/90">
+              <p className="text-[10px] leading-tight text-violet-600/75 font-medium pt-0.5">
                 +{formatAud(lang, EXTEND_FEE_AUD)}{' '}
                 {lang === 'en' ? '7-day add-on' : lang === 'fr' ? 'option 7 jours' : 'long 7 dei'}
               </p>
@@ -170,43 +180,60 @@ const DealsPricingCard: React.FC<Props> = ({
         )}
 
         {/* Total + savings */}
-        <div className="space-y-3 text-center pt-2">
+        <div className="space-y-2.5 text-center pt-1">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('passPricing.total_label', lang)}</p>
           <p className="text-4xl sm:text-5xl font-black tabular-nums tracking-tight text-slate-900">{formatAud(lang, total)}</p>
-          <p className="mx-auto max-w-md text-sm font-medium leading-relaxed text-teal-800/95">{savingsText}</p>
+          <div className="mx-auto flex max-w-md items-start justify-center gap-1.5 px-1 pt-0.5">
+            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" strokeWidth={2} aria-hidden />
+            <p className="text-center text-[13px] sm:text-sm font-bold leading-snug text-emerald-900">
+              {savingsText}
+            </p>
+          </div>
         </div>
 
-        {/* What's included */}
-        <div className="mx-auto max-w-md space-y-4 pt-2">
-          <div className="flex gap-4 rounded-xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-              <UtensilsCrossed className="h-5 w-5" aria-hidden />
+        {/* What's included — compact value strip */}
+        <div className="mx-auto max-w-lg border-y border-slate-100 py-3.5">
+          <div className="flex flex-col gap-2 text-[13px] font-semibold leading-snug text-slate-700 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:gap-x-1 sm:gap-y-2">
+            <span className="inline-flex items-center gap-2 sm:gap-1.5">
+              <CircleCheck className="h-4 w-4 shrink-0 text-emerald-600" strokeWidth={2.5} aria-hidden />
+              {t('passPricing.included_meals', lang)}
             </span>
-            <p className="text-sm font-semibold text-slate-800 leading-snug pt-1.5">{t('passPricing.included_meals', lang)}</p>
-          </div>
-          <div className="flex gap-4 rounded-xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
-              <Map className="h-5 w-5" aria-hidden />
+            <span className="hidden text-slate-300 sm:inline" aria-hidden>
+              ·
             </span>
-            <p className="text-sm font-semibold text-slate-800 leading-snug pt-1.5">{t('passPricing.included_map', lang)}</p>
-          </div>
-          <div className="flex gap-4 rounded-xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
-              <QrCode className="h-5 w-5" aria-hidden />
+            <span className="inline-flex items-center gap-2 sm:gap-1.5">
+              <MapPin className="h-4 w-4 shrink-0 text-sky-600" strokeWidth={2.5} aria-hidden />
+              {t('passPricing.included_map', lang)}
             </span>
-            <p className="text-sm font-semibold text-slate-800 leading-snug pt-1.5">{t('passPricing.included_qr', lang)}</p>
+            <span className="hidden text-slate-300 sm:inline" aria-hidden>
+              ·
+            </span>
+            <span className="inline-flex items-center gap-2 sm:gap-1.5">
+              <Zap className="h-4 w-4 shrink-0 text-teal-600" strokeWidth={2.5} aria-hidden />
+              {t('passPricing.included_qr', lang)}
+            </span>
           </div>
         </div>
 
         {/* Purchase */}
-        <div className="pt-2">
+        <div className="pt-1">
           <button
             type="button"
             disabled={purchaseDisabled}
             onClick={() => onPurchase({ partySize, isExtended })}
-            className="w-full rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 py-4 text-base font-black text-white shadow-lg shadow-emerald-200/60 transition hover:from-emerald-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 py-4 text-base font-black text-white shadow-md shadow-emerald-900/20 ring-1 ring-emerald-500/30 transition hover:from-emerald-700 hover:to-teal-700 hover:shadow-lg hover:shadow-emerald-900/25 disabled:cursor-not-allowed disabled:opacity-55 disabled:ring-0 disabled:hover:shadow-md"
           >
-            {purchaseDisabled ? t('passPricing.purchase_locked', lang) : t('passPricing.purchase', lang)}
+            {purchaseDisabled ? (
+              <>
+                <Lock className="h-4 w-4 shrink-0 opacity-95" aria-hidden />
+                {t('passPricing.purchase_locked', lang)}
+              </>
+            ) : (
+              <>
+                {t('passPricing.purchase', lang)}
+                <ArrowRight className="h-4 w-4 shrink-0 opacity-95" aria-hidden />
+              </>
+            )}
           </button>
         </div>
       </div>
