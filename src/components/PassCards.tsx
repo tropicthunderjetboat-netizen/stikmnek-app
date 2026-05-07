@@ -37,8 +37,6 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
     return defaultPassCartFromProfile(userProfile, null);
   }, [user?.id, userProfile]);
 
-  const passI18nLang: 'en' | 'fr' | 'bi' = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
-
   if (embeddedOnHome && shouldOpenCheckoutInsteadOfPassesPage(user)) {
     return (
       <section className="py-14 bg-gradient-to-b from-white to-teal-50/40" id="passes">
@@ -67,17 +65,19 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
   }
 
   return (
-    <section className="py-20 bg-gradient-to-b from-white to-teal-50/30" id="passes">
+    <section className="py-10 sm:py-20 bg-gradient-to-b from-white to-teal-50/30" id="passes">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-14">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-50 border border-teal-100 text-teal-700 text-sm font-semibold mb-4">
-            <Users className="w-4 h-4" />
+        <div className="text-center mb-6 sm:mb-14">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-100 text-teal-700 text-xs sm:text-sm font-semibold mb-3 sm:mb-4">
+            <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             {language === 'en' ? 'Tourist Pass' : language === 'fr' ? 'Pass touriste' : 'Turis Pas'}
           </div>
-          <div className="text-center mb-6">
-            <h2 className="text-2xl md:text-3xl font-black text-gray-900">{t('passSelection.title', language)}</h2>
-            <p className="text-sm text-gray-600 mt-2 max-w-lg mx-auto leading-relaxed">
-              {t('passSelection.subtitle', language)}
+          <div className="text-center mb-4 sm:mb-6">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-gray-900 leading-tight">
+              {t('passPricing.page_title', language)}
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-600 mt-1.5 sm:mt-2 max-w-lg mx-auto leading-snug sm:leading-relaxed">
+              {t('passPricing.page_subtitle', language)}
             </p>
           </div>
         </div>
@@ -115,9 +115,8 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
           </div>
         )}
 
-        <div className="max-w-xl mx-auto mb-10">
+        <div className="max-w-xl mx-auto mb-6 sm:mb-10">
           <DealsPricingCard
-            language={passI18nLang}
             initialPartySize={cartHint?.partySize}
             initialExtended={cartHint?.isExtended}
             onPurchase={(opts) => void purchasePass(opts)}

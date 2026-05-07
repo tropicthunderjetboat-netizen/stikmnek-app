@@ -55,6 +55,29 @@ export const translations: Record<string, Record<Language, string>> = {
   },
 
   // Pass pricing card (package UI)
+  'passPricing.page_title': {
+    en: 'Choose your adventure',
+    fr: 'Choisissez votre aventure',
+    bi: 'Jusum adventja blong yu',
+  },
+  'passPricing.page_subtitle': {
+    en: 'One pass — premium deals across Vanuatu.',
+    fr: 'Un pass — offres premium partout au Vanuatu.',
+    bi: 'Wan pas — premium dils long Vanuatu.',
+  },
+  'passPricing.pricing_micro': {
+    en: 'A$__BASE__ 1st guest + A$__GUEST__/extra (6+) · Under 6 free · max __MAX__/pass',
+    fr: '__BASE__ $ 1re pers. + __GUEST__ $/supp. (6+) · -6 ans gratuits · max __MAX__/pass',
+    bi: 'A$__BASE__ fes + A$__GUEST__/narafala (6+) · under 6 fri · mak __MAX__/pas',
+  },
+  'passPricing.card_1d_title': { en: '1 day', fr: '1 jour', bi: '1 dei' },
+  'passPricing.card_1d_hint': { en: '24h access', fr: 'Accès 24 h', bi: '24 owa' },
+  'passPricing.card_7d_title': { en: '7 days', fr: '7 jours', bi: '7 dei' },
+  'passPricing.card_7d_hint': { en: 'Holiday pass', fr: 'Pass vacances', bi: 'Holiday pas' },
+  'passPricing.badge_best_value': { en: 'Best value', fr: 'Meilleur rapport', bi: 'Bes wolju' },
+  'passPricing.chip_35': { en: '35% off', fr: '-35 %', bi: '35% of' },
+  'passPricing.chip_map': { en: 'Maps', fr: 'Cartes', bi: 'Map' },
+  'passPricing.chip_qr': { en: 'QR', fr: 'QR', bi: 'QR' },
   'passPricing.simple_header': {
     en: 'Simple pricing: A$__BASE__ for the first person, A$__GUEST__ per extra guest. Kids under 6 always FREE.',
     fr: 'Tarifs simples : __BASE__ $ AUD pour la 1re personne, __GUEST__ $ par invité supplémentaire. Enfants de moins de 6 ans : toujours GRATUIT.',
@@ -106,6 +129,21 @@ export const translations: Record<string, Record<Language, string>> = {
   },
   'passPricing.purchase': { en: 'Purchase pass', fr: 'Acheter le pass', bi: 'Baem pas' },
   'passPricing.purchase_locked': { en: 'Active pass', fr: 'Pass actif', bi: 'Pas i aktiv' },
+  'passPricing.holiday_addon_micro': {
+    en: '+A$10 · 7-day unlock',
+    fr: '+10 $ AUD · déblocage 7 j.',
+    bi: '+A$10 · 7-dei anlok',
+  },
+  'passPricing.aria_decrease_party': {
+    en: 'Decrease party size',
+    fr: 'Réduire le nombre de personnes',
+    bi: 'Lesen namba blong man',
+  },
+  'passPricing.aria_increase_party': {
+    en: 'Increase party size',
+    fr: 'Augmenter le nombre de personnes',
+    bi: 'Ap nemba blong man',
+  },
 
   // Checkout (pricing summary + conversion)
   'checkout.breakdown_title': { en: 'Price breakdown', fr: 'Détail du prix', bi: 'Prais brekdaon' },
