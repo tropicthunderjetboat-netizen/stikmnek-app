@@ -1,5 +1,5 @@
 import React from 'react';
-import { Gift, Users, Clock, CalendarRange, Sparkles } from 'lucide-react';
+import { Gift, Users, Clock, CalendarRange, CreditCard } from 'lucide-react';
 import {
   BASE_PRICE_AUD,
   EXTEND_FEE_AUD,
@@ -12,13 +12,22 @@ export type DealsPricingLanguage = 'en' | 'fr' | 'bi';
 
 type Props = {
   language: DealsPricingLanguage;
+  onPurchase24h: () => void;
+  onPurchase7Day: () => void;
+  /** When user already has an active pass — CTAs disabled. */
+  purchaseDisabled?: boolean;
 };
 
 /**
  * Transparent breakdown of StikmNek Pass pricing (dynamic model).
  * Amounts stay in sync with `src/data/pricing.ts` / Edge `pricingDynamic.ts`.
  */
-const DealsPricingCard: React.FC<Props> = ({ language }) => {
+const DealsPricingCard: React.FC<Props> = ({
+  language,
+  onPurchase24h,
+  onPurchase7Day,
+  purchaseDisabled = false,
+}) => {
   const examplePartySize = 3;
   const exampleTotal = calculatePassPrice(examplePartySize, false);
   const exampleHolidayTotal = calculatePassPrice(examplePartySize, true);
@@ -45,8 +54,8 @@ const DealsPricingCard: React.FC<Props> = ({ language }) => {
           scenario7Sub: `Même groupe + prolongation ; bonus partage → jusqu’à 14 j.`,
           scenarioMath24: `Base ${BASE_PRICE_AUD} $ + ${exampleExtraGuests} × ${GUEST_FEE_AUD} $`,
           scenarioMath7: `Base + invités + ${EXTEND_FEE_AUD} $ (7 j.) ; 2e semaine après partage`,
-          valueNote:
-            'Économisez sur repas, visites et plus — le pass se rentabilise vite. Ce n’est pas un bouton : passez à l’achat depuis la page Pass.',
+          purchaseCta: 'Acheter ce pass',
+          purchaseLocked: 'Pass actif',
         }
       : language === 'bi'
         ? {
@@ -68,8 +77,8 @@ const DealsPricingCard: React.FC<Props> = ({ language }) => {
             scenario7Sub: `Sem grup + longem; share bonus → antap 14 dei`,
             scenarioMath24: `Bes ${BASE_PRICE_AUD} $ + ${exampleExtraGuests} × ${GUEST_FEE_AUD} $`,
             scenarioMath7: `Bes + narafala + ${EXTEND_FEE_AUD} $ (7 dei); wik 2 afta share`,
-            valueNote:
-              'Save long kakae, tua, mo narafala — dis pas i wot long yu. Hem no wan baton: go long Pas blong bai.',
+            purchaseCta: 'Baem pas ia',
+            purchaseLocked: 'Pas i aktiv',
           }
         : {
             title: 'StikmNek Pass Pricing',
@@ -90,8 +99,8 @@ const DealsPricingCard: React.FC<Props> = ({ language }) => {
             scenario7Sub: 'Same group + upgrade; share bonus → up to 14 days',
             scenarioMath24: `Base A$${BASE_PRICE_AUD} + ${exampleExtraGuests} × A$${GUEST_FEE_AUD}`,
             scenarioMath7: `Same base + guests + A$${EXTEND_FEE_AUD} (7-day); 2nd week after sharing`,
-            valueNote:
-              'Save on meals, tours, and more — the pass often pays for itself. This is info, not a button: buy your pass from the Pass page.',
+            purchaseCta: 'Purchase this pass',
+            purchaseLocked: 'Active pass',
           };
 
   const aud = (n: number) => (language === 'fr' || language === 'bi' ? `${n} $ AUD` : `A$${n}`);
@@ -191,6 +200,15 @@ const DealsPricingCard: React.FC<Props> = ({ language }) => {
               </div>
               <p className="text-2xl font-black tabular-nums text-cyan-900">{aud(exampleTotal)}</p>
               <p className="text-[11px] text-slate-600 mt-1.5 leading-snug">{copy.scenarioMath24}</p>
+              <button
+                type="button"
+                disabled={purchaseDisabled}
+                onClick={onPurchase24h}
+                className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 py-2.5 text-sm font-bold text-white shadow-md shadow-cyan-200/50 transition hover:from-cyan-700 hover:to-teal-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+              >
+                <CreditCard className="h-4 w-4 shrink-0 opacity-95" aria-hidden />
+                {purchaseDisabled ? copy.purchaseLocked : copy.purchaseCta}
+              </button>
             </div>
 
             <div className="relative overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-4 shadow-sm">
@@ -208,14 +226,17 @@ const DealsPricingCard: React.FC<Props> = ({ language }) => {
               </div>
               <p className="text-2xl font-black tabular-nums text-violet-900">{aud(exampleHolidayTotal)}</p>
               <p className="text-[11px] text-slate-600 mt-1.5 leading-snug">{copy.scenarioMath7}</p>
+              <button
+                type="button"
+                disabled={purchaseDisabled}
+                onClick={onPurchase7Day}
+                className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 py-2.5 text-sm font-bold text-white shadow-md shadow-violet-200/50 transition hover:from-violet-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+              >
+                <CreditCard className="h-4 w-4 shrink-0 opacity-95" aria-hidden />
+                {purchaseDisabled ? copy.purchaseLocked : copy.purchaseCta}
+              </button>
             </div>
           </div>
-        </div>
-
-        {/* Value note — not button-shaped */}
-        <div className="mt-6 flex gap-3 rounded-xl border border-teal-100/90 bg-teal-50/40 px-4 py-3.5">
-          <Sparkles className="h-5 w-5 shrink-0 text-teal-600 mt-0.5" aria-hidden />
-          <p className="text-left text-xs sm:text-sm text-teal-900/90 leading-relaxed font-medium">{copy.valueNote}</p>
         </div>
       </div>
     </div>

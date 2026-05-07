@@ -280,7 +280,8 @@ interface AppContextType {
   toggleFavorite: (id: string) => void;
   cart: CartItem | null;
   setCart: (item: CartItem | null) => void;
-  purchasePass: () => void;
+  /** Opens checkout; optional `isExtended` overrides profile default (24h vs 7-day). */
+  purchasePass: (opts?: { isExtended?: boolean }) => void;
   selectedBusiness: Business | null;
   setSelectedBusiness: React.Dispatch<React.SetStateAction<Business | null>>;
   showAuth: boolean;
@@ -1483,26 +1484,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   // PURCHASE PASS
   // ═══════════════════════════════════════════════════════════
-  const purchasePass = useCallback(async () => {
-    if (!user) {
-      setShowAuth(true);
-      setAuthMode('signup-tourist');
-      return;
-    }
-    if (user.passId) {
-      toast.info('You already have an active pass!');
-      return;
-    }
-    let authMeta: Record<string, unknown> | null = null;
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      authMeta = (authUser?.user_metadata ?? null) as Record<string, unknown> | null;
-    } catch {
-      authMeta = null;
-    }
-    setCart(defaultPassCartFromProfile(userProfile, authMeta));
-    setCurrentView('checkout');
-  }, [user, userProfile, setCurrentView]);
+  const purchasePass = useCallback(
+    async (opts?: { isExtended?: boolean }) => {
+      if (!user) {
+        setShowAuth(true);
+        setAuthMode('signup-tourist');
+        return;
+      }
+      if (user.passId) {
+        toast.info('You already have an active pass!');
+        return;
+      }
+      let authMeta: Record<string, unknown> | null = null;
+      try {
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+        authMeta = (authUser?.user_metadata ?? null) as Record<string, unknown> | null;
+      } catch {
+        authMeta = null;
+      }
+      const defaults = defaultPassCartFromProfile(userProfile, authMeta);
+      const nextCart =
+        opts?.isExtended !== undefined ? { ...defaults, isExtended: opts.isExtended } : defaults;
+      setCart(nextCart);
+      setCurrentView('checkout');
+    },
+    [user, userProfile, setCurrentView],
+  );
 
   const refreshUserProfile = useCallback(async () => {
     if (!user?.id) return;
