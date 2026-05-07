@@ -15,6 +15,7 @@ import {
   getPassTripGuidance,
   buildPassStayMismatchMessage,
 } from '@/lib/passRecommendation';
+import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 
 export interface PassCardsProps {
   /** Home layout: short CTA for signed-in buyers instead of the full marketing funnel. */
@@ -555,25 +556,10 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
           );
 
           if (data?.success) {
-            // ═══ SUCCESS: Pass extended OR pre-purchase unlock recorded ═══
+            // ═══ SUCCESS: Pass extended ═══
             console.log('[PassCards] extend-pass success:', data);
             bonusClaimed = true;
 
-            if (data?.prepurchase) {
-              toast.success(
-                language === 'en'
-                  ? 'Share Bonus unlocked! It will be applied automatically when you purchase your pass.'
-                  : language === 'fr'
-                    ? 'Bonus de partage débloqué ! Il sera appliqué automatiquement quand vous achèterez votre pass.'
-                    : 'Bonus blong serem i anlokem! Bae i go insaed otomatik taem yu baem pas.',
-                { duration: 6000 }
-              );
-              try { await refreshUserProfile(); } catch {}
-              // No celebration (no pass to extend). Stop here.
-              setSharingPassId(null);
-              return;
-            }
-            
             const passName = language === 'fr' ? pass.nameFr : language === 'bi' ? pass.nameBi : pass.name;
             const bonusDays = data.bonus?.days ?? pass.shareBonus.extraDays;
             const bonusPeople = data.bonus?.people ?? pass.shareBonus.extraPeople;
@@ -617,6 +603,20 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
 
 
 
+          } else if (
+            data &&
+            data.success === false &&
+            (data.share_bonus_ineligible || data.code === 'no_active_pass')
+          ) {
+            const msg =
+              typeof data.error === 'string'
+                ? data.error
+                : language === 'en'
+                  ? 'Share bonus is only available with a 7-day holiday pass.'
+                  : language === 'fr'
+                    ? 'Le bonus de partage est disponible uniquement avec un pass vacances 7 jours.'
+                    : 'Bonus blong serem i olsem blong holiday pas 7 dei nomo.';
+            toast.info(msg, { duration: 6000 });
           } else if (errorBody?.already_claimed || data?.already_claimed) {
             // ═══ ALREADY CLAIMED: Share bonus was already used for this pass ═══
             console.log('[PassCards] Share bonus already claimed:', errorBody || data);
@@ -688,13 +688,15 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
         try { localStorage.setItem('stikmnek-shared-passes', JSON.stringify([...newShared])); } catch {}
       }
 
-      // ═══ STEP 4: Show basic success if no celebration was triggered and user has no active pass ═══
-      if (!celebrationTriggered && !(user?.pass && user?.passId)) {
+      // ═══ STEP 4: Signed-out users: thanks only (no pre-purchase share unlock). ═══
+      if (!celebrationTriggered && !user?.id) {
         toast.success(
-          language === 'en' ? 'Thanks for sharing! Your Share Bonus will apply automatically when you purchase a pass.' :
-          language === 'fr' ? 'Merci d\'avoir partagé ! Votre bonus sera appliqué automatiquement quand vous achèterez un pass.' :
-          'Tangkiu blong serem! Bonus bae i go insaed otomatik taem yu baem pas.',
-          { duration: 5000 }
+          language === 'en'
+            ? 'Thanks for sharing StikmNek!'
+            : language === 'fr'
+              ? 'Merci d\'avoir partagé StikmNek !'
+              : 'Tangkiu blong serem StikmNek!',
+          { duration: 5000 },
         );
       }
     } catch (err: any) {
@@ -878,6 +880,17 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
               const color = `from-${pass.colorFrom} to-${pass.colorTo}`;
               const shadow = `shadow-${pass.shadowColor}`;
               const isCurrentUserPass = Boolean(user?.passId);
+              const passCalendarSpan =
+                isCurrentUserPass && user?.passValidFrom && user?.passValidUntil
+                  ? inclusiveCalendarDaysBetween(user.passValidFrom, user.passValidUntil)
+                  : null;
+              /** Share bonus (2nd week) only for extended 7-day holiday pass — not 24h / pre-purchase. */
+              const userHasExtendedHolidayPass =
+                isCurrentUserPass &&
+                user?.pass === 'dynamic' &&
+                (Boolean(user?.shareBonusApplied) ||
+                  (passCalendarSpan != null && passCalendarSpan > 1));
+              const showHolidayShareUi = hasBonus && userHasExtendedHolidayPass;
               const shared = isCurrentUserPass ? Boolean(user?.shareBonusApplied) : isShared(pass.id);
               const isSharing = sharingPassId === pass.id;
               const bonus = pass.shareBonus;
@@ -1049,7 +1062,7 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
                     )}
 
                     {/* Share Bonus Badge - prominent callout */}
-                    {hasBonus && !shared && (
+                    {showHolidayShareUi && !shared && (
                       <div className="mb-5 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200">
                         <Gift className="w-4 h-4 text-amber-600 flex-shrink-0" />
                         <span className="text-sm font-bold text-amber-800">
@@ -1074,7 +1087,7 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
                     </ul>
 
                     {/* Share Bonus Section */}
-                    {hasBonus && (
+                    {showHolidayShareUi && (
                       <div className={`mb-5 p-3.5 rounded-xl border transition-all duration-500 ${
                         shared
                           ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200'

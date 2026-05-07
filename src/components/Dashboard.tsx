@@ -253,15 +253,34 @@ const Dashboard: React.FC = () => {
         toast.error(typeof error.message === 'string' ? error.message : 'Could not apply bonus');
         return;
       }
-      if ((data as { already_claimed?: boolean })?.already_claimed) {
+      const d = data as {
+        success?: boolean;
+        already_claimed?: boolean;
+        share_bonus_ineligible?: boolean;
+        code?: string;
+        error?: string;
+        bonus?: { days?: number };
+      };
+      if (d?.share_bonus_ineligible || d?.code === 'no_active_pass') {
+        toast.info(d.error || 'Share bonus is only available on a 7-day holiday pass.');
+        return;
+      }
+      if (d?.already_claimed) {
         toast.info('Share bonus already applied.');
         await refreshUserPass();
         return;
       }
-      if ((data as { success?: boolean })?.success) {
-        toast.success('Second week unlocked!');
+      if (d?.success) {
+        const bd = d.bonus?.days ?? 0;
+        if (bd > 0) {
+          toast.success('Second week unlocked!');
+        } else {
+          toast.info(d.error || 'No bonus applied for this pass.');
+        }
         await refreshUserPass();
+        return;
       }
+      toast.error(d?.error ?? 'Could not apply bonus');
     } finally {
       setShareBusy(false);
     }

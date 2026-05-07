@@ -250,9 +250,18 @@ const ShareCTA: React.FC<{
   passType: string;
   userId: string;
   isHolidayPass: boolean;
+  /** Share-for-second-week applies only to extended (7-day) holiday purchases */
+  eligibleForShareProgram: boolean;
   shareBonusAlreadyApplied: boolean;
   onBonusApplied?: (bonus: ShareBonusApplied) => void;
-}> = ({ passType, userId, isHolidayPass, shareBonusAlreadyApplied, onBonusApplied }) => {
+}> = ({
+  passType,
+  userId,
+  isHolidayPass,
+  eligibleForShareProgram,
+  shareBonusAlreadyApplied,
+  onBonusApplied,
+}) => {
   const { language } = useAppContext();
   const passLang = toPassLang(language);
   const productId = passProductIdFromDb(passType);
@@ -276,7 +285,7 @@ const ShareCTA: React.FC<{
   }, [shareBonusAlreadyApplied, shareState]);
 
   const bonus = productId ? SHARE_BONUSES[productId] : undefined;
-  if (!isHolidayPass || !bonus) return null;
+  if (!isHolidayPass || !eligibleForShareProgram || !bonus) return null;
 
   const hasBonus = bonus.extraDays > 0 || bonus.extraPeople > 0 || bonus.extraKids > 0;
   if (!hasBonus) return null;
@@ -304,6 +313,16 @@ const ShareCTA: React.FC<{
     errorBody: any,
     statusCode: number | null
   ) => {
+    if (!error && data?.success === false && (data?.share_bonus_ineligible || data?.code === 'no_active_pass')) {
+      const msg =
+        typeof data?.error === 'string'
+          ? data.error
+          : 'Share bonus is not available for this pass. It applies to 7-day holiday passes only.';
+      toast.info(msg, { duration: 6000 });
+      setShareState('idle');
+      return;
+    }
+
     if (!error && data?.success) {
       // ═══ SUCCESS ═══
       const bd = data.bonus?.days ?? bonus.extraDays;
@@ -899,6 +918,9 @@ const PaymentConfirmation: React.FC = () => {
   const receiptDiscountUntilStr = passMask.displayUntilDateStr;
   const receiptDiscountDayCount = passMask.displayDayCount || (payment.days ?? 0);
 
+  const shareProgramEligible =
+    Boolean(payment.isExtended) || (payment.isExtended == null && truthSpanDays >= 7);
+
   const receiptDiscountUntilDate =
     receiptDiscountUntilStr && /^\d{4}-\d{2}-\d{2}$/.test(receiptDiscountUntilStr)
       ? new Date(`${receiptDiscountUntilStr}T12:00:00`)
@@ -1328,6 +1350,7 @@ Enjoy your deals in Vanuatu!
             passType={payment.passType}
             userId={user.id}
             isHolidayPass={isHolidayPass}
+            eligibleForShareProgram={shareProgramEligible}
             shareBonusAlreadyApplied={shareBonusApplied}
             onBonusApplied={handleShareBonusApplied}
           />

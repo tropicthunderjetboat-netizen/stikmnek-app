@@ -4,6 +4,7 @@
  * Applies share bonus to the user's active pass: extra people and/or extra days.
  * Called after the user shares the app (e.g. from PassCards).
  * Body: { user_id?, share_proof?, platform? } — user_id can be omitted (uses JWT).
+ * Requires an active pass: share bonus applies only to eligible pass rows (e.g. 7-day holiday window).
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -138,22 +139,12 @@ Deno.serve(async (req) => {
 
     const pass = passes?.[0];
     if (!pass) {
-      // Allow pre-purchase share: store a "share bonus unlocked" flag on the user's profile.
-      // This will be consumed on the next pass purchase (paypal-capture / process-card-payment).
-      const { error: upErr } = await supabase
-        .from('user_profiles')
-        .update({ share_bonus_unlocked: true, updated_at: new Date().toISOString() })
-        .eq('user_id', userId);
-
-      if (upErr) {
-        console.error('[extend-pass] prepurchase update user_profiles error:', upErr);
-        return errorResponse('No active pass found (and failed to record share bonus). Please try again later.', 500);
-      }
-
+      // Share rewards apply only after an extended (7-day) holiday pass is purchased and active.
       return jsonResponse({
-        success: true,
-        prepurchase: true,
-        message: 'Share bonus unlocked. It will be applied automatically when you purchase your next pass.',
+        success: false,
+        code: 'no_active_pass',
+        error:
+          'No active pass. Purchase a 7-day holiday pass first; then share to unlock your second week bonus.',
       });
     }
 
@@ -166,7 +157,32 @@ Deno.serve(async (req) => {
 
     const bonus = shareBonusForPassRow(pass);
     if (bonus.extraPeople === 0 && bonus.extraDays === 0) {
-      return jsonResponse({ success: true, bonus: { days: 0, people: 0, kids: 0 } });
+      const pt = String(pass.pass_type ?? '').toLowerCase();
+      let err =
+        'No share bonus applies to this pass.';
+      let code = 'no_share_bonus_for_pass_type';
+      if (pt === 'dynamic') {
+        const from = String(pass.valid_from ?? '').slice(0, 10);
+        const to = String(pass.valid_until ?? '').slice(0, 10);
+        if (from && to) {
+          const span = inclusiveCalendarDaySpanUtc(from, to);
+          if (span <= 1) {
+            code = 'pass_not_eligible_for_share_bonus';
+            err =
+              'Share bonus is only available on an active 7-day holiday pass (not the 24-hour pass).';
+          } else if (span >= 14) {
+            code = 'share_bonus_already_max_window';
+            err = 'Your pass already includes the full discount window (share bonus applied).';
+          }
+        }
+      }
+      return jsonResponse({
+        success: false,
+        share_bonus_ineligible: true,
+        code,
+        bonus: { days: 0, people: 0, kids: 0 },
+        error: err,
+      });
     }
 
     const currentMax = typeof pass.max_people === 'number' ? pass.max_people : 4;
