@@ -144,6 +144,26 @@ export const translations: Record<string, Record<Language, string>> = {
     fr: 'Augmenter le nombre de personnes',
     bi: 'Ap nemba blong man',
   },
+  'passPricing.hero_holiday_title': {
+    en: '7-Day Holiday Pass',
+    fr: 'Pass vacances 7 jours',
+    bi: 'Holiday pas 7 dei',
+  },
+  'passPricing.hero_1d_title': {
+    en: '1-Day Pass',
+    fr: 'Pass 1 jour',
+    bi: 'Pas wan dei',
+  },
+  'passPricing.hero_1d_sub': {
+    en: 'Full deal access for one calendar day.',
+    fr: 'Accès aux offres pour un jour calendaire.',
+    bi: 'Ful akses long dils long wan kalenda dei.',
+  },
+  'passPricing.secure_pay_micro': {
+    en: 'Secure checkout',
+    fr: 'Paiement sécurisé',
+    bi: 'Sekua pem',
+  },
 
   // Checkout (pricing summary + conversion)
   'checkout.breakdown_title': { en: 'Price breakdown', fr: 'Détail du prix', bi: 'Prais brekdaon' },
