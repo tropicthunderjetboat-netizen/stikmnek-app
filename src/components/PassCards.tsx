@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext, defaultPassCartFromProfile } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
-import { Lock, Users, Share2, Calendar, Info, CreditCard } from 'lucide-react';
+import { Users, Share2, Calendar, Info } from 'lucide-react';
 
 import DealsPricingCard from '@/components/DealsPricingCard';
 import { getPassTripGuidance } from '@/lib/passRecommendation';
@@ -122,29 +122,6 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
             onPurchase={(opts) => void purchasePass(opts)}
             purchaseDisabled={Boolean(user?.passId)}
           />
-          <div className="mt-2 flex flex-col items-center gap-1.5 px-1">
-            <p className="text-[9px] font-medium text-slate-500">
-              {t('passPricing.secure_pay_micro', language)}
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-3 opacity-90">
-              <div className="flex items-center gap-1 rounded-md border border-slate-200/80 bg-white/90 px-1.5 py-0.5 shadow-sm">
-                <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0 text-[#003087]" fill="currentColor" aria-hidden>
-                  <path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.69 1.81 1.01 1.15 1.304 2.42 1.012 4.287-.023.143-.047.288-.077.437-.983 5.05-4.349 6.797-8.647 6.797H9.603c-.564 0-1.04.408-1.13.964L7.076 21.337z" />
-                </svg>
-                <span className="text-[9px] font-bold leading-none text-[#003087]">PayPal</span>
-              </div>
-              <div className="flex items-center gap-1 rounded-md border border-slate-200/80 bg-white/90 px-1.5 py-0.5 shadow-sm">
-                <CreditCard className="h-3 w-3 shrink-0 text-slate-500" aria-hidden />
-                <span className="text-[9px] font-bold leading-none text-slate-600">
-                  {language === 'en' ? 'Card' : language === 'fr' ? 'Carte' : 'Kaed'}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 text-[8px] text-slate-400">
-                <Lock className="h-2.5 w-2.5 shrink-0" aria-hidden />
-                <span>SSL</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </section>

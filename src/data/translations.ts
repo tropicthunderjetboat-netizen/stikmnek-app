@@ -162,7 +162,17 @@ export const translations: Record<string, Record<Language, string>> = {
     fr: 'Augmenter le nombre de personnes',
     bi: 'Ap nemba blong man',
   },
-  'passPricing.hero_holiday_title': {
+  'passPricing.value_2nd_week_headline': {
+    en: '2nd Week FREE!',
+    fr: '2e semaine OFFERTE !',
+    bi: 'Wik 2 FREE!',
+  },
+  'passPricing.cta_secure_line': {
+    en: 'Secure payment',
+    fr: 'Paiement sécurisé',
+    bi: 'Sekua pem',
+  },
+  'passPricing.card_header_holiday': {
     en: '7-Day Holiday Pass',
     fr: 'Pass vacances 7 jours',
     bi: 'Holiday pas 7 dei',
