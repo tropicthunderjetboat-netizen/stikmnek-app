@@ -1,5 +1,5 @@
 import React from 'react';
-import { Gift } from 'lucide-react';
+import { Gift, Users, Clock, CalendarRange, Sparkles } from 'lucide-react';
 import {
   BASE_PRICE_AUD,
   EXTEND_FEE_AUD,
@@ -19,7 +19,6 @@ type Props = {
  * Amounts stay in sync with `src/data/pricing.ts` / Edge `pricingDynamic.ts`.
  */
 const DealsPricingCard: React.FC<Props> = ({ language }) => {
-  /** Example: 3 people ages 6+ on a 24-hour pass → $15 + 2×$5 = $25 */
   const examplePartySize = 3;
   const exampleTotal = calculatePassPrice(examplePartySize, false);
   const exampleHolidayTotal = calculatePassPrice(examplePartySize, true);
@@ -39,11 +38,15 @@ const DealsPricingCard: React.FC<Props> = ({ language }) => {
           extendSub: 'Passez de 24 h à 7 jours',
           kidsTitle: 'Enfants de moins de 6 ans',
           kidsSub: 'Toujours gratuits !',
-          exampleLead: `Exemple : ${examplePartySize} personnes (6 ans et +), pass 24 h`,
-          exampleMath: `(Base ${BASE_PRICE_AUD} $ + ${exampleExtraGuests} × ${GUEST_FEE_AUD} $ par personne supplémentaire)`,
-          exampleHolidayLead: `Exemple : ${examplePartySize} personnes, pass vacances 7 jours (+ bonus partage → jusqu’à 14 j.)`,
-          exampleHolidayMath: `(Même base + invités + ${EXTEND_FEE_AUD} $ prolongation 7 j.; partage après achat pour la 2e semaine)`,
-          savings: 'Économisez sur les restaurants et activités ! Ce pass se rentabilise vite.',
+          scenarioTitle: 'Deux exemples rapides',
+          scenario24Label: 'Pass 24 h',
+          scenario24Sub: `${examplePartySize} personnes (6 ans et +)`,
+          scenario7Label: 'Pass vacances 7 jours',
+          scenario7Sub: `Même groupe + prolongation ; bonus partage → jusqu’à 14 j.`,
+          scenarioMath24: `Base ${BASE_PRICE_AUD} $ + ${exampleExtraGuests} × ${GUEST_FEE_AUD} $`,
+          scenarioMath7: `Base + invités + ${EXTEND_FEE_AUD} $ (7 j.) ; 2e semaine après partage`,
+          valueNote:
+            'Économisez sur repas, visites et plus — le pass se rentabilise vite. Ce n’est pas un bouton : passez à l’achat depuis la page Pass.',
         }
       : language === 'bi'
         ? {
@@ -58,11 +61,15 @@ const DealsPricingCard: React.FC<Props> = ({ language }) => {
             extendSub: 'Longem long 24 owa go 7 dei',
             kidsTitle: 'Pikinini under 6',
             kidsSub: 'Oltaim fri!',
-            exampleLead: `Eksemple: ${examplePartySize} man (6+), pas 24 owa`,
-            exampleMath: `(Bes ${BASE_PRICE_AUD} $ + ${exampleExtraGuests} × ${GUEST_FEE_AUD} $ evri narafala man)`,
-            exampleHolidayLead: `Eksemple: ${examplePartySize} man, holiday pas 7 dei (+ share bonus → antap 14 dei)`,
-            exampleHolidayMath: `(Sem bes + narafala + ${EXTEND_FEE_AUD} $ blong 7 dei; share afta bai blong wik 2)`,
-            savings: 'Save long lokol experiens! Dis pas i pe blong hemsef.',
+            scenarioTitle: 'Tu fala eksemple',
+            scenario24Label: 'Pas 24 owa',
+            scenario24Sub: `${examplePartySize} man (6+)`,
+            scenario7Label: 'Holiday pas 7 dei',
+            scenario7Sub: `Sem grup + longem; share bonus → antap 14 dei`,
+            scenarioMath24: `Bes ${BASE_PRICE_AUD} $ + ${exampleExtraGuests} × ${GUEST_FEE_AUD} $`,
+            scenarioMath7: `Bes + narafala + ${EXTEND_FEE_AUD} $ (7 dei); wik 2 afta share`,
+            valueNote:
+              'Save long kakae, tua, mo narafala — dis pas i wot long yu. Hem no wan baton: go long Pas blong bai.',
           }
         : {
             title: 'StikmNek Pass Pricing',
@@ -76,105 +83,140 @@ const DealsPricingCard: React.FC<Props> = ({ language }) => {
             extendSub: 'Upgrade from 24-hour to 7 days',
             kidsTitle: 'Kids under 6',
             kidsSub: 'Always free — not counted in party size',
-            exampleLead: `Example: ${examplePartySize} people ages 6+ (24-hour pass)`,
-            exampleMath: `(Base A$${BASE_PRICE_AUD} + ${exampleExtraGuests} × A$${GUEST_FEE_AUD} each additional guest)`,
-            exampleHolidayLead: `Example: ${examplePartySize} people — 7-day Holiday Pass (+ share bonus for up to 14 days)`,
-            exampleHolidayMath: `(Same base + guests + A$${EXTEND_FEE_AUD} 7-day add-on; share after purchase for 2nd week)`,
-            savings: '💰 Save on meals, tours, and more — this pass pays for itself.',
+            scenarioTitle: 'Quick examples',
+            scenario24Label: '24-hour pass',
+            scenario24Sub: `${examplePartySize} people ages 6+`,
+            scenario7Label: '7-day Holiday Pass',
+            scenario7Sub: 'Same group + upgrade; share bonus → up to 14 days',
+            scenarioMath24: `Base A$${BASE_PRICE_AUD} + ${exampleExtraGuests} × A$${GUEST_FEE_AUD}`,
+            scenarioMath7: `Same base + guests + A$${EXTEND_FEE_AUD} (7-day); 2nd week after sharing`,
+            valueNote:
+              'Save on meals, tours, and more — the pass often pays for itself. This is info, not a button: buy your pass from the Pass page.',
           };
 
   const aud = (n: number) => (language === 'fr' || language === 'bi' ? `${n} $ AUD` : `A$${n}`);
 
   return (
-    <div className="bg-white shadow-lg rounded-xl p-6 border border-gray-100">
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-black text-gray-900">{copy.title}</h2>
-        <p className="text-sm text-gray-600 mt-2">{copy.subtitle}</p>
-        <p className="text-xs text-gray-500 mt-2 max-w-md mx-auto leading-relaxed">{copy.checkoutBlurb}</p>
-      </div>
-
-      <div className="space-y-4">
-        <div className="flex justify-between items-center gap-3 bg-blue-50 p-3 rounded-lg">
-          <div className="min-w-0">
-            <h3 className="font-bold text-blue-900">{copy.baseTitle}</h3>
-            <p className="text-sm text-gray-600">{copy.baseSub}</p>
-          </div>
-          <span className="text-lg font-black text-blue-700 shrink-0 tabular-nums">{aud(BASE_PRICE_AUD)}</span>
+    <div className="rounded-2xl bg-gradient-to-br from-sky-100/90 via-white to-emerald-100/80 p-[1px] shadow-xl shadow-teal-900/5 ring-1 ring-teal-100/60">
+      <div className="rounded-2xl bg-white/90 backdrop-blur-sm px-5 py-6 sm:px-7 sm:py-7">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-black tracking-tight bg-gradient-to-r from-teal-700 via-cyan-700 to-emerald-700 bg-clip-text text-transparent">
+            {copy.title}
+          </h2>
+          <p className="text-sm font-semibold text-slate-600 mt-2">{copy.subtitle}</p>
+          <p className="text-xs text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">{copy.checkoutBlurb}</p>
         </div>
 
-        <div className="flex justify-between items-center gap-3 bg-green-50 p-3 rounded-lg">
-          <div className="min-w-0">
-            <h3 className="font-bold text-green-900">{copy.extraTitle}</h3>
-            <p className="text-sm text-gray-600">{copy.extraSub}</p>
-          </div>
-          <span className="text-lg font-black text-green-700 shrink-0 text-right">
-            +{aud(GUEST_FEE_AUD)}
-            <span className="block text-xs font-bold text-green-800 normal-case">
-              {language === 'en' ? 'per extra guest' : language === 'fr' ? 'par personne supp.' : 'long evri narafala man'}
-            </span>
-          </span>
-        </div>
-
-        <div className="flex flex-col gap-2 bg-purple-50 p-3 rounded-lg border border-purple-100">
-          <div className="flex justify-between items-start gap-3">
+        <div className="space-y-3">
+          <div className="flex justify-between items-center gap-3 rounded-xl bg-sky-50/90 p-3.5 ring-1 ring-sky-100/80 shadow-sm shadow-sky-100/40">
             <div className="min-w-0">
-              <h3 className="font-bold text-purple-900">{copy.extendTitle}</h3>
-              <p className="text-sm text-gray-600">{copy.extendSub}</p>
+              <h3 className="font-bold text-sky-900">{copy.baseTitle}</h3>
+              <p className="text-sm text-slate-600">{copy.baseSub}</p>
             </div>
-            <span className="text-lg font-black text-purple-700 shrink-0 tabular-nums">+{aud(EXTEND_FEE_AUD)}</span>
+            <span className="text-lg font-black text-sky-700 shrink-0 tabular-nums">{aud(BASE_PRICE_AUD)}</span>
           </div>
-          <div className="flex items-start gap-2 rounded-lg bg-purple-100/90 border border-purple-200/80 px-2.5 py-2">
-            <Gift className="w-4 h-4 text-purple-700 shrink-0 mt-0.5" aria-hidden />
-            <p className="text-[11px] sm:text-xs text-purple-950 leading-snug font-medium">
-              {language === 'en' ? (
-                <>
-                  Bonus: Share app with another holiday maker to unlock a{' '}
-                  <span className="font-black text-purple-900 tracking-tight">2nd week FREE</span> (14 days total)!
-                </>
-              ) : language === 'fr' ? (
-                <>
-                  Bonus : partagez l’app avec un autre voyageur pour une{' '}
-                  <span className="font-black text-purple-900 tracking-tight">2e semaine gratuite</span> (14 jours au
-                  total) !
-                </>
-              ) : (
-                <>
-                  Bonus: share app wetem narafala tourist blong{' '}
-                  <span className="font-black text-purple-900 tracking-tight">fri wik 2</span> (14 dei long total)!
-                </>
-              )}
-            </p>
+
+          <div className="flex justify-between items-center gap-3 rounded-xl bg-emerald-50/90 p-3.5 ring-1 ring-emerald-100/80 shadow-sm shadow-emerald-100/40">
+            <div className="min-w-0">
+              <h3 className="font-bold text-emerald-900">{copy.extraTitle}</h3>
+              <p className="text-sm text-slate-600">{copy.extraSub}</p>
+            </div>
+            <span className="text-lg font-black text-emerald-700 shrink-0 text-right">
+              +{aud(GUEST_FEE_AUD)}
+              <span className="block text-xs font-bold text-emerald-800 normal-case">
+                {language === 'en' ? 'per extra guest' : language === 'fr' ? 'par personne supp.' : 'long evri narafala man'}
+              </span>
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-2.5 rounded-xl bg-violet-50/95 p-3.5 ring-1 ring-violet-100/90 shadow-sm shadow-violet-100/50">
+            <div className="flex justify-between items-start gap-3">
+              <div className="min-w-0">
+                <h3 className="font-bold text-violet-900">{copy.extendTitle}</h3>
+                <p className="text-sm text-slate-600">{copy.extendSub}</p>
+              </div>
+              <span className="text-lg font-black text-violet-700 shrink-0 tabular-nums">+{aud(EXTEND_FEE_AUD)}</span>
+            </div>
+            <div className="flex items-start gap-2.5 rounded-xl bg-white/70 border border-violet-200/60 px-3 py-2.5 shadow-inner shadow-white/60">
+              <Gift className="w-4 h-4 text-violet-600 shrink-0 mt-0.5" aria-hidden />
+              <p className="text-[11px] sm:text-xs text-violet-950 leading-snug font-medium">
+                {language === 'en' ? (
+                  <>
+                    Bonus: Share the app with another traveller to unlock a{' '}
+                    <span className="font-black text-violet-900 tracking-tight">2nd week FREE</span> (14 days total).
+                  </>
+                ) : language === 'fr' ? (
+                  <>
+                    Bonus : partagez l’app avec un autre voyageur pour une{' '}
+                    <span className="font-black text-violet-900 tracking-tight">2e semaine gratuite</span> (14 jours au
+                    total).
+                  </>
+                ) : (
+                  <>
+                    Bonus: share app wetem narafala tourist blong{' '}
+                    <span className="font-black text-violet-900 tracking-tight">fri wik 2</span> (14 dei long total).
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center gap-3 rounded-xl bg-amber-50/90 p-3.5 ring-1 ring-amber-100/80 shadow-sm shadow-amber-100/40">
+            <div className="min-w-0">
+              <h3 className="font-bold text-amber-900">{copy.kidsTitle}</h3>
+              <p className="text-sm text-slate-600">{copy.kidsSub}</p>
+            </div>
+            <span className="text-lg font-black text-amber-700 shrink-0 tabular-nums">{aud(0)}</span>
           </div>
         </div>
 
-        <div className="flex justify-between items-center gap-3 bg-amber-50 p-3 rounded-lg">
-          <div className="min-w-0">
-            <h3 className="font-bold text-amber-900">{copy.kidsTitle}</h3>
-            <p className="text-sm text-gray-600">{copy.kidsSub}</p>
-          </div>
-          <span className="text-lg font-black text-amber-700 shrink-0 tabular-nums">{aud(0)}</span>
-        </div>
-      </div>
+        {/* Visual examples — icon-led cards, no grey slab */}
+        <div className="mt-7">
+          <p className="text-center text-xs font-bold uppercase tracking-wider text-teal-700/90 mb-3">
+            {copy.scenarioTitle}
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="relative overflow-hidden rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50 to-white p-4 shadow-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white shadow-md ring-1 ring-cyan-100">
+                  <Clock className="h-6 w-6 text-cyan-600" aria-hidden />
+                </div>
+                <div className="min-w-0 text-left">
+                  <p className="text-sm font-black text-cyan-950 leading-tight">{copy.scenario24Label}</p>
+                  <p className="text-xs text-slate-600 mt-0.5 flex items-center gap-1">
+                    <Users className="h-3.5 w-3.5 shrink-0 text-cyan-600" aria-hidden />
+                    {copy.scenario24Sub}
+                  </p>
+                </div>
+              </div>
+              <p className="text-2xl font-black tabular-nums text-cyan-900">{aud(exampleTotal)}</p>
+              <p className="text-[11px] text-slate-600 mt-1.5 leading-snug">{copy.scenarioMath24}</p>
+            </div>
 
-      <div className="mt-6 bg-gray-100 p-4 rounded-lg text-center space-y-4">
-        <div>
-          <p className="text-sm font-semibold text-gray-800">{copy.exampleLead}</p>
-          <div className="flex flex-col sm:flex-row sm:justify-center sm:items-center mt-2 gap-1 sm:gap-2">
-            <span className="text-xl font-black text-gray-900 tabular-nums">{aud(exampleTotal)}</span>
-            <span className="text-sm text-gray-600">{copy.exampleMath}</span>
+            <div className="relative overflow-hidden rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-white p-4 shadow-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white shadow-md ring-1 ring-violet-100">
+                  <CalendarRange className="h-6 w-6 text-violet-600" aria-hidden />
+                </div>
+                <div className="min-w-0 text-left">
+                  <p className="text-sm font-black text-violet-950 leading-tight">{copy.scenario7Label}</p>
+                  <p className="text-xs text-slate-600 mt-0.5 flex items-center gap-1">
+                    <Gift className="h-3.5 w-3.5 shrink-0 text-violet-600" aria-hidden />
+                    {copy.scenario7Sub}
+                  </p>
+                </div>
+              </div>
+              <p className="text-2xl font-black tabular-nums text-violet-900">{aud(exampleHolidayTotal)}</p>
+              <p className="text-[11px] text-slate-600 mt-1.5 leading-snug">{copy.scenarioMath7}</p>
+            </div>
           </div>
         </div>
-        <div className="border-t border-gray-200 pt-4">
-          <p className="text-sm font-semibold text-gray-800">{copy.exampleHolidayLead}</p>
-          <div className="flex flex-col sm:flex-row sm:justify-center sm:items-center mt-2 gap-1 sm:gap-2">
-            <span className="text-xl font-black text-gray-900 tabular-nums">{aud(exampleHolidayTotal)}</span>
-            <span className="text-sm text-gray-600">{copy.exampleHolidayMath}</span>
-          </div>
-        </div>
-      </div>
 
-      <div className="mt-4 bg-green-600 text-white p-3 rounded-lg text-center">
-        <p className="text-sm font-bold leading-snug">{copy.savings}</p>
+        {/* Value note — not button-shaped */}
+        <div className="mt-6 flex gap-3 rounded-xl border border-teal-100/90 bg-teal-50/40 px-4 py-3.5">
+          <Sparkles className="h-5 w-5 shrink-0 text-teal-600 mt-0.5" aria-hidden />
+          <p className="text-left text-xs sm:text-sm text-teal-900/90 leading-relaxed font-medium">{copy.valueNote}</p>
+        </div>
       </div>
     </div>
   );
