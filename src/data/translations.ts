@@ -78,6 +78,24 @@ export const translations: Record<string, Record<Language, string>> = {
   'passPricing.chip_35': { en: '35% off', fr: '-35 %', bi: '35% of' },
   'passPricing.chip_map': { en: 'Maps', fr: 'Cartes', bi: 'Map' },
   'passPricing.chip_qr': { en: 'QR', fr: 'QR', bi: 'QR' },
+  'passPricing.chip_row_35': { en: '35% Off', fr: '-35 %', bi: '35% Of' },
+  'passPricing.chip_row_map': { en: 'Live Map', fr: 'Carte live', bi: 'Map laev' },
+  'passPricing.chip_row_qr': { en: 'Fast QR', fr: 'QR rapide', bi: 'QR fas' },
+  'passPricing.holiday_ribbon_prefix': {
+    en: 'Buy 1 week, get ',
+    fr: 'Achetez 1 semaine, ',
+    bi: 'Bae wan wik, ',
+  },
+  'passPricing.holiday_ribbon_emphasis': {
+    en: '1 WEEK FREE',
+    fr: 'LA 2E SEMAINE GRATUITE',
+    bi: '1 WIK FREE',
+  },
+  'passPricing.holiday_ribbon_title': {
+    en: '7-Day Holiday Pass',
+    fr: 'Pass vacances 7 jours',
+    bi: 'Holiday pas 7 dei',
+  },
   'passPricing.simple_header': {
     en: 'Simple pricing: A$__BASE__ for the first person, A$__GUEST__ per extra guest. Kids under 6 always FREE.',
     fr: 'Tarifs simples : __BASE__ $ AUD pour la 1re personne, __GUEST__ $ par invité supplémentaire. Enfants de moins de 6 ans : toujours GRATUIT.',

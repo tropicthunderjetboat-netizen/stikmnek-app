@@ -109,6 +109,13 @@ export default {
           '0%': { transform: 'translateY(0) rotate(0deg)', opacity: '0.9' },
           '100%': { transform: 'translateY(72px) rotate(180deg)', opacity: '0' },
         },
+        /** Pass pricing CTA — slow glossy sheen */
+        'pass-cta-sheen': {
+          '0%': { transform: 'translateX(-120%) skewX(-18deg)', opacity: '0' },
+          '12%': { opacity: '0.55' },
+          '55%': { opacity: '0.4' },
+          '100%': { transform: 'translateX(220%) skewX(-18deg)', opacity: '0' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -119,6 +126,7 @@ export default {
         'savings-glow': 'savings-glow 2.2s ease-in-out infinite',
         'celebration-rise': 'celebration-rise 0.65s ease-out both',
         'confetti-drift': 'confetti-drift 2.4s ease-in forwards',
+        'pass-cta-sheen': 'pass-cta-sheen 3.2s ease-in-out infinite',
       },
 
       typography: {
