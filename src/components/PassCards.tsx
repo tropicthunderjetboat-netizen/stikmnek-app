@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { useAppContext } from '@/contexts/AppContext';
+import { useAppContext, defaultPassCartFromProfile } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
 import { Lock, ShieldCheck, Users, Share2, Calendar, Info, CreditCard } from 'lucide-react';
@@ -31,6 +31,11 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
     if (!userProfile) return null;
     return getPassTripGuidance(userProfile);
   }, [userProfile]);
+
+  const cartHint = useMemo(() => {
+    if (!user?.id || !userProfile) return null;
+    return defaultPassCartFromProfile(userProfile, null);
+  }, [user?.id, userProfile]);
 
   const passI18nLang: 'en' | 'fr' | 'bi' = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
 
@@ -113,8 +118,9 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
         <div className="max-w-xl mx-auto mb-10">
           <DealsPricingCard
             language={passI18nLang}
-            onPurchase24h={() => void purchasePass({ isExtended: false })}
-            onPurchase7Day={() => void purchasePass({ isExtended: true })}
+            initialPartySize={cartHint?.partySize}
+            initialExtended={cartHint?.isExtended}
+            onPurchase={(opts) => void purchasePass(opts)}
             purchaseDisabled={Boolean(user?.passId)}
           />
         </div>

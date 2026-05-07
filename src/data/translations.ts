@@ -54,6 +54,59 @@ export const translations: Record<string, Record<Language, string>> = {
     bi: 'Long Pas, praes i stat long A$15 long fes man + A$5 long evri narafala (6+), kasem 6 long wan pas. Jusum 24 owa o 7 dei, mo pei — total i apdet stretwe.',
   },
 
+  // Pass pricing card (package UI)
+  'passPricing.simple_header': {
+    en: 'Simple pricing: A$__BASE__ for the first person, A$__GUEST__ per extra guest. Kids under 6 always FREE.',
+    fr: 'Tarifs simples : __BASE__ $ AUD pour la 1re personne, __GUEST__ $ par invité supplémentaire. Enfants de moins de 6 ans : toujours GRATUIT.',
+    bi: 'Prais we i simpol: A$__BASE__ long fes man, A$__GUEST__ long evri narafala man. Pikinini under 6: oltaim fri.',
+  },
+  'passPricing.people_label': {
+    en: 'People (ages 6+)',
+    fr: 'Personnes (6 ans et +)',
+    bi: 'Man (6+)',
+  },
+  'passPricing.coverage_label': { en: 'Coverage', fr: 'Couverture', bi: 'Kava' },
+  'passPricing.max_per_pass': {
+    en: 'Max __N__ per pass',
+    fr: 'Max __N__ par pass',
+    bi: 'Maksem __N__ long wan pas',
+  },
+  'passPricing.duration_1d': { en: '1 day', fr: '1 jour', bi: '1 dei' },
+  'passPricing.duration_7d': { en: '7 days', fr: '7 jours', bi: '7 dei' },
+  'passPricing.total_label': { en: 'Total', fr: 'Total', bi: 'Total' },
+  'passPricing.savings_anchor': {
+    en: 'With __COUNT__ people, you could save A$__SAVE__ on your first day alone!',
+    fr: 'Avec __COUNT__ personnes, vous pourriez économiser __SAVE__ $ AUD rien que le premier jour !',
+    bi: 'Wet __COUNT__ man, yu save kasem A$__SAVE__ long fes dei nomo!',
+  },
+  'passPricing.holiday_headline': {
+    en: 'Buy 1 week, get 1 week FREE',
+    fr: 'Achetez 1 semaine, la 2e semaine est GRATUITE',
+    bi: 'Bae wan wik, karem narafala wik fri',
+  },
+  'passPricing.holiday_sub': {
+    en: '7-day Holiday Pass + share the app after purchase to unlock your second week of deals.',
+    fr: 'Pass vacances 7 jours + partagez l’app après l’achat pour débloquer votre 2e semaine d’offres.',
+    bi: 'Holiday pas 7 dei + share app afta bai blong anlokem wik 2 blong dils.',
+  },
+  'passPricing.included_meals': {
+    en: 'Up to 35% off meals & tours',
+    fr: 'Jusqu’à 35 % sur repas & visites',
+    bi: 'Kasem 35% of long kakae mo tua',
+  },
+  'passPricing.included_map': {
+    en: 'Interactive map & savings tracker',
+    fr: 'Carte interactive & suivi des économies',
+    bi: 'Map we i laev + traeka blong saving',
+  },
+  'passPricing.included_qr': {
+    en: 'Instant QR redemption',
+    fr: 'Utilisation QR instantanée',
+    bi: 'QR i redim stretwe',
+  },
+  'passPricing.purchase': { en: 'Purchase pass', fr: 'Acheter le pass', bi: 'Baem pas' },
+  'passPricing.purchase_locked': { en: 'Active pass', fr: 'Pass actif', bi: 'Pas i aktiv' },
+
   // Checkout (pricing summary + conversion)
   'checkout.breakdown_title': { en: 'Price breakdown', fr: 'Détail du prix', bi: 'Prais brekdaon' },
   'checkout.base_pass_row': {
