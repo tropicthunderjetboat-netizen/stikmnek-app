@@ -880,6 +880,14 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
               const color = `from-${pass.colorFrom} to-${pass.colorTo}`;
               const shadow = `shadow-${pass.shadowColor}`;
               const isCurrentUserPass = Boolean(user?.passId);
+              const shared = isCurrentUserPass ? Boolean(user?.shareBonusApplied) : isShared(pass.id);
+              const isSharing = sharingPassId === pass.id;
+              const bonus = pass.shareBonus;
+              const shareLang: ShareLang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+              const shareContent = buildPassShareContent(pass, shareLang);
+              const hasBonusDays = bonus.extraDays > 0;
+              const hasBonusPeople = bonus.extraPeople > 0 || bonus.extraKids > 0;
+              const hasBonus = hasBonusDays || hasBonusPeople;
               const passCalendarSpan =
                 isCurrentUserPass && user?.passValidFrom && user?.passValidUntil
                   ? inclusiveCalendarDaysBetween(user.passValidFrom, user.passValidUntil)
@@ -891,14 +899,6 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
                 (Boolean(user?.shareBonusApplied) ||
                   (passCalendarSpan != null && passCalendarSpan > 1));
               const showHolidayShareUi = hasBonus && userHasExtendedHolidayPass;
-              const shared = isCurrentUserPass ? Boolean(user?.shareBonusApplied) : isShared(pass.id);
-              const isSharing = sharingPassId === pass.id;
-              const bonus = pass.shareBonus;
-              const shareLang: ShareLang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
-              const shareContent = buildPassShareContent(pass, shareLang);
-              const hasBonusDays = bonus.extraDays > 0;
-              const hasBonusPeople = bonus.extraPeople > 0 || bonus.extraKids > 0;
-              const hasBonus = hasBonusDays || hasBonusPeople;
               const isRecommended = false;
               const arrival = String(userProfile?.expected_arrival_date ?? '').slice(0, 10);
               const departure = String(userProfile?.expected_departure_date ?? '').slice(0, 10);
