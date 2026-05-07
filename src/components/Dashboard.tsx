@@ -15,7 +15,7 @@ import {
   Ticket, Heart, History, QrCode, Calendar, ChevronRight, Wifi,
   LayoutDashboard, TrendingUp, BarChart3,
   MapPin, Star, Zap, Target, Clock, Flame, Users, Share2, Loader2, Pencil,
-  Wallet,
+  Wallet, Sparkles, PartyPopper,
 } from 'lucide-react';
 
 import QRCodeDisplay from './QRCodeDisplay';
@@ -82,6 +82,10 @@ const Dashboard: React.FC = () => {
 
   const netSavingsVsPassVtApprox =
     passVtApprox != null ? totalSaved - passVtApprox : null;
+
+  /** Deal savings in VT strictly exceed approximate pass cost — show celebration. */
+  const isPassCostBeaten =
+    netSavingsVsPassVtApprox != null && netSavingsVsPassVtApprox > 0;
 
   // Analytics data
   const analytics = useMemo(() => {
@@ -337,12 +341,45 @@ const Dashboard: React.FC = () => {
                 <p className="text-2xl font-bold text-gray-900">{redemptions.length}</p>
                 <p className="text-xs text-gray-500">{language === 'en' ? 'Redeemed' : language === 'fr' ? 'Utilisés' : 'Yusim'}</p>
               </div>
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 shadow-sm border border-green-100 text-left">
-                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mb-2">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
+              <div
+                className={`rounded-xl p-4 text-left shadow-sm ${
+                  isPassCostBeaten
+                    ? 'border-2 border-amber-300/80 bg-gradient-to-br from-amber-50 via-emerald-50 to-teal-50 shadow-md shadow-emerald-100/70 ring-1 ring-fuchsia-200/40'
+                    : totalSaved > 0
+                      ? 'border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50'
+                      : 'border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50'
+                }`}
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                      totalSaved > 0
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm'
+                        : 'bg-green-100'
+                    }`}
+                  >
+                    <TrendingUp className={`h-5 w-5 ${totalSaved > 0 ? 'text-white' : 'text-green-600'}`} />
+                  </div>
+                  {isPassCostBeaten && (
+                    <Sparkles className="h-5 w-5 text-amber-500" aria-hidden />
+                  )}
                 </div>
-                <p className="text-2xl font-bold text-green-700">{totalSaved.toLocaleString()}<span className="text-xs font-semibold text-green-500 ml-1">VT</span></p>
-                <p className="text-xs text-green-600 font-medium">
+                <p className="text-2xl font-black tracking-tight">
+                  {totalSaved > 0 ? (
+                    <>
+                      <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                        {totalSaved.toLocaleString()}
+                      </span>
+                      <span className="ml-1 text-sm font-bold text-teal-600/90">VT</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-green-700">0</span>
+                      <span className="ml-1 text-xs font-semibold text-green-500">VT</span>
+                    </>
+                  )}
+                </p>
+                <p className="text-xs font-semibold text-emerald-800">
                   {language === 'en' ? 'Total saved (redemptions)' : language === 'fr' ? 'Total économisé (utilisations)' : 'Total sevem (redim)'}
                 </p>
               </div>
@@ -641,15 +678,40 @@ const Dashboard: React.FC = () => {
         {activeTab === 'analytics' && (
           <div className="space-y-6">
             {/* Analytics Header */}
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white relative overflow-hidden">
+            <div
+              className={`rounded-2xl p-6 text-white relative overflow-hidden ${
+                isPassCostBeaten
+                  ? 'bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 shadow-lg shadow-fuchsia-300/30'
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600'
+              }`}
+            >
               <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-24 translate-x-24" />
+              {isPassCostBeaten && (
+                <Sparkles className="absolute top-4 right-20 w-6 h-6 text-yellow-200/90 animate-pulse" aria-hidden />
+              )}
               <div className="relative flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center">
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                    isPassCostBeaten ? 'bg-white/25 ring-2 ring-white/40' : 'bg-white/15'
+                  }`}
+                >
                   <BarChart3 className="w-7 h-7" />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold">{language === 'en' ? 'Your Travel Analytics' : 'Vos analyses de voyage'}</h2>
-                  <p className="text-white/70 text-sm">{language === 'en' ? 'Insights into your StikmNek activity' : 'Aperçu de votre activité StikmNek'}</p>
+                  <p className="text-white/80 text-sm">
+                    {isPassCostBeaten
+                      ? language === 'en'
+                        ? 'Your deal savings are ahead of your pass — keep stacking the wins!'
+                        : language === 'fr'
+                          ? 'Vos économies dépassent le pass — continuez comme ça !'
+                          : 'Sevin i win long pass — go hed!'
+                      : language === 'en'
+                        ? 'Insights into your StikmNek activity'
+                        : language === 'fr'
+                          ? 'Aperçu de votre activité StikmNek'
+                          : 'Lukim wetem yu bin du long StikmNek'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -663,15 +725,38 @@ const Dashboard: React.FC = () => {
                 <p className="text-2xl font-bold text-gray-900">{analytics.uniqueBusinesses}</p>
                 <p className="text-xs text-gray-500">{language === 'en' ? 'Places Visited' : 'Lieux visités'}</p>
               </div>
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center mb-2">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
+              <div
+                className={`rounded-xl p-4 shadow-sm border ${
+                  analytics.totalDeals > 0
+                    ? 'border-emerald-200/90 bg-gradient-to-br from-emerald-50 via-white to-teal-50 shadow-md shadow-emerald-100/60'
+                    : 'border-gray-100 bg-white'
+                }`}
+              >
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 ${
+                    analytics.totalDeals > 0 ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm' : 'bg-green-50'
+                  }`}
+                >
+                  <TrendingUp className={`w-5 h-5 ${analytics.totalDeals > 0 ? 'text-white' : 'text-green-600'}`} />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {analytics.totalDeals > 0 ? Math.round(analytics.avgSavingsPerDeal).toLocaleString() : '0'}
-                  <span className="text-xs text-gray-400 ml-1">VT</span>
+                <p className="text-2xl font-black tracking-tight">
+                  {analytics.totalDeals > 0 ? (
+                    <>
+                      <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                        {Math.round(analytics.avgSavingsPerDeal).toLocaleString()}
+                      </span>
+                      <span className="text-sm font-bold text-teal-600/80 ml-1">VT</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-gray-900">0</span>
+                      <span className="text-xs text-gray-400 ml-1">VT</span>
+                    </>
+                  )}
                 </p>
-                <p className="text-xs text-gray-500">{language === 'en' ? 'Avg. Savings/Deal' : 'Écon. moy./offre'}</p>
+                <p className={`text-xs font-semibold ${analytics.totalDeals > 0 ? 'text-emerald-800' : 'text-gray-500'}`}>
+                  {language === 'en' ? 'Avg. Savings/Deal' : 'Écon. moy./offre'}
+                </p>
               </div>
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                 <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center mb-2">
@@ -680,27 +765,106 @@ const Dashboard: React.FC = () => {
                 <p className="text-2xl font-bold text-gray-900">{analytics.streak}</p>
                 <p className="text-xs text-gray-500">{language === 'en' ? 'Day Streak' : 'Jours consécutifs'}</p>
               </div>
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mb-2">
-                  <Zap className="w-5 h-5 text-purple-600" />
+              <div
+                className={`rounded-xl p-4 shadow-sm border ${
+                  isPassCostBeaten
+                    ? 'border-amber-200 bg-gradient-to-br from-amber-50 via-fuchsia-50/40 to-violet-50 shadow-md shadow-amber-100/80'
+                    : 'border-gray-100 bg-white'
+                }`}
+              >
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 ${
+                    isPassCostBeaten ? 'bg-gradient-to-br from-amber-400 to-fuchsia-600 text-white' : 'bg-purple-50'
+                  }`}
+                >
+                  <Zap className={`w-5 h-5 ${isPassCostBeaten ? 'text-white' : 'text-purple-600'}`} />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{analytics.totalDeals}</p>
-                <p className="text-xs text-gray-500">{language === 'en' ? 'Total Deals Used' : 'Total offres utilisées'}</p>
+                <p
+                  className={`text-2xl font-black ${isPassCostBeaten ? 'text-fuchsia-800' : 'text-gray-900'}`}
+                >
+                  {analytics.totalDeals}
+                </p>
+                <p className={`text-xs font-semibold ${isPassCostBeaten ? 'text-amber-900/80' : 'text-gray-500'}`}>
+                  {language === 'en'
+                    ? 'Total Deals Used'
+                    : language === 'fr'
+                      ? 'Total offres utilisées'
+                      : 'Total deals'}
+                </p>
               </div>
             </div>
 
             {(user.passId || (user.passAmountPaidAud ?? 0) > 0 || totalSaved > 0) && (
-              <div className="bg-white rounded-xl shadow-sm border border-emerald-100 overflow-hidden">
-                <div className="p-5 border-b border-emerald-50 bg-emerald-50/50">
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                    <Wallet className="w-5 h-5 text-emerald-700" />
-                    {language === 'en'
-                      ? 'Pass vs deal savings'
-                      : language === 'fr'
-                        ? 'Pass et économies'
-                        : 'Pass mo sevin long deals'}
-                  </h3>
-                  <p className="text-xs text-gray-600 mt-1.5 leading-relaxed">
+              <div
+                className={`relative rounded-2xl overflow-hidden ${
+                  isPassCostBeaten
+                    ? 'border-2 border-amber-300/90 shadow-xl shadow-amber-200/50 ring-1 ring-fuchsia-300/30'
+                    : 'border border-emerald-100 shadow-sm'
+                } bg-white`}
+              >
+                <div
+                  className={`relative border-b p-5 ${
+                    isPassCostBeaten
+                      ? 'border-white/25 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white'
+                      : 'border-emerald-50 bg-emerald-50/50'
+                  }`}
+                >
+                  {isPassCostBeaten && (
+                    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-t-2xl" aria-hidden>
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+                        <span
+                          key={i}
+                          className={`absolute top-4 h-2 w-2 rounded-sm opacity-90 animate-confetti-drift ${
+                            i % 3 === 0 ? 'bg-amber-200' : i % 3 === 1 ? 'bg-white' : 'bg-fuchsia-200'
+                          }`}
+                          style={{
+                            left: `${6 + ((i * 17) % 88)}%`,
+                            animationDelay: `${i * 0.1}s`,
+                            animationDuration: `${2.1 + (i % 4) * 0.25}s`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <div className="relative z-[1] flex flex-wrap items-start justify-between gap-3">
+                    <h3 className="font-bold flex items-center gap-2 text-lg">
+                      {isPassCostBeaten ? (
+                        <PartyPopper className="h-6 w-6 shrink-0 text-amber-200" aria-hidden />
+                      ) : (
+                        <Wallet className={`h-5 w-5 shrink-0 ${isPassCostBeaten ? '' : 'text-emerald-700'}`} />
+                      )}
+                      <span className={isPassCostBeaten ? 'drop-shadow-sm' : 'text-gray-900'}>
+                        {language === 'en'
+                          ? isPassCostBeaten
+                            ? 'You beat the pass cost!'
+                            : 'Pass vs deal savings'
+                          : language === 'fr'
+                            ? isPassCostBeaten
+                              ? 'Le pass est amorti !'
+                              : 'Pass et économies'
+                            : isPassCostBeaten
+                              ? 'Yu win long pem blong pass!'
+                              : 'Pass mo sevin long deals'}
+                      </span>
+                    </h3>
+                    {isPassCostBeaten && (
+                      <Sparkles className="h-8 w-8 shrink-0 text-yellow-200 animate-pulse" aria-hidden />
+                    )}
+                  </div>
+                  {isPassCostBeaten && (
+                    <p className="relative z-[1] mt-2 text-sm font-semibold text-white/95 animate-celebration-rise drop-shadow">
+                      {language === 'en'
+                        ? 'Every VT here is holiday money back in your pocket — epic work!'
+                        : language === 'fr'
+                          ? 'Chaque VT compte : bravo pour vos économies !'
+                          : 'Ol VT ia i helpem pocket blong yu — gudfala wok!'}
+                    </p>
+                  )}
+                  <p
+                    className={`relative z-[1] text-xs leading-relaxed ${
+                      isPassCostBeaten ? 'mt-2 text-white/85' : 'mt-1.5 text-gray-600'
+                    }`}
+                  >
                     {language === 'en'
                       ? `Illustrative only: pass payments are in ${user.passCurrency || 'AUD'}; deal savings are in VT. We use about ${APPROX_VTU_PER_AUD} VT per 1 AUD so you can compare — not a bank rate.`
                       : language === 'fr'
@@ -708,10 +872,10 @@ const Dashboard: React.FC = () => {
                         : `Ol namba ia i rid guides nomo — pass i pem long ${user.passCurrency || 'AUD'}, deals long VT (~${APPROX_VTU_PER_AUD} VT / 1 AUD).`}
                   </p>
                 </div>
-                <div className="p-5 space-y-4 text-sm">
+                <div className={`space-y-4 p-5 text-sm ${isPassCostBeaten ? 'bg-gradient-to-b from-emerald-50/90 via-white to-amber-50/40' : ''}`}>
                   {(user.passAmountPaidAud ?? 0) > 0 ? (
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                      <span className="text-gray-600 shrink-0">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <span className="shrink-0 text-gray-600">
                         {language === 'en' ? 'Pass price paid' : language === 'fr' ? 'Prix du pass' : 'Pem blong pass'}
                       </span>
                       <div className="text-right sm:max-w-[60%]">
@@ -721,15 +885,14 @@ const Dashboard: React.FC = () => {
                             : `${user.passCurrency || 'AUD'} ${Number(user.passAmountPaidAud).toFixed(2)}`}
                         </p>
                         {passVtApprox != null && (
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {language === 'en' ? '≈' : '≈'}{' '}
-                            {passVtApprox.toLocaleString()} VT
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {language === 'en' ? '≈' : '≈'} {passVtApprox.toLocaleString()} VT
                           </p>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <p className="text-gray-500 text-xs">
+                    <p className="text-xs text-gray-500">
                       {language === 'en'
                         ? 'Pass purchase amount will show here after your next checkout syncs.'
                         : language === 'fr'
@@ -737,29 +900,42 @@ const Dashboard: React.FC = () => {
                           : 'Pem blong pass bae i kam afta checkout i sink.'}
                     </p>
                   )}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-1 border-t border-gray-100">
-                    <span className="text-gray-600">
+                  <div className="flex flex-col gap-2 border-t border-gray-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="font-medium text-gray-700">
                       {language === 'en' ? 'Deal savings (redemptions)' : language === 'fr' ? 'Économies (offres)' : 'Sevin long deals'}
                     </span>
-                    <span className="font-bold text-green-700">{totalSaved.toLocaleString()} VT</span>
+                    <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-xl font-black text-transparent">
+                      {totalSaved.toLocaleString()} VT
+                    </span>
                   </div>
                   {netSavingsVsPassVtApprox != null && (
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-3 border-t border-gray-100">
-                      <span className="text-gray-700 font-medium">
+                    <div className="flex flex-col gap-2 border-t border-gray-200/80 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="font-medium text-gray-800">
                         {language === 'en'
                           ? 'Approx. balance (savings − pass in VT)'
                           : language === 'fr'
                             ? 'Solde indicatif (économies − pass en VT)'
                             : 'Balans rid (sevin − pass long VT)'}
                       </span>
-                      <span
-                        className={`text-lg font-black ${
-                          netSavingsVsPassVtApprox >= 0 ? 'text-emerald-700' : 'text-amber-700'
-                        }`}
-                      >
-                        {netSavingsVsPassVtApprox >= 0 ? '+' : ''}
-                        {netSavingsVsPassVtApprox.toLocaleString()} VT
-                      </span>
+                      {isPassCostBeaten ? (
+                        <div className="animate-savings-glow rounded-xl bg-white/90 px-4 py-2 text-center shadow-inner ring-2 ring-emerald-400/40 sm:text-right">
+                          <span className="block bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 bg-clip-text text-2xl font-black text-transparent">
+                            +{netSavingsVsPassVtApprox.toLocaleString()} VT
+                          </span>
+                          <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-emerald-700/90">
+                            {language === 'en' ? 'Ahead of your pass' : language === 'fr' ? 'Au-delà du pass' : 'Antap long pass'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span
+                          className={`text-lg font-black ${
+                            netSavingsVsPassVtApprox >= 0 ? 'text-emerald-700' : 'text-amber-700'
+                          }`}
+                        >
+                          {netSavingsVsPassVtApprox >= 0 ? '+' : ''}
+                          {netSavingsVsPassVtApprox.toLocaleString()} VT
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -792,7 +968,9 @@ const Dashboard: React.FC = () => {
                                 <p className="text-[10px] text-gray-400">{data.count} {language === 'en' ? 'deals' : 'offres'}</p>
                               </div>
                             </div>
-                            <p className="text-sm font-bold text-green-600">{data.saved.toLocaleString()} VT</p>
+                            <p className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-base font-extrabold text-transparent">
+                              {data.saved.toLocaleString()} VT
+                            </p>
                           </div>
                           <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                             <div className={`h-full rounded-full bg-gradient-to-r ${categoryColors[cat] || 'from-gray-400 to-gray-600'} transition-all duration-700`} style={{ width: `${pct}%` }} />
