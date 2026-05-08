@@ -932,10 +932,16 @@ const BusinessOwnerDashboard: React.FC = () => {
     if (!selectedBusiness || !selectedProfileId) return;
     setGalleryLoading(true);
     try {
+      const listingOfferingId =
+        selectedBusiness._profileBusinessId &&
+        String(selectedBusiness.id) !== String(selectedBusiness._profileBusinessId)
+          ? String(selectedBusiness.id)
+          : null;
       const { data, error } = await supabase
         .from('business_photos')
         .select('*')
         .eq('business_id', selectedProfileId)
+        .eq('offering_id', listingOfferingId)
         .order('is_main', { ascending: false })
         .order('created_at', { ascending: false });
       if (error) throw error;
