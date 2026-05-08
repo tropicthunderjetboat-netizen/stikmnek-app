@@ -25,6 +25,8 @@ function todayStr(): string {
 }
 
 interface PricingDiscountFieldsProps {
+  /** When tiered pricing is used (tours/activities), prices come from tiers; keep only discount + validity + extras. */
+  mode?: 'flat' | 'tiered';
   originalPrice: string;
   discountPercent: string;
   onOriginalPriceChange: (val: string) => void;
@@ -47,6 +49,7 @@ interface PricingDiscountFieldsProps {
 }
 
 const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
+  mode = 'flat',
   originalPrice,
   discountPercent,
   onOriginalPriceChange,
@@ -66,6 +69,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
 }) => {
   // Auto-calculate deal price
   const calculatedDealPrice = useMemo(() => {
+    if (mode === 'tiered') return '';
     const orig = parseFloat(originalPrice);
     const pct = parseFloat(discountPercent);
     if (!isNaN(orig) && orig > 0 && !isNaN(pct) && pct > 0 && pct < 100) {
@@ -107,38 +111,45 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
           </span>
         </div>
         <p className="text-xs text-gray-500 mb-4">
-          {language === 'en'
-            ? 'Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.'
-            : language === 'fr'
-            ? 'Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.'
-            : 'Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'}
+          {mode === 'tiered'
+            ? language === 'en'
+              ? 'For tours & activities, prices come from your tier table below. Use this section to set an optional % discount badge and validity dates.'
+              : language === 'fr'
+                ? 'Pour les visites et activités, les prix viennent du tableau des paliers ci-dessous. Utilisez cette section pour définir une remise (%) et des dates.'
+                : 'Long tua mo aktiviti, praes i kam long tier tebol daon. Yusum ples ia blong setem diskaon (%) mo det.'
+            : language === 'en'
+              ? 'Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.'
+              : language === 'fr'
+                ? 'Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.'
+                : 'Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'}
         </p>
 
 
         {/* Price + Discount + New Price row */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-          {/* Original Price */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              {language === 'en' ? 'Your Price (VT)' : language === 'fr' ? 'Votre prix (VT)' : 'Praes blong yu (VT)'}
-            </label>
+        <div className={mode === 'tiered' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3 items-end' : 'grid grid-cols-1 sm:grid-cols-3 gap-3 items-end'}>
+          {mode !== 'tiered' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                {language === 'en' ? 'Your Price (VT)' : language === 'fr' ? 'Votre prix (VT)' : 'Praes blong yu (VT)'}
+              </label>
 
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">VT</span>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={originalPrice}
-                onChange={(e) => onOriginalPriceChange(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
-                placeholder="5000"
-              />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">VT</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={originalPrice}
+                  onChange={(e) => onOriginalPriceChange(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                  placeholder="5000"
+                />
+              </div>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {language === 'en' ? 'Regular price per person in Vatu' : 'Prix normal par personne en Vatu'}
+              </p>
             </div>
-            <p className="text-[10px] text-gray-400 mt-0.5">
-              {language === 'en' ? 'Regular price per person in Vatu' : 'Prix normal par personne en Vatu'}
-            </p>
-          </div>
+          )}
 
           {/* Discount Percentage */}
           <div>
@@ -164,32 +175,33 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
             </p>
           </div>
 
-          {/* Auto-Calculated New Price */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              {language === 'en' ? 'New Price (auto)' : language === 'fr' ? 'Nouveau prix (auto)' : 'Niu Praes (oto)'}
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">VT</span>
-              <input
-                type="text"
-                value={calculatedDealPrice ? formatVT(parseFloat(calculatedDealPrice)).replace('VT ', '') : '—'}
-                readOnly
-                className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm cursor-not-allowed ${
-                  calculatedDealPrice
-                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700 font-bold'
-                    : 'bg-gray-50 border-gray-200 text-gray-400'
-                }`}
-              />
+          {mode !== 'tiered' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                {language === 'en' ? 'New Price (auto)' : language === 'fr' ? 'Nouveau prix (auto)' : 'Niu Praes (oto)'}
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">VT</span>
+                <input
+                  type="text"
+                  value={calculatedDealPrice ? formatVT(parseFloat(calculatedDealPrice)).replace('VT ', '') : '—'}
+                  readOnly
+                  className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm cursor-not-allowed ${
+                    calculatedDealPrice
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-700 font-bold'
+                      : 'bg-gray-50 border-gray-200 text-gray-400'
+                  }`}
+                />
+              </div>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                {language === 'en' ? 'Calculated from price & discount' : 'Calculé automatiquement'}
+              </p>
             </div>
-            <p className="text-[10px] text-gray-400 mt-0.5">
-              {language === 'en' ? 'Calculated from price & discount' : 'Calculé automatiquement'}
-            </p>
-          </div>
+          )}
         </div>
 
         {/* ─── Live Price Breakdown Preview ─── */}
-        {calculatedDealPrice && originalPrice && (
+        {mode !== 'tiered' && calculatedDealPrice && originalPrice && (
           <div className="mt-4 p-4 rounded-xl bg-white border border-teal-200 shadow-sm">
             <div className="flex items-center gap-1.5 mb-3">
               <Tag className="w-3.5 h-3.5 text-teal-600" />

@@ -1814,6 +1814,7 @@ const BusinessOwnerDashboard: React.FC = () => {
             {/* ─── Pricing & Discount (PricingDiscountFields component) ─── */}
             <div className={submitFieldErrors.pricing && !categoryUsesTieredPricing(submitForm.category) ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
               <PricingDiscountFields
+                mode={categoryUsesTieredPricing(submitForm.category) ? 'tiered' : 'flat'}
                 originalPrice={submitForm.originalPrice}
                 discountPercent={submitForm.discountPercent}
                 onOriginalPriceChange={(val) => {
