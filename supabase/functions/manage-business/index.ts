@@ -214,22 +214,26 @@ async function getAuthUser(
   return { user };
 }
 
-async function isAdminUser(supabase: SupabaseServiceClient, userId: string): Promise<boolean> {
+// Keep in sync with frontend admin allowlist (AppContext.tsx) for build mode.
+const ADMIN_EMAILS = ['admin@stikmnek.com', 'testadmin@example.com', 'stikmnek@gmail.com'];
+
+async function isAdminUser(supabase: SupabaseServiceClient, userId: string, email?: string): Promise<boolean> {
+  if (email && ADMIN_EMAILS.includes(email.toLowerCase())) return true;
   const { data } = await supabase
     .from('user_profiles')
-    .select('role')
+    .select('role, user_type')
     .eq('user_id', userId)
     .maybeSingle();
-  return Boolean(data && data.role === 'admin');
+  return Boolean(data && (data.role === 'admin' || (data as any).user_type === 'admin'));
 }
 
 /** Returns a 403 Response if the user is not an admin; otherwise null. */
 async function assertAdmin(
   supabase: SupabaseServiceClient,
-  userId: string,
+  authUser: { id: string; email?: string },
   req: Request,
 ): Promise<Response | null> {
-  if (!(await isAdminUser(supabase, userId))) {
+  if (!(await isAdminUser(supabase, authUser.id, authUser.email))) {
     return unauthorizedResponse(req);
   }
   return null;
@@ -257,11 +261,11 @@ async function requireOwner(
 async function assertAdminOrOwner(
   supabase: SupabaseServiceClient,
   businessId: string,
-  userId: string,
+  authUser: { id: string; email?: string },
   req: Request,
 ): Promise<Response | null> {
-  if (await isAdminUser(supabase, userId)) return null;
-  return requireOwner(supabase, businessId, userId, req);
+  if (await isAdminUser(supabase, authUser.id, authUser.email)) return null;
+  return requireOwner(supabase, businessId, authUser.id, req);
 }
 
 /**
@@ -741,7 +745,7 @@ Deno.serve(async (req) => {
     // ─── DIAGNOSE_BUSINESS_PHOTOS ─── (admin only)
     // Provides a safe, non-destructive schema compatibility report for `business_photos`.
     if (action === 'diagnose_business_photos') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const report: Record<string, unknown> = {
@@ -1303,7 +1307,7 @@ Deno.serve(async (req) => {
 
     // ─── ADMIN_CREATE_BUSINESS ───
     if (action === 'admin_create_business') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const targetOwnerId =
@@ -1343,7 +1347,7 @@ Deno.serve(async (req) => {
 
     // ─── REVIEW_BUSINESS ───
     if (action === 'review_business') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const pendingId = body.businessId; // pending_businesses.id
@@ -1660,7 +1664,7 @@ Deno.serve(async (req) => {
     // creating a new business_offerings row (or overwrote the primary one). This repairs by
     // inserting a fresh offering row and relinking photos, then deletes the stuck pending row.
     if (action === 'repair_approved_submission') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const pendingId = body.pendingId ?? body.pending_id ?? body.businessId;
@@ -1811,7 +1815,7 @@ Deno.serve(async (req) => {
       const confirmEntire =
         body.confirmDeleteEntireProfile === true || body.confirmDeleteEntireProfile === 'true';
 
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       if (confirmEntire) {
@@ -1921,7 +1925,7 @@ Deno.serve(async (req) => {
         return errorResponse(req, 'Missing businessId or changes');
       }
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), userId, req);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser, req);
       if (denied) return denied;
 
       let ownerIdForEdit = userId;
@@ -1958,7 +1962,7 @@ Deno.serve(async (req) => {
 
     // ─── REVIEW_EDIT ───
     if (action === 'review_edit') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const editId = body.editId;
@@ -2009,7 +2013,7 @@ Deno.serve(async (req) => {
         return errorResponse(req, 'Missing businessId or updates');
       }
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id, req);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser, req);
       if (denied) return denied;
 
       const { error } = await supabase
@@ -2028,7 +2032,7 @@ Deno.serve(async (req) => {
 
       if (!businessId || active === undefined) return errorResponse(req, 'Missing businessId or active');
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id, req);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser, req);
       if (denied) return denied;
 
       const { error } = await supabase
@@ -2093,7 +2097,7 @@ Deno.serve(async (req) => {
 
     // ─── ADMIN_LIST_REVIEWS ─── (admin only)
     if (action === 'admin_list_reviews') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const limit = Math.min(Math.max(Number(body.limit) || 100, 1), 500);
@@ -2126,7 +2130,7 @@ Deno.serve(async (req) => {
 
     // ─── ADMIN_SET_REVIEW_PUBLIC ─── (admin only)
     if (action === 'admin_set_review_public') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
       const reviewId = String(body.reviewId || '').trim();
       const isPublic = body.isPublic;
@@ -2147,7 +2151,7 @@ Deno.serve(async (req) => {
 
     // ─── ADMIN_DELETE_REVIEW ─── (admin only)
     if (action === 'admin_delete_review') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
       const reviewId = String(body.reviewId || '').trim();
       if (!reviewId) return errorResponse(req, 'Missing reviewId');
@@ -2158,7 +2162,7 @@ Deno.serve(async (req) => {
 
     // ─── GET_ALL_PHOTOS ─── (admin only)
     if (action === 'get_all_photos') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const { data, error } = await supabase
@@ -2175,7 +2179,7 @@ Deno.serve(async (req) => {
       const photoId = body.photoId;
       if (!photoId) return errorResponse(req, 'Missing photoId');
 
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const status = action === 'approve_photo' ? 'approved' : 'rejected';
@@ -2193,7 +2197,7 @@ Deno.serve(async (req) => {
       const businessId = body.businessId;
       if (!businessId) return errorResponse(req, 'Missing businessId');
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id, req);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser, req);
       if (denied) return denied;
 
       const { data: reviews } = await supabase
@@ -2221,7 +2225,7 @@ Deno.serve(async (req) => {
       const targetUserId = body.targetUserId || body.userId;
       if (!targetUserId) return errorResponse(req, 'Missing targetUserId');
 
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       // Prevent deleting self

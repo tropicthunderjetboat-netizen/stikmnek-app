@@ -798,7 +798,10 @@ const AdminPanel: React.FC = () => {
         headers: await getEdgeAuthHeaders(),
         body: { action: 'admin_list_reviews', limit: 300 },
       });
-      if (error) throw error;
+      if (error) {
+        const edgeMsg = (await tryReadEdgeFunctionJsonError(error)) || (error as any)?.message || 'Edge function error';
+        throw new Error(edgeMsg);
+      }
       if (data?.error) throw new Error(String(data.error));
       setAdminReviews(Array.isArray(data?.reviews) ? data.reviews : []);
     } catch (err: any) {
@@ -823,7 +826,10 @@ const AdminPanel: React.FC = () => {
           headers: await getEdgeAuthHeaders(),
           body: { action: 'admin_set_review_public', reviewId, isPublic, reason },
         });
-        if (error) throw error;
+        if (error) {
+          const edgeMsg = (await tryReadEdgeFunctionJsonError(error)) || (error as any)?.message || 'Edge function error';
+          throw new Error(edgeMsg);
+        }
         if (data?.error) throw new Error(String(data.error));
         toast.success(isPublic ? 'Review is now public' : 'Review hidden');
         await loadAdminReviews();
@@ -846,7 +852,10 @@ const AdminPanel: React.FC = () => {
           headers: await getEdgeAuthHeaders(),
           body: { action: 'admin_delete_review', reviewId },
         });
-        if (error) throw error;
+        if (error) {
+          const edgeMsg = (await tryReadEdgeFunctionJsonError(error)) || (error as any)?.message || 'Edge function error';
+          throw new Error(edgeMsg);
+        }
         if (data?.error) throw new Error(String(data.error));
         toast.success('Review deleted');
         await loadAdminReviews();
