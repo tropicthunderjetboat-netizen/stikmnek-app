@@ -603,7 +603,6 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
 
   /** Shown in “New price (auto)” — derived from VT + % (and DB deal as fallback). */
   const displayAutoDealPrice = useMemo(() => {
-    if (categoryUsesTieredPricing(form.category)) return '';
     const orig = parseFloat(String(form.originalPrice).replace(/,/g, ''));
     const pct = parseFloat(String(form.discountPercent).replace(/,/g, ''));
     if (Number.isFinite(orig) && orig > 0 && Number.isFinite(pct) && pct > 0 && pct < 100) {
@@ -612,18 +611,17 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     const fd = parseFloat(String(form.dealPrice).replace(/,/g, ''));
     if (Number.isFinite(fd) && fd > 0) return String(fd);
     return '';
-  }, [form.category, form.originalPrice, form.discountPercent, form.dealPrice]);
+  }, [form.originalPrice, form.discountPercent, form.dealPrice]);
 
-  // Sync calculated values into form state for submission (flat pricing only; tiered deals keep DB discount text)
+  // Sync calculated values into form state for submission (also for tours/activities so cards get deal + badge text).
   useEffect(() => {
-    if (categoryUsesTieredPricing(form.category)) return;
     if (calculatedDealPrice && calculatedDiscountLabel) {
       setForm(prev => ({
         ...prev,
         dealPrice: calculatedDealPrice,
         discount: calculatedDiscountLabel,
       }));
-    } else if (!embeddedEdit) {
+    } else if (!embeddedEdit && !categoryUsesTieredPricing(form.category)) {
       setForm(prev => ({
         ...prev,
         dealPrice: '',
@@ -906,9 +904,25 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         isMain: index === 0,
       }));
 
-      // For no-discount listings, set dealPrice = originalPrice
+      // Headline prices: derive deal from % if needed (tiered categories used to skip this and saved equal orig/deal).
       const finalOriginalPrice = form.originalPrice ? Number(form.originalPrice) : 0;
-      const finalDealPrice = form.dealPrice ? Number(form.dealPrice) : finalOriginalPrice;
+      let finalDealNumeric = form.dealPrice ? Number(form.dealPrice) : 0;
+      const pctSubmit = parseFloat(String(form.discountPercent).replace(/,/g, ''));
+      if (
+        (!Number.isFinite(finalDealNumeric) || finalDealNumeric <= 0) &&
+        finalOriginalPrice > 0 &&
+        Number.isFinite(pctSubmit) &&
+        pctSubmit > 0 &&
+        pctSubmit < 100
+      ) {
+        finalDealNumeric = finalOriginalPrice * (1 - pctSubmit / 100);
+      }
+      const finalDealPrice =
+        Number.isFinite(finalDealNumeric) && finalDealNumeric > 0 ? finalDealNumeric : finalOriginalPrice;
+      let discountStr = String(form.discount || '').trim();
+      if (!discountStr && Number.isFinite(pctSubmit) && pctSubmit > 0 && pctSubmit < 100) {
+        discountStr = `${Math.round(pctSubmit)}% OFF`;
+      }
       const normalizedWebsite = normalizeWebsiteForStorage(form.website) ?? null;
       const descriptionForStorage = trimBusinessDescriptionHtmlForStorage(form.description);
 
@@ -918,7 +932,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         name: form.name,
         category: form.category,
         description: descriptionForStorage,
-        discount: form.discount || '',
+        discount: discountStr,
         originalPrice: finalOriginalPrice,
         dealPrice: finalDealPrice,
         location: form.address || 'Port Vila, Vanuatu',
@@ -962,9 +976,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           p_name: form.name,
           p_category: form.category,
           p_description: descriptionForStorage,
-          p_discount: form.discount,
-          p_original_price: Number(form.originalPrice) || 0,
-          p_deal_price: Number(form.dealPrice) || 0,
+          p_discount: discountStr,
+          p_original_price: finalOriginalPrice,
+          p_deal_price: finalDealPrice,
           p_location: form.address || 'Port Vila, Vanuatu',
           p_phone: form.phone,
           p_email: form.email || user.email,

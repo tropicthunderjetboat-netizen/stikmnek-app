@@ -51,10 +51,11 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
   const hasDiscount = listingHasActiveDiscount(business);
   const displayPrice = customerFacingListPrice(business);
   const savings = hasDiscount ? Math.max(0, originalPrice - dealPrice) : 0;
+  const discountLabel = String(business.discount ?? '').trim();
   const discountBadgeText =
-    hasDiscount && business.discount.trim()
-      ? business.discount.trim()
-      : hasDiscount && originalPrice > 0
+    hasDiscount && discountLabel
+      ? discountLabel
+      : hasDiscount && originalPrice > 0 && dealPrice < originalPrice
         ? `${Math.round((1 - dealPrice / originalPrice) * 100)}% OFF`
         : null;
   const cardImage =

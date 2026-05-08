@@ -67,11 +67,10 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
   onWebsiteChange,
   language = 'en',
 }) => {
-  // Auto-calculate deal price
+  // Auto-calculate deal price (same for flat & tiered categories — tier table is additional, not a substitute).
   const calculatedDealPrice = useMemo(() => {
-    if (mode === 'tiered') return '';
-    const orig = parseFloat(originalPrice);
-    const pct = parseFloat(discountPercent);
+    const orig = parseFloat(String(originalPrice).replace(/,/g, ''));
+    const pct = parseFloat(String(discountPercent).replace(/,/g, ''));
     if (!isNaN(orig) && orig > 0 && !isNaN(pct) && pct > 0 && pct < 100) {
       return (orig * (1 - pct / 100)).toFixed(2);
     }

@@ -1156,6 +1156,28 @@ const BusinessOwnerDashboard: React.FC = () => {
       dlPrice = Number(submitForm.dealPrice) || 0;
     }
 
+    const pctForHeadline = parseFloat(String(submitForm.discountPercent).replace(/,/g, ''));
+    if (
+      (!Number.isFinite(dlPrice) || dlPrice <= 0) &&
+      Number.isFinite(origPrice) &&
+      origPrice > 0 &&
+      Number.isFinite(pctForHeadline) &&
+      pctForHeadline > 0 &&
+      pctForHeadline < 100
+    ) {
+      dlPrice = origPrice * (1 - pctForHeadline / 100);
+    }
+
+    let discountForSubmit = String(submitForm.discount || '').trim();
+    if (
+      !discountForSubmit &&
+      Number.isFinite(pctForHeadline) &&
+      pctForHeadline > 0 &&
+      pctForHeadline < 100
+    ) {
+      discountForSubmit = `${Math.round(pctForHeadline)}% OFF`;
+    }
+
     let tiersPayload: unknown[] | null = null;
     if (categoryUsesTieredPricing(submitForm.category)) {
       const { data } = validatePricingTiersForSubmit(pricingTiers);
@@ -1196,7 +1218,7 @@ const BusinessOwnerDashboard: React.FC = () => {
             name: submitForm.name,
             category: submitForm.category,
             description: submitForm.description,
-            discount: submitForm.discount || '',
+            discount: discountForSubmit,
             originalPrice: origPrice,
             dealPrice: dlPrice,
             location: submitForm.location || 'Port Vila, Vanuatu',
@@ -1248,7 +1270,7 @@ const BusinessOwnerDashboard: React.FC = () => {
             p_name: submitForm.name,
             p_category: submitForm.category,
             p_description: submitForm.description,
-            p_discount: submitForm.discount || '',
+            p_discount: discountForSubmit,
             p_original_price: origPrice,
             p_deal_price: dlPrice,
             p_location: submitForm.location || 'Port Vila, Vanuatu',
@@ -1337,7 +1359,7 @@ const BusinessOwnerDashboard: React.FC = () => {
           name: submitForm.name,
           category: submitForm.category,
           description: submitForm.description,
-          discount: submitForm.discount || '',
+          discount: discountForSubmit,
           originalPrice: origPrice,
           dealPrice: dlPrice,
           location: submitForm.location || 'Port Vila, Vanuatu',
@@ -1814,7 +1836,7 @@ const BusinessOwnerDashboard: React.FC = () => {
             {/* ─── Pricing & Discount (PricingDiscountFields component) ─── */}
             <div className={submitFieldErrors.pricing && !categoryUsesTieredPricing(submitForm.category) ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
               <PricingDiscountFields
-                mode={categoryUsesTieredPricing(submitForm.category) ? 'tiered' : 'flat'}
+                mode="flat"
                 originalPrice={submitForm.originalPrice}
                 discountPercent={submitForm.discountPercent}
                 onOriginalPriceChange={(val) => {
