@@ -49,6 +49,9 @@ ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
 -- We intentionally do not allow SELECT/UPDATE/DELETE from clients (edge function provides aggregates).
 GRANT INSERT ON public.analytics_events TO anon, authenticated;
 
+-- Edge Functions use the service role key. Service role bypasses RLS but still requires SQL privileges.
+GRANT SELECT, INSERT ON public.analytics_events TO service_role;
+
 DROP POLICY IF EXISTS "analytics_events_insert_any" ON public.analytics_events;
 CREATE POLICY "analytics_events_insert_any"
   ON public.analytics_events
