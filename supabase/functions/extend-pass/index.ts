@@ -17,15 +17,26 @@ function getSafeCorsHeaders(req: Request): Record<string, string> {
   const raw = (Deno.env.get('CORS_ALLOWED_ORIGINS') ?? '').trim();
   const allowed = raw.split(',').map((s) => s.trim()).filter(Boolean);
   const origin = req.headers.get('Origin') ?? '';
+  // Some clients send different header sets depending on runtime/version.
+  // Echo requested headers during CORS preflight so the browser unblocks the fetch.
+  const requestedHeaders = req.headers.get('access-control-request-headers') ?? '';
   const base: Record<string, string> = {
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': requestedHeaders
+      ? requestedHeaders
+      : 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
   };
+  /**
+   * This function is always authenticated (Bearer JWT) and does not rely on cookies,
+   * so a permissive CORS policy is acceptable and prevents “Failed to fetch / Failed to send”
+   * when deploy URLs change (preview domains, localhost, etc).
+   */
   if (allowed.length === 0) {
     base['Access-Control-Allow-Origin'] = '*';
     return base;
   }
-  base['Access-Control-Allow-Origin'] = allowed.includes(origin) ? origin : allowed[0]!;
+  // If a allowlist is provided, prefer exact-match; otherwise fall back to * (not the first entry).
+  base['Access-Control-Allow-Origin'] = allowed.includes(origin) ? origin : '*';
   return base;
 }
 
