@@ -358,7 +358,16 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
 
       const { data, error } = await supabase.functions.invoke('manage-business', {
         headers: await getEdgeAuthHeaders(),
-        body: { action: 'submit_edit', userId: user.id, businessId: profileId, changes },
+        body: {
+          action: 'submit_edit',
+          userId: user.id,
+          businessId: profileId,
+          offeringId:
+            selectedBusiness?.id && String(selectedBusiness.id) !== String(profileId)
+              ? String(selectedBusiness.id)
+              : undefined,
+          changes,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

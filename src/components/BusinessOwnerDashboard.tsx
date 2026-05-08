@@ -1044,9 +1044,21 @@ const BusinessOwnerDashboard: React.FC = () => {
       if (editForm.deal_price !== originalEditForm.deal_price) changes.deal_price = editForm.deal_price;
       if (editForm.original_price !== originalEditForm.original_price) changes.original_price = editForm.original_price;
 
+      const listingOfferingId =
+        selectedBusiness?._profileBusinessId &&
+        String(selectedBusiness.id) !== String(selectedBusiness._profileBusinessId)
+          ? String(selectedBusiness.id)
+          : '';
+
       const { data, error } = await supabase.functions.invoke('manage-business', {
         headers: await getEdgeAuthHeaders(),
-        body: { action: 'submit_edit', userId: user.id, businessId: selectedProfileId, changes },
+        body: {
+          action: 'submit_edit',
+          userId: user.id,
+          businessId: selectedProfileId,
+          ...(listingOfferingId ? { offeringId: listingOfferingId } : {}),
+          changes,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

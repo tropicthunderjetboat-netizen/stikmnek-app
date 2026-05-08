@@ -170,6 +170,7 @@ const AdminPanel: React.FC = () => {
 
   // ─── Edit Business modal state ───
   const [editBusinessId, setEditBusinessId] = useState<string | null>(null);
+  const [editOfferingId, setEditOfferingId] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '', category: '', description: '', discount: '',
@@ -712,6 +713,9 @@ const AdminPanel: React.FC = () => {
       discountValidFrom: new Date().toISOString().split('T')[0], listingDuration: '1_month',
     });
     setEditBusinessId(profileBusinessIdFor(biz));
+    // When the row is a listing (offering-driven), `biz.id` is the offering id.
+    // Keep this so admin edits apply to that specific listing, not just the master profile.
+    setEditOfferingId(String(biz.id || '').trim() || null);
   };
 
   // ─── Save Edit (admin direct) ───
@@ -726,21 +730,36 @@ const AdminPanel: React.FC = () => {
     }
     setSavingEdit(true);
     try {
-      // Use canonical schema (image, discount, deal_price, hours) to avoid "column not found"
-      const updates: Record<string, any> = {
-        name: editForm.name, category: editForm.category, description: editForm.description,
-        discount: editForm.discount, original_price: Number(editForm.originalPrice) || 0,
+      const changes: Record<string, any> = {
+        title: editForm.name,
+        category: editForm.category,
+        description: editForm.description,
+        discount: editForm.discount,
+        original_price: Number(editForm.originalPrice) || 0,
         deal_price: Number(editForm.dealPrice) || 0,
-        location: editForm.location, phone: editForm.phone,
+        location: editForm.location,
+        phone: editForm.phone,
         hours: editForm.hours,
-        map_url: editForm.mapUrl, website: normalizeWebsiteForStorage(editForm.website) ?? '',
+        map_url: editForm.mapUrl,
+        website: normalizeWebsiteForStorage(editForm.website) ?? '',
       };
-      if (editForm.image) updates.image = editForm.image;
+      if (editForm.image) changes.image = editForm.image;
 
-      const { error } = await supabase.from('businesses').update(updates).eq('id', editBusinessId);
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: {
+          action: 'submit_edit',
+          userId: user?.id,
+          businessId: editBusinessId,
+          ...(editOfferingId ? { offeringId: editOfferingId } : {}),
+          changes,
+        },
+      });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       toast.success(`"${editForm.name}" updated successfully!`);
       setEditBusinessId(null);
+      setEditOfferingId(null);
       await refreshBusinesses();
     } catch (err: any) { toast.error('Failed to update business: ' + (err.message || 'Unknown error')); }
     finally { setSavingEdit(false); }
