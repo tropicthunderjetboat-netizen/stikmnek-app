@@ -2222,14 +2222,31 @@ Deno.serve(async (req) => {
       const { data: redemptions, error: redErr } = await redQ;
       if (redErr) return errorResponse(req, redErr.message, 500);
 
-      const evQ = supabase
-        .from('analytics_events')
-        .select('id, event_type, created_at, offering_id')
-        .eq('business_id', businessId)
-        .gte('created_at', sinceIso);
-      if (offeringId) evQ.eq('offering_id', offeringId);
-      const { data: events, error: evErr } = await evQ;
-      if (evErr) return errorResponse(req, evErr.message, 500);
+      // Events table is new; fail-soft if it's not deployed yet.
+      let events: any[] = [];
+      {
+        const evQ = supabase
+          .from('analytics_events')
+          .select('id, event_type, created_at, offering_id')
+          .eq('business_id', businessId)
+          .gte('created_at', sinceIso);
+        if (offeringId) evQ.eq('offering_id', offeringId);
+        const { data: evData, error: evErr } = await evQ;
+        if (evErr) {
+          const msg = String((evErr as any)?.message || evErr);
+          const code = String((evErr as any)?.code || '');
+          // Common when migration hasn't been applied yet:
+          // - Postgres: 42P01 (undefined_table)
+          // - message includes 'relation "analytics_events" does not exist'
+          const isMissingTable =
+            code === '42P01' ||
+            msg.toLowerCase().includes('analytics_events') && msg.toLowerCase().includes('does not exist');
+          if (!isMissingTable) return errorResponse(req, msg, 500);
+          events = [];
+        } else {
+          events = Array.isArray(evData) ? evData : [];
+        }
+      }
 
       const safeReviews = Array.isArray(reviews) ? reviews : [];
       const safeReds = Array.isArray(redemptions) ? redemptions : [];
