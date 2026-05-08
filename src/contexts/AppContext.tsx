@@ -154,6 +154,7 @@ export function defaultPassCartFromProfile(
 export interface DBReview {
   id: string;
   business_id: string;
+  offering_id?: string | null;
   user_name: string;
   rating: number;
   comment: string;
@@ -172,6 +173,7 @@ export function reviewRowToDBReview(row: Record<string, unknown> | null | undefi
   return {
     id: String(row.id),
     business_id: String(row.business_id),
+    offering_id: row.offering_id != null ? String(row.offering_id) : null,
     user_name: (row.user_name != null && String(row.user_name).trim()) ? String(row.user_name).trim() : 'Anonymous',
     rating: displayRating,
     comment: row.comment != null ? String(row.comment) : '',
@@ -185,7 +187,8 @@ function reviewFingerprint(r: DBReview): string {
   const name = (r.user_name || 'Anonymous').trim().toLowerCase();
   const cmt = (r.comment || '').trim();
   const ratingKey = r.has_super_star ? 'super' : String(r.rating);
-  return `fp:${r.business_id}|${name}|${ratingKey}|${cmt}|${createdDate}`;
+  const off = r.offering_id ? String(r.offering_id) : '';
+  return `fp:${r.business_id}|${off}|${name}|${ratingKey}|${cmt}|${createdDate}`;
 }
 
 export function dedupeReviewsList(list: DBReview[]): DBReview[] {
@@ -297,7 +300,8 @@ interface AppContextType {
   redemptions: { businessId: string; date: string; saved: number; offeringId: string | null }[];
   dbBusinesses: Business[];
   dbReviews: DBReview[];
-  submitReview: (businessId: string, rating: number, comment: string, isSuperStar?: boolean) => Promise<void>;
+  /** optional `offeringId` associates the review to a specific listing/deal (businessId stays the master profile id). */
+  submitReview: (businessId: string, rating: number, comment: string, isSuperStar?: boolean, offeringId?: string | null) => Promise<void>;
   /**
    * Owner + redemption preflight for Super Star *payment* (credits === 0).
    * Call before opening the payment modal or charging the card — not after payment.
@@ -1687,7 +1691,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // SUBMIT REVIEW — Direct insert or RPC for Superstar
   // ═══════════════════════════════════════════════════════════
   const submitReview = useCallback(
-    async (businessId: string, rating: number, comment: string, isSuperStar = false) => {
+    async (businessId: string, rating: number, comment: string, isSuperStar = false, offeringId?: string | null) => {
       if (!user) {
         setShowAuth(true);
         return;
@@ -1721,6 +1725,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             p_business_id: businessId,
             p_user_name: user.name,
             p_comment: comment,
+            p_offering_id: offeringId ?? null,
           });
           if (error) throw error;
         } else {
@@ -1728,6 +1733,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .from('reviews')
             .insert({
               business_id: businessId,
+              offering_id: offeringId ?? null,
               user_id: user.id,
               user_name: user.name,
               rating,

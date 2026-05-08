@@ -77,7 +77,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
   // Compute super star count: use DB field if available, otherwise count from reviews
   const superStarCount = (business.superStarCount && business.superStarCount > 0)
     ? business.superStarCount
-    : dbReviews.filter(r => r.business_id === profileId && r.has_super_star).length;
+    : dbReviews.filter((r: any) => r.business_id === profileId && (r.offering_id ? String(r.offering_id) === String(business.id) : true) && r.has_super_star).length;
 
   const hasWhatsApp = digitsForWaMe(getBusinessWhatsAppRaw(business)).length >= 5;
 

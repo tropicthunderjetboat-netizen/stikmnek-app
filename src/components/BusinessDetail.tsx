@@ -188,10 +188,17 @@ const BusinessDetail: React.FC = () => {
     return profileOfferings[0] ?? selectedBusiness;
   }, [selectedBusiness, profileOfferings]);
 
-  const reviews = useMemo(
-    () => (profileId ? dbReviews.filter((r) => r.business_id === profileId) : []),
-    [dbReviews, profileId],
-  );
+  const reviews = useMemo(() => {
+    if (!profileId || !effectiveBiz) return [];
+    const offeringId = String(effectiveBiz.id || '').trim();
+    return dbReviews.filter((r) => {
+      const bid = String((r as any).business_id || '').trim();
+      if (bid !== profileId) return false;
+      const oid = (r as any).offering_id != null ? String((r as any).offering_id).trim() : '';
+      // Prefer offering-specific reviews; keep legacy business-level reviews as a fallback.
+      return oid ? oid === offeringId : true;
+    });
+  }, [dbReviews, profileId, effectiveBiz?.id]);
 
   useEffect(() => {
     if (reviews.length === 0) {
@@ -932,6 +939,7 @@ const BusinessDetail: React.FC = () => {
                   <ReviewForm
                     businessId={profileId}
                     businessName={biz.name}
+                    offeringId={biz.id}
                     compact
                     onSuccess={() => setShowReviewForm(false)}
                     onCancel={() => setShowReviewForm(false)}
