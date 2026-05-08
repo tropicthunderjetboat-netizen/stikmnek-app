@@ -2199,23 +2199,100 @@ Deno.serve(async (req) => {
       const denied = await assertAdminOrOwner(supabase, String(businessId), authUser, req);
       if (denied) return denied;
 
-      const { data: reviews } = await supabase
-        .from('reviews')
-        .select('id, rating, created_at')
-        .eq('business_id', businessId);
+      const offeringId = String(body.offeringId || '').trim() || null;
+      const rangeDaysRaw = Number(body.rangeDays);
+      const rangeDays = Number.isFinite(rangeDaysRaw) && rangeDaysRaw > 0 ? Math.min(rangeDaysRaw, 365) : 30;
+      const sinceIso = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
 
-      const { data: redemptions } = await supabase
+      const reviewsQ = supabase
+        .from('reviews')
+        .select('id, rating, created_at, has_super_star')
+        .eq('business_id', businessId)
+        .gte('created_at', sinceIso);
+      if (offeringId) reviewsQ.eq('offering_id', offeringId);
+      const { data: reviews, error: revErr } = await reviewsQ;
+      if (revErr) return errorResponse(req, revErr.message, 500);
+
+      const redQ = supabase
         .from('redemptions')
-        .select('id, created_at')
-        .eq('business_id', businessId);
+        .select('id, redeemed_at, saved_amount, offering_id')
+        .eq('business_id', businessId)
+        .gte('redeemed_at', sinceIso);
+      if (offeringId) redQ.eq('offering_id', offeringId);
+      const { data: redemptions, error: redErr } = await redQ;
+      if (redErr) return errorResponse(req, redErr.message, 500);
+
+      const evQ = supabase
+        .from('analytics_events')
+        .select('id, event_type, created_at, offering_id')
+        .eq('business_id', businessId)
+        .gte('created_at', sinceIso);
+      if (offeringId) evQ.eq('offering_id', offeringId);
+      const { data: events, error: evErr } = await evQ;
+      if (evErr) return errorResponse(req, evErr.message, 500);
+
+      const safeReviews = Array.isArray(reviews) ? reviews : [];
+      const safeReds = Array.isArray(redemptions) ? redemptions : [];
+      const safeEvents = Array.isArray(events) ? events : [];
+      const reviewCount = safeReviews.length;
+      const superStarCount = safeReviews.filter((r: any) => !!r.has_super_star).length;
+      const avgRating = reviewCount
+        ? safeReviews.reduce((s: number, r: any) => s + (Number(r.rating) || 0), 0) / reviewCount
+        : 0;
+
+      const redemptionCount = safeReds.length;
+      const totalSaved = safeReds.reduce((s: number, r: any) => s + (Number(r.saved_amount) || 0), 0);
+
+      const viewCount = safeEvents.filter((e: any) => e.event_type === 'view_listing').length;
+      const clickCount = safeEvents.filter((e: any) => e.event_type === 'click_listing').length;
+      const requestBookingTapCount = safeEvents.filter((e: any) => e.event_type === 'tap_request_booking').length;
+      const whatsappTapCount = safeEvents.filter((e: any) => e.event_type === 'tap_whatsapp').length;
+
+      // Group redemptions by day (YYYY-MM-DD)
+      const byDay: Record<string, { date: string; count: number; saved: number }> = {};
+      for (const r of safeReds as any[]) {
+        const iso = r.redeemed_at ? String(r.redeemed_at) : '';
+        const day = iso ? new Date(iso).toISOString().slice(0, 10) : null;
+        if (!day) continue;
+        if (!byDay[day]) byDay[day] = { date: day, count: 0, saved: 0 };
+        byDay[day].count += 1;
+        byDay[day].saved += Number(r.saved_amount) || 0;
+      }
+      const redemptionsByDay = Object.values(byDay).sort((a, b) => a.date.localeCompare(b.date));
+
+      // Group events by day + type
+      const evByDay: Record<
+        string,
+        { date: string; views: number; clicks: number; requestBookings: number; whatsappTaps: number }
+      > = {};
+      for (const e of safeEvents as any[]) {
+        const iso = e.created_at ? String(e.created_at) : '';
+        const day = iso ? new Date(iso).toISOString().slice(0, 10) : null;
+        if (!day) continue;
+        if (!evByDay[day]) evByDay[day] = { date: day, views: 0, clicks: 0, requestBookings: 0, whatsappTaps: 0 };
+        if (e.event_type === 'view_listing') evByDay[day].views += 1;
+        if (e.event_type === 'click_listing') evByDay[day].clicks += 1;
+        if (e.event_type === 'tap_request_booking') evByDay[day].requestBookings += 1;
+        if (e.event_type === 'tap_whatsapp') evByDay[day].whatsappTaps += 1;
+      }
+      const eventsByDay = Object.values(evByDay).sort((a, b) => a.date.localeCompare(b.date));
 
       return jsonResponse(req, {
         success: true,
-        reviewCount: reviews?.length || 0,
-        redemptionCount: redemptions?.length || 0,
-        avgRating: reviews?.length
-          ? reviews.reduce((s: number, r: any) => s + (r.rating || 0), 0) / reviews.length
-          : 0,
+        businessId,
+        offeringId,
+        rangeDays,
+        reviewCount,
+        superStarCount,
+        redemptionCount,
+        totalSaved,
+        avgRating,
+        redemptionsByDay,
+        viewCount,
+        clickCount,
+        requestBookingTapCount,
+        whatsappTapCount,
+        eventsByDay,
       });
     }
 

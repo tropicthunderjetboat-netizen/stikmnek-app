@@ -7,6 +7,7 @@ import ReviewForm from '@/components/ReviewForm';
 import PhotoGallery from '@/components/PhotoGallery';
 import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe, getPhotoDisplayUrl } from '@/lib/utils';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
+import { trackInteractionEvent } from '@/lib/interactionEvents';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import BookingInquiryModal from '@/components/BookingInquiryModal';
 import { categoryUsesTieredPricing, pricingTiersFromDb } from '@/lib/pricingTiers';
@@ -445,6 +446,16 @@ const BusinessDetail: React.FC = () => {
   /** Same rule as booking: only pass holders get WhatsApp (avoids discount leakage). */
   const canUseWhatsAppContact = Boolean(user?.pass);
 
+  useEffect(() => {
+    if (!profileId) return;
+    void trackInteractionEvent({
+      eventType: 'view_listing',
+      businessId: profileId,
+      offeringId: String(biz.id),
+      dedupeInSession: true,
+    });
+  }, [profileId, biz?.id]);
+
   const openReviewFormIfAllowed = () => {
     if (!profileId) return;
     void (async () => {
@@ -487,6 +498,13 @@ const BusinessDetail: React.FC = () => {
       void purchasePass();
       return;
     }
+    if (profileId) {
+      void trackInteractionEvent({
+        eventType: 'tap_request_booking',
+        businessId: profileId,
+        offeringId: String(biz.id),
+      });
+    }
     setShowBookingModal(true);
   };
 
@@ -510,6 +528,13 @@ const BusinessDetail: React.FC = () => {
     const raw = getBusinessWhatsAppRaw(biz);
     const d = digitsForWaMe(raw);
     if (d.length < 5) return;
+    if (profileId) {
+      void trackInteractionEvent({
+        eventType: 'tap_whatsapp',
+        businessId: profileId,
+        offeringId: String(biz.id),
+      });
+    }
     const url = buildBookingInquiryWhatsAppUrl(d, {
       businessName: biz.name,
       visitDate: 'To be confirmed',

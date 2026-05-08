@@ -12,6 +12,7 @@ import {
 import { Star, Heart, MapPin, Clock, Share2, Sparkles } from 'lucide-react';
 import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
+import { trackInteractionEvent } from '@/lib/interactionEvents';
 import { toast } from 'sonner';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
@@ -84,6 +85,12 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
   const viewDetailsLabel = `View details for ${business.name}`;
 
   const handleViewDeal = () => {
+    void trackInteractionEvent({
+      eventType: 'click_listing',
+      businessId: profileId,
+      offeringId: String(business.id),
+      dedupeInSession: false,
+    });
     setSelectedBusiness(business);
     setCurrentView('business-detail');
   };
@@ -118,6 +125,12 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
     }
     const d = digitsForWaMe(getBusinessWhatsAppRaw(business));
     if (d.length < 5) return;
+    void trackInteractionEvent({
+      eventType: 'tap_whatsapp',
+      businessId: profileId,
+      offeringId: String(business.id),
+      dedupeInSession: false,
+    });
     const url = buildBookingInquiryWhatsAppUrl(d, {
       businessName: business.name,
       visitDate: 'To be confirmed',
