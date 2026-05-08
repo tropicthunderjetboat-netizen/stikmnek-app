@@ -228,6 +228,21 @@ const BusinessDetail: React.FC = () => {
     categoryUsesTieredPricing(effectiveBiz.category) &&
     pricingTiers.length > 0;
 
+  const tierDiscountBadge = useMemo(() => {
+    if (!showTieredTable) return null;
+    let bestPct = 0;
+    for (const t of pricingTiers) {
+      const o = Number(t.original_price_vt) || 0;
+      const d = Number(t.deal_price_vt) || 0;
+      if (o > 0 && d > 0 && d < o) {
+        const pct = Math.round((1 - d / o) * 100);
+        if (pct > bestPct) bestPct = pct;
+      }
+    }
+    if (bestPct <= 0) return null;
+    return `${bestPct}% OFF`;
+  }, [pricingTiers, showTieredTable]);
+
   const mapCoords = useMemo(() => {
     if (!effectiveBiz) return null;
     const o = primaryEmbeddedOffering(selectedBusiness as Business);
@@ -372,11 +387,13 @@ const BusinessDetail: React.FC = () => {
   const operatingHoursText = String(biz.hours || '').trim();
   const dealPx = effectiveListingDealPrice(biz);
   const origPx = effectiveListingOriginalPrice(biz);
-  const hasActiveDiscount = listingHasActiveDiscount(biz);
+  const hasActiveDiscount = listingHasActiveDiscount(biz) || Boolean(tierDiscountBadge);
   const displayListPx = customerFacingListPrice(biz);
   const detailDiscountBadge =
     hasActiveDiscount && String(biz.discount ?? '').trim()
       ? String(biz.discount).trim()
+      : tierDiscountBadge
+        ? tierDiscountBadge
       : hasActiveDiscount && origPx > 0
         ? `${Math.round((1 - dealPx / origPx) * 100)}% OFF`
         : null;

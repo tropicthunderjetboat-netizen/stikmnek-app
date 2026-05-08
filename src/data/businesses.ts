@@ -1,4 +1,4 @@
-import { representativePerPersonPricesFromTiers } from '@/lib/pricingTiers';
+import { pricingTiersFromDb, representativePerPersonPricesFromTiers } from '@/lib/pricingTiers';
 
 export type Category = 'dining' | 'activities' | 'tours' | 'shopping' | 'spa' | 'accommodation';
 
@@ -136,7 +136,17 @@ export function effectiveListingOriginalPrice(b: Business): number {
 export function listingHasActiveDiscount(b: Business): boolean {
   const deal = effectiveListingDealPrice(b);
   const orig = effectiveListingOriginalPrice(b);
-  return orig > 0 && deal > 0 && deal < orig;
+  if (orig > 0 && deal > 0 && deal < orig) return true;
+
+  // Fallback: tiered rows may exist even when the “headline” pair is not present/mapped.
+  const o = primaryEmbeddedOffering(b);
+  const raw =
+    b.pricingTiers ??
+    (b as Record<string, unknown>).pricing_tiers ??
+    o?.pricing_tiers ??
+    (o as Record<string, unknown> | undefined)?.tier_pricing;
+  const tiers = pricingTiersFromDb(raw);
+  return tiers.some((t) => t.original_price_vt > 0 && t.deal_price_vt > 0 && t.deal_price_vt < t.original_price_vt);
 }
 
 /** Headline price for cards and detail (discounted price, or list price when no deal). */
