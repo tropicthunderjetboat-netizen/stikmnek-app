@@ -2103,6 +2103,8 @@ Deno.serve(async (req) => {
       const limit = Math.min(Math.max(Number(body.limit) || 100, 1), 500);
       const { data, error } = await supabase
         .from('reviews')
+        // Avoid implicit joins: some projects don't have FKs between reviews ↔ businesses/offers,
+        // which makes PostgREST relationship embedding fail ("schema cache" error).
         .select(
           [
             'id',
@@ -2117,9 +2119,6 @@ Deno.serve(async (req) => {
             'moderated_at',
             'moderated_by',
             'moderation_reason',
-            // joins (when FK exists)
-            'businesses(name)',
-            'business_offerings(title)',
           ].join(','),
         )
         .order('created_at', { ascending: false })
