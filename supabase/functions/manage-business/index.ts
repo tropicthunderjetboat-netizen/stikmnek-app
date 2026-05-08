@@ -2299,6 +2299,7 @@ Deno.serve(async (req) => {
 
       return jsonResponse(req, {
         success: true,
+        action: 'get_analytics',
         businessId,
         offeringId,
         rangeDays,
