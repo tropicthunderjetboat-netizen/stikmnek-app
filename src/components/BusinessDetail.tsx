@@ -47,7 +47,7 @@ type ReviewResponseRow = { review_id: string; response: string; created_at: stri
 
 /** Master profile fields required by `mapJoinedOfferingToBusiness` (listing detail lives on offerings). */
 const PROFILE_STUB_COLS =
-  'id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone, email, contact_email, business_email, whatsapp_number, rating, review_count, featured, active, map_url, website, tags';
+  'id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone, email, contact_email, business_email, whatsapp_number, rating, review_count, featured, active, map_url, website, tags, image, logo_url';
 
 // WhatsApp SVG icon component
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
@@ -540,6 +540,17 @@ const BusinessDetail: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
+              {biz.profileLogoUrl && (
+                <div className="h-10 w-10 rounded-xl bg-white/90 p-1 shadow-lg ring-1 ring-white/60">
+                  <img
+                    src={biz.profileLogoUrl}
+                    alt=""
+                    className="h-full w-full rounded-lg object-contain"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              )}
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white">{biz.name}</h1>
               {superStarCount > 0 && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500 to-violet-600 text-white text-xs font-bold shadow-lg shadow-purple-500/30">

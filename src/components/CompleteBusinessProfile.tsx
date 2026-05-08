@@ -118,7 +118,9 @@ const CompleteBusinessProfile: React.FC = () => {
         description: '',
         description_fr: '',
         description_bi: '',
+        // `image` is deprecated for listings, but kept as fallback for older reads.
         image: logoUrl,
+        logo_url: logoUrl,
         discount: '',
         original_price: 0,
         deal_price: 0,

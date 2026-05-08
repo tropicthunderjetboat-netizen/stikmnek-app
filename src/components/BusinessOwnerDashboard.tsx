@@ -192,7 +192,7 @@ function mapProfileRowToUnified(b: Record<string, unknown>): UnifiedBusiness {
     description: String(b.description ?? ''),
     descriptionFr: String((b.description_fr ?? b.description) ?? ''),
     descriptionBi: String((b.description_bi ?? b.description) ?? ''),
-    image: String((b.image as string) || (b.image_url as string) || ''),
+              image: String((b.logo_url as string) || (b.image as string) || (b.image_url as string) || ''),
     rating: Number(b.rating) || 0,
     reviewCount: Number(b.review_count) || 0,
     discount: String((b.discount as string) || (b.deal as string) || ''),

@@ -33,6 +33,8 @@ export interface Business {
   profileBusinessId?: string;
   /** Trading / venue name from profile (optional subtitle vs offer `title`). */
   profileName?: string;
+  /** Business logo URL from the master `businesses` profile. */
+  profileLogoUrl?: string | null;
   /**
    * Embedded offerings from `select('*, business_offerings(*)')` (optional).
    * Cleared in most UI paths after mapping with `mapJoinedOfferingToBusiness`.
