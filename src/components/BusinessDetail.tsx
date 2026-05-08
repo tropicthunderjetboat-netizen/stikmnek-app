@@ -435,6 +435,8 @@ const BusinessDetail: React.FC = () => {
         : null;
   const isListingOwner = Boolean(user?.id && biz.ownerId && user.id === biz.ownerId);
   const isFav = favorites.includes(profileId);
+  /** Same rule as booking: only pass holders get WhatsApp (avoids discount leakage). */
+  const canUseWhatsAppContact = Boolean(user?.pass);
 
   const openReviewFormIfAllowed = () => {
     if (!profileId) return;
@@ -482,6 +484,22 @@ const BusinessDetail: React.FC = () => {
   };
 
   const handleWhatsApp = () => {
+    if (!user) {
+      setShowAuth(true);
+      setAuthMode('signin');
+      return;
+    }
+    if (!user.pass) {
+      toast.error(
+        language === 'en'
+          ? 'Get a StikmNek pass to message businesses on WhatsApp and unlock member rates.'
+          : language === 'fr'
+            ? 'Obtenez un pass StikmNek pour contacter les entreprises sur WhatsApp et bénéficier des tarifs membres.'
+            : 'Yu nidim StikmNek pas blong mesej bisnis long WhatsApp mo kasem praes blong membas.',
+      );
+      void purchasePass();
+      return;
+    }
     const raw = getBusinessWhatsAppRaw(biz);
     const d = digitsForWaMe(raw);
     if (d.length < 5) return;
@@ -598,6 +616,7 @@ const BusinessDetail: React.FC = () => {
               <span className="px-2 py-0.5 rounded-md bg-white/20 backdrop-blur-sm text-white text-xs capitalize">{biz.category}</span>
               {hasWhatsApp && (
                 <button
+                  type="button"
                   onClick={handleWhatsApp}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/90 backdrop-blur-sm text-white text-xs font-bold hover:bg-green-600 transition-colors"
                 >
@@ -763,7 +782,7 @@ const BusinessDetail: React.FC = () => {
               </div>
             )}
 
-            {/* WhatsApp Contact Card */}
+            {/* WhatsApp Contact Card — number shown only to pass holders */}
             {hasWhatsApp && (
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-5 shadow-sm border border-green-200">
                 <div className="flex items-center gap-3 mb-3">
@@ -775,35 +794,59 @@ const BusinessDetail: React.FC = () => {
                       {language === 'en' ? 'Chat on WhatsApp' : language === 'fr' ? 'Discuter sur WhatsApp' : 'Toktok long WhatsApp'}
                     </h3>
                     <p className="text-xs text-green-600">
-                      {language === 'en'
-                        ? 'Send a message directly to this business'
-                        : language === 'fr'
-                        ? 'Envoyez un message directement à cette entreprise'
-                        : 'Sendem mesej daerekli long bisnis ia'}
+                      {canUseWhatsAppContact
+                        ? language === 'en'
+                          ? 'Send a message directly to this business'
+                          : language === 'fr'
+                            ? 'Envoyez un message directement à cette entreprise'
+                            : 'Sendem mesej daerekli long bisnis ia'
+                        : language === 'en'
+                          ? 'Available once you have an active StikmNek pass — same as Request booking.'
+                          : language === 'fr'
+                            ? 'Disponible avec un pass StikmNek actif — comme « Demander une réservation ».'
+                            : 'I save wok sapos yu gat aktiv StikmNek pas — semak Askem bukin.'}
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-green-200 flex-1 min-w-0">
-                    <WhatsAppIcon className="w-4 h-4 text-green-600 shrink-0" />
-                    <span className="text-sm font-medium text-gray-700 truncate">{formatWhatsAppDisplay(businessWhatsAppRaw)}</span>
-                  </div>
+                {canUseWhatsAppContact ? (
+                  <>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-green-200 flex-1 min-w-0">
+                        <WhatsAppIcon className="w-4 h-4 text-green-600 shrink-0" />
+                        <span className="text-sm font-medium text-gray-700 truncate">{formatWhatsAppDisplay(businessWhatsAppRaw)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleWhatsApp}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold text-sm hover:from-green-600 hover:to-green-700 transition-all shadow-lg shadow-green-200/50 whitespace-nowrap"
+                      >
+                        <WhatsAppIcon className="w-4 h-4" />
+                        {language === 'en' ? 'Open WhatsApp' : language === 'fr' ? 'Ouvrir WhatsApp' : 'Openem WhatsApp'}
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-green-500 mt-2">
+                      {language === 'en'
+                        ? 'Opens WhatsApp with a pre-filled message. Available on mobile and desktop.'
+                        : language === 'fr'
+                          ? 'Ouvre WhatsApp avec un message pré-rempli. Disponible sur mobile et bureau.'
+                          : 'Openem WhatsApp wetem mesej we i redi. I wok long fon mo kompyuta.'}
+                    </p>
+                  </>
+                ) : (
                   <button
+                    type="button"
                     onClick={handleWhatsApp}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold text-sm hover:from-green-600 hover:to-green-700 transition-all shadow-lg shadow-green-200/50 whitespace-nowrap"
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold text-sm hover:from-green-600 hover:to-green-700 transition-all shadow-lg shadow-green-200/50"
                   >
                     <WhatsAppIcon className="w-4 h-4" />
-                    {language === 'en' ? 'Open WhatsApp' : language === 'fr' ? 'Ouvrir WhatsApp' : 'Openem WhatsApp'}
-                    <ExternalLink className="w-3.5 h-3.5" />
+                    {language === 'en'
+                      ? 'Sign in & get a pass to use WhatsApp'
+                      : language === 'fr'
+                        ? 'Connectez-vous et obtenez un pass pour WhatsApp'
+                        : 'Login mo kasem pas blong yusum WhatsApp'}
                   </button>
-                </div>
-                <p className="text-[11px] text-green-500 mt-2">
-                  {language === 'en'
-                    ? 'Opens WhatsApp with a pre-filled message. Available on mobile and desktop.'
-                    : language === 'fr'
-                    ? 'Ouvre WhatsApp avec un message pré-rempli. Disponible sur mobile et bureau.'
-                    : 'Openem WhatsApp wetem mesej we i redi. I wok long fon mo kompyuta.'}
-                </p>
+                )}
               </div>
             )}
 
@@ -1031,6 +1074,7 @@ const BusinessDetail: React.FC = () => {
               {/* WhatsApp Button in Sidebar */}
               {hasWhatsApp && (
                 <button
+                  type="button"
                   onClick={handleWhatsApp}
                   className="w-full py-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold text-sm hover:from-green-600 hover:to-green-700 transition-all shadow-lg shadow-green-200 mb-3 flex items-center justify-center gap-2"
                 >
@@ -1110,8 +1154,9 @@ const BusinessDetail: React.FC = () => {
                   </div>
                 ) : null}
                 <div className="flex items-center gap-3 text-sm text-gray-600"><Phone className="w-4 h-4 text-teal-600 shrink-0" />{biz.phone}</div>
-                {hasWhatsApp && (
+                {hasWhatsApp && canUseWhatsAppContact && (
                   <button
+                    type="button"
                     onClick={handleWhatsApp}
                     className="flex items-center gap-3 text-sm text-green-600 hover:text-green-700 transition-colors w-full text-left group"
                   >

@@ -43,7 +43,18 @@ const iconActionBtn =
   'inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2';
 
 const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false }) => {
-  const { language, favorites, toggleFavorite, setSelectedBusiness, setCurrentView, user, setShowAuth, setAuthMode, dbReviews } = useAppContext();
+  const {
+    language,
+    favorites,
+    toggleFavorite,
+    setSelectedBusiness,
+    setCurrentView,
+    user,
+    setShowAuth,
+    setAuthMode,
+    dbReviews,
+    purchasePass,
+  } = useAppContext();
   const profileId = profileBusinessIdFor(business);
   const embed = primaryEmbeddedOffering(business);
   const dealPrice = effectiveListingDealPrice(business);
@@ -89,6 +100,22 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
 
   const handleWhatsApp = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!user) {
+      setShowAuth(true);
+      setAuthMode('signin');
+      return;
+    }
+    if (!user.pass) {
+      toast.error(
+        language === 'en'
+          ? 'Get a StikmNek pass to message businesses on WhatsApp and unlock member rates.'
+          : language === 'fr'
+            ? 'Obtenez un pass StikmNek pour contacter les entreprises sur WhatsApp et bénéficier des tarifs membres.'
+            : 'Yu nidim StikmNek pas blong mesej bisnis long WhatsApp mo kasem praes blong membas.',
+      );
+      void purchasePass();
+      return;
+    }
     const d = digitsForWaMe(getBusinessWhatsAppRaw(business));
     if (d.length < 5) return;
     const url = buildBookingInquiryWhatsAppUrl(d, {
