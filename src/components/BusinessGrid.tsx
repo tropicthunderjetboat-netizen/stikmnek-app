@@ -42,17 +42,21 @@ function computeLeaderboardScore(
   const maxReviews = Math.max(...allBusinesses.map(b => b.reviewCount), 1);
   const maxSuperStars = Math.max(...allBusinesses.map(b => {
     const pid = profileBusinessIdFor(b);
-    const dbCount = b.superStarCount || 0;
-    const reviewCount = dbReviews.filter(r => r.business_id === pid && r.has_super_star).length;
-    return Math.max(dbCount, reviewCount);
+    const reviewCount = dbReviews.filter((r: any) =>
+      r.business_id === pid &&
+      r.has_super_star &&
+      (r.offering_id ? String(r.offering_id) === String(b.id) : false)
+    ).length;
+    return reviewCount;
   }), 1);
 
   const ratingScore = Math.min(biz.rating / 5, 1);
   const reviewScore = Math.min(Math.log(biz.reviewCount + 1) / Math.log(maxReviews + 1), 1);
-  const superStarCount = Math.max(
-    biz.superStarCount || 0,
-    dbReviews.filter(r => r.business_id === profileId && r.has_super_star).length
-  );
+  const superStarCount = dbReviews.filter((r: any) =>
+    r.business_id === profileId &&
+    r.has_super_star &&
+    (r.offering_id ? String(r.offering_id) === String(biz.id) : false)
+  ).length;
   const superStarScore = maxSuperStars > 0 ? Math.min(superStarCount / maxSuperStars, 1) : 0;
   const oDeal = effectiveListingDealPrice(biz);
   const oOrig = effectiveListingOriginalPrice(biz);
