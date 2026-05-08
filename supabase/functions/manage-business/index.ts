@@ -2091,6 +2091,71 @@ Deno.serve(async (req) => {
       return jsonResponse(req, { success: true });
     }
 
+    // ─── ADMIN_LIST_REVIEWS ─── (admin only)
+    if (action === 'admin_list_reviews') {
+      const denied = await assertAdmin(supabase, authUser.id, req);
+      if (denied) return denied;
+
+      const limit = Math.min(Math.max(Number(body.limit) || 100, 1), 500);
+      const { data, error } = await supabase
+        .from('reviews')
+        .select(
+          [
+            'id',
+            'business_id',
+            'offering_id',
+            'user_name',
+            'rating',
+            'comment',
+            'created_at',
+            'has_super_star',
+            'is_public',
+            'moderated_at',
+            'moderated_by',
+            'moderation_reason',
+            // joins (when FK exists)
+            'businesses(name)',
+            'business_offerings(title)',
+          ].join(','),
+        )
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { reviews: data || [] });
+    }
+
+    // ─── ADMIN_SET_REVIEW_PUBLIC ─── (admin only)
+    if (action === 'admin_set_review_public') {
+      const denied = await assertAdmin(supabase, authUser.id, req);
+      if (denied) return denied;
+      const reviewId = String(body.reviewId || '').trim();
+      const isPublic = body.isPublic;
+      const reason = String(body.reason || '').trim();
+      if (!reviewId || typeof isPublic !== 'boolean') {
+        return errorResponse(req, 'Missing reviewId or isPublic');
+      }
+      const updates: Record<string, unknown> = {
+        is_public: isPublic,
+        moderated_at: new Date().toISOString(),
+        moderated_by: authUser.id,
+        moderation_reason: reason || null,
+      };
+      const { error } = await supabase.from('reviews').update(updates).eq('id', reviewId);
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { success: true });
+    }
+
+    // ─── ADMIN_DELETE_REVIEW ─── (admin only)
+    if (action === 'admin_delete_review') {
+      const denied = await assertAdmin(supabase, authUser.id, req);
+      if (denied) return denied;
+      const reviewId = String(body.reviewId || '').trim();
+      if (!reviewId) return errorResponse(req, 'Missing reviewId');
+      const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { success: true });
+    }
+
     // ─── GET_ALL_PHOTOS ─── (admin only)
     if (action === 'get_all_photos') {
       const denied = await assertAdmin(supabase, authUser.id, req);

@@ -125,7 +125,13 @@ interface PendingEdit {
 const AdminPanel: React.FC = () => {
   const { language, user, refreshBusinesses, dbBusinesses } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'businesses' | 'approvals' | 'users' | 'passes' | 'emails' | 'reports'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'businesses' | 'approvals' | 'reviews' | 'users' | 'passes' | 'emails' | 'reports'>('overview');
+
+  // Review moderation (admin-only)
+  const [adminReviews, setAdminReviews] = useState<any[]>([]);
+  const [loadingAdminReviews, setLoadingAdminReviews] = useState(false);
+  const [moderatingReviewId, setModeratingReviewId] = useState<string | null>(null);
+  const [reviewReasonById, setReviewReasonById] = useState<Record<string, string>>({});
 
 
 
@@ -784,6 +790,75 @@ const AdminPanel: React.FC = () => {
     return () => clearTimeout(timer);
   }, [activeTab, user, loadPending]);
 
+  const loadAdminReviews = useCallback(async () => {
+    if (!user) return;
+    setLoadingAdminReviews(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: { action: 'admin_list_reviews', limit: 300 },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(String(data.error));
+      setAdminReviews(Array.isArray(data?.reviews) ? data.reviews : []);
+    } catch (err: any) {
+      toast.error('Failed to load reviews: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setLoadingAdminReviews(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (activeTab !== 'reviews' || !user) return;
+    void loadAdminReviews();
+  }, [activeTab, user, loadAdminReviews]);
+
+  const setReviewPublic = useCallback(
+    async (reviewId: string, isPublic: boolean) => {
+      if (!user) return;
+      setModeratingReviewId(reviewId);
+      try {
+        const reason = (reviewReasonById[reviewId] || '').trim();
+        const { data, error } = await supabase.functions.invoke('manage-business', {
+          headers: await getEdgeAuthHeaders(),
+          body: { action: 'admin_set_review_public', reviewId, isPublic, reason },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(String(data.error));
+        toast.success(isPublic ? 'Review is now public' : 'Review hidden');
+        await loadAdminReviews();
+      } catch (err: any) {
+        toast.error('Moderation failed: ' + (err?.message || 'Unknown error'));
+      } finally {
+        setModeratingReviewId(null);
+      }
+    },
+    [user, reviewReasonById, loadAdminReviews],
+  );
+
+  const deleteReviewAdmin = useCallback(
+    async (reviewId: string) => {
+      if (!user) return;
+      if (!confirm('Delete this review permanently? This cannot be undone.')) return;
+      setModeratingReviewId(reviewId);
+      try {
+        const { data, error } = await supabase.functions.invoke('manage-business', {
+          headers: await getEdgeAuthHeaders(),
+          body: { action: 'admin_delete_review', reviewId },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(String(data.error));
+        toast.success('Review deleted');
+        await loadAdminReviews();
+      } catch (err: any) {
+        toast.error('Delete failed: ' + (err?.message || 'Unknown error'));
+      } finally {
+        setModeratingReviewId(null);
+      }
+    },
+    [user, loadAdminReviews],
+  );
+
 
   // ─── Real-time subscription for pending_businesses table ───
   useEffect(() => {
@@ -1050,7 +1125,7 @@ const AdminPanel: React.FC = () => {
         {/* Tabs */}
         {/* Tabs */}
         <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm border border-gray-100 mb-8 w-fit overflow-x-auto">
-          {(['overview', 'businesses', 'approvals', 'users', 'passes', 'emails', 'reports'] as const).map(tab => (
+          {(['overview', 'businesses', 'approvals', 'reviews', 'users', 'passes', 'emails', 'reports'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1063,6 +1138,7 @@ const AdminPanel: React.FC = () => {
               {tab === 'users' && <Users className="w-3.5 h-3.5" />}
               {tab === 'emails' && <Mail className="w-3.5 h-3.5" />}
               {tab === 'passes' && <CreditCard className="w-3.5 h-3.5" />}
+              {tab === 'reviews' && <MessageSquare className="w-3.5 h-3.5" />}
               {tab}
               {tab === 'approvals' && (pendingCount + pendingEditCount) > 0 && (
                 <span className={`absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
@@ -1089,6 +1165,133 @@ const AdminPanel: React.FC = () => {
           <Suspense fallback={<AdminTabFallback />}>
             <AdminUserManager />
           </Suspense>
+        )}
+
+        {/* ═══ REVIEWS TAB ═══ */}
+        {activeTab === 'reviews' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 className="text-lg font-extrabold text-gray-900">Review Moderation</h2>
+                <p className="text-sm text-gray-500">
+                  Hide reviews with profanities/unsafe content, or delete when required.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadAdminReviews}
+                disabled={loadingAdminReviews}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingAdminReviews ? 'animate-spin' : ''}`} />
+                {loadingAdminReviews ? 'Loading…' : 'Reload'}
+              </button>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      <th className="px-4 py-3">Business / Listing</th>
+                      <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3">Rating</th>
+                      <th className="px-4 py-3">Comment</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminReviews.length === 0 && !loadingAdminReviews ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                          No reviews found.
+                        </td>
+                      </tr>
+                    ) : (
+                      adminReviews.map((r) => {
+                        const businessName = String(r?.businesses?.name || r?.business_name || r?.business_id || '');
+                        const offeringTitle = String(r?.business_offerings?.title || r?.offering_title || '').trim();
+                        const isPublic = r?.is_public !== false;
+                        const isSuper = Boolean(r?.has_super_star);
+                        const busy = moderatingReviewId === String(r.id);
+                        return (
+                          <tr key={r.id} className="border-b border-gray-100 last:border-0 align-top">
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-gray-900">{businessName || '—'}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">
+                                {offeringTitle
+                                  ? `Listing: ${offeringTitle}`
+                                  : r?.offering_id
+                                    ? `Listing: ${r.offering_id}`
+                                    : 'Listing: (business-level / legacy)'}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">{String(r.user_name || 'Anonymous')}</td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold ${
+                                  isSuper
+                                    ? 'bg-purple-50 text-purple-700 border border-purple-100'
+                                    : 'bg-gray-50 text-gray-700 border border-gray-100'
+                                }`}
+                              >
+                                {isSuper ? 'Super Star' : 'Review'} · {r.rating}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700 max-w-md">
+                              <div className="line-clamp-3 whitespace-pre-wrap">{String(r.comment || '')}</div>
+                              <input
+                                value={reviewReasonById[r.id] || ''}
+                                onChange={(e) => setReviewReasonById((p) => ({ ...p, [r.id]: e.target.value }))}
+                                placeholder="Moderation note (optional)…"
+                                className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={`inline-flex px-2 py-0.5 rounded-md text-xs font-bold ${
+                                  isPublic
+                                    ? 'bg-green-50 text-green-700 border border-green-100'
+                                    : 'bg-red-50 text-red-700 border border-red-100'
+                                }`}
+                              >
+                                {isPublic ? 'Public' : 'Hidden'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col gap-2 min-w-[10rem]">
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => setReviewPublic(String(r.id), !isPublic)}
+                                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 ${
+                                    isPublic
+                                      ? 'bg-amber-600 text-white hover:bg-amber-700'
+                                      : 'bg-teal-600 text-white hover:bg-teal-700'
+                                  }`}
+                                >
+                                  {busy ? 'Working…' : isPublic ? 'Hide' : 'Make public'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => deleteReviewAdmin(String(r.id))}
+                                  className="px-3 py-2 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                                >
+                                  {busy ? 'Working…' : 'Delete'}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
 
 

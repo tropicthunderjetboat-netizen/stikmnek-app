@@ -531,6 +531,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase
         .from('reviews')
         .select('*')
+        // Only show public reviews in the tourist UI; admins can hide/unhide in Admin Panel.
+        .or('is_public.is.null,is_public.eq.true')
         .order('created_at', { ascending: false });
       if (error) throw error;
       if (data) {
