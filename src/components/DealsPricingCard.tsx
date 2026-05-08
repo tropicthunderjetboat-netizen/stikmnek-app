@@ -77,19 +77,84 @@ export default function DealsPricingCard({
       )}
     >
       <div className="flex flex-col items-center gap-2 px-4 pb-3 pt-4 sm:gap-2.5 sm:px-5 sm:pb-4 sm:pt-5">
-        {/* Header */}
-        <div className="flex flex-col items-center gap-0.5">
+        {/* 1. Coverage first — 7-day leads (long-stay default story) */}
+        <div className="flex w-full max-w-[20rem] flex-col gap-1">
+          <p className="text-center text-[8px] font-bold uppercase tracking-widest text-slate-400">
+            {t('passPricing.coverage_label', language)}
+          </p>
+          <div
+            className="mx-auto flex w-full rounded-full bg-slate-200/80 p-0.5"
+            role="group"
+            aria-label={t('passPricing.coverage_label', language)}
+          >
+            <button
+              type="button"
+              onClick={() => setIsExtended(true)}
+              className={cn(
+                'min-w-0 flex-[3] rounded-full py-2 text-[11px] font-black uppercase tracking-wide transition-all sm:text-xs',
+                isExtended
+                  ? 'bg-white text-violet-700 shadow-md ring-1 ring-violet-200/60'
+                  : 'text-slate-500 hover:bg-white/40 hover:text-slate-700'
+              )}
+            >
+              {t('passPricing.duration_7d', language)}
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsExtended(false)}
+              className={cn(
+                'min-w-0 flex-[2] rounded-full py-2 text-[10px] font-bold uppercase tracking-wide transition-all sm:text-[11px]',
+                !isExtended
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-500 hover:bg-white/40 hover:text-slate-700'
+              )}
+            >
+              {t('passPricing.duration_1d', language)}
+            </button>
+          </div>
           <p
             className={cn(
-              'text-[10px] font-black uppercase tracking-[0.22em] sm:text-[11px]',
-              isExtended ? 'text-violet-600/90' : 'text-emerald-700/85'
+              'min-h-[2.25rem] px-1 text-center text-[9px] font-medium leading-snug sm:text-[10px]',
+              isExtended ? 'text-violet-600/80' : 'text-slate-400'
             )}
           >
-            {isExtended ? t('passPricing.card_header_holiday', language) : t('passPricing.hero_1d_title', language)}
+            {isExtended
+              ? t('passPricing.coverage_helper_7d', language)
+              : t('passPricing.coverage_nudge_7d', language)}
           </p>
         </div>
 
-        {/* Price — primary anchor */}
+        {/* 2. Hero — holiday dominates; 1-day is a smaller, secondary block */}
+        {isExtended ? (
+          <div className="flex w-full max-w-[19rem] flex-col items-center gap-1.5 border-b border-violet-100/60 pb-2">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-violet-700 sm:text-xs">
+              {t('passPricing.card_header_holiday', language)}
+            </p>
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-50 via-white to-amber-50 text-violet-600 shadow-md ring-1 ring-violet-100/90">
+              <Gift className="h-9 w-9" strokeWidth={1.5} aria-hidden />
+            </div>
+            <p className="bg-gradient-to-r from-violet-700 via-violet-600 to-amber-600 bg-clip-text text-2xl font-black leading-none tracking-tight text-transparent sm:text-3xl">
+              {t('passPricing.value_2nd_week_headline', language)}
+            </p>
+            <p className="max-w-[18rem] text-center text-[10px] font-medium leading-snug text-slate-500 sm:text-[11px]">
+              {sub}
+            </p>
+          </div>
+        ) : (
+          <div className="flex w-full max-w-[19rem] flex-col items-center gap-1 border-b border-slate-100/80 pb-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-700/80">
+              {t('passPricing.hero_1d_title', language)}
+            </p>
+            <p className="max-w-[18rem] text-center text-[11px] font-medium leading-snug text-slate-600 sm:text-xs">
+              {t('passPricing.port_stay_hint', language)}
+            </p>
+            <p className="max-w-[18rem] text-center text-[10px] leading-snug text-slate-400">
+              {t('passPricing.hero_1d_sub', language)}
+            </p>
+          </div>
+        )}
+
+        {/* 3. Price */}
         <div className="flex flex-col items-center">
           <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">
             {t('passPricing.total_label', language)}
@@ -99,91 +164,38 @@ export default function DealsPricingCard({
           </p>
         </div>
 
-        {/* Value universe */}
-        {isExtended ? (
-          <div className="flex w-full max-w-[18rem] flex-col items-center gap-1">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-50 via-white to-amber-50/80 text-violet-600 shadow-sm ring-1 ring-violet-100/80">
-              <Gift className="h-8 w-8" strokeWidth={1.5} aria-hidden />
-            </div>
-            <p className="bg-gradient-to-r from-violet-700 via-violet-600 to-amber-600 bg-clip-text text-xl font-black leading-tight tracking-tight text-transparent sm:text-2xl">
-              {t('passPricing.value_2nd_week_headline', language)}
-            </p>
-            <p className="max-w-[17rem] text-center text-[10px] font-medium leading-snug text-slate-500 sm:text-[11px]">
-              {sub}
-            </p>
-          </div>
-        ) : (
-          <p className="max-w-[17rem] text-center text-[11px] leading-snug text-slate-500 sm:text-xs">
-            {t('passPricing.hero_1d_sub', language)}
-          </p>
-        )}
-
-        {/* Minimal selectors — slate wash, no box borders */}
-        <div className="flex w-full max-w-[19rem] flex-col gap-1.5">
-          <div className="rounded-2xl bg-slate-100/90 px-2.5 py-2">
-            <p className="mb-1 text-center text-[8px] font-bold uppercase tracking-widest text-slate-400">
-              {t('passPricing.coverage_label', language)}
-            </p>
-            <div
-              className="mx-auto flex w-full max-w-[15.5rem] rounded-full bg-slate-200/80 p-0.5"
-              role="group"
-              aria-label={t('passPricing.coverage_label', language)}
+        {/* 4. People */}
+        <div className="flex w-full max-w-[19rem] flex-col items-center rounded-2xl bg-slate-100/90 px-2.5 py-2">
+          <span className="mb-1 text-center text-[8px] font-bold uppercase tracking-widest text-slate-400">
+            {t('passPricing.people_label', language)}
+          </span>
+          <div className="inline-flex items-center gap-0.5 rounded-full bg-white/90 px-1 py-0.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setPartySize((p) => clampPartySize(p - 1))}
+              disabled={partySize <= 1}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 disabled:opacity-25"
+              aria-label={t('passPricing.aria_decrease_party', language)}
             >
-              <button
-                type="button"
-                onClick={() => setIsExtended(false)}
-                className={cn(
-                  'flex-1 rounded-full py-1.5 text-[10px] font-black uppercase tracking-wide transition-all',
-                  !isExtended ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                )}
-              >
-                {t('passPricing.duration_1d', language)}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsExtended(true)}
-                className={cn(
-                  'flex-1 rounded-full py-1.5 text-[10px] font-black uppercase tracking-wide transition-all',
-                  isExtended ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                )}
-              >
-                {t('passPricing.duration_7d', language)}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center rounded-2xl bg-slate-100/90 px-2.5 py-2">
-            <span className="mb-1 text-center text-[8px] font-bold uppercase tracking-widest text-slate-400">
-              {t('passPricing.people_label', language)}
+              <Minus className="h-4 w-4" />
+            </button>
+            <span className="min-w-[1.35rem] text-center text-base font-black tabular-nums text-slate-900">
+              {partySize}
             </span>
-            <div className="inline-flex items-center gap-0.5 rounded-full bg-white/90 px-1 py-0.5 shadow-sm">
-              <button
-                type="button"
-                onClick={() => setPartySize((p) => clampPartySize(p - 1))}
-                disabled={partySize <= 1}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 disabled:opacity-25"
-                aria-label={t('passPricing.aria_decrease_party', language)}
-              >
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="min-w-[1.35rem] text-center text-base font-black tabular-nums text-slate-900">
-                {partySize}
-              </span>
-              <button
-                type="button"
-                onClick={() => setPartySize((p) => clampPartySize(p + 1))}
-                disabled={partySize >= MAX_PARTY_SIZE}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 disabled:opacity-25"
-                aria-label={t('passPricing.aria_increase_party', language)}
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <span className="mt-0.5 text-center text-[8px] text-slate-400">{maxPartyNote}</span>
+            <button
+              type="button"
+              onClick={() => setPartySize((p) => clampPartySize(p + 1))}
+              disabled={partySize >= MAX_PARTY_SIZE}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 disabled:opacity-25"
+              aria-label={t('passPricing.aria_increase_party', language)}
+            >
+              <Plus className="h-4 w-4" />
+            </button>
           </div>
+          <span className="mt-0.5 text-center text-[8px] text-slate-400">{maxPartyNote}</span>
         </div>
 
-        {/* Features — single calm row */}
+        {/* 5. Features */}
         <div className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-[9px] font-semibold text-slate-500 sm:text-[10px]">
           <span className="inline-flex items-center gap-0.5">
             <CircleCheck className="h-3 w-3 shrink-0 text-emerald-600" strokeWidth={2.25} />
@@ -205,7 +217,7 @@ export default function DealsPricingCard({
           </span>
         </div>
 
-        {/* Savings speech bubble */}
+        {/* 6. Savings + CTA */}
         <div className="flex w-full max-w-[20rem] flex-col items-center">
           <div className="relative w-full rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-3 py-2 text-center shadow-[0_4px_14px_rgba(5,150,105,0.25),0_12px_28px_-6px_rgba(16,185,129,0.35)] ring-1 ring-emerald-400/50">
             <p className="text-[10px] font-semibold leading-snug text-white sm:text-[11px]">{savingsText}</p>
@@ -215,7 +227,6 @@ export default function DealsPricingCard({
           </div>
         </div>
 
-        {/* Final yes — full width */}
         <button
           type="button"
           onClick={handlePurchase}
@@ -246,7 +257,6 @@ export default function DealsPricingCard({
         </button>
       </div>
 
-      {/* Receipt-style trust strip */}
       <div className="flex flex-col items-center gap-1.5 border-t border-slate-100 bg-slate-50/60 px-4 py-2.5">
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[8px] font-medium text-slate-400">
           <span className="inline-flex items-center gap-1 opacity-90">

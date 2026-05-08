@@ -177,6 +177,21 @@ export const translations: Record<string, Record<Language, string>> = {
     fr: 'Pass vacances 7 jours',
     bi: 'Holiday pas 7 dei',
   },
+  'passPricing.coverage_helper_7d': {
+    en: 'Our signature pass for longer stays — best value.',
+    fr: 'Notre pass signature pour les longs séjours — le meilleur rapport.',
+    bi: 'Signature pas blong long taem — bes wolju.',
+  },
+  'passPricing.coverage_nudge_7d': {
+    en: 'Staying a week or more? Choose 7 days — 2nd week free.',
+    fr: 'Une semaine ou plus ? Choisissez 7 jours — 2e semaine offerte.',
+    bi: 'Wan wik o moa? Josen 7 dei — wik 2 fri.',
+  },
+  'passPricing.port_stay_hint': {
+    en: 'Quick port visit? Day pass still includes full in-app savings.',
+    fr: 'Escale courte ? Le pass 1 jour garde toutes les économies dans l’app.',
+    bi: 'Sot taem long po? Wan-dei pas i gat ful saving insaed app.',
+  },
   'passPricing.hero_1d_title': {
     en: '1-Day Pass',
     fr: 'Pass 1 jour',
