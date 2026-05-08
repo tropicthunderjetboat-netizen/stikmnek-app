@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Business } from '@/data/businesses';
-import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { BarChart3, DollarSign, Loader2, ShoppingBag, Sparkles, Star } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -30,11 +30,13 @@ const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({ selectedBusines
   const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
 
   const rangeDays = timeRange === '7d' ? 7 : timeRange === '90d' ? 90 : 30;
-  const profileId = useMemo(() => profileBusinessIdFor(selectedBusiness), [selectedBusiness]);
-  const offeringId = useMemo(
-    () => (selectedBusiness?.profileBusinessId ? String(selectedBusiness.id) : null),
-    [selectedBusiness],
-  );
+  const profileId = useMemo(() => effectiveProfileBusinessId(selectedBusiness as any), [selectedBusiness]);
+  const offeringId = useMemo(() => {
+    const id = String((selectedBusiness as any)?.id ?? '').trim();
+    if (!id) return null;
+    // If this row represents a specific listing/offering, `id` differs from the profile business id.
+    return id !== String(profileId) ? id : null;
+  }, [selectedBusiness, profileId]);
 
   useEffect(() => {
     let cancelled = false;
