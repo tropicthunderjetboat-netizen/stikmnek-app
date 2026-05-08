@@ -81,15 +81,18 @@ if (!isRecoveryOnWrongPage) {
   createRoot(document.getElementById('root')!).render(<App />);
 }
 
-// Defer error logger initialization
-const initErrorLogger = () => {
+// Defer perf + error logger initialization (keep main thread free for FCP/LCP).
+const initPerfAndErrorLogger = () => {
   import('@/lib/errorLogger').then(({ errorLogger }) => {
     errorLogger.init();
+  });
+  import('@/lib/perf').then(({ initPerfMonitoring }) => {
+    initPerfMonitoring();
   });
 };
 
 if (typeof requestIdleCallback === 'function') {
-  requestIdleCallback(initErrorLogger, { timeout: 2000 });
+  requestIdleCallback(initPerfAndErrorLogger, { timeout: 2000 });
 } else {
-  setTimeout(initErrorLogger, 50);
+  setTimeout(initPerfAndErrorLogger, 50);
 }

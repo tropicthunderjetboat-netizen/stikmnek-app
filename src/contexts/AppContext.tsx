@@ -5,30 +5,20 @@ import { Business } from '@/data/businesses';
 import { supabase, directProfileInsert, SUPABASE_URL, ENDPOINTS } from '@/lib/supabase';
 import {
   mapJoinedOfferingToBusiness,
-  OFFERING_LISTING_COLUMNS,
-  BUSINESS_PROFILE_EMBED_COLS,
+  splitBusinessListingsViewRow,
+  BUSINESS_LISTINGS_VIEW_COLUMNS,
 } from '@/lib/businessOfferingMap';
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
 import type { ViewMode } from '@/utils/viewModes';
-import type { PassProductId } from '@/data/pricing';
-import { PASS_PRODUCTS, passProductIdFromDb } from '@/data/pricing';
+import type { PassProductId } from '@/data/passCatalog';
+import { passProductIdFromDb } from '@/data/passCatalog';
+import { clampPartySize, MAX_PARTY_SIZE } from '@/data/pricing';
+import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
 
 export type { ViewMode };
-export type { PassProductId };
-
-/** Embedded parent row (`businesses`) from `business_offerings` select — never `!inner`. */
-function singleEmbeddedProfile(raw: unknown): Record<string, unknown> | null {
-  if (raw == null) return null;
-  if (Array.isArray(raw)) {
-    const first = raw[0];
-    if (first && typeof first === 'object' && !Array.isArray(first)) return first as Record<string, unknown>;
-    return null;
-  }
-  if (typeof raw === 'object') return raw as Record<string, unknown>;
-  return null;
-}
+export type { PassProductId } from '@/data/passCatalog';
 
 // ═══════════════════════════════════════════════════════════════
 // ADMIN EMAILS: These always get 'admin' role regardless of DB
@@ -81,6 +71,10 @@ export interface UserProfile {
   post_pass_profile_completed?: boolean;
   /** If true, user has unlocked Share Bonus before buying a pass; consumed on purchase. */
   share_bonus_unlocked?: boolean;
+  /** Checkout default group size (1–6); column `user_profiles.party_size` (nullable). */
+  party_size?: number | null;
+  /** Checkout default pass length; column `user_profiles.preferred_pass_duration` enum. */
+  preferred_pass_duration?: 'short' | 'extended' | null;
   created_at: string;
   updated_at: string;
 }
@@ -104,16 +98,63 @@ export interface User {
   shareBonusUnlocked?: boolean | null;
   /** Super Star review credits (purchased, decremented on use). */
   superstarCredits?: number;
+  /** From active `passes.amount_paid` (typically AUD). */
+  passAmountPaidAud?: number | null;
+  /** From active `passes.currency` (e.g. AUD). */
+  passCurrency?: string | null;
 }
 
 export interface CartItem {
-  passType: PassProductId;
-  price: number;
+  partySize: number;
+  isExtended: boolean;
+}
+
+/** Initial checkout cart: profile / auth metadata, then adults+children (ages 6+), else 1 guest. */
+export function defaultPassCartFromProfile(
+  profile: UserProfile | null,
+  authMetadata?: Record<string, unknown> | null,
+): CartItem {
+  const authDur = String(authMetadata?.preferred_pass_duration ?? '').toLowerCase();
+  const authExt = authDur === 'extended';
+  const authShort = authDur === 'short';
+  const profExt = profile?.preferred_pass_duration === 'extended';
+  const profShort = profile?.preferred_pass_duration === 'short';
+
+  let isExtended = false;
+  if (authExt || profExt) isExtended = true;
+  else if (authShort || profShort) isExtended = false;
+  else isExtended = inferIsExtendedPassFromTripDates(profile);
+
+  if (profile) {
+    const adults = profile.num_adults ?? 0;
+    const children = profile.num_children ?? 0;
+    const combined = adults + children;
+    if (combined > 0) {
+      return { partySize: clampPartySize(combined), isExtended };
+    }
+  }
+
+  const rawMetaParty = authMetadata?.party_size ?? profile?.party_size;
+  const metaPartyN =
+    typeof rawMetaParty === 'number'
+      ? rawMetaParty
+      : typeof rawMetaParty === 'string'
+        ? parseInt(String(rawMetaParty), 10)
+        : NaN;
+  if (Number.isFinite(metaPartyN) && metaPartyN >= 1 && metaPartyN <= MAX_PARTY_SIZE) {
+    return { partySize: clampPartySize(metaPartyN), isExtended };
+  }
+
+  if (!profile) {
+    return { partySize: 1, isExtended };
+  }
+  return { partySize: 1, isExtended };
 }
 
 export interface DBReview {
   id: string;
   business_id: string;
+  offering_id?: string | null;
   user_name: string;
   rating: number;
   comment: string;
@@ -132,6 +173,7 @@ export function reviewRowToDBReview(row: Record<string, unknown> | null | undefi
   return {
     id: String(row.id),
     business_id: String(row.business_id),
+    offering_id: row.offering_id != null ? String(row.offering_id) : null,
     user_name: (row.user_name != null && String(row.user_name).trim()) ? String(row.user_name).trim() : 'Anonymous',
     rating: displayRating,
     comment: row.comment != null ? String(row.comment) : '',
@@ -145,7 +187,8 @@ function reviewFingerprint(r: DBReview): string {
   const name = (r.user_name || 'Anonymous').trim().toLowerCase();
   const cmt = (r.comment || '').trim();
   const ratingKey = r.has_super_star ? 'super' : String(r.rating);
-  return `fp:${r.business_id}|${name}|${ratingKey}|${cmt}|${createdDate}`;
+  const off = r.offering_id ? String(r.offering_id) : '';
+  return `fp:${r.business_id}|${off}|${name}|${ratingKey}|${cmt}|${createdDate}`;
 }
 
 export function dedupeReviewsList(list: DBReview[]): DBReview[] {
@@ -240,7 +283,8 @@ interface AppContextType {
   toggleFavorite: (id: string) => void;
   cart: CartItem | null;
   setCart: (item: CartItem | null) => void;
-  purchasePass: (passType: PassProductId) => void;
+  /** Opens checkout; optional `isExtended` / `partySize` override profile defaults. */
+  purchasePass: (opts?: { isExtended?: boolean; partySize?: number }) => void;
   selectedBusiness: Business | null;
   setSelectedBusiness: React.Dispatch<React.SetStateAction<Business | null>>;
   showAuth: boolean;
@@ -253,10 +297,11 @@ interface AppContextType {
   setSearchQuery: (q: string) => void;
   selectedCategory: string;
   setSelectedCategory: (cat: string) => void;
-  redemptions: { businessId: string; date: string; saved: number }[];
+  redemptions: { businessId: string; date: string; saved: number; offeringId: string | null }[];
   dbBusinesses: Business[];
   dbReviews: DBReview[];
-  submitReview: (businessId: string, rating: number, comment: string, isSuperStar?: boolean) => Promise<void>;
+  /** optional `offeringId` associates the review to a specific listing/deal (businessId stays the master profile id). */
+  submitReview: (businessId: string, rating: number, comment: string, isSuperStar?: boolean, offeringId?: string | null) => Promise<void>;
   /**
    * Owner + redemption preflight for Super Star *payment* (credits === 0).
    * Call before opening the payment modal or charging the card — not after payment.
@@ -279,6 +324,11 @@ interface AppContextType {
   businessOwnerHasBusinessRow: boolean | null;
   /** True if this owner has a pending_businesses submission (awaiting review). */
   businessOwnerHasPendingSubmission: boolean;
+  /**
+   * Last `refreshBusinessOwnerRowStatus` attempt counter: 0 = idle or last run succeeded;
+   * 1–3 while retrying; 3 = all retries failed (row unknown — `businessOwnerHasBusinessRow` stays null).
+   */
+  businessOwnerRowLookupRetryCount: number;
   refreshBusinessOwnerRowStatus: () => Promise<void>;
   /** Set when user_profiles could not be loaded (network/Supabase); avoids gating loops on null profile. */
   userProfileLoadError: string | null;
@@ -315,12 +365,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [showQR, setShowQR] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [redemptions, setRedemptions] = useState<{ businessId: string; date: string; saved: number }[]>([]);
+  const [redemptions, setRedemptions] = useState<
+    { businessId: string; date: string; saved: number; offeringId: string | null }[]
+  >([]);
   const [dbBusinesses, setDbBusinesses] = useState<Business[]>([]);
   const [dbReviews, setDbReviews] = useState<DBReview[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [businessOwnerHasBusinessRow, setBusinessOwnerHasBusinessRow] = useState<boolean | null>(null);
   const [businessOwnerHasPendingSubmission, setBusinessOwnerHasPendingSubmission] = useState(false);
+  /** Bumps to cancel in-flight owner-row lookups when user/session changes (see `refreshBusinessOwnerRowStatus`). */
+  const businessOwnerRowFetchGenRef = useRef(0);
+  /** Attempt index for the current refresh (1-based); 0 after success; 3 after exhausted retries. */
+  const [businessOwnerRowLookupRetryCount, setBusinessOwnerRowLookupRetryCount] = useState(0);
   const [userProfileLoadError, setUserProfileLoadError] = useState<string | null>(null);
 
   // Geolocation state
@@ -413,16 +469,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const listAbort = typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(45_000) : undefined;
     try {
       // Every active offering → one `Business` in `dbBusinesses` (no Map/Object keyed by business_id).
-      // Load from `business_offerings` so stub profiles (`businesses.active = false`) still surface
-      // their live offers. Embed `businesses` without `!inner` (default left join).
+      // Load from `business_listings_view` (merged businesses + business_offerings; offering-first).
+      // Stub profiles (`businesses.active = false`) still surface live offers via `active` on the view.
       let q = supabase
-        .from('business_offerings')
-        .select(`
-          ${OFFERING_LISTING_COLUMNS},
-          businesses (
-            ${BUSINESS_PROFILE_EMBED_COLS}
-          )
-        `)
+        .from('business_listings_view')
+        .select(BUSINESS_LISTINGS_VIEW_COLUMNS)
         .eq('active', true)
         .order('featured', { ascending: false })
         .order('title', { ascending: true });
@@ -441,21 +492,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (offeringRows && offeringRows.length > 0) {
         const mapped: Business[] = [];
         for (const row of offeringRows as Record<string, unknown>[]) {
-          const profile = singleEmbeddedProfile(row.businesses);
+          const { o: offering, b: profile } = splitBusinessListingsViewRow(row);
           if (!profile?.id) {
-            console.warn(`${DBG} Skipping offering (missing profile embed):`, row?.id);
+            console.warn(`${DBG} Skipping row (missing profile_business_id):`, row?.id);
             continue;
           }
           const profileName = String(profile.name ?? '(no name)');
           const profileId = String(profile.id ?? '');
-          const { businesses: _drop, ...offering } = row;
           try {
-            const b = mapJoinedOfferingToBusiness(
-              offering as Record<string, unknown>,
-              profile,
-              SUPABASE_URL,
-            );
-            // Public visibility follows the offering row only (stub profiles may have `active = false`).
+            const b = mapJoinedOfferingToBusiness(offering, profile, SUPABASE_URL);
             mapped.push(b);
           } catch (mapErr) {
             console.warn(
@@ -486,6 +531,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase
         .from('reviews')
         .select('*')
+        // Only show public reviews in the tourist UI; admins can hide/unhide in Admin Panel.
+        .or('is_public.is.null,is_public.eq.true')
         .order('created_at', { ascending: false });
       if (error) throw error;
       if (data) {
@@ -541,6 +588,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const peopleCount = pass.max_people ?? pass.people_count ?? null;
           const shareBonusApplied = pass.share_bonus_applied ?? false;
           // Only update if we have the same user — never clear user (prev can be null if race with setUser)
+          const paid = Number(pass.amount_paid);
+          const amountPaidAud = Number.isFinite(paid) && paid > 0 ? paid : null;
+          const cur = pass.currency != null ? String(pass.currency).trim().toUpperCase() : '';
           setUser(prev => {
             if (!prev || prev.id !== userId) return prev;
             return {
@@ -552,6 +602,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               passValidUntil: validUntil,
               passPeopleCount: peopleCount,
               shareBonusApplied,
+              passAmountPaidAud: amountPaidAud,
+              passCurrency: cur || 'AUD',
             };
           });
         }
@@ -565,16 +617,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data, error } = await supabase
         .from('redemptions')
-        .select('*')
+        .select('business_id, redeemed_at, saved_amount, offering_id')
         .eq('user_id', userId)
         .order('redeemed_at', { ascending: false });
       if (error) throw error;
       if (data) {
-        setRedemptions(data.map((r: any) => ({
-          businessId: r.business_id,
-          date: new Date(r.redeemed_at).toISOString().split('T')[0],
-          saved: Number(r.saved_amount) || 0,
-        })));
+        setRedemptions(
+          data.map((r: any) => ({
+            businessId: r.business_id,
+            date: new Date(r.redeemed_at).toISOString().split('T')[0],
+            saved: Number(r.saved_amount) || 0,
+            offeringId: r.offering_id != null ? String(r.offering_id) : null,
+          })),
+        );
       }
     } catch (err) {
       console.error('Failed to load redemptions:', err);
@@ -1163,7 +1218,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Realtime: refetch listings (business_offerings + profile join, or legacy businesses)
+  // Realtime: refetch listings when underlying tables change (view has no postgres_changes channel)
   useEffect(() => {
     const debounced = () => {
       void loadBusinessesRef.current?.();
@@ -1330,6 +1385,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCart(null);
     setCurrentView('home');
     setSidebarOpen(false);
+    businessOwnerRowFetchGenRef.current += 1;
+    setBusinessOwnerRowLookupRetryCount(0);
     setBusinessOwnerHasBusinessRow(null);
     setBusinessOwnerHasPendingSubmission(false);
 
@@ -1433,20 +1490,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   // PURCHASE PASS
   // ═══════════════════════════════════════════════════════════
-  const purchasePass = useCallback(async (passType: PassProductId) => {
-    if (!user) {
-      setShowAuth(true);
-      setAuthMode('signup-tourist');
-      return;
-    }
-    if (user.pass === passType) {
-      toast.info('You already have this pass active!');
-      return;
-    }
-    const price = PASS_PRODUCTS[passType]?.priceAUD ?? 0;
-    setCart({ passType, price });
-    setCurrentView('checkout');
-  }, [user, setCurrentView]);
+  const purchasePass = useCallback(
+    async (opts?: { isExtended?: boolean; partySize?: number }) => {
+      if (!user) {
+        setShowAuth(true);
+        setAuthMode('signup-tourist');
+        return;
+      }
+      if (user.passId) {
+        toast.info('You already have an active pass!');
+        return;
+      }
+      let authMeta: Record<string, unknown> | null = null;
+      try {
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+        authMeta = (authUser?.user_metadata ?? null) as Record<string, unknown> | null;
+      } catch {
+        authMeta = null;
+      }
+      const defaults = defaultPassCartFromProfile(userProfile, authMeta);
+      const nextCart = {
+        ...defaults,
+        ...(opts?.isExtended !== undefined ? { isExtended: opts.isExtended } : {}),
+        ...(opts?.partySize !== undefined ? { partySize: clampPartySize(opts.partySize) } : {}),
+      };
+      setCart(nextCart);
+      setCurrentView('checkout');
+    },
+    [user, userProfile, setCurrentView],
+  );
 
   const refreshUserProfile = useCallback(async () => {
     if (!user?.id) return;
@@ -1619,7 +1693,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // SUBMIT REVIEW — Direct insert or RPC for Superstar
   // ═══════════════════════════════════════════════════════════
   const submitReview = useCallback(
-    async (businessId: string, rating: number, comment: string, isSuperStar = false) => {
+    async (businessId: string, rating: number, comment: string, isSuperStar = false, offeringId?: string | null) => {
       if (!user) {
         setShowAuth(true);
         return;
@@ -1653,6 +1727,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             p_business_id: businessId,
             p_user_name: user.name,
             p_comment: comment,
+            p_offering_id: offeringId ?? null,
           });
           if (error) throw error;
         } else {
@@ -1660,6 +1735,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             .from('reviews')
             .insert({
               business_id: businessId,
+              offering_id: offeringId ?? null,
               user_id: user.id,
               user_name: user.name,
               rating,
@@ -1712,30 +1788,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const uid = user?.id;
     const utype = user?.type;
     if (!uid || utype !== 'business') {
+      businessOwnerRowFetchGenRef.current += 1;
+      setBusinessOwnerRowLookupRetryCount(0);
       setBusinessOwnerHasBusinessRow(null);
       setBusinessOwnerHasPendingSubmission(false);
       return;
     }
-    try {
-      const [bizRes, pendRes] = await Promise.all([
-        supabase.from('businesses').select('id').eq('owner_id', uid).limit(1),
-        supabase
-          .from('pending_businesses')
-          .select('id')
-          .eq('owner_id', uid)
-          .eq('status', 'pending')
-          .limit(1),
-      ]);
-      if (bizRes.error) throw bizRes.error;
-      if (pendRes.error) throw pendRes.error;
-      setBusinessOwnerHasBusinessRow((bizRes.data?.length ?? 0) > 0);
-      setBusinessOwnerHasPendingSubmission((pendRes.data?.length ?? 0) > 0);
-    } catch (e) {
-      console.warn('[refreshBusinessOwnerRowStatus]', e);
-      setBusinessOwnerHasBusinessRow(false);
-      setBusinessOwnerHasPendingSubmission(false);
+
+    const gen = ++businessOwnerRowFetchGenRef.current;
+    const backoffMs = [1000, 2000, 4000] as const;
+    const userEmail = user?.email ?? null;
+
+    setBusinessOwnerRowLookupRetryCount(0);
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (gen !== businessOwnerRowFetchGenRef.current) return;
+      setBusinessOwnerRowLookupRetryCount(attempt + 1);
+
+      try {
+        const [bizRes, pendRes] = await Promise.all([
+          supabase.from('businesses').select('id').eq('owner_id', uid).limit(1),
+          supabase
+            .from('pending_businesses')
+            .select('id')
+            .eq('owner_id', uid)
+            .eq('status', 'pending')
+            .limit(1),
+        ]);
+        if (gen !== businessOwnerRowFetchGenRef.current) return;
+        if (bizRes.error) throw bizRes.error;
+        if (pendRes.error) throw pendRes.error;
+        setBusinessOwnerHasBusinessRow((bizRes.data?.length ?? 0) > 0);
+        setBusinessOwnerHasPendingSubmission((pendRes.data?.length ?? 0) > 0);
+        setBusinessOwnerRowLookupRetryCount(0);
+        return;
+      } catch (e: unknown) {
+        if (gen !== businessOwnerRowFetchGenRef.current) return;
+
+        const errObj = e as { message?: string; code?: string; details?: string; hint?: string };
+        console.error('[refreshBusinessOwnerRowStatus] attempt failed', {
+          context: 'refreshBusinessOwnerRowStatus',
+          attempt: attempt + 1,
+          maxAttempts: 3,
+          userId: uid,
+          userEmail,
+          message: errObj?.message ?? (e instanceof Error ? e.message : String(e)),
+          code: errObj?.code,
+          details: errObj?.details,
+          hint: errObj?.hint,
+        });
+
+        if (attempt < 2) {
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, backoffMs[attempt]);
+          });
+        }
+      }
     }
-  }, [user?.id, user?.type]);
+
+    if (gen !== businessOwnerRowFetchGenRef.current) return;
+    console.error('[refreshBusinessOwnerRowStatus] all attempts failed — owner row / pending unknown', {
+      context: 'refreshBusinessOwnerRowStatus',
+      userId: uid,
+      userEmail,
+      attempts: 3,
+      backoffMsDelays: [...backoffMs],
+    });
+    setBusinessOwnerHasBusinessRow(null);
+    setBusinessOwnerRowLookupRetryCount(3);
+  }, [user?.id, user?.type, user?.email]);
 
   useEffect(() => {
     void refreshBusinessOwnerRowStatus();
@@ -1796,6 +1917,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         retryUserProfileFetch,
         businessOwnerHasBusinessRow,
         businessOwnerHasPendingSubmission,
+        businessOwnerRowLookupRetryCount,
         refreshBusinessOwnerRowStatus,
         userProfileLoadError,
         touristOnboardingResume,

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { PASS_PRODUCTS_IN_ORDER } from '@/data/pricing';
+import { t } from '@/data/translations';
+import { BASE_PRICE_AUD, EXTEND_FEE_AUD, GUEST_FEE_AUD, MAX_PARTY_SIZE } from '@/data/pricing';
 import {
   HelpCircle, Book, Store, Shield, Users, ChevronDown, ChevronRight,
   Search, ArrowLeft, MapPin, CreditCard, QrCode, Star, Camera,
@@ -35,27 +36,27 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
     }
   }, [initialSection]);
 
-  /** Keeps Help Center copy aligned with `PASS_PRODUCTS` / PassCards checkout. */
   const passProductSummary = useMemo(
-    () => PASS_PRODUCTS_IN_ORDER.map((p) => `${p.title} ($${p.priceAUD} AUD)`).join('; '),
+    () =>
+      `StikmNek Pass (AUD): $${BASE_PRICE_AUD} for the first person + $${GUEST_FEE_AUD} per additional guest (ages 6+, up to ${MAX_PARTY_SIZE} per pass); 24-hour day pass or 7-day holiday pass (+$${EXTEND_FEE_AUD} for the holiday period)`,
     [],
   );
 
+  const helpLang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+
   const howItWorksSteps = useMemo(() => {
-    const min = PASS_PRODUCTS_IN_ORDER[0]?.priceAUD ?? 15;
-    const max = PASS_PRODUCTS_IN_ORDER[PASS_PRODUCTS_IN_ORDER.length - 1]?.priceAUD ?? 199;
     return [
       { step: '1', title: 'Create an Account', desc: 'Sign up as a tourist or business owner' },
       {
         step: '2',
-        title: 'Choose Your Pass',
-        desc: `Open Passes, pick a pass that fits your group and trip (four options from $${min} to $${max} AUD), choose a start date, and pay with PayPal.`,
+        title: t('passSelection.title', helpLang),
+        desc: `Open Passes, set your group (ages 6+, up to ${MAX_PARTY_SIZE} per pass), choose 24-hour or 7-day holiday access, pick a start date, and pay ($${BASE_PRICE_AUD} first person + $${GUEST_FEE_AUD} per extra guest; +$${EXTEND_FEE_AUD} for the holiday period). PayPal or card where enabled.`,
       },
       { step: '3', title: 'Browse Deals', desc: 'Explore dining, tours, activities, spa, shopping, and accommodation on Deals and Map' },
       { step: '4', title: 'Show Your QR Code', desc: 'Present your pass QR code at a partner business; staff scan it in StikmNek' },
       { step: '5', title: 'Save Money', desc: 'Discounts follow each listing (deal price vs standard price)' },
     ];
-  }, []);
+  }, [helpLang]);
 
   const touristFAQ: FAQItem[] = useMemo(
     () => [
@@ -66,7 +67,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       },
       {
         question: 'How do I purchase a pass?',
-        answer: `Open Passes in the top menu, choose the pass that fits your group and trip (${passProductSummary}), pick a start date, and complete payment through PayPal. Your pass coverage follows the dates shown for that product. Prices are in AUD.`,
+        answer: `Open Passes in the top menu, set your group and 24-hour or 7-day holiday duration (${passProductSummary}), pick a start date, and complete payment (card or PayPal where enabled). Your pass coverage follows the dates shown at checkout. Prices are in AUD.`,
         icon: <CreditCard className="w-4 h-4" />,
       },
       {

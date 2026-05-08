@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Business } from '@/data/businesses';
 
-import { supabase } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   Edit3, X, RotateCcw, Eye, Clock, Phone, MapPin,
@@ -26,7 +26,7 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX,
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
-import BusinessDescriptionEditor from './BusinessDescriptionEditor';
+import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import PricingTiersEditor from './PricingTiersEditor';
 import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
 import {
@@ -228,6 +228,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
     setLoadingEdits(true);
     try {
       const { data } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_pending_edits', userId: user.id, businessId: profileId },
       });
       if (data?.edits) setPendingEdits(data.edits);
@@ -356,7 +357,17 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
       }
 
       const { data, error } = await supabase.functions.invoke('manage-business', {
-        body: { action: 'submit_edit', userId: user.id, businessId: profileId, changes },
+        headers: await getEdgeAuthHeaders(),
+        body: {
+          action: 'submit_edit',
+          userId: user.id,
+          businessId: profileId,
+          offeringId:
+            selectedBusiness?.id && String(selectedBusiness.id) !== String(profileId)
+              ? String(selectedBusiness.id)
+              : undefined,
+          changes,
+        },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -387,7 +398,8 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
     setDeleting(true);
     try {
       const { data, error } = await supabase.functions.invoke('manage-business', {
-        body: { action: 'delete_own_business', businessId: profileId },
+        headers: await getEdgeAuthHeaders(),
+        body: { action: 'delete_own_business', businessId: profileId, userId: user.id },
       });
       const res = data as { success?: boolean; error?: string } | null | undefined;
       if (error) {
@@ -580,7 +592,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                   )}
                 </label>
                 <div className="relative min-w-0 max-w-full">
-                  <BusinessDescriptionEditor
+                  <LazyBusinessDescriptionEditor
                     value={form.description}
                     onChange={(html) => setForm((prev) => ({ ...prev, description: html }))}
                     placeholder="Describe your business to tourists..."

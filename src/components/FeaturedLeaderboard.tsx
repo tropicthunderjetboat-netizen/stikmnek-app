@@ -50,9 +50,12 @@ const FeaturedLeaderboard: React.FC = () => {
     const maxReviews = Math.max(...allBusinesses.map(b => b.reviewCount), 1);
     const maxSuperStars = Math.max(...allBusinesses.map(b => {
       const pid = profileBusinessIdFor(b);
-      const dbCount = b.superStarCount || 0;
-      const reviewCount = dbReviews.filter(r => r.business_id === pid && r.has_super_star).length;
-      return Math.max(dbCount, reviewCount);
+      const reviewCount = dbReviews.filter((r: any) =>
+        r.business_id === pid &&
+        r.has_super_star &&
+        (r.offering_id ? String(r.offering_id) === String(b.id) : false)
+      ).length;
+      return reviewCount;
     }), 1);
 
     const scored = allBusinesses.map(business => {
@@ -64,10 +67,11 @@ const FeaturedLeaderboard: React.FC = () => {
       const reviewScore = Math.min(Math.log(business.reviewCount + 1) / Math.log(maxReviews + 1), 1);
 
       // 3. Super Star score (0-1): premium engagement signal
-      const superStarCount = Math.max(
-        business.superStarCount || 0,
-        dbReviews.filter(r => r.business_id === profileId && r.has_super_star).length
-      );
+      const superStarCount = dbReviews.filter((r: any) =>
+        r.business_id === profileId &&
+        r.has_super_star &&
+        (r.offering_id ? String(r.offering_id) === String(business.id) : false)
+      ).length;
       const superStarScore = maxSuperStars > 0 ? Math.min(superStarCount / maxSuperStars, 1) : 0;
 
       // 4. Deal value score (0-1): discount percentage (ignore missing/zero deal_price)
@@ -227,10 +231,11 @@ const FeaturedLeaderboard: React.FC = () => {
                 : hasDisc && oOrig > 0
                   ? `${Math.round((1 - oDeal / oOrig) * 100)}% OFF`
                   : null;
-            const superStarCount = Math.max(
-              business.superStarCount || 0,
-              dbReviews.filter(r => r.business_id === profileBusinessIdFor(business) && r.has_super_star).length
-            );
+            const superStarCount = dbReviews.filter((r: any) =>
+              r.business_id === profileBusinessIdFor(business) &&
+              r.has_super_star &&
+              (r.offering_id ? String(r.offering_id) === String(business.id) : false)
+            ).length;
 
             const isTopThree = rank <= 3;
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, MessageSquarePlus, Sparkles, ExternalLink, Store, Layers, Globe } from 'lucide-react';
@@ -7,10 +7,11 @@ import ReviewForm from '@/components/ReviewForm';
 import PhotoGallery from '@/components/PhotoGallery';
 import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe, getPhotoDisplayUrl } from '@/lib/utils';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
+import { trackInteractionEvent } from '@/lib/interactionEvents';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import BookingInquiryModal from '@/components/BookingInquiryModal';
 import { categoryUsesTieredPricing, pricingTiersFromDb } from '@/lib/pricingTiers';
-import BusinessDetailMap from '@/components/BusinessDetailMap';
+const BusinessDetailMap = React.lazy(() => import('@/components/BusinessDetailMap'));
 import {
   displayWebsiteForInput,
   effectiveBusinessCoords,
@@ -22,6 +23,7 @@ import {
   plainTextFromHtml,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
+import { PROSE_CLASSES } from '@/lib/prose';
 import {
   mapJoinedOfferingToBusiness,
   OFFERING_LISTING_COLUMNS,
@@ -36,14 +38,17 @@ import {
   primaryEmbeddedOffering,
   primaryOfferingDescriptionHtml,
 } from '@/data/businesses';
-import { legacyUntaggedPhotoBelongsToOffering } from '@/lib/offeringPhotoPartition';
+import {
+  legacyUntaggedPhotoBelongsToOffering,
+  supplementUntaggedPhotosForRecentNewestOffering,
+} from '@/lib/offeringPhotoPartition';
 import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
 
 /** Master profile fields required by `mapJoinedOfferingToBusiness` (listing detail lives on offerings). */
 const PROFILE_STUB_COLS =
-  'id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone, email, contact_email, business_email, whatsapp_number, rating, review_count, featured, active, map_url, website, tags';
+  'id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone, email, contact_email, business_email, whatsapp_number, rating, review_count, featured, active, map_url, website, tags, image, logo_url';
 
 // WhatsApp SVG icon component
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
@@ -58,11 +63,48 @@ function formatWhatsAppDisplay(number: string): string {
   return cleaned;
 }
 
+/** Explains the multi-offering dropdown (trading / profile name, not the listing title). */
+function detailOfferingSwitcherLabel(
+  language: string,
+  category: string,
+  profileDisplayName: string,
+): string {
+  const name = profileDisplayName.trim();
+  const fallback =
+    language === 'fr' ? 'cet établissement' : language === 'bi' ? 'bisnis ia' : 'this business';
+  const host = name || fallback;
+  const c = (category || '').toLowerCase();
+  if (language === 'fr') {
+    if (c === 'tours') return `Autres circuits et excursions proposés par ${host}`;
+    if (c === 'activities') return `Autres activités proposées par ${host}`;
+    if (c === 'dining') return `Autres offres restauration de ${host}`;
+    if (c === 'shopping') return `Autres offres de ${host}`;
+    if (c === 'spa') return `Autres offres spa & bien-être de ${host}`;
+    if (c === 'accommodation') return `Autres hébergements de ${host}`;
+    return `Autres annonces de ${host}`;
+  }
+  if (language === 'bi') {
+    if (c === 'tours' || c === 'activities')
+      return `Narafa tua mo aktiviti we ${host} i ofarem`;
+    return `Narafa ofa from ${host}`;
+  }
+  if (c === 'tours')
+    return `Other tours offered by ${host}`;
+  if (c === 'activities')
+    return `Other activities offered by ${host}`;
+  if (c === 'dining') return `Other dining offers from ${host}`;
+  if (c === 'shopping') return `Other offers from ${host}`;
+  if (c === 'spa') return `Other spa & wellness offers from ${host}`;
+  if (c === 'accommodation') return `Other stays from ${host}`;
+  return `Other listings from ${host}`;
+}
+
 const BusinessDetail: React.FC = () => {
   const {
     language, selectedBusiness, setCurrentView, setSelectedBusiness,
     favorites, toggleFavorite, user, userProfile, setShowAuth, setAuthMode,
     dbReviews, checkReviewSubmissionAllowed,
+    purchasePass,
   } = useAppContext();
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -147,10 +189,17 @@ const BusinessDetail: React.FC = () => {
     return profileOfferings[0] ?? selectedBusiness;
   }, [selectedBusiness, profileOfferings]);
 
-  const reviews = useMemo(
-    () => (profileId ? dbReviews.filter((r) => r.business_id === profileId) : []),
-    [dbReviews, profileId],
-  );
+  const reviews = useMemo(() => {
+    if (!profileId || !effectiveBiz) return [];
+    const offeringId = String(effectiveBiz.id || '').trim();
+    return dbReviews.filter((r) => {
+      const bid = String((r as any).business_id || '').trim();
+      if (bid !== profileId) return false;
+      const oid = (r as any).offering_id != null ? String((r as any).offering_id).trim() : '';
+      // Prefer offering-specific reviews; keep legacy business-level reviews as a fallback.
+      return oid ? oid === offeringId : true;
+    });
+  }, [dbReviews, profileId, effectiveBiz?.id]);
 
   useEffect(() => {
     if (reviews.length === 0) {
@@ -222,6 +271,21 @@ const BusinessDetail: React.FC = () => {
     effectiveBiz != null &&
     categoryUsesTieredPricing(effectiveBiz.category) &&
     pricingTiers.length > 0;
+
+  const tierDiscountBadge = useMemo(() => {
+    if (!showTieredTable) return null;
+    let bestPct = 0;
+    for (const t of pricingTiers) {
+      const o = Number(t.original_price_vt) || 0;
+      const d = Number(t.deal_price_vt) || 0;
+      if (o > 0 && d > 0 && d < o) {
+        const pct = Math.round((1 - d / o) * 100);
+        if (pct > bestPct) bestPct = pct;
+      }
+    }
+    if (bestPct <= 0) return null;
+    return `${bestPct}% OFF`;
+  }, [pricingTiers, showTieredTable]);
 
   const mapCoords = useMemo(() => {
     if (!effectiveBiz) return null;
@@ -324,7 +388,7 @@ const BusinessDetail: React.FC = () => {
             .order('created_at', { ascending: true });
           if (!cancelled && !oErr && rows?.length) {
             const ordered = rows as OfferingCreatedRow[];
-            const match = legacy.data.find((row) => {
+            let match = legacy.data.find((row) => {
               const r = row as { created_at?: string };
               return legacyUntaggedPhotoBelongsToOffering(
                 String(r.created_at || ''),
@@ -332,6 +396,16 @@ const BusinessDetail: React.FC = () => {
                 ordered,
               );
             });
+            if (!match) {
+              const extra = supplementUntaggedPhotosForRecentNewestOffering(
+                legacy.data as { created_at: string }[],
+                effectiveBiz.id,
+                ordered,
+              );
+              if (extra.length > 0) {
+                match = extra[0] as { url?: string; file_path?: string };
+              }
+            }
             first = match as { url?: string; file_path?: string } | undefined;
           }
         } else {
@@ -357,16 +431,30 @@ const BusinessDetail: React.FC = () => {
   const operatingHoursText = String(biz.hours || '').trim();
   const dealPx = effectiveListingDealPrice(biz);
   const origPx = effectiveListingOriginalPrice(biz);
-  const hasActiveDiscount = listingHasActiveDiscount(biz);
+  const hasActiveDiscount = listingHasActiveDiscount(biz) || Boolean(tierDiscountBadge);
   const displayListPx = customerFacingListPrice(biz);
   const detailDiscountBadge =
     hasActiveDiscount && String(biz.discount ?? '').trim()
       ? String(biz.discount).trim()
+      : tierDiscountBadge
+        ? tierDiscountBadge
       : hasActiveDiscount && origPx > 0
         ? `${Math.round((1 - dealPx / origPx) * 100)}% OFF`
         : null;
   const isListingOwner = Boolean(user?.id && biz.ownerId && user.id === biz.ownerId);
   const isFav = favorites.includes(profileId);
+  /** Same rule as booking: only pass holders get WhatsApp (avoids discount leakage). */
+  const canUseWhatsAppContact = Boolean(user?.pass);
+
+  useEffect(() => {
+    if (!profileId) return;
+    void trackInteractionEvent({
+      eventType: 'view_listing',
+      businessId: profileId,
+      offeringId: String(biz.id),
+      dedupeInSession: true,
+    });
+  }, [profileId, biz?.id]);
 
   const openReviewFormIfAllowed = () => {
     if (!profileId) return;
@@ -407,16 +495,46 @@ const BusinessDetail: React.FC = () => {
             ? 'Vous avez besoin d’un pass actif pour demander une réservation et bénéficier des réductions !'
             : 'Yu nidim aktiv pas blong askem bukin mo kasem diskaon!',
       );
-      setCurrentView('passes');
+      void purchasePass();
       return;
+    }
+    if (profileId) {
+      void trackInteractionEvent({
+        eventType: 'tap_request_booking',
+        businessId: profileId,
+        offeringId: String(biz.id),
+      });
     }
     setShowBookingModal(true);
   };
 
   const handleWhatsApp = () => {
+    if (!user) {
+      setShowAuth(true);
+      setAuthMode('signin');
+      return;
+    }
+    if (!user.pass) {
+      toast.error(
+        language === 'en'
+          ? 'Get a StikmNek pass to message businesses on WhatsApp and unlock member rates.'
+          : language === 'fr'
+            ? 'Obtenez un pass StikmNek pour contacter les entreprises sur WhatsApp et bénéficier des tarifs membres.'
+            : 'Yu nidim StikmNek pas blong mesej bisnis long WhatsApp mo kasem praes blong membas.',
+      );
+      void purchasePass();
+      return;
+    }
     const raw = getBusinessWhatsAppRaw(biz);
     const d = digitsForWaMe(raw);
     if (d.length < 5) return;
+    if (profileId) {
+      void trackInteractionEvent({
+        eventType: 'tap_whatsapp',
+        businessId: profileId,
+        offeringId: String(biz.id),
+      });
+    }
     const url = buildBookingInquiryWhatsAppUrl(d, {
       businessName: biz.name,
       visitDate: 'To be confirmed',
@@ -482,12 +600,26 @@ const BusinessDetail: React.FC = () => {
           </div>
         )}
         {profileOfferings.length > 1 && (
-          <div className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-            <label htmlFor="detail-offering-select" className="text-xs font-semibold text-gray-600 uppercase tracking-wide shrink-0">
-              {language === 'en' ? 'Deal' : language === 'fr' ? 'Offre' : 'Dil'}
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+            <label
+              htmlFor="detail-offering-select"
+              className="block text-sm font-semibold text-gray-900 leading-snug sm:max-w-md shrink-0"
+            >
+              {detailOfferingSwitcherLabel(
+                language,
+                biz.category,
+                String(biz.profileName || profileOfferings[0]?.profileName || '').trim(),
+              )}
             </label>
             <select
               id="detail-offering-select"
+              aria-label={
+                language === 'en'
+                  ? 'Choose another listing from this business'
+                  : language === 'fr'
+                    ? 'Choisir une autre annonce'
+                    : 'Jus wan narafa listing'
+              }
               value={biz.id}
               onChange={(e) => {
                 const next = profileOfferings.find((o) => o.id === e.target.value);
@@ -516,6 +648,7 @@ const BusinessDetail: React.FC = () => {
               <span className="px-2 py-0.5 rounded-md bg-white/20 backdrop-blur-sm text-white text-xs capitalize">{biz.category}</span>
               {hasWhatsApp && (
                 <button
+                  type="button"
                   onClick={handleWhatsApp}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-500/90 backdrop-blur-sm text-white text-xs font-bold hover:bg-green-600 transition-colors"
                 >
@@ -525,6 +658,17 @@ const BusinessDetail: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
+              {biz.profileLogoUrl && (
+                <div className="h-10 w-10 rounded-xl bg-white/90 p-1 shadow-lg ring-1 ring-white/60">
+                  <img
+                    src={biz.profileLogoUrl}
+                    alt=""
+                    className="h-full w-full rounded-lg object-contain"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              )}
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white">{biz.name}</h1>
               {superStarCount > 0 && (
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500 to-violet-600 text-white text-xs font-bold shadow-lg shadow-purple-500/30">
@@ -603,7 +747,7 @@ const BusinessDetail: React.FC = () => {
               >
                 {looksLikeRichDescriptionHtml(desc || '') ? (
                   <div
-                    className="prose prose-sm max-w-none text-gray-700 leading-relaxed"
+                    className={`${PROSE_CLASSES} text-gray-700 leading-relaxed`}
                     dangerouslySetInnerHTML={{ __html: sanitizeBusinessDescriptionHtml(desc || '') }}
                   />
                 ) : (
@@ -670,7 +814,7 @@ const BusinessDetail: React.FC = () => {
               </div>
             )}
 
-            {/* WhatsApp Contact Card */}
+            {/* WhatsApp Contact Card — number shown only to pass holders */}
             {hasWhatsApp && (
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-5 shadow-sm border border-green-200">
                 <div className="flex items-center gap-3 mb-3">
@@ -682,35 +826,59 @@ const BusinessDetail: React.FC = () => {
                       {language === 'en' ? 'Chat on WhatsApp' : language === 'fr' ? 'Discuter sur WhatsApp' : 'Toktok long WhatsApp'}
                     </h3>
                     <p className="text-xs text-green-600">
-                      {language === 'en'
-                        ? 'Send a message directly to this business'
-                        : language === 'fr'
-                        ? 'Envoyez un message directement à cette entreprise'
-                        : 'Sendem mesej daerekli long bisnis ia'}
+                      {canUseWhatsAppContact
+                        ? language === 'en'
+                          ? 'Send a message directly to this business'
+                          : language === 'fr'
+                            ? 'Envoyez un message directement à cette entreprise'
+                            : 'Sendem mesej daerekli long bisnis ia'
+                        : language === 'en'
+                          ? 'Available once you have an active StikmNek pass — same as Request booking.'
+                          : language === 'fr'
+                            ? 'Disponible avec un pass StikmNek actif — comme « Demander une réservation ».'
+                            : 'I save wok sapos yu gat aktiv StikmNek pas — semak Askem bukin.'}
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-green-200 flex-1 min-w-0">
-                    <WhatsAppIcon className="w-4 h-4 text-green-600 shrink-0" />
-                    <span className="text-sm font-medium text-gray-700 truncate">{formatWhatsAppDisplay(businessWhatsAppRaw)}</span>
-                  </div>
+                {canUseWhatsAppContact ? (
+                  <>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-green-200 flex-1 min-w-0">
+                        <WhatsAppIcon className="w-4 h-4 text-green-600 shrink-0" />
+                        <span className="text-sm font-medium text-gray-700 truncate">{formatWhatsAppDisplay(businessWhatsAppRaw)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleWhatsApp}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold text-sm hover:from-green-600 hover:to-green-700 transition-all shadow-lg shadow-green-200/50 whitespace-nowrap"
+                      >
+                        <WhatsAppIcon className="w-4 h-4" />
+                        {language === 'en' ? 'Open WhatsApp' : language === 'fr' ? 'Ouvrir WhatsApp' : 'Openem WhatsApp'}
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-green-500 mt-2">
+                      {language === 'en'
+                        ? 'Opens WhatsApp with a pre-filled message. Available on mobile and desktop.'
+                        : language === 'fr'
+                          ? 'Ouvre WhatsApp avec un message pré-rempli. Disponible sur mobile et bureau.'
+                          : 'Openem WhatsApp wetem mesej we i redi. I wok long fon mo kompyuta.'}
+                    </p>
+                  </>
+                ) : (
                   <button
+                    type="button"
                     onClick={handleWhatsApp}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold text-sm hover:from-green-600 hover:to-green-700 transition-all shadow-lg shadow-green-200/50 whitespace-nowrap"
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold text-sm hover:from-green-600 hover:to-green-700 transition-all shadow-lg shadow-green-200/50"
                   >
                     <WhatsAppIcon className="w-4 h-4" />
-                    {language === 'en' ? 'Open WhatsApp' : language === 'fr' ? 'Ouvrir WhatsApp' : 'Openem WhatsApp'}
-                    <ExternalLink className="w-3.5 h-3.5" />
+                    {language === 'en'
+                      ? 'Sign in & get a pass to use WhatsApp'
+                      : language === 'fr'
+                        ? 'Connectez-vous et obtenez un pass pour WhatsApp'
+                        : 'Login mo kasem pas blong yusum WhatsApp'}
                   </button>
-                </div>
-                <p className="text-[11px] text-green-500 mt-2">
-                  {language === 'en'
-                    ? 'Opens WhatsApp with a pre-filled message. Available on mobile and desktop.'
-                    : language === 'fr'
-                    ? 'Ouvre WhatsApp avec un message pré-rempli. Disponible sur mobile et bureau.'
-                    : 'Openem WhatsApp wetem mesej we i redi. I wok long fon mo kompyuta.'}
-                </p>
+                )}
               </div>
             )}
 
@@ -796,6 +964,7 @@ const BusinessDetail: React.FC = () => {
                   <ReviewForm
                     businessId={profileId}
                     businessName={biz.name}
+                    offeringId={biz.id}
                     compact
                     onSuccess={() => setShowReviewForm(false)}
                     onCancel={() => setShowReviewForm(false)}
@@ -938,6 +1107,7 @@ const BusinessDetail: React.FC = () => {
               {/* WhatsApp Button in Sidebar */}
               {hasWhatsApp && (
                 <button
+                  type="button"
                   onClick={handleWhatsApp}
                   className="w-full py-3 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold text-sm hover:from-green-600 hover:to-green-700 transition-all shadow-lg shadow-green-200 mb-3 flex items-center justify-center gap-2"
                 >
@@ -960,12 +1130,21 @@ const BusinessDetail: React.FC = () => {
               <div className="mt-5 space-y-3 pt-5 border-t border-gray-100">
                 <div className="flex items-center gap-3 text-sm text-gray-600"><MapPin className="w-4 h-4 text-teal-600 shrink-0" />{biz.location}</div>
                 {mapCoords && (
-                  <BusinessDetailMap
-                    lat={mapCoords.lat}
-                    lng={mapCoords.lng}
-                    savedMapUrl={savedMapUrlTrimmed || null}
-                    language={language}
-                  />
+                  <Suspense
+                    fallback={
+                      <div
+                        className="h-48 w-full rounded-xl bg-gray-100 animate-pulse"
+                        aria-hidden
+                      />
+                    }
+                  >
+                    <BusinessDetailMap
+                      lat={mapCoords.lat}
+                      lng={mapCoords.lng}
+                      savedMapUrl={savedMapUrlTrimmed || null}
+                      language={language}
+                    />
+                  </Suspense>
                 )}
                 {websiteHref && (
                   <a
@@ -1008,8 +1187,9 @@ const BusinessDetail: React.FC = () => {
                   </div>
                 ) : null}
                 <div className="flex items-center gap-3 text-sm text-gray-600"><Phone className="w-4 h-4 text-teal-600 shrink-0" />{biz.phone}</div>
-                {hasWhatsApp && (
+                {hasWhatsApp && canUseWhatsAppContact && (
                   <button
+                    type="button"
                     onClick={handleWhatsApp}
                     className="flex items-center gap-3 text-sm text-green-600 hover:text-green-700 transition-colors w-full text-left group"
                   >

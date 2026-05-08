@@ -1,4 +1,4 @@
-import { representativePerPersonPricesFromTiers } from '@/lib/pricingTiers';
+import { pricingTiersFromDb, representativePerPersonPricesFromTiers } from '@/lib/pricingTiers';
 
 export type Category = 'dining' | 'activities' | 'tours' | 'shopping' | 'spa' | 'accommodation';
 
@@ -33,6 +33,8 @@ export interface Business {
   profileBusinessId?: string;
   /** Trading / venue name from profile (optional subtitle vs offer `title`). */
   profileName?: string;
+  /** Business logo URL from the master `businesses` profile. */
+  profileLogoUrl?: string | null;
   /**
    * Embedded offerings from `select('*, business_offerings(*)')` (optional).
    * Cleared in most UI paths after mapping with `mapJoinedOfferingToBusiness`.
@@ -107,25 +109,37 @@ function tierHeadlinePrices(b: Business) {
   return representativePerPersonPricesFromTiers(raw);
 }
 
+/** Flat / offering columns on the listing row (may be wrong for tours when only tiers were filled). */
+function flatListingPricePair(b: Business): { orig: number; deal: number } {
+  const flatO = Number(b.originalPrice);
+  const flatD = Number(b.dealPrice);
+  const o = primaryEmbeddedOffering(b);
+  const offO = Number(o?.original_price);
+  const offD = Number(o?.deal_price);
+  const orig =
+    Number.isFinite(flatO) && flatO > 0 ? flatO : Number.isFinite(offO) && offO > 0 ? offO : 0;
+  const deal =
+    Number.isFinite(flatD) && flatD > 0 ? flatD : Number.isFinite(offD) && offD > 0 ? offD : 0;
+  return { orig, deal };
+}
+
 /** Deal / list price with fallback to embedded offering and tier JSON (legacy tier-only rows). */
 export function effectiveListingDealPrice(b: Business): number {
-  const n = Number(b.dealPrice);
-  if (Number.isFinite(n) && n > 0) return n;
-  const o = primaryEmbeddedOffering(b);
-  const d = Number(o?.deal_price);
-  if (Number.isFinite(d) && d > 0) return d;
   const th = tierHeadlinePrices(b);
+  const { orig: fo, deal: fd } = flatListingPricePair(b);
+  const flatShowsDiscount = fo > 0 && fd > 0 && fd < fo;
+  if (th && !flatShowsDiscount) return th.deal_price_vt;
+  if (fd > 0) return fd;
   if (th) return th.deal_price_vt;
   return 0;
 }
 
 export function effectiveListingOriginalPrice(b: Business): number {
-  const n = Number(b.originalPrice);
-  if (Number.isFinite(n) && n > 0) return n;
-  const o = primaryEmbeddedOffering(b);
-  const d = Number(o?.original_price);
-  if (Number.isFinite(d) && d > 0) return d;
   const th = tierHeadlinePrices(b);
+  const { orig: fo, deal: fd } = flatListingPricePair(b);
+  const flatShowsDiscount = fo > 0 && fd > 0 && fd < fo;
+  if (th && !flatShowsDiscount) return th.original_price_vt;
+  if (fo > 0) return fo;
   if (th) return th.original_price_vt;
   return 0;
 }
@@ -134,7 +148,17 @@ export function effectiveListingOriginalPrice(b: Business): number {
 export function listingHasActiveDiscount(b: Business): boolean {
   const deal = effectiveListingDealPrice(b);
   const orig = effectiveListingOriginalPrice(b);
-  return orig > 0 && deal > 0 && deal < orig;
+  if (orig > 0 && deal > 0 && deal < orig) return true;
+
+  // Fallback: tiered rows may exist even when the “headline” pair is not present/mapped.
+  const o = primaryEmbeddedOffering(b);
+  const raw =
+    b.pricingTiers ??
+    (b as Record<string, unknown>).pricing_tiers ??
+    o?.pricing_tiers ??
+    (o as Record<string, unknown> | undefined)?.tier_pricing;
+  const tiers = pricingTiersFromDb(raw);
+  return tiers.some((t) => t.original_price_vt > 0 && t.deal_price_vt > 0 && t.deal_price_vt < t.original_price_vt);
 }
 
 /** Headline price for cards and detail (discounted price, or list price when no deal). */

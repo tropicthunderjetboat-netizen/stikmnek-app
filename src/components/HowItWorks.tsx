@@ -1,15 +1,19 @@
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
+import { t } from '@/data/translations';
+import type { Language } from '@/data/translations';
 import { Ticket, QrCode, MapPin, Smile } from 'lucide-react';
 
 const HowItWorks: React.FC = () => {
-  const { language, setCurrentView } = useAppContext();
+  const { language, setCurrentView, user, purchasePass } = useAppContext();
+  const lang: Language = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
 
   const steps = [
     {
       icon: <Ticket className="w-7 h-7" />,
-      title: language === 'en' ? 'Get Your Pass' : language === 'fr' ? 'Obtenez votre pass' : 'Karem Pas Blong Yu',
-      desc: language === 'en' ? 'Choose a Family Explorer, Group Adventure, or Crew Experience pass for your group' : language === 'fr' ? 'Choisissez un pass Explorateur Familial, Aventure Groupe ou Expérience Équipe pour votre groupe' : 'Jusem Famili Eksplora, Grup Advenija, o Kru Eksperiens pas blong grup blong yu',
+      title: t('passSelection.title', lang),
+      desc: t('pass.build_how_desc', lang),
 
       color: 'from-sky-500 to-blue-600',
       shadow: 'shadow-sky-200',
@@ -72,7 +76,11 @@ const HowItWorks: React.FC = () => {
 
         <div className="text-center mt-12">
           <button
-            onClick={() => setCurrentView('passes')}
+            type="button"
+            onClick={() => {
+              if (shouldOpenCheckoutInsteadOfPassesPage(user)) void purchasePass();
+              else setCurrentView('passes');
+            }}
             className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200 hover:shadow-xl"
           >
             {language === 'en' ? 'Start Saving Today' : language === 'fr' ? 'Commencez à économiser aujourd\'hui' : 'Stat Sevem Tede'}

@@ -246,6 +246,7 @@ const ReviewsSection: React.FC = () => {
                   <ReviewForm
                     businessId={selectedBusinessId}
                     businessName={selectedBusinessName}
+                    offeringId={null}
                     onSuccess={handleReviewSuccess}
                     onCancel={() => { setShowReviewModal(false); setSelectedBusinessId(''); }}
                   />

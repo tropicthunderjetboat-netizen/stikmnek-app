@@ -4,11 +4,12 @@ import typography from "@tailwindcss/typography";
 
 export default {
   darkMode: ["class"],
+  // Vite entry + all TS/TSX (exclude test and Cypress files for faster builds and smaller CSS)
   content: [
-    "./pages/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./app/**/*.{ts,tsx}",
+    "./index.html",
     "./src/**/*.{ts,tsx}",
+    "!./src/**/*.test.{ts,tsx}",     // Exclude Jest/Vitest test files
+    "!./src/**/*.cy.{ts,tsx}",       // Exclude Cypress test files
   ],
   prefix: "",
   theme: {
@@ -94,6 +95,27 @@ export default {
         shimmer: {
           '100%': { transform: 'translateX(100%)' },
         },
+        /** Tourist dashboard — pass cost beaten (deal savings > pass in VT). */
+        'savings-glow': {
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(16, 185, 129, 0.35)' },
+          '50%': { boxShadow: '0 0 28px 6px rgba(45, 212, 191, 0.45)' },
+        },
+        'celebration-rise': {
+          '0%': { transform: 'translateY(8px) scale(0.96)', opacity: '0' },
+          '55%': { transform: 'translateY(0) scale(1.02)', opacity: '1' },
+          '100%': { transform: 'translateY(0) scale(1)', opacity: '1' },
+        },
+        'confetti-drift': {
+          '0%': { transform: 'translateY(0) rotate(0deg)', opacity: '0.9' },
+          '100%': { transform: 'translateY(72px) rotate(180deg)', opacity: '0' },
+        },
+        /** Pass pricing CTA — slow glossy sheen */
+        'pass-cta-sheen': {
+          '0%': { transform: 'translateX(-120%) skewX(-18deg)', opacity: '0' },
+          '12%': { opacity: '0.55' },
+          '55%': { opacity: '0.4' },
+          '100%': { transform: 'translateX(220%) skewX(-18deg)', opacity: '0' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -101,6 +123,10 @@ export default {
         'fade-in': 'fade-in 0.3s ease-out',
         'slide-in': 'slide-in 0.3s ease-out',
         shimmer: 'shimmer 1.5s infinite',
+        'savings-glow': 'savings-glow 2.2s ease-in-out infinite',
+        'celebration-rise': 'celebration-rise 0.65s ease-out both',
+        'confetti-drift': 'confetti-drift 2.4s ease-in forwards',
+        'pass-cta-sheen': 'pass-cta-sheen 3.2s ease-in-out infinite',
       },
 
       typography: {

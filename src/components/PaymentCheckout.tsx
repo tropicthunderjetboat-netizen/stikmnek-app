@@ -1,33 +1,30 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Shield, Lock, Check, Loader2,
-  Zap, Star, Crown, ChevronRight, Calendar, CalendarRange, Info,
-  Users, CreditCard, AlertCircle, CheckCircle
+  ChevronRight, Calendar, CalendarRange, Info,
+  Users, CreditCard, AlertCircle, CheckCircle, Ticket, Zap,
 } from 'lucide-react';
 
-import { PASS_PRODUCTS, PASS_PRODUCT_ORDER, type PassProductId } from '@/data/pricing';
-
-type LucideIcon = typeof Zap;
-
-type CheckoutPassRow = {
-  price: number;
-  days: number;
-  label: string;
-  icon: LucideIcon;
-  color: string;
-  shadow: string;
-  group: string;
-};
-
-const CHECKOUT_PASS_UI: Record<PassProductId, { icon: LucideIcon; color: string; shadow: string }> = {
-  family_explorer: { icon: Zap, color: 'from-sky-500 to-blue-600', shadow: 'shadow-sky-200' },
-  extended_group_adventure: { icon: Star, color: 'from-teal-500 to-emerald-600', shadow: 'shadow-teal-200' },
-  ultimate_crew_experience: { icon: Crown, color: 'from-orange-500 to-amber-600', shadow: 'shadow-orange-200' },
-  mega_group_experience: { icon: Crown, color: 'from-fuchsia-600 to-purple-700', shadow: 'shadow-fuchsia-200' },
-};
+import {
+  calculatePassPrice,
+  passInclusiveCalendarDays,
+  validUntilDayOffset,
+  addCalendarDaysIso,
+  clampPartySize,
+  MAX_PARTY_SIZE,
+  BASE_PRICE_AUD,
+  GUEST_FEE_AUD,
+  EXTEND_FEE_AUD,
+} from '@/data/pricing';
+import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
+import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
+import CheckoutPricingSummary from '@/components/CheckoutPricingSummary';
+import { t } from '@/data/translations';
+import type { Language } from '@/data/translations';
 
 /** Local calendar YYYY-MM-DD */
 function dateOnlyLocal(d = new Date()): string {
@@ -58,25 +55,6 @@ function latestPassStartDateUtc(now = new Date()): string {
   d.setUTCDate(d.getUTCDate() + 30);
   return d.toISOString().split('T')[0];
 }
-
-const PASSES = Object.fromEntries(
-  PASS_PRODUCT_ORDER.map((id) => {
-    const p = PASS_PRODUCTS[id];
-    const ui = CHECKOUT_PASS_UI[id];
-    return [
-      id,
-      {
-        price: p.priceAUD,
-        days: p.baseDays,
-        label: p.title,
-        icon: ui.icon,
-        color: ui.color,
-        shadow: ui.shadow,
-        group: `Up to ${p.basePeople} people`,
-      } satisfies CheckoutPassRow,
-    ];
-  }),
-) as Record<PassProductId, CheckoutPassRow>;
 
 /**
  * Ensures the Supabase SDK has a valid, fresh access token before Edge invokes.
@@ -135,6 +113,22 @@ async function getInvokeErrorBody(error: any): Promise<Record<string, unknown> |
       return body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
     }
   } catch {}
+  return null;
+}
+
+/** `FunctionsFetchError`: fetch threw before HTTP — unwrap TypeError / cause for debugging. */
+function describeFunctionsFetchFailure(error: unknown): string | null {
+  if (!error || typeof error !== 'object') return null;
+  const e = error as { name?: string; context?: unknown };
+  if (e.name !== 'FunctionsFetchError') return null;
+  const ctx = e.context;
+  if (ctx != null && typeof ctx === 'object') {
+    const c = ctx as { message?: string; cause?: { message?: string } };
+    if (typeof c.message === 'string' && c.message.trim()) return c.message.trim();
+    if (c.cause && typeof c.cause.message === 'string' && c.cause.message.trim()) {
+      return c.cause.message.trim();
+    }
+  }
   return null;
 }
 
@@ -215,7 +209,10 @@ const CardBrandIcon: React.FC<{ brand: string; className?: string }> = ({ brand,
 };
 
 const PaymentCheckout: React.FC = () => {
-  const { user, userProfile, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass } = useAppContext();
+  const navigate = useNavigate();
+  const { user, userProfile, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass, language } =
+    useAppContext();
+  const checkoutLang: Language = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
   const [processing, setProcessing] = useState(false);
   const [step, setStep] = useState<'dates' | 'payment' | 'processing' | 'success'>('dates');
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -280,6 +277,10 @@ const PaymentCheckout: React.FC = () => {
   const cardNumberRef = useRef<HTMLInputElement>(null);
   const expiryRef = useRef<HTMLInputElement>(null);
   const cvvRef = useRef<HTMLInputElement>(null);
+  /** Previous `cart.partySize` for oversize → capped sync (keep warning visible after cap). */
+  const prevCartPartySizeRef = useRef<number | null>(null);
+  /** One-time merge of demographics + trip length into cart when profile loads (reduces re-typing). */
+  const profileCheckoutSyncedRef = useRef(false);
 
   /**
    * Stable idempotency key for pass purchase retries (same cart pass type).
@@ -290,7 +291,7 @@ const PaymentCheckout: React.FC = () => {
 
   useEffect(() => {
     passPurchaseIdempotencyKeyRef.current = null;
-  }, [cart?.passType]);
+  }, [cart?.partySize, cart?.isExtended]);
 
   function getOrCreatePassPurchaseIdempotencyKey(): string {
     if (!passPurchaseIdempotencyKeyRef.current) {
@@ -302,50 +303,192 @@ const PaymentCheckout: React.FC = () => {
     return passPurchaseIdempotencyKeyRef.current;
   }
 
-  const selectedPass = cart ? PASSES[cart.passType] : null;
+  const [partySize, setPartySize] = useState(() => clampPartySize(cart?.partySize ?? 1));
+  const [isExtended, setIsExtended] = useState(() => cart?.isExtended ?? false);
+  const [showGroupSizeWarning, setShowGroupSizeWarning] = useState(
+    () => cart != null && Number(cart.partySize) > MAX_PARTY_SIZE,
+  );
+  const [showPartyEditor, setShowPartyEditor] = useState(false);
 
-  /** When the user’s active pass already has the share bonus and matches the cart pass type, show boosted people/days (same rules as pricing / extend-pass). */
-  const checkoutPassStats = useMemo(() => {
-    if (!cart?.passType) {
-      return { days: 1, groupLabel: 'Up to 4 people', bonusForThisProduct: false };
+  const handlePartySizeChange = (value: number) => {
+    if (!cart) return;
+    if (value > MAX_PARTY_SIZE) {
+      setShowGroupSizeWarning(true);
+      setPartySize(MAX_PARTY_SIZE);
+      setCart({ ...cart, partySize: MAX_PARTY_SIZE, isExtended: cart.isExtended });
+    } else {
+      setShowGroupSizeWarning(false);
+      setPartySize(value);
+      setCart({ ...cart, partySize: value, isExtended: cart.isExtended });
     }
-    const pt = cart.passType;
-    const product = PASS_PRODUCTS[pt];
-    // Bonus can be active on an existing pass OR pre-unlocked before purchase.
-    const bonusForThisProduct = Boolean((user?.shareBonusApplied && user?.pass === pt) || user?.shareBonusUnlocked);
-    const days = bonusForThisProduct
-      ? product.shareBonus.totalDaysAfterShare ??
-        product.baseDays + (product.shareBonus.extraDays || 0)
-      : product.baseDays;
-    const people = bonusForThisProduct
-      ? user?.passPeopleCount ?? product.shareBonus.totalPeopleAfterShare
-      : product.basePeople;
+  };
+
+  const handleDurationChange = (nextExtended: boolean) => {
+    setIsExtended(nextExtended);
+    if (cart) setCart({ ...cart, partySize, isExtended: nextExtended });
+  };
+
+  useEffect(() => {
+    if (!cart || !userProfile || profileCheckoutSyncedRef.current) return;
+
+    let nextParty = cart.partySize;
+    let nextExtended = cart.isExtended;
+
+    const adults = userProfile.num_adults ?? 0;
+    const children = userProfile.num_children ?? 0;
+    const combined = adults + children;
+    if (combined > 0) {
+      nextParty = clampPartySize(combined);
+    } else if (
+      userProfile.party_size != null &&
+      Number.isFinite(Number(userProfile.party_size)) &&
+      Number(userProfile.party_size) >= 1
+    ) {
+      nextParty = clampPartySize(Number(userProfile.party_size));
+    }
+
+    if (userProfile.preferred_pass_duration !== 'short' && inferIsExtendedPassFromTripDates(userProfile)) {
+      nextExtended = true;
+    }
+
+    if (nextParty === cart.partySize && nextExtended === cart.isExtended) {
+      profileCheckoutSyncedRef.current = true;
+      return;
+    }
+
+    profileCheckoutSyncedRef.current = true;
+    setPartySize(nextParty);
+    setIsExtended(nextExtended);
+    setCart({ ...cart, partySize: nextParty, isExtended: nextExtended });
+  }, [cart, userProfile, setCart]);
+
+  useEffect(() => {
+    if (!cart) return;
+    const raw = Number(cart.partySize);
+    const clamped = clampPartySize(Number.isFinite(raw) ? raw : 1);
+    const prev = prevCartPartySizeRef.current;
+    prevCartPartySizeRef.current = raw;
+
+    setPartySize(clamped);
+    setIsExtended(cart.isExtended);
+
+    if (raw > MAX_PARTY_SIZE) {
+      setShowGroupSizeWarning(true);
+      if (clamped !== raw) {
+        setCart({ ...cart, partySize: clamped, isExtended: cart.isExtended });
+      }
+    } else if (!(prev != null && prev > MAX_PARTY_SIZE && raw <= MAX_PARTY_SIZE)) {
+      setShowGroupSizeWarning(false);
+    }
+  }, [cart?.partySize, cart?.isExtended]);
+
+  const passLabel = 'StikmNek Pass';
+  const priceAud = useMemo(() => calculatePassPrice(partySize, isExtended), [partySize, isExtended]);
+  const priceShortOption = useMemo(() => calculatePassPrice(partySize, false), [partySize]);
+  const priceExtendedOption = useMemo(() => calculatePassPrice(partySize, true), [partySize]);
+
+  const profilePartyCount = useMemo(() => {
+    const a = userProfile?.num_adults ?? 0;
+    const c = userProfile?.num_children ?? 0;
+    const combined = a + c;
+    return combined > 0 ? clampPartySize(combined) : 0;
+  }, [userProfile?.num_adults, userProfile?.num_children]);
+
+  const grantSecondWeekPreview = Boolean(user?.shareBonusUnlocked) && isExtended;
+  const daysCount = passInclusiveCalendarDays(isExtended, grantSecondWeekPreview);
+  const extendedCalendarDays = passInclusiveCalendarDays(true, false);
+  const groupLabel = useMemo(() => {
+    if (checkoutLang === 'fr') {
+      return `${partySize} voyageur${partySize > 1 ? 's' : ''} (6 ans et +) · ${BASE_PRICE_AUD} $ + ${GUEST_FEE_AUD} $/invité supp.`;
+    }
+    if (checkoutLang === 'bi') {
+      return `${partySize} man (6+) · A$${BASE_PRICE_AUD} + A$${GUEST_FEE_AUD}/narafala`;
+    }
+    return `${partySize} guests (ages 6+) · A$${BASE_PRICE_AUD} first + A$${GUEST_FEE_AUD}/extra`;
+  }, [partySize, checkoutLang]);
+
+  const tripInclusiveDays = useMemo(() => {
+    const a = normalizeDateOnly(userProfile?.expected_arrival_date);
+    const d = normalizeDateOnly(userProfile?.expected_departure_date);
+    if (!a || !d) return null;
+    return inclusiveCalendarDaysBetween(a, d);
+  }, [userProfile?.expected_arrival_date, userProfile?.expected_departure_date]);
+
+  const tripNights = tripInclusiveDays != null ? Math.max(0, tripInclusiveDays - 1) : null;
+
+  const coverageUi = useMemo(() => {
+    const cal = daysCount;
+    if (!isExtended) {
+      return {
+        periodBadge: t('checkout.period_badge_one_day', checkoutLang),
+        periodSub: null as string | null,
+        endHelper: t('checkout.end_date_helper_short', checkoutLang),
+        orderDealsLine: t('checkout.order_summary_deals_short', checkoutLang),
+        summaryPrimary: t('checkout.period_badge_one_day', checkoutLang),
+        summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+        paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+      };
+    }
+    const legal = t('checkout.period_legal_extended', checkoutLang).replace('__CAL__', String(cal));
+    if (tripNights != null && tripNights >= 1) {
+      const nightsBadge = t('checkout.period_badge_trip_nights', checkoutLang).replace(
+        '__NIGHTS__',
+        String(tripNights),
+      );
+      return {
+        periodBadge: nightsBadge,
+        periodSub: legal,
+        endHelper: t('checkout.end_date_helper_extended', checkoutLang).replace('__CAL__', String(cal)),
+        orderDealsLine: t('checkout.order_summary_deals_extended', checkoutLang).replace('__CAL__', String(cal)),
+        summaryPrimary: nightsBadge,
+        summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+        paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+      };
+    }
     return {
-      days,
-      groupLabel: `Up to ${people} people`,
-      bonusForThisProduct,
+      periodBadge: t('checkout.period_badge_extended_generic', checkoutLang),
+      periodSub: legal,
+      endHelper: t('checkout.end_date_helper_extended', checkoutLang).replace('__CAL__', String(cal)),
+      orderDealsLine: t('checkout.order_summary_deals_extended', checkoutLang).replace('__CAL__', String(cal)),
+      summaryPrimary: t('checkout.period_badge_extended_generic', checkoutLang),
+      summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+      paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
     };
-  }, [cart?.passType, user?.shareBonusApplied, user?.shareBonusUnlocked, user?.pass, user?.passPeopleCount]);
+  }, [isExtended, tripNights, daysCount, checkoutLang, grantSecondWeekPreview]);
+
+  const profilePartySummary =
+    userProfile != null
+      ? t('checkout.profile_party_line', checkoutLang)
+          .replace('__ADULTS__', String(userProfile.num_adults ?? 0))
+          .replace('__CHILDREN__', String(userProfile.num_children ?? 0))
+          .replace('__INFANTS__', String(userProfile.num_infants ?? 0))
+          .replace('__PARTY__', String(partySize))
+      : null;
 
   const endDate = useMemo(() => {
-    if (!selectedPass || !startDate) return '';
-    const start = new Date(startDate);
-    start.setDate(start.getDate() + checkoutPassStats.days);
-    return start.toISOString().split('T')[0];
-  }, [startDate, selectedPass, checkoutPassStats.days]);
+    if (!startDate) return '';
+    const g = Boolean(user?.shareBonusUnlocked) && isExtended;
+    return addCalendarDaysIso(startDate, validUntilDayOffset(isExtended, g));
+  }, [startDate, isExtended, user?.shareBonusUnlocked]);
 
-  const daysCount = checkoutPassStats.days;
   const cardType = detectCardType(cardNumber);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
+    const iso = dateStr.slice(0, 10);
+    const d = new Date(`${iso}T12:00:00Z`);
+    return d.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
   };
 
   if (!user) return null;
 
-  if (!cart || !selectedPass) {
+  if (!cart) {
     return (
       <div className="min-h-screen bg-gray-50 pt-20 pb-16">
         <div className="max-w-lg mx-auto px-4 text-center pt-20">
@@ -355,7 +498,8 @@ const PaymentCheckout: React.FC = () => {
           <h2 className="text-xl font-bold text-gray-900 mb-3">No Pass Selected</h2>
           <p className="text-gray-500 mb-6">Please select a pass to purchase first.</p>
           <button
-            onClick={() => setCurrentView('passes')}
+            type="button"
+            onClick={() => navigate('/passes?info=1')}
             className="px-6 py-3 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors"
           >
             View Passes
@@ -440,7 +584,9 @@ const PaymentCheckout: React.FC = () => {
 
       const invokeBody = {
         action: 'purchase_pass' as const,
-        passType: cart.passType,
+        passType: 'dynamic',
+        partySize,
+        isExtended,
         startDate: payStartDate,
         cardNumber: cardNumber.replace(/\s/g, ''),
         cardExpiry,
@@ -477,7 +623,10 @@ const PaymentCheckout: React.FC = () => {
         if (serverError) {
           throw new Error(serverError);
         }
-        const errMsg = error.message || 'Payment processing failed';
+        const fetchDetail = describeFunctionsFetchFailure(error);
+        const errMsg = fetchDetail
+          ? `${error.message || 'Payment processing failed'} (${fetchDetail})`
+          : error.message || 'Payment processing failed';
         if (errMsg.includes('non-2xx')) {
           if (status === 404) throw new Error('Payment server: "process-card-payment" not found. Deploy the Edge Function in Supabase.');
           if (status === 501) throw new Error('Card payment is temporarily unavailable. Please try again later.');
@@ -504,7 +653,7 @@ const PaymentCheckout: React.FC = () => {
         const paymentResultData = {
           receiptNumber: data.receiptNumber,
           passType: data.passType,
-          passLabel: data.passLabel || selectedPass.label,
+          passLabel: data.passLabel || passLabel,
           amount: data.amount,
           currency: data.currency || 'AUD',
           paymentMethod: data.paymentMethod || 'card',
@@ -513,7 +662,9 @@ const PaymentCheckout: React.FC = () => {
           validUntil: data.validUntil,
           days: data.days,
           shareBonusApplied: Boolean(data.shareBonusApplied),
-          group: data.group || checkoutPassStats.groupLabel,
+          group: data.group || groupLabel,
+          partySize,
+          isExtended,
           sessionId: data.sessionId,
           completedAt: new Date().toISOString(),
           cardLast4: data.cardLast4,
@@ -560,7 +711,8 @@ const PaymentCheckout: React.FC = () => {
   };
 
 
-  const Icon = selectedPass.icon;
+  const Icon = Ticket;
+  const passCardGradient = 'from-teal-500 to-emerald-600';
   const currentStepIndex = step === 'dates' ? 0 : step === 'payment' ? 1 : step === 'success' ? 2 : 2;
 
   return (
@@ -568,7 +720,8 @@ const PaymentCheckout: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back Button */}
         <button
-          onClick={() => setCurrentView('passes')}
+          type="button"
+          onClick={() => navigate('/passes?info=1')}
           className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -620,35 +773,166 @@ const PaymentCheckout: React.FC = () => {
                     <Info className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-teal-800">
                       <p className="font-semibold mb-1">How it works</p>
-                      <p className="text-teal-700">
-                        {checkoutPassStats.bonusForThisProduct ? (
-                          <>
-                            Your <strong>Share Bonus</strong> is already applied. Choose your start date and your <strong>{selectedPass.label}</strong> will be valid for <strong>{daysCount} day{daysCount > 1 ? 's' : ''}</strong> for <strong>{checkoutPassStats.groupLabel}</strong>.
-                            The end date is automatically calculated.
-                          </>
-                        ) : (
-                          <>
-                            Choose your start date and your <strong>{selectedPass.label}</strong> will be valid for <strong>{daysCount} day{daysCount > 1 ? 's' : ''}</strong> for <strong>{checkoutPassStats.groupLabel}</strong>.
-                            The end date is automatically calculated.
-                          </>
-                        )}
+                      <p className="text-teal-700">{t('checkout.how_it_works_compact', checkoutLang)}</p>
+                    </div>
+                  </div>
+
+                  {profilePartySummary && (
+                    <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
+                      <p className="text-xs font-bold uppercase tracking-wide text-teal-700 mb-1.5">
+                        {t('checkout.profile_party_title', checkoutLang)}
                       </p>
-                      {!checkoutPassStats.bonusForThisProduct && (
-                        <p className="text-teal-700 mt-2 font-medium">
-                          Share the app (from the Passes page or after purchase) to unlock bonus extra people and/or extra days.
+                      <p className="text-sm text-gray-700 leading-relaxed">{profilePartySummary}</p>
+                    </div>
+                  )}
+
+                  <div className="pt-1">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">
+                      {t('checkout.section_pass_group', checkoutLang)}
+                    </h4>
+                  <div>
+                    {!showPartyEditor && profilePartyCount > 0 ? (
+                      <div className="flex items-center justify-between gap-3 rounded-xl border-2 border-teal-100 bg-teal-50/40 px-4 py-3">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">
+                            {t('checkout.party_summary_label', checkoutLang)}
+                          </p>
+                          <p className="text-sm font-bold text-gray-900 mt-0.5">
+                            {t('checkout.party_summary_line', checkoutLang).replace('__N__', String(partySize))}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowPartyEditor(true)}
+                          className="text-sm font-semibold text-teal-700 hover:text-teal-900 px-3 py-1.5 rounded-lg border border-teal-200 bg-white shrink-0"
+                        >
+                          {t('checkout.party_edit', checkoutLang)}
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-sm font-semibold text-gray-700">People (ages 6+)</label>
+                          {profilePartyCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowPartyEditor(false)}
+                              className="text-xs font-semibold text-teal-600 hover:text-teal-800"
+                            >
+                              {t('checkout.party_done', checkoutLang)}
+                            </button>
+                          )}
+                        </div>
+                        <select
+                          value={partySize}
+                          onChange={(e) => handlePartySizeChange(Number(e.target.value))}
+                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                        >
+                          {[1, 2, 3, 4, 5, 6].map((n) => (
+                            <option key={n} value={n}>
+                              {n} {n === 1 ? 'person' : 'people'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <span className="block text-sm font-semibold text-gray-700 mb-2">{t('checkout.plan_pick_title', checkoutLang)}</span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(false)}
+                        className={`text-left rounded-xl border-2 p-4 transition-all ${
+                          !isExtended
+                            ? 'border-teal-600 bg-teal-50/80 ring-2 ring-teal-300 shadow-md'
+                            : 'border-gray-200 bg-white hover:border-teal-200'
+                        }`}
+                      >
+                        <p className="text-sm font-extrabold text-gray-900">{t('checkout.plan_day_title', checkoutLang)}</p>
+                        <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                          {t('checkout.plan_day_sub', checkoutLang)}
                         </p>
-                      )}
+                        <p className="text-lg font-extrabold text-teal-700 mt-3">
+                          A${priceShortOption.toFixed(2)}{' '}
+                          <span className="text-xs font-semibold text-gray-500">{t('checkout.option_total', checkoutLang)}</span>
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDurationChange(true)}
+                        className={`text-left rounded-xl border-2 p-4 transition-all ${
+                          isExtended
+                            ? 'border-teal-600 bg-teal-50/80 ring-2 ring-teal-300 shadow-md'
+                            : 'border-gray-200 bg-white hover:border-teal-200'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-extrabold text-gray-900">{t('checkout.plan_holiday_title', checkoutLang)}</p>
+                          {tripNights != null && tripNights >= 1 && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                              {t('checkout.option_extended_badge', checkoutLang).replace('__NIGHTS__', String(tripNights))}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                          {t('checkout.plan_holiday_sub', checkoutLang)}
+                        </p>
+                        <p className="mt-2 text-[11px] font-bold text-emerald-900 leading-snug bg-emerald-100/90 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+                          {t('checkout.share_second_week_unlock', checkoutLang)}
+                        </p>
+                        <p className="text-lg font-extrabold text-teal-700 mt-3">
+                          A${priceExtendedOption.toFixed(2)}{' '}
+                          <span className="text-xs font-normal text-gray-500">
+                            (+A${EXTEND_FEE_AUD.toFixed(0)} vs day pass)
+                          </span>
+                        </p>
+                      </button>
                     </div>
                   </div>
 
-                  {/* Group Info */}
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
-                    <Users className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                    <div className="text-sm text-blue-800">
-                      <span className="font-semibold">Group Size:</span> {checkoutPassStats.groupLabel}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3.5 mt-4">
+                    <div className="flex items-start gap-2.5">
+                      <span className="text-lg flex-shrink-0 mt-0.5" role="img" aria-label="Information">
+                        ℹ️
+                      </span>
+                      <p className="text-sm text-blue-900 leading-relaxed">
+                        <span className="font-semibold">Children under 6 are FREE!</span>{' '}
+                        {`They don't count toward your party size and can accompany your group at no extra cost.`}
+                      </p>
                     </div>
                   </div>
 
+                  {showGroupSizeWarning && (
+                    <div className="bg-amber-50 border-l-4 border-amber-500 rounded-r-lg p-4 mt-3 mb-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-xl flex-shrink-0" aria-hidden="true">
+                          ⚠️
+                        </span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-amber-900 text-sm sm:text-base">
+                            Group Size Limit Reached
+                          </p>
+                          <p className="text-sm text-amber-800 mt-1">
+                            Maximum {MAX_PARTY_SIZE} people per voucher. For groups larger than {MAX_PARTY_SIZE}, please purchase a second voucher after completing this one.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <CheckoutPricingSummary
+                    partySize={partySize}
+                    isExtended={isExtended}
+                    language={checkoutLang}
+                  />
+                  </div>
+
+                  <div className="border-t border-gray-100 pt-6 mt-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-4">
+                      {t('checkout.section_dates', checkoutLang)}
+                    </h4>
                   {/* Start Date Picker */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
@@ -690,42 +974,52 @@ const PaymentCheckout: React.FC = () => {
                       </div>
                     </div>
                     <p className="text-xs text-gray-400 mt-1.5">
-                      Automatically set to {daysCount} day{daysCount > 1 ? 's' : ''} after your start date
+                      {coverageUi.endHelper}
                     </p>
                   </div>
 
                   {/* Date Range Preview */}
-                  <div className="mt-2 p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
-                    <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider mb-3">Your Discount Period</p>
-                    <div className="flex items-center gap-3">
+                  <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
+                    <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider mb-3">Your discount window</p>
+                    <div className="flex flex-col sm:flex-row sm:items-stretch gap-4">
                       <div className="flex-1 bg-white rounded-lg p-3 border border-teal-200 shadow-sm">
                         <p className="text-[10px] text-gray-400 font-medium uppercase">Start</p>
                         <p className="text-sm font-bold text-gray-900 mt-0.5">{formatDate(startDate)}</p>
                       </div>
-                      <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
-                        <div className="px-3 py-1 rounded-full bg-teal-600 text-white text-[10px] font-bold shadow-sm">
-                          {daysCount} day{daysCount > 1 ? 's' : ''}
+                      <div className="flex sm:flex-col items-center justify-center gap-1 flex-shrink-0 px-2">
+                        <div className="px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold shadow-sm text-center leading-snug max-w-[11rem]">
+                          {coverageUi.periodBadge}
                         </div>
-                        <div className="w-8 h-0.5 bg-teal-300 rounded-full" />
+                        {coverageUi.periodSub && (
+                          <p className="text-[10px] text-teal-800/90 text-center leading-snug max-w-[12rem] mt-1 hidden sm:block">
+                            {coverageUi.periodSub}
+                          </p>
+                        )}
                       </div>
                       <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200 shadow-sm">
                         <p className="text-[10px] text-gray-400 font-medium uppercase">End</p>
                         <p className="text-sm font-bold text-gray-900 mt-0.5">{formatDate(endDate)}</p>
                       </div>
                     </div>
+                    {coverageUi.periodSub && (
+                      <p className="text-[10px] text-teal-800/90 text-center leading-snug mt-3 sm:hidden">
+                        {coverageUi.periodSub}
+                      </p>
+                    )}
 
                     {startDate === minStartDate && (
                       <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5" />
+                        <Zap className="w-3.5 h-3.5 flex-shrink-0" />
                         Starting on the earliest available day — discounts activate right after purchase.
                       </p>
                     )}
                     {startDate > minStartDate && (
                       <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5" />
+                        <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
                         Your discounts will activate on {formatDate(startDate)}.
                       </p>
                     )}
+                  </div>
                   </div>
                 </div>
 
@@ -756,15 +1050,29 @@ const PaymentCheckout: React.FC = () => {
                 </div>
 
                 {/* Date summary bar */}
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-teal-50 border border-teal-100 text-sm">
-                  <CalendarRange className="w-4 h-4 text-teal-600 flex-shrink-0" />
-                  <span className="text-teal-800">
-                    <strong>{formatDate(startDate)}</strong>
-                    <span className="mx-2 text-teal-400">to</span>
-                    <strong>{formatDate(endDate)}</strong>
-                    <span className="text-teal-500 ml-2">({daysCount} day{daysCount > 1 ? 's' : ''})</span>
-                  </span>
+                <div className="flex gap-3 p-3 rounded-xl bg-teal-50 border border-teal-100 text-sm">
+                  <CalendarRange className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-teal-800 min-w-0">
+                    <p>
+                      <strong>{formatDate(startDate)}</strong>
+                      <span className="mx-2 text-teal-400">to</span>
+                      <strong>{formatDate(endDate)}</strong>
+                    </p>
+                    <p className="text-xs text-teal-700 mt-1 leading-snug">
+                      <span className="font-semibold">{coverageUi.periodBadge}</span>
+                      {coverageUi.paymentBarSecondary ? (
+                        <span className="text-teal-600"> · {coverageUi.paymentBarSecondary}</span>
+                      ) : null}
+                    </p>
+                  </div>
                 </div>
+
+                <CheckoutPricingSummary
+                  partySize={partySize}
+                  isExtended={isExtended}
+                  language={checkoutLang}
+                  showSavingsCallout={false}
+                />
 
                 {/* Payment Error */}
                 {paymentError && (
@@ -946,6 +1254,24 @@ const PaymentCheckout: React.FC = () => {
                   </div>
                 </div>
 
+                {partySize >= 1 && (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-4 rounded-r-lg mb-6 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl shrink-0" aria-hidden>
+                        💰
+                      </span>
+                      <div>
+                        <p className="text-base sm:text-lg font-semibold text-gray-900 leading-snug">
+                          {t('checkout.savings_anchor_v2', checkoutLang)
+                            .replace('__COUNT__', String(partySize))
+                            .replace('__PASS__', priceAud.toFixed(0))}
+                        </p>
+                        <p className="text-sm text-gray-700 mt-1">{t('checkout.savings_subline', checkoutLang)}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Pay with Card Button */}
                 <button
                   type="button"
@@ -961,7 +1287,7 @@ const PaymentCheckout: React.FC = () => {
                   ) : (
                     <>
                       <Lock className="w-5 h-5" />
-                      Pay A${selectedPass.price}.00 with Card
+                      Pay A${priceAud.toFixed(2)} with Card
                     </>
                   )}
                 </button>
@@ -1000,7 +1326,7 @@ const PaymentCheckout: React.FC = () => {
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
                 <p className="text-gray-500 mb-6">
-                  Your {selectedPass.label} is now active. Redirecting to your receipt...
+                  Your {passLabel} is now active. Redirecting to your receipt...
                 </p>
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 border border-green-200 text-sm text-green-700 font-medium">
                   <CreditCard className="w-4 h-4" />
@@ -1038,25 +1364,22 @@ const PaymentCheckout: React.FC = () => {
 
               <div className="p-5">
                 {/* Pass Card */}
-                <div className={`relative bg-gradient-to-br ${selectedPass.color} rounded-xl p-5 text-white mb-5 overflow-hidden`}>
+                <div className={`relative bg-gradient-to-br ${passCardGradient} rounded-xl p-5 text-white mb-5 overflow-hidden`}>
                   <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
                   <div className="relative">
                     <div className="flex items-center gap-2 mb-3">
                       <Icon className="w-5 h-5" />
                       <span className="text-sm font-medium text-white/80">StikmNek</span>
                     </div>
-                    <h4 className="text-lg font-bold">{selectedPass.label}</h4>
+                    <h4 className="text-lg font-bold">{passLabel}</h4>
                     <div className="flex items-center gap-2 mt-2">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/20 text-white text-xs font-semibold">
                         <Users className="w-3 h-3" />
-                        {checkoutPassStats.groupLabel}
+                        {groupLabel}
                       </span>
                     </div>
-                    <p className="text-sm text-white/70 mt-2">
-                      {daysCount} day{daysCount > 1 ? 's' : ''} of unlimited deals
-                      {checkoutPassStats.bonusForThisProduct && (
-                        <span className="block text-xs text-white/60 mt-1">Includes Share Bonus</span>
-                      )}
+                    <p className="text-sm text-white/80 mt-2 leading-snug">
+                      {coverageUi.orderDealsLine}
                     </p>
                   </div>
                 </div>
@@ -1070,41 +1393,32 @@ const PaymentCheckout: React.FC = () => {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-500">Valid From</span>
-                      <span className="font-bold text-gray-900">
-                        {new Date(startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
+                      <span className="font-bold text-gray-900">{formatDate(startDate)}</span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gray-500">Valid Until</span>
-                      <span className="font-bold text-gray-900">
-                        {endDate && new Date(endDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
+                      <span className="font-bold text-gray-900">{endDate ? formatDate(endDate) : '—'}</span>
                     </div>
-                    <div className="flex items-center justify-between text-xs pt-1 border-t border-teal-100">
-                      <span className="text-gray-500">Duration</span>
-                      <span className="font-bold text-teal-700">{daysCount} day{daysCount > 1 ? 's' : ''}</span>
+                    <div className="pt-1 border-t border-teal-100 space-y-0.5">
+                      <div className="flex items-center justify-between text-xs gap-2">
+                        <span className="text-gray-500 shrink-0">{t('checkout.summary_duration_label', checkoutLang)}</span>
+                        <span className="font-bold text-teal-700 text-right leading-snug">{coverageUi.summaryPrimary}</span>
+                      </div>
+                      {coverageUi.summarySecondary && (
+                        <p className="text-[10px] text-gray-500 text-right leading-snug">{coverageUi.summarySecondary}</p>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Price Breakdown */}
-                <div className="space-y-3 mb-5">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">{selectedPass.label}</span>
-                    <span className="font-medium text-gray-900">A${selectedPass.price}.00</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Processing fee</span>
-                    <span className="font-medium text-gray-900">A$0.00</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Tax</span>
-                    <span className="font-medium text-gray-900">A$0.00</span>
-                  </div>
-                  <div className="border-t border-gray-100 pt-3 flex justify-between">
-                    <span className="font-bold text-gray-900">Total</span>
-                    <span className="text-xl font-extrabold text-gray-900">A${selectedPass.price}.00 <span className="text-sm font-semibold text-gray-500">AUD</span></span>
-                  </div>
+                <div className="mb-5">
+                  <CheckoutPricingSummary
+                    partySize={partySize}
+                    isExtended={isExtended}
+                    language={checkoutLang}
+                    variant="sidebar"
+                    showSavingsCallout={step !== 'payment'}
+                  />
                 </div>
 
                 {/* Payment Method Indicator */}

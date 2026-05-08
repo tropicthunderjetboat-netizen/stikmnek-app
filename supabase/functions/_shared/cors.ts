@@ -6,6 +6,33 @@
  * both work when only one is listed (reduces browser CORS failures after domain changes).
  */
 
+/**
+ * Vercel preview deployments (*.vercel.app). Any preview hostname is allowed when the
+ * allowlist includes a stikmnek.com site — preview URLs vary (`stikmnek-…`, `*-git-*-…`, team slug, etc.).
+ */
+function isVercelPreviewOrigin(origin: string): boolean {
+  try {
+    return new URL(origin).hostname.toLowerCase().endsWith('.vercel.app');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * `http://localhost:*`, `127.0.0.1`, `::1` — typical Vite/Next dev servers.
+ * Browsers send a real Origin for these; they cannot be spoofed by random websites,
+ * so echoing the origin is safe and avoids CORS failures when production
+ * `CORS_ALLOWED_ORIGINS` omits every dev port.
+ */
+function isLocalMachineDevOrigin(origin: string): boolean {
+  try {
+    const h = new URL(origin).hostname.toLowerCase();
+    return h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
 function originMatchesAllowList(origin: string, allowed: string[]): boolean {
   const o = origin.trim();
   if (!o) return false;
@@ -65,6 +92,18 @@ export function getSafeCorsHeaders(req: Request): Record<string, string> {
     return base;
   }
   if (origin && originMatchesAllowList(origin, allowed)) {
+    base['Access-Control-Allow-Origin'] = origin;
+  } else if (
+    origin &&
+    isVercelPreviewOrigin(origin) &&
+    allowed.some((a) => /stikmnek\.com/i.test(a))
+  ) {
+    // Production allowlist is set, but the request is from a Vercel preview — echo Origin so
+    // browser credentialed calls (Authorization + cookies) pass CORS.
+    base['Access-Control-Allow-Origin'] = origin;
+  } else if (origin && isLocalMachineDevOrigin(origin)) {
+    // Dev: allowlist often lists only production domains; wrong static Allow-Origin breaks fetch()
+    // with a generic network error (see FunctionsFetchError in supabase-js).
     base['Access-Control-Allow-Origin'] = origin;
   } else {
     base['Access-Control-Allow-Origin'] = allowed[0]!;

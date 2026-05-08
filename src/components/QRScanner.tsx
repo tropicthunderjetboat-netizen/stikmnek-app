@@ -6,7 +6,8 @@ import {
   partyFromValidityApi,
   type PartyCounts,
 } from '@/lib/redemptionSavings';
-import { supabase } from '@/lib/supabase';
+import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
+import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
   Camera, X, CheckCircle, XCircle, Loader2, ScanLine,
@@ -71,6 +72,11 @@ interface ValidityResult {
     validUntil: string;
     expiresAt: string;
     purchasedAt: string;
+    maxPeople?: number | null;
+    /** Same as maxPeople when set — ages 6+ capacity (from verify-redemption). */
+    partySize?: number | null;
+    totalPartySize?: number;
+    headcountAgainstPass?: number;
   };
   voucher: {
     businessName: string;
@@ -126,17 +132,16 @@ function formatOfferDiscountLine(listing: OwnerListingOffer): string {
 // ═══ PASS TIER STYLING ═══
 const getPassTierConfig = (passType: string) => {
   const pid = passProductIdFromDb(passType);
-  if (pid === 'family_explorer') {
-    return { gradient: 'from-sky-500 to-blue-600', bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-800', badge: 'bg-gradient-to-r from-sky-500 to-blue-600', icon: <Zap className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
-  }
-  if (pid === 'extended_group_adventure') {
-    return { gradient: 'from-teal-500 to-emerald-600', bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-800', badge: 'bg-gradient-to-r from-teal-500 to-emerald-600', icon: <Star className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
-  }
-  if (pid === 'ultimate_crew_experience') {
-    return { gradient: 'from-orange-500 to-amber-600', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', badge: 'bg-gradient-to-r from-orange-500 to-amber-600', icon: <Crown className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
-  }
-  if (pid === 'mega_group_experience') {
-    return { gradient: 'from-fuchsia-600 to-purple-700', bg: 'bg-fuchsia-50', border: 'border-fuchsia-200', text: 'text-fuchsia-900', badge: 'bg-gradient-to-r from-fuchsia-600 to-purple-700', icon: <Crown className="w-4 h-4" />, label: getPassDisplayTitle(passType, 'en') };
+  if (pid === 'dynamic' || String(passType).toLowerCase() === 'dynamic') {
+    return {
+      gradient: 'from-teal-500 to-emerald-600',
+      bg: 'bg-teal-50',
+      border: 'border-teal-200',
+      text: 'text-teal-800',
+      badge: 'bg-gradient-to-r from-teal-500 to-emerald-600',
+      icon: <Ticket className="w-4 h-4" />,
+      label: getPassDisplayTitle('dynamic', 'en'),
+    };
   }
   const type = (passType || '').toLowerCase();
   if (type.includes('gold') || type.includes('premium') || type.includes('vip')) {
@@ -189,6 +194,19 @@ function resolveVerifyRedemptionBackendError(
   return undefined;
 }
 
+type InvokeErrorPayload = {
+  success?: boolean;
+  error?: string;
+  errorCode?: number;
+  reason?: string;
+  postgresCode?: string | null;
+  postgresMessage?: string | null;
+  profileError?: string | null;
+  profileRole?: unknown;
+  profileUserType?: unknown;
+  duplicateProfileRows?: number | null;
+};
+
 /** Human-readable line for Edge Function failures (includes HTTP + errorCode from JSON when present). */
 function formatVerifyInvokeFailure(
   backendMsg: string | undefined,
@@ -200,17 +218,89 @@ function formatVerifyInvokeFailure(
   const code = parsed?.errorCode ?? (httpStatus ?? undefined);
   if (code != null) parts.push(`HTTP ${code}`);
   if (parsed?.reason) parts.push(`reason: ${parsed.reason}`);
+  if (typeof parsed?.postgresMessage === 'string' && parsed.postgresMessage.trim()) {
+    parts.push(`pg: ${parsed.postgresMessage.trim().slice(0, 160)}`);
+  }
+  if (typeof parsed?.profileError === 'string' && parsed.profileError.trim()) {
+    parts.push(`detail: ${parsed.profileError.trim().slice(0, 200)}`);
+  }
+  if (parsed?.reason === 'invalid_edge_service_role_key') {
+    parts.push('Fix: remove wrong APP_SUPABASE_SERVICE_ROLE_KEY or set it to service_role; reserved SUPABASE_SERVICE_ROLE_KEY is used first');
+  }
+  if (parsed?.reason === 'scanner_profile_query_failed' || parsed?.reason === 'scanner_role') {
+    if (parsed.profileRole != null) parts.push(`roleCol: ${String(parsed.profileRole)}`);
+    if (parsed.profileUserType != null) parts.push(`userTypeCol: ${String(parsed.profileUserType)}`);
+    if (parsed.duplicateProfileRows != null) parts.push(`dupRows: ${String(parsed.duplicateProfileRows)}`);
+  }
   return parts.length > 0 ? parts.join(' — ') : 'Edge Function request failed';
 }
 
-type InvokeErrorPayload = {
-  success?: boolean;
-  error?: string;
-  errorCode?: number;
-  reason?: string;
-  postgresCode?: string | null;
-  postgresMessage?: string | null;
-};
+// #region agent log
+/** Debug NDJSON ingest (desktop dev only reaches localhost; mobile silently no-ops). */
+function agentLogVerifyRedemption(hypothesisId: string, data: Record<string, unknown>): void {
+  fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'bf845b' },
+    body: JSON.stringify({
+      sessionId: 'bf845b',
+      hypothesisId,
+      location: 'QRScanner.tsx',
+      message: 'verify-redemption invoke failure',
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+}
+// #endregion
+
+function mergeVerifyInvokeParsed(
+  parsed: InvokeErrorPayload | null,
+  invokeData: unknown,
+): InvokeErrorPayload | null {
+  if (parsed) return parsed;
+  if (invokeData && typeof invokeData === 'object' && invokeData !== null) {
+    const o = invokeData as Record<string, unknown>;
+    if (typeof o.error === 'string' || typeof o.reason === 'string') return o as InvokeErrorPayload;
+  }
+  return null;
+}
+
+/** One string so minified builds + ErrorLogger show full payload (objects alone print as "Object"). */
+function stringifyVerifyRedemptionClientDebug(
+  phase: string,
+  error: unknown,
+  invokeData: unknown,
+  parsed: InvokeErrorPayload | null,
+  httpStatus: number | null,
+): string {
+  const err = error as { name?: string; message?: string };
+  let dataSnippet: string | null = null;
+  try {
+    if (invokeData == null) dataSnippet = 'null';
+    else if (typeof invokeData === 'string') dataSnippet = invokeData.slice(0, 400);
+    else dataSnippet = JSON.stringify(invokeData).slice(0, 800);
+  } catch {
+    dataSnippet = 'unserializable-data';
+  }
+  let parsedSnippet: string | null = null;
+  try {
+    parsedSnippet = parsed ? JSON.stringify(parsed).slice(0, 800) : 'null';
+  } catch {
+    parsedSnippet = 'unserializable-parsed';
+  }
+  try {
+    return JSON.stringify({
+      phase,
+      httpStatus,
+      sdkErrorName: err?.name ?? null,
+      sdkErrorMessage: err?.message ?? null,
+      invokeDataSnippet: dataSnippet,
+      parsedSnippet,
+    });
+  } catch {
+    return JSON.stringify({ phase, httpStatus, note: 'stringify_verify_debug_failed' });
+  }
+}
 
 /** Parse JSON body from supabase.functions.invoke FunctionsHttpError (context Response or message). */
 async function extractFunctionsInvokeErrorBody(
@@ -417,12 +507,17 @@ const QRScanner: React.FC<QRScannerProps> = ({
   ) => {
     const discountLine = formatOfferDiscountLine(listing);
     const preview = computeRedemptionSavingsForListing(listing, party);
+    const offeringIdForServer =
+      listing.id && listing.profileBusinessId && listing.id !== listing.profileBusinessId
+        ? listing.id
+        : undefined;
     const { data, error } = await supabase.functions.invoke('verify-redemption', {
       body: {
         action: 'verify_and_redeem',
         qrData: rawData,
         businessId: listing.profileBusinessId,
         businessName: listing.name,
+        ...(offeringIdForServer ? { offeringId: offeringIdForServer } : {}),
         discount: discountLine,
         discountLabel: discountLine,
         savedAmount: preview.savedAmount,
@@ -432,17 +527,26 @@ const QRScanner: React.FC<QRScannerProps> = ({
       },
     });
     if (error) {
-      const parsed = await extractFunctionsInvokeErrorBody(error);
+      const parsedRaw = await extractFunctionsInvokeErrorBody(error);
+      const parsed = mergeVerifyInvokeParsed(parsedRaw, data);
       const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
       const httpStatus = getFunctionsInvokeHttpStatus(error);
-      console.error('[QRScanner] verify_and_redeem failed', {
+      agentLogVerifyRedemption('H1', {
+        phase: 'verify_and_redeem',
         httpStatus,
-        error: parsed?.error,
-        errorCode: parsed?.errorCode,
+        reason: parsed?.reason ?? null,
+        fnError: parsed?.error ?? null,
+        profileError: parsed?.profileError ?? null,
+        postgresCode: parsed?.postgresCode ?? null,
+        uid8: user?.id ? user.id.slice(0, 8) : null,
       });
+      console.error(
+        '[QRScanner] verify_and_redeem failed',
+        stringifyVerifyRedemptionClientDebug('verify_and_redeem', error, data, parsed, httpStatus),
+      );
       const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
       if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
-      else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280));
+      else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 400));
       setResult({
         success: false,
         error: invalidQr
@@ -539,6 +643,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
     if (rows.length === 0) {
       const { data: mbData, error: mbErr } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_owner_businesses', userId: user.id },
       });
 
@@ -628,17 +733,26 @@ const QRScanner: React.FC<QRScannerProps> = ({
           },
         });
         if (error) {
-          const parsed = await extractFunctionsInvokeErrorBody(error);
+          const parsedRaw = await extractFunctionsInvokeErrorBody(error);
+          const parsed = mergeVerifyInvokeParsed(parsedRaw, data);
           const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
           const httpStatus = getFunctionsInvokeHttpStatus(error);
-          console.error('[QRScanner] check_voucher_validity failed', {
+          agentLogVerifyRedemption('H1', {
+            phase: 'check_voucher_validity',
             httpStatus,
-            error: parsed?.error,
-            errorCode: parsed?.errorCode,
+            reason: parsed?.reason ?? null,
+            fnError: parsed?.error ?? null,
+            profileError: parsed?.profileError ?? null,
+            postgresCode: parsed?.postgresCode ?? null,
+            uid8: user?.id ? user.id.slice(0, 8) : null,
           });
+          console.error(
+            '[QRScanner] check_voucher_validity failed',
+            stringifyVerifyRedemptionClientDebug('check_voucher_validity', error, data, parsed, httpStatus),
+          );
           const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
           if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
-          else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280));
+          else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 400));
           setValidityResult({
             success: false,
             error: invalidQr
@@ -661,17 +775,26 @@ const QRScanner: React.FC<QRScannerProps> = ({
           },
         });
         if (error) {
-          const parsed = await extractFunctionsInvokeErrorBody(error);
+          const parsedRaw = await extractFunctionsInvokeErrorBody(error);
+          const parsed = mergeVerifyInvokeParsed(parsedRaw, data);
           const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
           const httpStatus = getFunctionsInvokeHttpStatus(error);
-          console.error('[QRScanner] redeem flow validity check failed', {
+          agentLogVerifyRedemption('H1', {
+            phase: 'redeem_flow_check_voucher_validity',
             httpStatus,
-            error: parsed?.error,
-            errorCode: parsed?.errorCode,
+            reason: parsed?.reason ?? null,
+            fnError: parsed?.error ?? null,
+            profileError: parsed?.profileError ?? null,
+            postgresCode: parsed?.postgresCode ?? null,
+            uid8: user?.id ? user.id.slice(0, 8) : null,
           });
+          console.error(
+            '[QRScanner] redeem flow validity check failed',
+            stringifyVerifyRedemptionClientDebug('redeem_flow_check_voucher_validity', error, data, parsed, httpStatus),
+          );
           const invalidQr = isInvalidQrPayloadBackendMessage(backendMsg);
           if (invalidQr) toast.error(INVALID_QR_PAYLOAD_USER_MESSAGE);
-          else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 280));
+          else toast.error(formatVerifyInvokeFailure(backendMsg, parsed, httpStatus).slice(0, 400));
           setResult({
             success: false,
             error: invalidQr
@@ -1214,35 +1337,116 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const renderValiditySuccess = () => {
     if (!validityResult?.success) return null;
     const tierConfig = getPassTierConfig(validityResult.pass?.type || '');
+    const pass = validityResult.pass;
+    const passStatus = String(pass?.status ?? '');
+    const isExpired = passStatus === 'date_range_expired' || passStatus === 'expired';
+    const isActive = passStatus === 'active';
+    const passCap =
+      typeof pass?.partySize === 'number' && pass.partySize > 0
+        ? pass.partySize
+        : typeof pass?.maxPeople === 'number' && pass.maxPeople > 0
+          ? pass.maxPeople
+          : null;
+    const passValidityCalendarDays =
+      pass?.validFrom && pass?.validUntil
+        ? inclusiveCalendarDaysBetween(
+            String(pass.validFrom).slice(0, 10),
+            String(pass.validUntil).slice(0, 10),
+          )
+        : null;
+    const childrenPolicyNote =
+      'Children under 6 may accompany this group for free.';
 
     return (
       <div className="space-y-4 -mx-5 -mt-5">
-        {/* Status Banner */}
-        <div className={`relative px-6 pt-8 pb-6 overflow-hidden ${
-          validityResult.canRedeem
-            ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600'
-            : 'bg-gradient-to-br from-amber-400 via-orange-500 to-amber-600'
-        }`}>
-          <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 -mr-10 -mt-10" />
-          <div className="relative text-center">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-white flex items-center justify-center shadow-xl">
-              {validityResult.canRedeem
-                ? <BadgeCheck className="w-10 h-10 text-emerald-500" />
-                : <AlertTriangle className="w-10 h-10 text-amber-500" />
-              }
+        {/* High-contrast pass status — outdoor / mobile merchant view */}
+        <div className="px-4 pt-4 sm:px-5 sm:pt-5">
+          {isExpired ? (
+            <div
+              className="rounded-xl border-4 border-red-900 bg-[#ef4444] px-4 py-5 sm:px-6 sm:py-6 text-center text-white shadow-xl"
+              role="status"
+            >
+              <div className="text-3xl sm:text-4xl font-black tracking-tight leading-none">✗ EXPIRED</div>
+              {passCap != null && (
+                <>
+                  <p className="mt-4 text-xl sm:text-2xl font-bold leading-tight">
+                    PASS CAPACITY: {passCap} PEOPLE (AGES 6+)
+                  </p>
+                  <p className="mt-3 text-sm sm:text-base font-medium leading-snug opacity-95 px-1">
+                    {childrenPolicyNote}
+                  </p>
+                </>
+              )}
             </div>
-            <h3 className="text-2xl font-extrabold text-white mb-1">
-              {validityResult.canRedeem ? 'Eligible for Redemption' : 'Not Eligible Right Now'}
-            </h3>
-            <p className="text-white/80 text-sm font-medium">
-              {validityResult.canRedeem
-                ? 'Pass and voucher are both valid'
-                : validityResult.pass?.message || 'See details below'}
-            </p>
+          ) : isActive ? (
+            <div
+              className="rounded-xl border-4 border-emerald-900 bg-[#10b981] px-4 py-5 sm:px-6 sm:py-6 text-center text-white shadow-xl"
+              role="status"
+            >
+              <div className="text-3xl sm:text-4xl font-black tracking-tight leading-none">✓ VALID</div>
+              {passCap != null && (
+                <>
+                  <p className="mt-4 text-2xl sm:text-3xl font-black leading-tight tracking-tight">
+                    VALID FOR {passCap} PEOPLE
+                  </p>
+                  {passValidityCalendarDays != null && (
+                    <p className="mt-2 text-lg sm:text-xl font-black tracking-wide uppercase">
+                      {passValidityCalendarDays}-DAY DISCOUNT WINDOW
+                    </p>
+                  )}
+                  <p className="mt-3 text-sm sm:text-base font-medium leading-snug opacity-95 px-1">
+                    {childrenPolicyNote}
+                  </p>
+                </>
+              )}
+            </div>
+          ) : (
+            <div
+              className="rounded-xl border-4 border-amber-900 bg-amber-500 px-4 py-5 sm:px-6 sm:py-6 text-center text-black shadow-xl"
+              role="status"
+            >
+              <div className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">⚠ NOT VALID</div>
+              <p className="mt-2 text-sm sm:text-base font-bold leading-snug">
+                {pass?.message || 'This pass cannot be used right now.'}
+              </p>
+              {passCap != null && (
+                <p className="mt-4 text-lg sm:text-xl font-extrabold leading-tight">
+                  Pass covers up to {passCap} people (ages 6+)
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Redemption eligibility (separate from calendar validity) */}
+        <div
+          className={`mx-4 sm:mx-5 rounded-xl border-2 px-4 py-3 sm:px-5 ${
+            validityResult.canRedeem
+              ? 'border-emerald-700 bg-emerald-50'
+              : 'border-amber-700 bg-amber-50'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            {validityResult.canRedeem ? (
+              <BadgeCheck className="w-6 h-6 text-emerald-700 flex-shrink-0 mt-0.5" />
+            ) : (
+              <AlertTriangle className="w-6 h-6 text-amber-700 flex-shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0 text-left">
+              <p className={`text-sm sm:text-base font-extrabold ${validityResult.canRedeem ? 'text-emerald-900' : 'text-amber-900'}`}>
+                {validityResult.canRedeem ? 'Eligible for redemption' : 'Not eligible to redeem yet'}
+              </p>
+              <p className={`text-xs sm:text-sm font-semibold mt-1 leading-snug ${validityResult.canRedeem ? 'text-emerald-800' : 'text-amber-900'}`}>
+                {validityResult.canRedeem
+                  ? 'Pass checks passed for this scan — you can proceed if the deal applies.'
+                  : pass?.message || 'See voucher and details below.'}
+              </p>
+            </div>
           </div>
         </div>
 
         <div className="px-5 space-y-4">
+
           {/* Tourist Identity Card */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <div className="flex items-center gap-4">
@@ -1608,7 +1812,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                   <span className="text-sm font-extrabold text-emerald-900">Valid pass</span>
                 </div>
                 <p className="text-xs text-emerald-800">
-                  {verifiedForOfferFlow.tourist?.name} · {getPassDisplayTitle(verifiedForOfferFlow.pass?.type || 'extended_group_adventure', 'en')}
+                  {verifiedForOfferFlow.tourist?.name} · {getPassDisplayTitle(verifiedForOfferFlow.pass?.type || 'dynamic', 'en')}
                 </p>
                 {(() => {
                   const p = partyFromValidityApi(verifiedForOfferFlow.party);

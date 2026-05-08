@@ -13,6 +13,7 @@ import {
   looksLikeRichDescriptionHtml,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
+import { PROSE_CLASSES } from '@/lib/prose';
 import { formatVT } from '@/lib/utils';
 import {
   customerFacingListPrice,
@@ -312,7 +313,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <div className="p-5">
               {looksLikeRichDescriptionHtml(selectedBusiness.description || '') ? (
                 <div
-                  className="prose prose-sm max-w-none text-gray-600 leading-relaxed"
+                    className={`${PROSE_CLASSES} text-gray-600 leading-relaxed`}
                   dangerouslySetInnerHTML={{
                     __html: sanitizeBusinessDescriptionHtml(selectedBusiness.description || ''),
                   }}

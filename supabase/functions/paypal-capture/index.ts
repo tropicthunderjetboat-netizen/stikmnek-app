@@ -4,29 +4,41 @@
  * Captures a PayPal order and creates the pass in the database.
  * Requires: PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET in Supabase Edge Function secrets.
  * Optional: PAYPAL_MODE=sandbox (default) or live. (Also accepts PAYPAL_SANDBOX=true/false.)
+ *
+ * Debugging: Supabase Dashboard → Edge Functions → paypal-capture → Logs (this CLI may not expose `functions logs`).
+ * Verify secrets: PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_MODE (sandbox vs live).
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
-import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
-
-const PASS_DAYS: Record<DbPassType, number> = { daily: 1, weekly: 6, monthly: 6, mega_group: 7 };
-const PASS_MAX_PEOPLE: Record<DbPassType, number> = { daily: 4, weekly: 4, monthly: 7, mega_group: 20 };
-const PASS_PRICES_AUD: Record<DbPassType, number> = { daily: 15, weekly: 45, monthly: 99, mega_group: 199 };
-const SHARE_BONUS: Record<DbPassType, { extraPeople: number; extraDays: number }> = {
-  daily: { extraPeople: 2, extraDays: 0 },
-  weekly: { extraPeople: 2, extraDays: 1 },
-  monthly: { extraPeople: 1, extraDays: 1 },
-  mega_group: { extraPeople: 0, extraDays: 5 },
-};
+import { semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
+import {
+  calculatePassPriceAud,
+  dynamicPassInclusiveDays,
+  parsePartySizeAndExtended,
+  validUntilOffsetDays,
+} from '../_shared/pricingDynamic.ts';
 
 function passTypeToBrandDisplay(passType: string): string {
-  const db = normalizePassTypeToDb(passType);
-  if (db === 'daily') return 'Family Explorer Pass';
-  if (db === 'weekly') return 'Extended Group Adventure Pass';
-  if (db === 'monthly') return 'Ultimate Crew Experience Pass';
-  if (db === 'mega_group') return 'Mega Group Experience Pass';
+  if (String(passType).toLowerCase() === 'dynamic') return 'StikmNek Pass';
   return 'StikmNek Pass';
+}
+
+/** Gross amount from PayPal capture response (AUD). */
+function capturedAmountFromPayPalCapture(captureJson: Record<string, unknown>): number | null {
+  try {
+    const units = captureJson.purchase_units as unknown[] | undefined;
+    const u0 = units?.[0] as Record<string, unknown> | undefined;
+    const payments = u0?.payments as Record<string, unknown> | undefined;
+    const caps = payments?.captures as unknown[] | undefined;
+    const c0 = caps?.[0] as Record<string, unknown> | undefined;
+    const amt = c0?.amount as Record<string, unknown> | undefined;
+    const v = amt?.value;
+    const n = parseFloat(String(v ?? ''));
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
 }
 
 async function sendReceiptEmail(params: {
@@ -181,22 +193,34 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const paypalOrderId = body?.paypalOrderId ?? body?.orderId;
-    const rawPassType = String(body?.passType ?? body?.pass_type ?? '').trim();
-    const passTypeDb = normalizePassTypeToDb(rawPassType);
     const startDate = body?.startDate ?? body?.start_date;
+    const parsed = parsePartySizeAndExtended(body as Record<string, unknown>);
 
     if (!paypalOrderId) {
       return errorResponse('Missing paypalOrderId', 400);
     }
-    if (!passTypeDb) {
-      return errorResponse('Missing or invalid passType', 400);
+    if (!parsed) {
+      return errorResponse('Missing or invalid partySize (1-6) or isExtended', 400);
     }
+    const { partySize, isExtended } = parsed;
     if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
       return errorResponse('Missing or invalid startDate (YYYY-MM-DD)', 400);
     }
+    const expectedAmount = calculatePassPriceAud(partySize, isExtended);
 
     const mode = (Deno.env.get('PAYPAL_MODE') ?? Deno.env.get('PAYPAL_SANDBOX') ?? 'sandbox').toString().toLowerCase();
     const sandbox = mode !== 'live' && mode !== 'production' && mode !== 'false';
+    console.log('[paypal-capture] request', {
+      userId: user.id,
+      paypalOrderId: String(paypalOrderId).slice(0, 8) + '…',
+      partySize,
+      isExtended,
+      startDate,
+      expectedAmount,
+      paypalMode: sandbox ? 'sandbox' : 'live',
+      ts: new Date().toISOString(),
+    });
+
     const base = sandbox ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
     const accessToken = await getPayPalAccessToken(sandbox);
 
@@ -232,27 +256,51 @@ Deno.serve(async (req) => {
       );
     }
 
-    const passType = passTypeDb;
-    const baseDays = PASS_DAYS[passType] ?? 1;
-    const baseMaxPeople = PASS_MAX_PEOPLE[passType] ?? 4;
-    const amount = PASS_PRICES_AUD[passType] ?? 0;
+    const captureJson = (await captureRes.json().catch(() => ({}))) as Record<string, unknown>;
+    const capturedAud = capturedAmountFromPayPalCapture(captureJson);
+    if (capturedAud == null || Math.abs(capturedAud - expectedAmount) > 0.02) {
+      console.error('[paypal-capture] amount mismatch', {
+        capturedAud,
+        expectedAmount,
+        partySize,
+        isExtended,
+        paypalOrderId: String(paypalOrderId).slice(0, 12) + '…',
+      });
+      return errorResponse('Captured PayPal amount does not match pass price. Order not completed.', 400, {
+        reason: 'paypal_amount_mismatch',
+        expectedAmount,
+        capturedAud,
+      });
+    }
+
+    console.log('[paypal-capture] capture_ok', {
+      expectedAmount,
+      capturedAud,
+      partySize,
+      isExtended,
+      ts: new Date().toISOString(),
+    });
+
+    const passTypeDb: DbPassType = 'dynamic';
+    const amount = expectedAmount;
     const validFrom = startDate;
-    // Pre-purchase share bonus: apply automatically if unlocked, then consume the flag.
-    let applyShareBonus = false;
-    try {
-      const { data: profileRow } = await supabase
+
+    let grantSecondWeek = false;
+    if (isExtended) {
+      const { data: profRow, error: profErr } = await supabase
         .from('user_profiles')
         .select('share_bonus_unlocked')
         .eq('user_id', user.id)
         .maybeSingle();
-      applyShareBonus = Boolean(profileRow?.share_bonus_unlocked);
-    } catch {}
+      if (profErr) console.error('[paypal-capture] profile share flag', profErr);
+      grantSecondWeek = !!(profRow as { share_bonus_unlocked?: boolean } | null)?.share_bonus_unlocked;
+    }
 
-    const bonus = SHARE_BONUS[passType] ?? { extraPeople: 0, extraDays: 0 };
-    const days = applyShareBonus ? (baseDays + (bonus.extraDays || 0)) : baseDays;
-    const maxPeople = applyShareBonus ? (baseMaxPeople + (bonus.extraPeople || 0)) : baseMaxPeople;
-    const validUntil = addDays(startDate, days);
+    const shareBonusApplied = isExtended && grantSecondWeek;
+    const maxPeople = partySize;
+    const validUntil = addDays(startDate, validUntilOffsetDays(isExtended, grantSecondWeek));
     const expiresAt = endOfDayDate(validUntil);
+    const inclusiveDays = dynamicPassInclusiveDays(isExtended, grantSecondWeek);
     const receiptNumber = body?.receiptNumber ?? `STK-${Date.now().toString(36).toUpperCase()}`;
 
     const passRow = {
@@ -263,7 +311,11 @@ Deno.serve(async (req) => {
       valid_until: validUntil,
       expires_at: expiresAt,
       max_people: maxPeople,
-      share_bonus_applied: applyShareBonus,
+      share_bonus_applied: shareBonusApplied,
+      amount_paid: amount,
+      currency: 'AUD',
+      payment_provider: 'paypal',
+      payment_session_id: String(paypalOrderId),
       purchased_at: new Date().toISOString(),
     };
 
@@ -275,17 +327,28 @@ Deno.serve(async (req) => {
 
     if (insertErr) {
       console.error('[paypal-capture] Insert passes error:', insertErr);
+      if (
+        typeof insertErr.message === 'string' &&
+        insertErr.message.includes('passes_pass_type_check')
+      ) {
+        return errorResponse(
+          'Pass could not be saved: database needs the latest pass type update. Apply Supabase migrations (pass_type dynamic), then contact support if this persists.',
+          500,
+          { reason: 'pass_type_constraint', postgresCode: insertErr.code ?? null },
+        );
+      }
       return errorResponse('Payment captured but failed to create pass: ' + insertErr.message, 500, {
         reason: 'pass_insert_failed',
         postgresCode: insertErr.code ?? null,
       });
     }
 
-    if (applyShareBonus) {
-      await supabase
+    if (grantSecondWeek) {
+      const { error: clrErr } = await supabase
         .from('user_profiles')
         .update({ share_bonus_unlocked: false, updated_at: new Date().toISOString() })
         .eq('user_id', user.id);
+      if (clrErr) console.error('[paypal-capture] clear share_bonus_unlocked', clrErr);
     }
 
     // Send receipt email (best-effort; do not fail purchase if email fails)
@@ -315,13 +378,15 @@ Deno.serve(async (req) => {
       success: true,
       receiptNumber,
       passType: semanticPassIdFromDb(passTypeDb),
+      passLabel: 'StikmNek Pass',
       amount,
       currency: 'AUD',
       expiresAt,
       validFrom,
       validUntil,
-      days,
-      shareBonusApplied: applyShareBonus,
+      days: inclusiveDays,
+      shareBonusApplied,
+      group: `Up to ${partySize} people (ages 6+)`,
       sessionId: insertedPass?.id ?? receiptNumber,
       receiptEmail,
     });

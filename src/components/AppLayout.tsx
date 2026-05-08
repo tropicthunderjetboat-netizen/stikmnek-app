@@ -13,13 +13,11 @@ import CategoryShowcase from './CategoryShowcase';
 import FeaturedLeaderboard from './FeaturedLeaderboard';
 import BusinessGrid from './BusinessGrid';
 import PassCards from './PassCards';
-import MapView from './MapView';
+import PassesEntryGate from './PassesEntryGate';
 import ReviewsSection from './ReviewsSection';
-import BusinessListingForm from './BusinessListingForm';
 import ListYourBusinessCta from './ListYourBusinessCta';
 import Footer from './Footer';
 import AuthModal from './AuthModal';
-import BusinessDetail from './BusinessDetail';
 import CookieConsent from './CookieConsent';
 import PaymentConfirmation from './PaymentConfirmation';
 import FloatingPassButton from './FloatingPassButton';
@@ -33,6 +31,9 @@ const AdminPanel = React.lazy(() => import('./AdminPanel'));
 const PaymentCheckout = React.lazy(() => import('./PaymentCheckout'));
 const BusinessOwnerDashboard = React.lazy(() => import('./BusinessOwnerDashboard'));
 const HelpCenter = React.lazy(() => import('./HelpCenter'));
+const MapView = React.lazy(() => import('./MapView'));
+const BusinessDetail = React.lazy(() => import('./BusinessDetail'));
+const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
 
 /** URL path → in-app view (excludes /legal/* handled separately). */
 const PATH_TO_VIEW: Record<string, ViewMode> = {
@@ -60,6 +61,21 @@ const TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
   'business-guide',
 ];
 
+/**
+ * Business partners without a `businesses` row yet may leave the setup form and browse
+ * the site; we only force `complete-business-profile` when they open the hub or other gated views.
+ */
+const BUSINESS_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
+  'home',
+  'deals',
+  'map',
+  'passes',
+  'business-detail',
+  'help',
+  'faq',
+  'business-guide',
+];
+
 function legalSlugFromPath(pathname: string): string | null {
   const m = pathname.match(/^\/legal\/([^/]+)\/?$/);
   return m ? decodeURIComponent(m[1]) : null;
@@ -67,14 +83,21 @@ function legalSlugFromPath(pathname: string): string | null {
 
 /** Single listing form instance for home + /business/new (dashboard uses the same component in its Submit tab). */
 function BusinessListingFormInLayout({ padded }: { padded: boolean }) {
+  const form = (
+    <Suspense
+      fallback={
+        <div className="min-h-[24rem] flex items-center justify-center rounded-xl border border-gray-100 bg-gray-50/80">
+          <LoadingSkeleton />
+        </div>
+      }
+    >
+      <BusinessListingForm />
+    </Suspense>
+  );
   if (padded) {
-    return (
-      <div className="pt-16 max-w-4xl mx-auto px-4">
-        <BusinessListingForm />
-      </div>
-    );
+    return <div className="pt-16 max-w-4xl mx-auto px-4">{form}</div>;
   }
-  return <BusinessListingForm />;
+  return form;
 }
 
 const AppLayout: React.FC = () => {
@@ -120,8 +143,13 @@ const AppLayout: React.FC = () => {
       return;
     }
 
-    // Business onboarding screen — do not bounce to dashboard until profile row exists
-    if (role === 'business' && currentView === 'business-dashboard' && businessOwnerHasBusinessRow === false) {
+    // Business onboarding: only redirect off the hub when we *know* there is no `businesses` row (`false`).
+    // `null` = lookup failed or in-flight — do not send owners to complete-business-profile (avoids false positives).
+    if (
+      role === 'business' &&
+      currentView === 'business-dashboard' &&
+      businessOwnerHasBusinessRow === false
+    ) {
       setCurrentView('complete-business-profile');
       return;
     }
@@ -157,9 +185,14 @@ const AppLayout: React.FC = () => {
     const role = userProfile?.role || user.type || 'tourist';
     if (role !== 'business') return;
     if (userProfileLoadError) return;
+    // Unknown row status: wait for a definitive true/false (do not hard-redirect to profile setup).
     if (businessOwnerHasBusinessRow === null) return;
 
-    if (businessOwnerHasBusinessRow === false && currentView !== 'complete-business-profile') {
+    if (
+      businessOwnerHasBusinessRow === false &&
+      currentView !== 'complete-business-profile' &&
+      !BUSINESS_BROWSE_VIEWS_WHILE_INCOMPLETE.includes(currentView)
+    ) {
       setCurrentView('complete-business-profile');
     }
   }, [
@@ -223,7 +256,7 @@ const AppLayout: React.FC = () => {
       case 'passes':
         return (
           <div className="pt-16">
-            <PassCards />
+            <PassesEntryGate />
           </div>
         );
       case 'dashboard':
@@ -264,7 +297,7 @@ const AppLayout: React.FC = () => {
             <HowItWorks />
             <CategoryShowcase />
             <FeaturedLeaderboard />
-            <PassCards />
+            <PassCards embeddedOnHome />
             <MapView />
             <ReviewsSection />
             <ListYourBusinessCta />

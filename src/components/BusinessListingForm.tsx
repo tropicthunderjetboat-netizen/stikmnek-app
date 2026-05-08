@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { FunctionsHttpError, FunctionsFetchError, PostgrestError } from '@supabase/supabase-js';
-import { supabase, SUPABASE_URL } from '@/lib/supabase';
+import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
 import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
 import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, AlertTriangle, Globe, Info } from 'lucide-react';
 
@@ -36,7 +36,11 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
   trimBusinessDescriptionHtmlForStorage,
 } from '@/lib/businessDescriptionHtml';
-import BusinessDescriptionEditor from './BusinessDescriptionEditor';
+import {
+  validateListingSubmissionOnboarding,
+  localizedListingSubmitValidationFeedback,
+} from '@/lib/businessOnboardingValidation';
+import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 
 
 /** Whole submit (RPC + edge + attach) — allow RPC + edge cold starts without false “slow connection” */
@@ -78,11 +82,6 @@ function addDays(dateStr: string, days: number): string {
 
 function todayStr(): string {
   return new Date().toISOString().split('T')[0];
-}
-
-function isValidListingImageUrl(url: string): boolean {
-  const u = url.trim();
-  return u.length > 0 && /^https?:\/\//i.test(u);
 }
 
 function truncateForSubmissionLog(s: string, max: number): string {
@@ -374,6 +373,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
   const [pricingTiers, setPricingTiers] = useState<PricingTierInput[]>([]);
   /** Inline validation for submit (images, description, pricing). */
   const [fieldErrors, setFieldErrors] = useState<{
+    title?: string;
     description?: string;
     photos?: string;
     pricing?: string;
@@ -603,7 +603,6 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
 
   /** Shown in “New price (auto)” — derived from VT + % (and DB deal as fallback). */
   const displayAutoDealPrice = useMemo(() => {
-    if (categoryUsesTieredPricing(form.category)) return '';
     const orig = parseFloat(String(form.originalPrice).replace(/,/g, ''));
     const pct = parseFloat(String(form.discountPercent).replace(/,/g, ''));
     if (Number.isFinite(orig) && orig > 0 && Number.isFinite(pct) && pct > 0 && pct < 100) {
@@ -612,18 +611,17 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     const fd = parseFloat(String(form.dealPrice).replace(/,/g, ''));
     if (Number.isFinite(fd) && fd > 0) return String(fd);
     return '';
-  }, [form.category, form.originalPrice, form.discountPercent, form.dealPrice]);
+  }, [form.originalPrice, form.discountPercent, form.dealPrice]);
 
-  // Sync calculated values into form state for submission (flat pricing only; tiered deals keep DB discount text)
+  // Sync calculated values into form state for submission (also for tours/activities so cards get deal + badge text).
   useEffect(() => {
-    if (categoryUsesTieredPricing(form.category)) return;
     if (calculatedDealPrice && calculatedDiscountLabel) {
       setForm(prev => ({
         ...prev,
         dealPrice: calculatedDealPrice,
         discount: calculatedDiscountLabel,
       }));
-    } else if (!embeddedEdit) {
+    } else if (!embeddedEdit && !categoryUsesTieredPricing(form.category)) {
       setForm(prev => ({
         ...prev,
         dealPrice: '',
@@ -758,124 +756,40 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     const titleForSubmit = embeddedEdit
       ? (form.name?.trim() || embeddedEdit.listingTitle?.trim())
       : form.name?.trim();
-    if (!titleForSubmit) {
-      toast.error(
-        language === 'en'
-          ? 'Please enter a title for this deal or listing.'
-          : language === 'fr'
-            ? 'Veuillez indiquer un titre pour cette offre.'
-            : 'Putem titel blong dil ia.',
-      );
-      return;
-    }
 
-    if (!hasMeaningfulDescriptionContent(form.description)) {
-      const msg =
-        language === 'en'
-          ? 'Please add a description with real detail (not only empty formatting).'
-          : 'Veuillez ajouter une description avec du contenu réel.';
-      setFieldErrors({ description: msg });
-      toast.error(msg);
-      return;
-    }
-
-    const descPlainLen = plainTextFromHtml(form.description).length;
-    if (descPlainLen > BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX) {
-      const msg =
-        language === 'en'
-          ? `Description must be ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} characters or fewer (plain text).`
-          : `La description doit comporter au plus ${BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX} caractères (texte brut).`;
-      setFieldErrors({ description: msg });
-      toast.error(msg);
-      return;
-    }
-
+    // ─── New + embedded listing: shared rules in `@/lib/businessOnboardingValidation` ───
+    // (description, photo URL, flat vs tiered pricing). i18n for toasts / `fieldErrors` below.
     const mainImageUrl = photos.length > 0 ? String(photos[0].url || '').trim() : '';
-    if (!isValidListingImageUrl(mainImageUrl)) {
-      const msg =
-        language === 'en'
-          ? 'Add at least one photo and wait for upload to finish (a valid image URL is required).'
-          : 'Ajoutez au moins une photo et attendez la fin du téléchargement.';
-      setFieldErrors({ photos: msg });
-      toast.error(msg);
+    const listingValidation = validateListingSubmissionOnboarding({
+      title: titleForSubmit ?? '',
+      descriptionHtml: form.description,
+      category: form.category,
+      mainImageUrl,
+      flatPricing: categoryUsesTieredPricing(form.category)
+        ? null
+        : {
+            originalPrice: form.originalPrice,
+            dealPrice: form.dealPrice,
+            discountPercent: form.discountPercent,
+          },
+      pricingTiers: categoryUsesTieredPricing(form.category) ? pricingTiers : null,
+    });
+
+    if (!listingValidation.valid) {
+      const { fieldErrors: nextErrors, toastMessage } = localizedListingSubmitValidationFeedback(
+        listingValidation.errors,
+        form.description,
+        language,
+      );
+      setFieldErrors(nextErrors);
+      toast.error(toastMessage);
       return;
     }
 
     let tiersPayload: unknown[] | null = null;
     if (categoryUsesTieredPricing(form.category)) {
-      const { data, error: tierErr } = validatePricingTiersForSubmit(pricingTiers);
-      if (tierErr) {
-        setFieldErrors({ pricing: tierErr });
-        toast.error(tierErr);
-        return;
-      }
-      if (!data || !Array.isArray(data) || data.length === 0) {
-        const msg =
-          language === 'en'
-            ? 'Add at least one complete pricing tier (label and valid standard / StikmNek prices).'
-            : 'Ajoutez au moins un palier de prix complet (libellé et prix valides).';
-        setFieldErrors({ pricing: msg });
-        toast.error(msg);
-        return;
-      }
-      tiersPayload = data;
-    } else {
-      const origPrice = Number(form.originalPrice);
-      if (!Number.isFinite(origPrice) || origPrice <= 0) {
-        const msg =
-          language === 'en'
-            ? 'Enter your standard price in VT (must be greater than 0).'
-            : 'Indiquez votre prix standard en VT (supérieur à 0).';
-        setFieldErrors({ pricing: msg });
-        toast.error(msg);
-        return;
-      }
-
-      const hasDiscount = Boolean(form.discountPercent?.trim());
-      let dealNum: number;
-      if (hasDiscount) {
-        const pct = Number(form.discountPercent);
-        if (!Number.isFinite(pct) || pct <= 0 || pct >= 100) {
-          const msg =
-            language === 'en'
-              ? 'Discount must be between 1% and 99%.'
-              : 'La remise doit être entre 1% et 99%.';
-          setFieldErrors({ pricing: msg });
-          toast.error(msg);
-          return;
-        }
-        dealNum = Number(form.dealPrice);
-        if (!Number.isFinite(dealNum) || dealNum <= 0) {
-          const msg =
-            language === 'en'
-              ? 'Enter a valid discounted price (or adjust discount %).'
-              : 'Entrez un prix promotionnel valide.';
-          setFieldErrors({ pricing: msg });
-          toast.error(msg);
-          return;
-        }
-        if (dealNum >= origPrice) {
-          const msg =
-            language === 'en'
-              ? 'With a discount set, the StikmNek price must be less than your standard price.'
-              : 'Avec une remise, le prix StikmNek doit être inférieur au prix standard.';
-          setFieldErrors({ pricing: msg });
-          toast.error(msg);
-          return;
-        }
-      } else {
-        dealNum = origPrice;
-      }
-
-      if (!Number.isFinite(dealNum) || dealNum <= 0 || dealNum > origPrice) {
-        const msg =
-          language === 'en'
-            ? 'Invalid pricing: listed price must be positive and not greater than your standard price.'
-            : 'Prix invalide : le prix affiché doit être positif et ne pas dépasser le prix standard.';
-        setFieldErrors({ pricing: msg });
-        toast.error(msg);
-        return;
-      }
+      const { data } = validatePricingTiersForSubmit(pricingTiers);
+      tiersPayload = data ?? null;
     }
 
     if (embeddedEdit) {
@@ -916,6 +830,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       setSubmitting(true);
       try {
         const { data, error } = await supabase.functions.invoke('manage-business', {
+          headers: await getEdgeAuthHeaders(),
           body: {
             action: 'submit_edit',
             userId: user.id,
@@ -988,9 +903,26 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         filePath: photo.filePath,
         isMain: index === 0,
       }));
-      // For no-discount listings, set dealPrice = originalPrice
+
+      // Headline prices: derive deal from % if needed (tiered categories used to skip this and saved equal orig/deal).
       const finalOriginalPrice = form.originalPrice ? Number(form.originalPrice) : 0;
-      const finalDealPrice = form.dealPrice ? Number(form.dealPrice) : finalOriginalPrice;
+      let finalDealNumeric = form.dealPrice ? Number(form.dealPrice) : 0;
+      const pctSubmit = parseFloat(String(form.discountPercent).replace(/,/g, ''));
+      if (
+        (!Number.isFinite(finalDealNumeric) || finalDealNumeric <= 0) &&
+        finalOriginalPrice > 0 &&
+        Number.isFinite(pctSubmit) &&
+        pctSubmit > 0 &&
+        pctSubmit < 100
+      ) {
+        finalDealNumeric = finalOriginalPrice * (1 - pctSubmit / 100);
+      }
+      const finalDealPrice =
+        Number.isFinite(finalDealNumeric) && finalDealNumeric > 0 ? finalDealNumeric : finalOriginalPrice;
+      let discountStr = String(form.discount || '').trim();
+      if (!discountStr && Number.isFinite(pctSubmit) && pctSubmit > 0 && pctSubmit < 100) {
+        discountStr = `${Math.round(pctSubmit)}% OFF`;
+      }
       const normalizedWebsite = normalizeWebsiteForStorage(form.website) ?? null;
       const descriptionForStorage = trimBusinessDescriptionHtmlForStorage(form.description);
 
@@ -1000,7 +932,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         name: form.name,
         category: form.category,
         description: descriptionForStorage,
-        discount: form.discount || '',
+        discount: discountStr,
         originalPrice: finalOriginalPrice,
         dealPrice: finalDealPrice,
         location: form.address || 'Port Vila, Vanuatu',
@@ -1044,9 +976,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           p_name: form.name,
           p_category: form.category,
           p_description: descriptionForStorage,
-          p_discount: form.discount,
-          p_original_price: Number(form.originalPrice) || 0,
-          p_deal_price: Number(form.dealPrice) || 0,
+          p_discount: discountStr,
+          p_original_price: finalOriginalPrice,
+          p_deal_price: finalDealPrice,
           p_location: form.address || 'Port Vila, Vanuatu',
           p_phone: form.phone,
           p_email: form.email || user.email,
@@ -1119,7 +1051,22 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               { maxRetries: 2, label: 'attach_pending_photos', logPrefix: '[BusinessForm]' },
             );
             if (attachErr || attachData?.error) {
-              throw new Error(await formatEdgeInvokeFailure(null, attachData, attachErr));
+              const detail = await formatEdgeInvokeFailure(null, attachData, attachErr);
+              // Listing row already exists; if we only throw, the user often retries and creates duplicates.
+              // Best-effort rollback (requires RLS allowing owners to delete their own pending row).
+              try {
+                const { error: delErr } = await supabase
+                  .from('pending_businesses')
+                  .delete()
+                  .eq('id', String(directData.id))
+                  .eq('owner_id', user.id);
+                if (delErr) {
+                  console.warn('[BusinessForm] Could not roll back pending row after photo attach failure:', delErr);
+                }
+              } catch (rollbackEx) {
+                console.warn('[BusinessForm] Rollback exception after photo attach failure:', rollbackEx);
+              }
+              throw new Error(detail);
             }
           } catch (photoEx) {
             throw photoEx;
@@ -1321,16 +1268,23 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 {language === 'en'
-                  ? 'Deal / listing title *'
+                  ? 'Deal / listing title'
                   : language === 'fr'
-                    ? 'Titre de l’offre *'
-                    : 'Titel blong dil *'}
+                    ? 'Titre de l’offre'
+                    : 'Titel blong dil'}
+                <span className="text-red-600 font-semibold" aria-hidden> *</span>
               </label>
               <input
                 type="text"
                 value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                onChange={(e) => {
+                  setFieldErrors((fe) => ({ ...fe, title: undefined }));
+                  setForm({ ...form, name: e.target.value });
+                }}
+                aria-invalid={!!fieldErrors.title}
+                className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                  fieldErrors.title ? 'border-red-400 ring-2 ring-red-100' : 'border-gray-200'
+                }`}
                 placeholder={
                   language === 'en'
                     ? 'e.g. Reef Explorer Semi-Sub Tour – Port Vila'
@@ -1339,6 +1293,12 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                       : 'ex. Semi-sub tua – Port Vila'
                 }
               />
+              {fieldErrors.title && (
+                <p className="text-sm text-red-600 mt-1.5 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
+                  {fieldErrors.title}
+                </p>
+              )}
               <p className="text-[11px] text-gray-500 mt-1">
                 {language === 'en'
                   ? 'This is the name tourists see for this deal. Save to update your live listing.'
@@ -1349,11 +1309,15 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {language === 'en' ? 'Category *' : 'Catégorie *'}
+                {language === 'en' ? 'Category' : 'Catégorie'}
+                <span className="text-red-600 font-semibold" aria-hidden> *</span>
               </label>
               <select
                 value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                onChange={(e) => {
+                  setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                  setForm({ ...form, category: e.target.value });
+                }}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
               >
                 <option value="dining">Dining</option>
@@ -1368,20 +1332,23 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {language === 'en' ? 'Description *' : 'Description *'}
+              {language === 'en' ? 'Description' : 'Description'}
+              <span className="text-red-600 font-semibold" aria-hidden> *</span>
             </label>
-            <BusinessDescriptionEditor
-              value={form.description}
-              onChange={(html) => {
-                setFieldErrors((fe) => ({ ...fe, description: undefined }));
-                setForm({ ...form, description: html });
-              }}
-              placeholder={
-                language === 'en'
-                  ? 'Describe your business and what makes it special...'
-                  : 'Décrivez votre entreprise...'
-              }
-            />
+            <div className={fieldErrors.description ? 'rounded-xl ring-2 ring-red-100 border border-red-200 overflow-hidden' : ''}>
+              <LazyBusinessDescriptionEditor
+                value={form.description}
+                onChange={(html) => {
+                  setFieldErrors((fe) => ({ ...fe, description: undefined }));
+                  setForm({ ...form, description: html });
+                }}
+                placeholder={
+                  language === 'en'
+                    ? 'Describe your business and what makes it special...'
+                    : 'Décrivez votre entreprise...'
+                }
+              />
+            </div>
             <div className="flex items-center justify-end mt-1">
               <span
                 className={`text-[11px] font-medium ${
@@ -1401,11 +1368,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </p>
             )}
           </div>
-          {/* ─── Pricing & Discount (flat VT only — tiered categories use the per-person editor below) ─── */}
-          {!categoryUsesTieredPricing(form.category) && (
+          {/* ─── Pricing & Discount (VT) ─── */}
           <div
             className={`p-5 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border ${
-              fieldErrors.pricing && !categoryUsesTieredPricing(form.category)
+              fieldErrors.pricing
                 ? 'border-red-300 ring-1 ring-red-200'
                 : 'border-teal-100'
             }`}
@@ -1420,11 +1386,17 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </span>
             </div>
             <p className="text-xs text-gray-500 mb-4">
-              {language === 'en'
-                ? 'Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.'
-                : language === 'fr'
-                ? 'Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.'
-                : 'Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'}
+              {categoryUsesTieredPricing(form.category)
+                ? language === 'en'
+                  ? 'Enter a single per-person price in Vatu (VT) (used if you add no tiers). Discount is optional — businesses offering discounts get featured priority.'
+                  : language === 'fr'
+                    ? "Entrez un prix unique par personne en Vatu (VT) (utilisé si vous n’ajoutez pas de paliers). La remise est optionnelle — les entreprises offrant des remises sont prioritaires."
+                    : 'Putum wan praes long Vatu (VT) (hem i wok sapos yu no putum tiers). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'
+                : language === 'en'
+                  ? 'Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.'
+                  : language === 'fr'
+                    ? 'Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.'
+                    : 'Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'}
             </p>
 
 
@@ -1572,14 +1544,13 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 </div>
               </div>
             )}
-            {fieldErrors.pricing && !categoryUsesTieredPricing(form.category) && (
+            {fieldErrors.pricing && (
               <p className="text-sm text-red-600 mt-3 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
                 {fieldErrors.pricing}
               </p>
             )}
           </div>
-          )}
 
           {categoryUsesTieredPricing(form.category) && (
             <div
@@ -1812,22 +1783,25 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           {/* Photo Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              {language === 'en' ? 'Business Photos *' : 'Photos de l\'entreprise *'}
+              {language === 'en' ? 'Business photos' : 'Photos de l\'entreprise'}
+              <span className="text-red-600 font-semibold" aria-hidden> *</span>
             </label>
             <p className="text-xs text-gray-500 mb-2">
               {language === 'en'
                 ? 'At least one photo is required. The first photo is used as the cover image.'
                 : 'Au moins une photo est requise. La première sert d’image de couverture.'}
             </p>
-            <PhotoUploader
-              photos={photos}
-              onPhotosChange={(next) => {
-                setFieldErrors((fe) => ({ ...fe, photos: undefined }));
-                setPhotos(next);
-              }}
-              maxPhotos={5}
-              userId={user?.id || ''}
-            />
+            <div className={fieldErrors.photos ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
+              <PhotoUploader
+                photos={photos}
+                onPhotosChange={(next) => {
+                  setFieldErrors((fe) => ({ ...fe, photos: undefined }));
+                  setPhotos(next);
+                }}
+                maxPhotos={5}
+                userId={user?.id || ''}
+              />
+            </div>
             {fieldErrors.photos && (
               <p className="text-sm text-red-600 mt-2 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />

@@ -2,6 +2,7 @@ import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { PROSE_CLASSES } from '@/lib/prose';
 
 const VALID_SLUGS = new Set([
   'privacy',
@@ -219,7 +220,7 @@ const LegalDocumentPage: React.FC<LegalDocumentPageProps> = ({ slug }) => {
         <ArrowLeft className="w-4 h-4" />
         {lang === 'en' ? 'Back to home' : lang === 'fr' ? 'Retour à l’accueil' : 'Go bak hom'}
       </Link>
-      <article className="prose prose-gray max-w-none">
+      <article className={PROSE_CLASSES}>
         <h1 className="text-3xl font-bold text-gray-900 mb-6">{title}</h1>
         <div className="text-sm">{bodyFor(slug, lang)}</div>
         <p className="text-xs text-gray-400 mt-10">

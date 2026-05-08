@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as hardcodedBusinesses, Business } from '@/data/businesses';
 
+import { FunctionsFetchError } from '@supabase/supabase-js';
 import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
@@ -23,15 +24,34 @@ import {
   BUSINESS_DESCRIPTION_PLAIN_TEXT_MAX,
   BUSINESS_DESCRIPTION_PLAIN_TEXT_SOFT_LIMIT,
 } from '@/lib/businessDescriptionHtml';
+import { PROSE_CLASSES } from '@/lib/prose';
 import PricingDiscountFields from './PricingDiscountFields';
-import BusinessDescriptionEditor from './BusinessDescriptionEditor';
+import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 
-import EmailReceiptManager from './EmailReceiptManager';
-import EmailNotificationCenter from './EmailNotificationCenter';
-import PassEditor from './PassEditor';
-import AdminPurchaseOverview from './AdminPurchaseOverview';
-import AdminUserManager from './AdminUserManager';
+const AdminPurchaseOverview = React.lazy(() => import('./AdminPurchaseOverview'));
+const PassEditor = React.lazy(() => import('./PassEditor'));
+const AdminUserManager = React.lazy(() => import('./AdminUserManager'));
+const EmailReceiptManager = React.lazy(() => import('./EmailReceiptManager'));
+const EmailNotificationCenter = React.lazy(() => import('./EmailNotificationCenter'));
+
+function AdminTabFallback() {
+  return (
+    <div className="flex justify-center py-16" role="status" aria-live="polite">
+      <Loader2 className="h-8 w-8 text-teal-600 animate-spin" aria-hidden />
+    </div>
+  );
+}
+
+/** Emails tab: minimal placeholder (no spinner) while receipt + notification chunks load in parallel. */
+function AdminEmailTabFallback() {
+  return (
+    <div className="space-y-6" role="status" aria-live="polite">
+      <div className="h-36 rounded-xl border border-gray-100 bg-gray-50/90 animate-pulse" />
+      <div className="h-48 rounded-xl border border-gray-100 bg-gray-50/90 animate-pulse" />
+    </div>
+  );
+}
 
 /** On HTTP errors, `invoke` often leaves `data` null; the edge JSON may be on `FunctionsHttpError.context` (a `Response`). */
 async function tryReadEdgeFunctionJsonError(invokeError: unknown): Promise<string | null> {
@@ -51,15 +71,6 @@ async function tryReadEdgeFunctionJsonError(invokeError: unknown): Promise<strin
     return null;
   }
 }
-
-
-
-
-
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, Area, AreaChart
-} from 'recharts';
 
 interface PendingBusiness {
   id: string;
@@ -88,6 +99,9 @@ interface BusinessPhoto {
   id: string;
   business_id: string | null;
   pending_id?: string | null;
+  /** Set for moderation rows; kept after approve so admin can group by `pending_businesses.id`. */
+  submission_pending_id?: string | null;
+  offering_id?: string | null;
   url: string;
   file_path: string;
   uploaded_by: string;
@@ -111,7 +125,13 @@ interface PendingEdit {
 const AdminPanel: React.FC = () => {
   const { language, user, refreshBusinesses, dbBusinesses } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'businesses' | 'approvals' | 'users' | 'passes' | 'emails' | 'reports'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'businesses' | 'approvals' | 'reviews' | 'users' | 'passes' | 'emails' | 'reports'>('overview');
+
+  // Review moderation (admin-only)
+  const [adminReviews, setAdminReviews] = useState<any[]>([]);
+  const [loadingAdminReviews, setLoadingAdminReviews] = useState(false);
+  const [moderatingReviewId, setModeratingReviewId] = useState<string | null>(null);
+  const [reviewReasonById, setReviewReasonById] = useState<Record<string, string>>({});
 
 
 
@@ -156,6 +176,7 @@ const AdminPanel: React.FC = () => {
 
   // ─── Edit Business modal state ───
   const [editBusinessId, setEditBusinessId] = useState<string | null>(null);
+  const [editOfferingId, setEditOfferingId] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '', category: '', description: '', discount: '',
@@ -189,9 +210,11 @@ const AdminPanel: React.FC = () => {
           console.log('[Admin]' + (label ? ' ' + label : '') + ' Retry ' + attempt + '/' + maxRetries + ' after ' + delay + 'ms...');
           await new Promise(r => setTimeout(r, delay));
         }
+        const auth = await getEdgeAuthHeaders();
+        const mergedHeaders = { ...(headers ?? {}), ...auth };
         const result = await supabase.functions.invoke(fnName, {
           body,
-          ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
+          ...(Object.keys(mergedHeaders).length > 0 ? { headers: mergedHeaders } : {}),
         });
 
         // Check if the error is a rate-limit (429) or other HTTP error
@@ -303,18 +326,43 @@ const AdminPanel: React.FC = () => {
     } catch (err) { console.error('[Admin] Direct fallback failed:', err); }
   }, []);
 
+  /** Index each photo under every id admins use to open a card (pending row, live profile, or stable submission link). */
   const groupPhotosByBusinessId = useCallback((photos: BusinessPhoto[]) => {
     const grouped: Record<string, BusinessPhoto[]> = {};
     for (const photo of photos) {
-      const key = String(photo.pending_id ?? photo.business_id ?? '');
-      if (!key) continue;
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(photo);
+      const keys = new Set<string>();
+      if (photo.pending_id) keys.add(String(photo.pending_id));
+      if (photo.submission_pending_id) keys.add(String(photo.submission_pending_id));
+      if (photo.business_id) keys.add(String(photo.business_id));
+      for (const key of keys) {
+        if (!key) continue;
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(photo);
+      }
     }
     return grouped;
   }, []);
 
-  const loadPhotosFromAdminRpc = useCallback(async (businesses: PendingBusiness[]) => {
+  /** Union photo rows from several keyed buckets (RPC map vs edge/direct map can diverge — empty `[]` is truthy in JS). */
+  const unionPhotosForKeys = useCallback((maps: Record<string, BusinessPhoto[]>[], keys: string[]) => {
+    const seen = new Set<string>();
+    const out: BusinessPhoto[] = [];
+    const keyList = keys.filter(Boolean);
+    for (const m of maps) {
+      for (const k of keyList) {
+        const list = m[k];
+        if (!Array.isArray(list)) continue;
+        for (const p of list) {
+          if (!p?.id || seen.has(p.id)) continue;
+          seen.add(p.id);
+          out.push(p);
+        }
+      }
+    }
+    return out;
+  }, []);
+
+  const loadPhotosFromAdminRpc = useCallback(async (_businesses: PendingBusiness[]) => {
     setLoadingRpcPhotos(true);
     try {
       const { data, error } = await supabase.rpc('get_business_photos_for_admin');
@@ -323,28 +371,30 @@ const AdminPanel: React.FC = () => {
       const grouped = groupPhotosByBusinessId(allPhotos);
       setRpcPhotoMap(grouped);
       setBusinessPhotos(grouped);
-      return true;
+      return { ok: true as const, count: allPhotos.length };
     } catch (err) {
       console.warn('[Admin] get_business_photos_for_admin RPC failed:', err);
-      return false;
+      return { ok: false as const, count: 0 };
     } finally {
       setLoadingRpcPhotos(false);
     }
   }, [groupPhotosByBusinessId]);
 
   const loadAllPhotos = async (businesses: PendingBusiness[]) => {
-    // REQUIRED path: explicit RPC call
-    const rpcOk = await loadPhotosFromAdminRpc(businesses);
-    if (rpcOk) return;
+    // Prefer admin RPC; if it errors or returns no rows, still try edge + direct (legacy keys / RLS drift).
+    const rpc = await loadPhotosFromAdminRpc(businesses);
+    if (rpc.ok && rpc.count > 0) return;
 
     // Fallback: Edge Function
     try {
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_all_photos', userId: user?.id },
       });
       if (!error && data?.photos && Array.isArray(data.photos)) {
         const grouped = groupPhotosByBusinessId(data.photos as BusinessPhoto[]);
         setBusinessPhotos(grouped);
+        setRpcPhotoMap(grouped);
         return;
       }
     } catch (err) {
@@ -360,12 +410,17 @@ const AdminPanel: React.FC = () => {
       if (!error && data && Array.isArray(data)) {
         const grouped = groupPhotosByBusinessId(data as BusinessPhoto[]);
         setBusinessPhotos(grouped);
+        setRpcPhotoMap(grouped);
       } else if (businesses.length > 0) {
         setBusinessPhotos({});
+        setRpcPhotoMap({});
       }
     } catch (err) {
       console.warn('[Admin] Direct photo load failed:', err);
-      if (businesses.length > 0) setBusinessPhotos({});
+      if (businesses.length > 0) {
+        setBusinessPhotos({});
+        setRpcPhotoMap({});
+      }
     }
   };
 
@@ -377,15 +432,9 @@ const AdminPanel: React.FC = () => {
         .order('created_at', { ascending: true });
       if (error) return;
       if (data && data.length > 0) {
-        const grouped: Record<string, BusinessPhoto[]> = {};
-        for (const photo of data) {
-          const p = photo as BusinessPhoto;
-          const key = String(p.pending_id ?? p.business_id ?? '');
-          if (!key) continue;
-          if (!grouped[key]) grouped[key] = [];
-          grouped[key].push(p);
-        }
+        const grouped = groupPhotosByBusinessId(data as BusinessPhoto[]);
         setBusinessPhotos(grouped);
+        setRpcPhotoMap(grouped);
       }
     } catch (err) {
       console.error('[Admin] Direct photo fallback failed:', err);
@@ -401,13 +450,19 @@ const AdminPanel: React.FC = () => {
       const { data, error } = await supabase
         .from('business_photos')
         .select('*')
-        .eq('pending_id', pendingId)
+        .or(`pending_id.eq.${pendingId},submission_pending_id.eq.${pendingId},business_id.eq.${pendingId}`)
         .order('created_at', { ascending: true });
       if (error) return;
       if (data && data.length > 0) {
+        const list = data as BusinessPhoto[];
+        const pid = String(pendingId);
         setBusinessPhotos(prev => ({
           ...prev,
-          [String(pendingId)]: data as BusinessPhoto[],
+          [pid]: list,
+        }));
+        setRpcPhotoMap(prev => ({
+          ...prev,
+          [pid]: list,
         }));
       }
     } catch (err) {
@@ -423,9 +478,11 @@ const AdminPanel: React.FC = () => {
     if (pendingBusinesses.length === 0) return;
     pendingBusinesses.forEach(biz => {
       const key = String(biz.id);
-      if (!businessPhotos[key]?.length) loadPhotosForPendingId(key);
+      if (!businessPhotos[key]?.length && !rpcPhotoMap[key]?.length) {
+        void loadPhotosForPendingId(key);
+      }
     });
-  }, [pendingIdsKey, loadPhotosForPendingId]);
+  }, [pendingIdsKey, loadPhotosForPendingId, businessPhotos, rpcPhotoMap]);
 
   // Explicitly refresh admin photos from RPC whenever pending list changes
   useEffect(() => {
@@ -452,7 +509,10 @@ const AdminPanel: React.FC = () => {
         return;
       }
       // Strategy 2: Edge Function
-      const { data, error } = await supabase.functions.invoke('manage-business', { body: { action: 'get_pending_edits', userId: user.id, isAdmin: true } });
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: { action: 'get_pending_edits', userId: user.id, isAdmin: true },
+      });
       if (!error && data?.edits && Array.isArray(data.edits)) {
         const pendingOnly = data.edits.filter((e: PendingEdit) => e.status === 'pending');
         setPendingEdits(pendingOnly);
@@ -475,7 +535,10 @@ const AdminPanel: React.FC = () => {
   const handleReviewEdit = async (editId: string, decision: 'approved' | 'rejected') => {
     setProcessingEditId(editId);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-business', { body: { action: 'review_edit', userId: user?.id, editId, decision, adminNotes: editAdminNotes[editId] || '' } });
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: { action: 'review_edit', userId: user?.id, editId, decision, adminNotes: editAdminNotes[editId] || '' },
+      });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       setPendingEdits(prev => prev.filter(e => e.id !== editId));
@@ -550,7 +613,7 @@ const AdminPanel: React.FC = () => {
 
       throw new Error('No response from server');
     } catch (err: unknown) {
-      const fromBody = tryReadEdgeFunctionJsonError(err);
+      const fromBody = await tryReadEdgeFunctionJsonError(err);
       const errMsg =
         fromBody ||
         (err instanceof Error ? err.message : String(err ?? 'Unknown error'));
@@ -612,6 +675,7 @@ const AdminPanel: React.FC = () => {
       const validUntil = validUntilDate.toISOString().split('T')[0];
 
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: {
           action: 'admin_create_business',
           userId: user?.id,
@@ -655,6 +719,9 @@ const AdminPanel: React.FC = () => {
       discountValidFrom: new Date().toISOString().split('T')[0], listingDuration: '1_month',
     });
     setEditBusinessId(profileBusinessIdFor(biz));
+    // When the row is a listing (offering-driven), `biz.id` is the offering id.
+    // Keep this so admin edits apply to that specific listing, not just the master profile.
+    setEditOfferingId(String(biz.id || '').trim() || null);
   };
 
   // ─── Save Edit (admin direct) ───
@@ -669,21 +736,36 @@ const AdminPanel: React.FC = () => {
     }
     setSavingEdit(true);
     try {
-      // Use canonical schema (image, discount, deal_price, hours) to avoid "column not found"
-      const updates: Record<string, any> = {
-        name: editForm.name, category: editForm.category, description: editForm.description,
-        discount: editForm.discount, original_price: Number(editForm.originalPrice) || 0,
+      const changes: Record<string, any> = {
+        title: editForm.name,
+        category: editForm.category,
+        description: editForm.description,
+        discount: editForm.discount,
+        original_price: Number(editForm.originalPrice) || 0,
         deal_price: Number(editForm.dealPrice) || 0,
-        location: editForm.location, phone: editForm.phone,
+        location: editForm.location,
+        phone: editForm.phone,
         hours: editForm.hours,
-        map_url: editForm.mapUrl, website: normalizeWebsiteForStorage(editForm.website) ?? '',
+        map_url: editForm.mapUrl,
+        website: normalizeWebsiteForStorage(editForm.website) ?? '',
       };
-      if (editForm.image) updates.image = editForm.image;
+      if (editForm.image) changes.image = editForm.image;
 
-      const { error } = await supabase.from('businesses').update(updates).eq('id', editBusinessId);
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: {
+          action: 'submit_edit',
+          userId: user?.id,
+          businessId: editBusinessId,
+          ...(editOfferingId ? { offeringId: editOfferingId } : {}),
+          changes,
+        },
+      });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       toast.success(`"${editForm.name}" updated successfully!`);
       setEditBusinessId(null);
+      setEditOfferingId(null);
       await refreshBusinesses();
     } catch (err: any) { toast.error('Failed to update business: ' + (err.message || 'Unknown error')); }
     finally { setSavingEdit(false); }
@@ -707,6 +789,84 @@ const AdminPanel: React.FC = () => {
     }, 300);
     return () => clearTimeout(timer);
   }, [activeTab, user, loadPending]);
+
+  const loadAdminReviews = useCallback(async () => {
+    if (!user) return;
+    setLoadingAdminReviews(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: { action: 'admin_list_reviews', limit: 300 },
+      });
+      if (error) {
+        const edgeMsg = (await tryReadEdgeFunctionJsonError(error)) || (error as any)?.message || 'Edge function error';
+        throw new Error(edgeMsg);
+      }
+      if (data?.error) throw new Error(String(data.error));
+      setAdminReviews(Array.isArray(data?.reviews) ? data.reviews : []);
+    } catch (err: any) {
+      toast.error('Failed to load reviews: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setLoadingAdminReviews(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (activeTab !== 'reviews' || !user) return;
+    void loadAdminReviews();
+  }, [activeTab, user, loadAdminReviews]);
+
+  const setReviewPublic = useCallback(
+    async (reviewId: string, isPublic: boolean) => {
+      if (!user) return;
+      setModeratingReviewId(reviewId);
+      try {
+        const reason = (reviewReasonById[reviewId] || '').trim();
+        const { data, error } = await supabase.functions.invoke('manage-business', {
+          headers: await getEdgeAuthHeaders(),
+          body: { action: 'admin_set_review_public', reviewId, isPublic, reason },
+        });
+        if (error) {
+          const edgeMsg = (await tryReadEdgeFunctionJsonError(error)) || (error as any)?.message || 'Edge function error';
+          throw new Error(edgeMsg);
+        }
+        if (data?.error) throw new Error(String(data.error));
+        toast.success(isPublic ? 'Review is now public' : 'Review hidden');
+        await loadAdminReviews();
+      } catch (err: any) {
+        toast.error('Moderation failed: ' + (err?.message || 'Unknown error'));
+      } finally {
+        setModeratingReviewId(null);
+      }
+    },
+    [user, reviewReasonById, loadAdminReviews],
+  );
+
+  const deleteReviewAdmin = useCallback(
+    async (reviewId: string) => {
+      if (!user) return;
+      if (!confirm('Delete this review permanently? This cannot be undone.')) return;
+      setModeratingReviewId(reviewId);
+      try {
+        const { data, error } = await supabase.functions.invoke('manage-business', {
+          headers: await getEdgeAuthHeaders(),
+          body: { action: 'admin_delete_review', reviewId },
+        });
+        if (error) {
+          const edgeMsg = (await tryReadEdgeFunctionJsonError(error)) || (error as any)?.message || 'Edge function error';
+          throw new Error(edgeMsg);
+        }
+        if (data?.error) throw new Error(String(data.error));
+        toast.success('Review deleted');
+        await loadAdminReviews();
+      } catch (err: any) {
+        toast.error('Delete failed: ' + (err?.message || 'Unknown error'));
+      } finally {
+        setModeratingReviewId(null);
+      }
+    },
+    [user, loadAdminReviews],
+  );
 
 
   // ─── Real-time subscription for pending_businesses table ───
@@ -796,6 +956,7 @@ const AdminPanel: React.FC = () => {
       // profile (single-offer model) and can overwrite previous deals. We only use it as a fallback for
       // rejections, not approvals.
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: {
           action: 'review_business',
           userId: user?.id,
@@ -835,8 +996,15 @@ const AdminPanel: React.FC = () => {
 
       // Owner decision emails are sent from the `manage-business` edge function (SendGrid + service role)
       // so the browser never calls `send-email` here (avoids duplicate mail and JWT/RS256 invoke issues).
-    } catch (err: any) {
-      const msg = rpcErrorMsg || err?.message || 'Unknown error';
+    } catch (err: unknown) {
+      let msg = rpcErrorMsg || (err instanceof Error ? err.message : 'Unknown error');
+      if (err instanceof FunctionsFetchError) {
+        const inner = err.context;
+        const innerMsg = inner instanceof Error ? inner.message : String(inner ?? '');
+        msg =
+          'Could not reach the server (often CORS from a Vercel preview). Deploy the latest `manage-business` edge function from this repo (includes CORS for *.vercel.app), or add your preview origin to Supabase CORS_ALLOWED_ORIGINS. ' +
+          (innerMsg ? `(${innerMsg})` : '');
+      }
       toast.error('Failed to process review: ' + msg);
     } finally {
       setProcessingId(null);
@@ -863,6 +1031,7 @@ const AdminPanel: React.FC = () => {
     setRepairingId(pendingId);
     try {
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'repair_approved_submission', userId: user?.id, pendingId },
       });
       if (error) throw error;
@@ -884,6 +1053,7 @@ const AdminPanel: React.FC = () => {
     try {
       const action = decision === 'approved' ? 'approve_photo' : 'reject_photo';
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action, userId: user?.id, photoId },
       });
 
@@ -891,7 +1061,7 @@ const AdminPanel: React.FC = () => {
       if (data?.error) throw new Error(data.error);
 
       // Update local state
-      setBusinessPhotos(prev => {
+      const patchMap = (prev: Record<string, BusinessPhoto[]>) => {
         const updated = { ...prev };
         for (const bizId of Object.keys(updated)) {
           updated[bizId] = updated[bizId].map(p =>
@@ -899,7 +1069,9 @@ const AdminPanel: React.FC = () => {
           );
         }
         return updated;
-      });
+      };
+      setBusinessPhotos(patchMap);
+      setRpcPhotoMap(patchMap);
 
       toast.success(`Photo ${decision === 'approved' ? 'approved' : 'rejected'}!`);
     } catch (err: any) {
@@ -962,7 +1134,7 @@ const AdminPanel: React.FC = () => {
         {/* Tabs */}
         {/* Tabs */}
         <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm border border-gray-100 mb-8 w-fit overflow-x-auto">
-          {(['overview', 'businesses', 'approvals', 'users', 'passes', 'emails', 'reports'] as const).map(tab => (
+          {(['overview', 'businesses', 'approvals', 'reviews', 'users', 'passes', 'emails', 'reports'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -975,6 +1147,7 @@ const AdminPanel: React.FC = () => {
               {tab === 'users' && <Users className="w-3.5 h-3.5" />}
               {tab === 'emails' && <Mail className="w-3.5 h-3.5" />}
               {tab === 'passes' && <CreditCard className="w-3.5 h-3.5" />}
+              {tab === 'reviews' && <MessageSquare className="w-3.5 h-3.5" />}
               {tab}
               {tab === 'approvals' && (pendingCount + pendingEditCount) > 0 && (
                 <span className={`absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
@@ -991,12 +1164,143 @@ const AdminPanel: React.FC = () => {
 
         {/* ═══ PASSES TAB ═══ */}
         {activeTab === 'passes' && (
-          <PassEditor />
+          <Suspense fallback={<AdminTabFallback />}>
+            <PassEditor />
+          </Suspense>
         )}
 
         {/* ═══ USERS TAB ═══ */}
         {activeTab === 'users' && (
-          <AdminUserManager />
+          <Suspense fallback={<AdminTabFallback />}>
+            <AdminUserManager />
+          </Suspense>
+        )}
+
+        {/* ═══ REVIEWS TAB ═══ */}
+        {activeTab === 'reviews' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h2 className="text-lg font-extrabold text-gray-900">Review Moderation</h2>
+                <p className="text-sm text-gray-500">
+                  Hide reviews with profanities/unsafe content, or delete when required.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadAdminReviews}
+                disabled={loadingAdminReviews}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingAdminReviews ? 'animate-spin' : ''}`} />
+                {loadingAdminReviews ? 'Loading…' : 'Reload'}
+              </button>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      <th className="px-4 py-3">Business / Listing</th>
+                      <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3">Rating</th>
+                      <th className="px-4 py-3">Comment</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminReviews.length === 0 && !loadingAdminReviews ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                          No reviews found.
+                        </td>
+                      </tr>
+                    ) : (
+                      adminReviews.map((r) => {
+                        const businessName = String(r?.businesses?.name || r?.business_name || r?.business_id || '');
+                        const offeringTitle = String(r?.business_offerings?.title || r?.offering_title || '').trim();
+                        const isPublic = r?.is_public !== false;
+                        const isSuper = Boolean(r?.has_super_star);
+                        const busy = moderatingReviewId === String(r.id);
+                        return (
+                          <tr key={r.id} className="border-b border-gray-100 last:border-0 align-top">
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-gray-900">{businessName || '—'}</div>
+                              <div className="text-xs text-gray-500 mt-0.5">
+                                {offeringTitle
+                                  ? `Listing: ${offeringTitle}`
+                                  : r?.offering_id
+                                    ? `Listing: ${r.offering_id}`
+                                    : 'Listing: (business-level / legacy)'}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">{String(r.user_name || 'Anonymous')}</td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold ${
+                                  isSuper
+                                    ? 'bg-purple-50 text-purple-700 border border-purple-100'
+                                    : 'bg-gray-50 text-gray-700 border border-gray-100'
+                                }`}
+                              >
+                                {isSuper ? 'Super Star' : 'Review'} · {r.rating}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700 max-w-md">
+                              <div className="line-clamp-3 whitespace-pre-wrap">{String(r.comment || '')}</div>
+                              <input
+                                value={reviewReasonById[r.id] || ''}
+                                onChange={(e) => setReviewReasonById((p) => ({ ...p, [r.id]: e.target.value }))}
+                                placeholder="Moderation note (optional)…"
+                                className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={`inline-flex px-2 py-0.5 rounded-md text-xs font-bold ${
+                                  isPublic
+                                    ? 'bg-green-50 text-green-700 border border-green-100'
+                                    : 'bg-red-50 text-red-700 border border-red-100'
+                                }`}
+                              >
+                                {isPublic ? 'Public' : 'Hidden'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col gap-2 min-w-[10rem]">
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => setReviewPublic(String(r.id), !isPublic)}
+                                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 ${
+                                    isPublic
+                                      ? 'bg-amber-600 text-white hover:bg-amber-700'
+                                      : 'bg-teal-600 text-white hover:bg-teal-700'
+                                  }`}
+                                >
+                                  {busy ? 'Working…' : isPublic ? 'Hide' : 'Make public'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => deleteReviewAdmin(String(r.id))}
+                                  className="px-3 py-2 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                                >
+                                  {busy ? 'Working…' : 'Delete'}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
 
 
@@ -1004,10 +1308,12 @@ const AdminPanel: React.FC = () => {
 
 
         {activeTab === 'overview' && (
-          <AdminPurchaseOverview
-            totalBusinesses={allBusinesses.length}
-            dbBusinessCount={dbBusinesses.length}
-          />
+          <Suspense fallback={<AdminTabFallback />}>
+            <AdminPurchaseOverview
+              totalBusinesses={allBusinesses.length}
+              dbBusinessCount={dbBusinesses.length}
+            />
+          </Suspense>
         )}
 
 
@@ -1250,8 +1556,16 @@ const AdminPanel: React.FC = () => {
             {pendingBusinesses.length > 0 ? (
               <div className="space-y-4">
                 {pendingBusinesses.map(biz => {
-                  const photos = (rpcPhotoMap[String(biz.id)] || businessPhotos[String(biz.id)] || [])
-                    .filter(p => String(p.business_id) === String(biz.id))
+                  const keyPending = String(biz.id);
+                  const keyProfile = biz.business_id ? String(biz.business_id) : '';
+                  const raw = unionPhotosForKeys([rpcPhotoMap, businessPhotos], [keyPending, keyProfile]);
+                  const seen = new Set<string>();
+                  const photos = raw
+                    .filter(p => {
+                      if (seen.has(p.id)) return false;
+                      seen.add(p.id);
+                      return true;
+                    })
                     .sort((a, b) => {
                       if (a.is_main && !b.is_main) return -1;
                       if (!a.is_main && b.is_main) return 1;
@@ -1682,7 +1996,7 @@ const AdminPanel: React.FC = () => {
                   )}
                 </h3>
                 <button
-                  onClick={loadPendingEdits}
+                  onClick={() => loadPendingEdits(true)}
                   disabled={loadingEdits}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
@@ -1846,18 +2160,16 @@ const AdminPanel: React.FC = () => {
           </div>
         )}
 
-        {/* ═══ EMAILS TAB ═══ */}
+        {/* ═══ EMAILS TAB ═══ (lazy: receipt manager + notification center load in parallel) */}
         {activeTab === 'emails' && (
-          <div className="space-y-8">
-            {/* Receipt Manager */}
-            <EmailReceiptManager />
-
-            {/* Divider */}
-            <div className="border-t border-gray-200 pt-8">
-              {/* Email Notification Center (admin mode) */}
-              <EmailNotificationCenter mode="admin" />
+          <Suspense fallback={<AdminEmailTabFallback />}>
+            <div className="space-y-8">
+              <EmailReceiptManager />
+              <div className="border-t border-gray-200 pt-8">
+                <EmailNotificationCenter mode="admin" />
+              </div>
             </div>
-          </div>
+          </Suspense>
         )}
 
 
@@ -1889,9 +2201,9 @@ const AdminPanel: React.FC = () => {
                   <h4 className="text-sm font-semibold text-gray-700 mb-2">Pass Type Distribution</h4>
                   <div className="space-y-2">
                     {[
-                      { label: 'Daily', pct: 25, color: 'bg-sky-500' },
-                      { label: 'Weekly', pct: 55, color: 'bg-teal-500' },
-                      { label: 'Monthly', pct: 20, color: 'bg-orange-500' },
+                      { label: '24-hour day pass', pct: 35, color: 'bg-sky-500' },
+                      { label: '7-day holiday pass', pct: 55, color: 'bg-teal-500' },
+                      { label: '14-day (share bonus)', pct: 10, color: 'bg-orange-500' },
                     ].map((item, i) => (
                       <div key={i}>
                         <div className="flex justify-between text-xs mb-1">
@@ -2091,7 +2403,7 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Description *</label>
-                  <BusinessDescriptionEditor
+                  <LazyBusinessDescriptionEditor
                     value={addForm.description}
                     onChange={(html) => setAddForm((p) => ({ ...p, description: html }))}
                     placeholder="Describe the business..."
@@ -2168,7 +2480,7 @@ const AdminPanel: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
-                  <BusinessDescriptionEditor
+                  <LazyBusinessDescriptionEditor
                     value={editForm.description}
                     onChange={(html) => setEditForm((p) => ({ ...p, description: html }))}
                     className="focus-within:ring-blue-500"
@@ -2247,7 +2559,7 @@ const AdminPanel: React.FC = () => {
                   </div>
                   {looksLikeRichDescriptionHtml(biz.description || '') ? (
                     <div
-                      className="prose prose-sm max-w-none text-gray-600 mb-4 leading-relaxed"
+                      className={`${PROSE_CLASSES} text-gray-600 mb-4 leading-relaxed`}
                       dangerouslySetInnerHTML={{ __html: sanitizeBusinessDescriptionHtml(biz.description || '') }}
                     />
                   ) : (

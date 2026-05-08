@@ -1,7 +1,15 @@
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
+import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
 import { Menu, X, User, MapPin, Tag, LayoutDashboard, Shield, Ticket, Store, Plane, Briefcase, HelpCircle } from 'lucide-react';
+import {
+  loadAdminPanel,
+  loadBusinessOwnerDashboard,
+  loadMapView,
+  loadTouristDashboard,
+  prefetchChunk,
+} from '@/lib/heavyChunks';
 
 const APP_ICON = 'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg';
 
@@ -10,6 +18,7 @@ const Navbar: React.FC = () => {
     language, setLanguage, currentView, setCurrentView,
     user, signOut, setShowAuth, setAuthMode,
     sidebarOpen, toggleSidebar,
+    purchasePass,
   } = useAppContext();
 
   // ─── Build role-based navigation ───
@@ -44,6 +53,14 @@ const Navbar: React.FC = () => {
 
   // Help link for everyone
   navItems.push({ key: 'help', view: 'help', icon: <HelpCircle className="w-4 h-4" />, label: language === 'en' ? 'Help' : language === 'fr' ? 'Aide' : 'Halpem' });
+
+  const goToPassesOrCheckout = (view: string) => {
+    if (view === 'passes' && shouldOpenCheckoutInsteadOfPassesPage(user)) {
+      void purchasePass();
+      return;
+    }
+    setCurrentView(view);
+  };
 
   const langOptions = [
     { code: 'en' as const, label: 'EN', flag: '🇬🇧' },
@@ -113,7 +130,21 @@ const Navbar: React.FC = () => {
             {navItems.map(item => (
               <button
                 key={item.key}
-                onClick={() => setCurrentView(item.view)}
+                onClick={() => goToPassesOrCheckout(item.view)}
+                onMouseEnter={() => {
+                  // Strategic prefetch on intent (hover/focus) only.
+                  if (item.view === 'map') prefetchChunk(loadMapView);
+                  if (item.view === 'dashboard') prefetchChunk(loadTouristDashboard);
+                  if (item.view === 'business-dashboard') prefetchChunk(loadBusinessOwnerDashboard);
+                  if (item.view === 'admin') prefetchChunk(loadAdminPanel);
+                }}
+                onFocus={() => {
+                  // Keyboard users: prefetch on focus.
+                  if (item.view === 'map') prefetchChunk(loadMapView);
+                  if (item.view === 'dashboard') prefetchChunk(loadTouristDashboard);
+                  if (item.view === 'business-dashboard') prefetchChunk(loadBusinessOwnerDashboard);
+                  if (item.view === 'admin') prefetchChunk(loadAdminPanel);
+                }}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                   currentView === item.view
                     ? 'bg-teal-50 text-teal-700'
@@ -215,7 +246,7 @@ const Navbar: React.FC = () => {
             {navItems.map(item => (
               <button
                 key={item.key}
-                onClick={() => { setCurrentView(item.view); toggleSidebar(); }}
+                onClick={() => { goToPassesOrCheckout(item.view); toggleSidebar(); }}
                 className={`flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   currentView === item.view
                     ? 'bg-teal-50 text-teal-700'

@@ -1,0 +1,113 @@
+{
+  "budgets": {
+    "totals": {
+      "rawKB": 3000,
+      "gzipKB": 800
+    },
+    "css": {
+      "index.css.gz.kb": 25,
+      "vendor-quill.css.gz.kb": 5
+    },
+    "js": {
+      "initial.gz.kb": 300,
+      "singleChunkApp.gz.kb": 150,
+      "vendor-maps.gz.kb": 120,
+      "vendor-recharts.gz.kb": 120,
+      "vendor-quill.gz.kb": 70
+    }
+  },
+  "initial": {
+    "stablePrefixes": [
+      "index",
+      "vendor-react",
+      "vendor-radix",
+      "vendor-icons",
+      "vendor-query",
+      "vendor-supabase",
+      "utils",
+      "AppContext"
+    ]
+  },
+  "baseline": {
+    "note": "Update this after intentional bundle changes (run: npm run perf:bundle).",
+    "generatedAt": "2026-04-26T03:21:36.153Z",
+    "maxIncreasePct": 15,
+    "top": [
+      {
+        "stable": "index.js",
+        "gzipKB": 109.44,
+        "rawKB": 392.86
+      },
+      {
+        "stable": "vendor-maps.js",
+        "gzipKB": 99.09,
+        "rawKB": 323.59
+      },
+      {
+        "stable": "vendor-recharts-Bmo-MrcG.js",
+        "gzipKB": 98.88,
+        "rawKB": 385.65
+      },
+      {
+        "stable": "vendor-quill.js",
+        "gzipKB": 51.58,
+        "rawKB": 230.92
+      },
+      {
+        "stable": "vendor-supabase.js",
+        "gzipKB": 46.73,
+        "rawKB": 181.79
+      },
+      {
+        "stable": "BusinessOwnerDashboard.js",
+        "gzipKB": 40.06,
+        "rawKB": 180.25
+      },
+      {
+        "stable": "vendor-radix.js",
+        "gzipKB": 26.57,
+        "rawKB": 81.04
+      },
+      {
+        "stable": "index.css",
+        "gzipKB": 21.95,
+        "rawKB": 155.75
+      },
+      {
+        "stable": "AdminPanel-Jccj6-2h.js",
+        "gzipKB": 14.88,
+        "rawKB": 73.63
+      },
+      {
+        "stable": "BusinessListingForm-BkV0d_CW.js",
+        "gzipKB": 14.59,
+        "rawKB": 50.85
+      },
+      {
+        "stable": "BusinessDetail-cYprr-EB.js",
+        "gzipKB": 13.52,
+        "rawKB": 49.23
+      },
+      {
+        "stable": "vendor-icons.js",
+        "gzipKB": 12.09,
+        "rawKB": 35.88
+      },
+      {
+        "stable": "dist.js",
+        "gzipKB": 8.87,
+        "rawKB": 31.05
+      },
+      {
+        "stable": "HelpCenter.js",
+        "gzipKB": 8.72,
+        "rawKB": 27.49
+      },
+      {
+        "stable": "DiagnosticPanel.js",
+        "gzipKB": 8.54,
+        "rawKB": 30.68
+      }
+    ]
+  }
+}

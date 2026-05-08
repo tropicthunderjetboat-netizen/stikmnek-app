@@ -28,7 +28,84 @@ export const OFFERING_LISTING_COLUMNS =
 
 /** Parent `businesses` columns when embedded from `business_offerings` (left join — no `!inner`). */
 export const BUSINESS_PROFILE_EMBED_COLS =
-  'id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone, email, contact_email, business_email, whatsapp_number, rating, review_count, featured, active, map_url, website, tags';
+  'id, name, category, owner_id, location, lat, lng, hours, opening_hours, phone, email, contact_email, business_email, whatsapp_number, rating, review_count, featured, active, map_url, website, tags, image, logo_url';
+
+/**
+ * Flat row from `public.business_listings_view` (see migration). Use `*` so new view columns
+ * are included without updating this string.
+ */
+export const BUSINESS_LISTINGS_VIEW_COLUMNS = '*';
+
+/**
+ * Split a flat `business_listings_view` row into synthetic `business_offerings`-shaped and
+ * `businesses`-shaped records so existing `mapJoinedOfferingToBusiness` keeps working.
+ * Merged view fields populate `o`; raw profile fallbacks use `*_raw` / profile columns on `b`.
+ */
+export function splitBusinessListingsViewRow(
+  row: Record<string, unknown>,
+): { o: Record<string, unknown>; b: Record<string, unknown> } {
+  const tagsArray = (v: unknown): unknown[] =>
+    v == null ? [] : Array.isArray(v) ? (v as unknown[]) : [];
+
+  const oTags = tagsArray(row.offering_tags_raw ?? row.tags);
+  const bTags = tagsArray(row.business_tags_raw ?? row.tags);
+
+  const o: Record<string, unknown> = {
+    id: row.id,
+    business_id: row.business_id,
+    title: row.title,
+    description: row.description,
+    description_fr: row.description_fr,
+    description_bi: row.description_bi,
+    discount: row.discount,
+    original_price: row.original_price,
+    deal_price: row.deal_price,
+    image: row.image,
+    map_url: row.map_url,
+    website: row.website,
+    discount_valid_from: row.discount_valid_from,
+    discount_valid_until: row.discount_valid_until,
+    whatsapp_number: row.whatsapp_number,
+    pricing_tiers: row.pricing_tiers,
+    tags: oTags.length > 0 ? oTags : tagsArray(row.tags),
+    featured: row.offering_featured_raw ?? row.featured,
+    active: row.active,
+    created_at: row.offering_created_at,
+    updated_at: row.offering_updated_at,
+  };
+
+  const b: Record<string, unknown> = {
+    id: row.profile_business_id,
+    name: row.profile_name,
+    category: row.category,
+    owner_id: row.owner_id,
+    image: row.business_image_raw,
+    logo_url: row.profile_logo_url ?? row.business_logo_url_raw,
+    location: row.location,
+    lat: row.lat,
+    lng: row.lng,
+    hours: row.hours,
+    opening_hours: row.opening_hours,
+    phone: row.phone,
+    email: row.email,
+    contact_email: row.contact_email,
+    business_email: row.business_email,
+    rating: row.rating,
+    review_count: row.review_count,
+    super_star_count: row.super_star_count,
+    is_verified: row.is_verified,
+    active: row.profile_active,
+    created_at: row.business_created_at,
+    updated_at: row.business_updated_at,
+    map_url: row.business_map_url_raw,
+    website: row.business_website_raw,
+    tags: bTags.length > 0 ? bTags : tagsArray(row.tags),
+    featured: row.business_featured_raw ?? row.featured,
+    whatsapp_number: row.business_whatsapp_number_raw,
+  };
+
+  return { o, b };
+}
 
 /**
  * `businesses.hours` is often `''` after migrations while `opening_hours` holds the text.
@@ -127,6 +204,10 @@ export function mapJoinedOfferingToBusiness(
   return {
     id: oid,
     profileBusinessId: String(b.id),
+    profileLogoUrl: (() => {
+      const raw = String((b.logo_url ?? b.image ?? '') as string).trim();
+      return raw ? getBusinessImageUrl(raw, supabaseUrl) : null;
+    })(),
     name: listingDisplayTitleFromOfferingRow(o.title, b.name),
     category: cat,
     description: String(o.description ?? ''),

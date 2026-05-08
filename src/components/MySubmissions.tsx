@@ -15,6 +15,7 @@ import {
   looksLikeRichDescriptionHtml,
   sanitizeBusinessDescriptionHtml,
 } from '@/lib/businessDescriptionHtml';
+import { PROSE_CLASSES } from '@/lib/prose';
 import { mapJoinedOfferingToBusiness } from '@/lib/businessOfferingMap';
 
 export interface Submission {
@@ -40,6 +41,14 @@ export interface Submission {
   listingSource?: 'pending' | 'live';
   /** Real `business_offerings.id` when `listingSource === 'live'`. */
   offeringId?: string | null;
+  /** From `pending_businesses` / RPC — used for resubmit prefill & tiered pricing. */
+  pricing_tiers?: unknown;
+  map_url?: string | null;
+  website?: string | null;
+  whatsapp_number?: string | null;
+  discount_valid_from?: string | null;
+  discount_valid_until?: string | null;
+  updated_at?: string | null;
 }
 
 type LiveEdgeItem = {
@@ -81,6 +90,7 @@ function submissionFromLiveOffering(
 async function fetchLiveSubmissionsForOwner(userId: string): Promise<Submission[]> {
   try {
     const { data: edgeData, error: edgeErr } = await supabase.functions.invoke('manage-business', {
+      headers: await getEdgeAuthHeaders(),
       body: { action: 'get_owner_offerings_live', userId },
     });
     if (edgeErr) {
@@ -653,6 +663,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
 
     try {
       const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
         body: { action: 'get_pending', userId: user.id },
       });
 
@@ -1305,7 +1316,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
                           </p>
                           {looksLikeRichDescriptionHtml(submission.description) ? (
                             <div
-                              className="prose prose-sm max-w-none text-sm text-gray-700"
+                              className={`${PROSE_CLASSES} text-sm text-gray-700`}
                               dangerouslySetInnerHTML={{
                                 __html: sanitizeBusinessDescriptionHtml(submission.description),
                               }}

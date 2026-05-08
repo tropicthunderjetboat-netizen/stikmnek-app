@@ -54,7 +54,7 @@ export type RedemptionSavingsBreakdown = {
   isTiered: boolean;
   /** Per-person savings for flat pricing (VT). */
   unitSavings: number;
-  /** For flat: adults + children (infants excluded). For tiered: total pax in tier math. */
+  /** For flat: adults + children (infants excluded). For tiered: paying headcount (adults + children, min 1). */
   partyBillingCount: number;
   savingsLine: string;
 };
@@ -78,7 +78,7 @@ export function computeRedemptionSavingsForListing(
     const ts = Math.round(totalStandard);
     const td = Math.round(totalDeal);
     const saved = Math.max(0, ts - td);
-    const pax = party.adults + party.children + party.infants;
+    const payingForDisplay = Math.max(1, party.adults + party.children);
     const savingsLine =
       `Party: ${party.adults} adult(s)` +
       (party.children ? `, ${party.children} child(ren)` : '') +
@@ -90,7 +90,7 @@ export function computeRedemptionSavingsForListing(
       totalDeal: td,
       isTiered: true,
       unitSavings: 0,
-      partyBillingCount: Math.max(1, pax),
+      partyBillingCount: payingForDisplay,
       savingsLine,
     };
   }

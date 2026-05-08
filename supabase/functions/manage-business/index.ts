@@ -8,6 +8,10 @@
  * Optional: SENDGRID_FROM_EMAIL (default stikmnek@gmail.com if unset), SENDGRID_FROM_NAME, APP_BASE_URL (default https://www.stikmnek.com).
  * CORS: set CORS_ALLOWED_ORIGINS (comma-separated origins) in Edge Function secrets.
  * If unset, Access-Control-Allow-Origin is *. If set, request Origin must match an entry (see getSafeCorsHeaders).
+ *
+ * DEPLOY (important): This file imports `../_shared/cors.ts` and `./purge-user.ts`. Pasting only this file
+ * into the Supabase Dashboard does NOT update those modules — CORS fixes will not apply and the bundle can break.
+ * From the repo root run: `npm run functions:deploy:manage-business` (or `supabase functions deploy manage-business`).
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -42,6 +46,149 @@ function trimPendingDescription(input: unknown): string {
   return s.length <= PENDING_DESCRIPTION_MAX_CHARS ? s : s.slice(0, PENDING_DESCRIPTION_MAX_CHARS);
 }
 
+type DbErrorShape = { message?: string; code?: string; details?: string; hint?: string } | null | undefined;
+function dbErrorForLog(err: DbErrorShape): Record<string, unknown> | null {
+  if (!err) return null;
+  return {
+    message: typeof err.message === 'string' ? err.message : String(err.message ?? ''),
+    code: typeof err.code === 'string' ? err.code : null,
+    details: typeof err.details === 'string' ? err.details : null,
+    hint: typeof err.hint === 'string' ? err.hint : null,
+  };
+}
+
+function truncateForLog(value: unknown, max = 400): string {
+  const s = String(value ?? '');
+  if (s.length <= max) return s;
+  return `${s.slice(0, max)}… (${s.length} chars)`;
+}
+
+/** Safe logging view: strips huge HTML/base64 and only logs photo keys. */
+function payloadForLog(body: Record<string, unknown>): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...body };
+  if (typeof next.description === 'string') next.description = truncateForLog(next.description, 800);
+  if (typeof next.fileBase64 === 'string') next.fileBase64 = '[omitted]';
+  if (Array.isArray(next.photos)) {
+    next.photos = (next.photos as Record<string, unknown>[]).map((p) => ({
+      url: typeof p?.url === 'string' ? truncateForLog(p.url, 160) : p?.url,
+      filePath: typeof p?.filePath === 'string' ? truncateForLog(p.filePath, 160) : p?.filePath,
+      isMain: p?.isMain,
+    }));
+  }
+  return next;
+}
+
+/**
+ * Robust pending photo attachment across schema variants.
+ *
+ * `business_photos` has had multiple schemas:
+ * - Legacy: `business_id` (uuid NOT NULL), and some deployments stored `pending_businesses.id` there.
+ * - Current: XOR parent (`business_id` OR `pending_id`) with FKs and a CHECK (see 20260421140000).
+ *
+ * This function:
+ * - Deletes existing pending rows using the best available key
+ * - Inserts with `pending_id` when supported
+ * - Falls back to legacy `business_id = pendingId` when needed
+ */
+async function replacePendingBusinessPhotos(args: {
+  supabase: SupabaseServiceClient;
+  pendingId: string;
+  userId: string;
+  photos: Array<{ url?: string; filePath?: string | null; isMain?: boolean | null }>;
+  /** When set, include structured logs + return diagnostics in `meta`. */
+  debugLabel?: string;
+}): Promise<{
+  inserted: number;
+  mode: 'pending_id' | 'legacy_business_id';
+  warnings: string[];
+  meta: Record<string, unknown>;
+  error: { message: string } | null;
+}> {
+  const pendingId = String(args.pendingId || '').trim();
+  const userId = String(args.userId || '').trim();
+  const warnings: string[] = [];
+  const meta: Record<string, unknown> = {};
+  const label = args.debugLabel ? `[manage-business][photos][${args.debugLabel}]` : '[manage-business][photos]';
+  if (!pendingId || !userId) {
+    if (args.debugLabel) console.log(label, 'skip: missing pendingId or userId');
+    return { inserted: 0, mode: 'pending_id', warnings, meta, error: null };
+  }
+
+  const valid = (args.photos || []).filter((p) => typeof p?.url === 'string' && p.url.trim());
+  if (valid.length === 0) {
+    if (args.debugLabel) console.log(label, 'skip: no valid photos');
+    return { inserted: 0, mode: 'pending_id', warnings, meta, error: null };
+  }
+
+  meta.photoCount = valid.length;
+
+  // Best-effort delete; ignore schema mismatches.
+  // Delete any prior photo rows for this submission under BOTH key styles:
+  // - current schema: `pending_id = pending_businesses.id`
+  // - legacy schema: some deployments stored `pending_businesses.id` in `business_id`
+  if (args.debugLabel) console.log(label, 'delete existing (pending_id or legacy business_id)', { pendingId });
+  const delByPending = await args.supabase
+    .from('business_photos')
+    .delete()
+    .or(`pending_id.eq.${pendingId},business_id.eq.${pendingId},submission_pending_id.eq.${pendingId}`);
+  if (delByPending.error && String(delByPending.error.message || '').toLowerCase().includes('pending_id')) {
+    warnings.push('pending_id column not available (legacy schema) — falling back to business_id cleanup');
+    if (args.debugLabel) console.log(label, 'delete fallback (business_id)', { pendingId, err: delByPending.error.message });
+    await args.supabase.from('business_photos').delete().eq('business_id', pendingId);
+  }
+
+  // Preferred (current) schema.
+  const preferred = valid.map((p, i) => ({
+    pending_id: pendingId,
+    url: String(p.url || '').trim(),
+    file_path: p.filePath ?? null,
+    uploaded_by: userId,
+    is_main: p.isMain ?? i === 0,
+    status: 'pending',
+  }));
+  if (args.debugLabel) console.log(label, 'insert attempt (pending_id)', { pendingId, count: preferred.length });
+  const prefRes = await args.supabase.from('business_photos').insert(preferred);
+  if (!prefRes.error) {
+    meta.insertMethod = 'pending_id';
+    return { inserted: preferred.length, mode: 'pending_id', warnings, meta, error: null };
+  }
+
+  const msg = String(prefRes.error.message || '');
+  const lower = msg.toLowerCase();
+  const noPendingIdColumn =
+    lower.includes('pending_id') && (lower.includes('does not exist') || lower.includes('column'));
+  const businessIdNotNull =
+    lower.includes('null value in column') && lower.includes('business_id') && lower.includes('not-null');
+
+  // Legacy fallback.
+  if (noPendingIdColumn || businessIdNotNull) {
+    if (noPendingIdColumn) warnings.push('pending_id insert failed (missing column) — using legacy business_id = pendingId');
+    if (businessIdNotNull) warnings.push('pending_id insert failed (business_id NOT NULL) — using legacy business_id = pendingId');
+    if (args.debugLabel) console.log(label, 'insert fallback (legacy business_id)', { pendingId, err: msg });
+    const legacy = valid.map((p, i) => ({
+      business_id: pendingId,
+      url: String(p.url || '').trim(),
+      file_path: p.filePath ?? null,
+      uploaded_by: userId,
+      is_main: p.isMain ?? i === 0,
+      status: 'pending',
+    }));
+    const legacyRes = await args.supabase.from('business_photos').insert(legacy);
+    if (!legacyRes.error) {
+      meta.insertMethod = 'legacy_business_id';
+      return { inserted: legacy.length, mode: 'legacy_business_id', warnings, meta, error: null };
+    }
+    const legacyMsg = String(legacyRes.error.message || msg);
+    if (args.debugLabel) console.log(label, 'insert fallback failed', { pendingId, err: legacyMsg });
+    meta.insertMethod = 'legacy_business_id';
+    return { inserted: 0, mode: 'legacy_business_id', warnings, meta, error: { message: legacyMsg } };
+  }
+
+  if (args.debugLabel) console.log(label, 'insert failed (no fallback matched)', { pendingId, err: msg });
+  meta.insertMethod = 'pending_id';
+  return { inserted: 0, mode: 'pending_id', warnings, meta, error: { message: msg || 'Failed to attach pending photos' } };
+}
+
 /**
  * Resolve the authenticated user from the JWT in the request.
  * Never use `body.userId` for caller identity.
@@ -67,22 +214,26 @@ async function getAuthUser(
   return { user };
 }
 
-async function isAdminUser(supabase: SupabaseServiceClient, userId: string): Promise<boolean> {
+// Keep in sync with frontend admin allowlist (AppContext.tsx) for build mode.
+const ADMIN_EMAILS = ['admin@stikmnek.com', 'testadmin@example.com', 'stikmnek@gmail.com'];
+
+async function isAdminUser(supabase: SupabaseServiceClient, userId: string, email?: string): Promise<boolean> {
+  if (email && ADMIN_EMAILS.includes(email.toLowerCase())) return true;
   const { data } = await supabase
     .from('user_profiles')
-    .select('role')
+    .select('role, user_type')
     .eq('user_id', userId)
     .maybeSingle();
-  return Boolean(data && data.role === 'admin');
+  return Boolean(data && (data.role === 'admin' || (data as any).user_type === 'admin'));
 }
 
 /** Returns a 403 Response if the user is not an admin; otherwise null. */
 async function assertAdmin(
   supabase: SupabaseServiceClient,
-  userId: string,
+  authUser: { id: string; email?: string },
   req: Request,
 ): Promise<Response | null> {
-  if (!(await isAdminUser(supabase, userId))) {
+  if (!(await isAdminUser(supabase, authUser.id, authUser.email))) {
     return unauthorizedResponse(req);
   }
   return null;
@@ -110,11 +261,11 @@ async function requireOwner(
 async function assertAdminOrOwner(
   supabase: SupabaseServiceClient,
   businessId: string,
-  userId: string,
+  authUser: { id: string; email?: string },
   req: Request,
 ): Promise<Response | null> {
-  if (await isAdminUser(supabase, userId)) return null;
-  return requireOwner(supabase, businessId, userId, req);
+  if (await isAdminUser(supabase, authUser.id, authUser.email)) return null;
+  return requireOwner(supabase, businessId, authUser.id, req);
 }
 
 /**
@@ -514,7 +665,13 @@ async function sendAdminDecisionNotificationEmail(params: {
 }
 
 Deno.serve(async (req) => {
-  console.log('Manage Business Triggered:', req.method);
+  const requestId = crypto.randomUUID();
+  const startMs = Date.now();
+  console.log('[manage-business] request start', {
+    requestId,
+    method: req.method,
+    url: req.url,
+  });
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: getSafeCorsHeaders(req) });
   }
@@ -557,9 +714,22 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const action = body?.action;
+    const debug = Boolean((body as Record<string, unknown>)?.debug);
 
     if (!action) {
-      return errorResponse(req, 'Missing action');
+      console.error('[manage-business] missing action', { requestId, userId: authUser.id });
+      return errorResponse(req, 'Missing action', 400, { requestId, reason: 'missing_action' });
+    }
+
+    if (debug || action === 'resubmit_pending_business') {
+      console.log('[manage-business] action begin', {
+        requestId,
+        action,
+        userId: authUser.id,
+        email: authUser.email ?? null,
+        debug,
+        payload: payloadForLog(body as Record<string, unknown>),
+      });
     }
 
     // ─── HEALTH ───
@@ -570,6 +740,52 @@ Deno.serve(async (req) => {
     // ─── LIST_CATEGORIES ───
     if (action === 'list_categories') {
       return jsonResponse(req, { categories: CATEGORIES });
+    }
+
+    // ─── DIAGNOSE_BUSINESS_PHOTOS ─── (admin only)
+    // Provides a safe, non-destructive schema compatibility report for `business_photos`.
+    if (action === 'diagnose_business_photos') {
+      const denied = await assertAdmin(supabase, authUser, req);
+      if (denied) return denied;
+
+      const report: Record<string, unknown> = {
+        success: true,
+        now: new Date().toISOString(),
+        checks: {},
+        warnings: [] as string[],
+      };
+
+      // 1) pending_id column existence check (via PostgREST select)
+      const pendingIdProbe = await supabase.from('business_photos').select('pending_id').limit(1);
+      (report.checks as any).pending_id_column = pendingIdProbe.error ? false : true;
+      if (pendingIdProbe.error) {
+        const msg = String(pendingIdProbe.error.message || '');
+        (report.checks as any).pending_id_probe_error = msg;
+        if (msg.toLowerCase().includes('pending_id')) {
+          (report.warnings as string[]).push('`pending_id` column not available (legacy business_photos schema).');
+        }
+      }
+
+      // 2) business_id column existence check
+      const businessIdProbe = await supabase.from('business_photos').select('business_id').limit(1);
+      (report.checks as any).business_id_column = businessIdProbe.error ? false : true;
+      if (businessIdProbe.error) {
+        (report.checks as any).business_id_probe_error = String(businessIdProbe.error.message || '');
+      }
+
+      // 3) pending_id FK sanity: optional check for a caller-provided pendingId
+      const pendingId = String(body?.pendingId ?? body?.pending_id ?? '').trim();
+      if (pendingId) {
+        const exists = await supabase
+          .from('pending_businesses')
+          .select('id')
+          .eq('id', pendingId)
+          .maybeSingle();
+        (report.checks as any).pending_businesses_row_exists = Boolean(exists.data?.id);
+        if (exists.error) (report.checks as any).pending_businesses_row_error = exists.error.message;
+      }
+
+      return jsonResponse(req, report);
     }
 
     // ─── SUBMIT_BUSINESS ───
@@ -623,19 +839,18 @@ Deno.serve(async (req) => {
       };
 
       const attachPhotosForPending = async (pendingRowId: string) => {
-        const photos = body.photos || [];
-        await supabase.from('business_photos').delete().eq('pending_id', pendingRowId);
-        if (photos.length === 0) return null;
-        const photoRecords = photos.map((p: any, i: number) => ({
-          pending_id: pendingRowId,
-          url: p.url || '',
-          file_path: p.filePath || null,
-          uploaded_by: userId,
-          is_main: p.isMain ?? i === 0,
-          status: 'pending',
-        }));
-        const { error: photosErr } = await supabase.from('business_photos').insert(photoRecords);
-        return photosErr;
+        const photos = Array.isArray(body.photos) ? body.photos : [];
+        const { error, mode, warnings, meta } = await replacePendingBusinessPhotos({
+          supabase,
+          pendingId: pendingRowId,
+          userId,
+          photos,
+          debugLabel: body?.debug ? 'submit_business' : undefined,
+        });
+        if (body?.debug) {
+          console.log('[manage-business][photos][submit_business] result', { pendingRowId, mode, warnings, meta });
+        }
+        return error ? ({ message: error.message } as any) : null;
       };
 
       const record = {
@@ -726,7 +941,11 @@ Deno.serve(async (req) => {
         }
       }
 
-      await supabase.from('business_photos').delete().eq('pending_id', String(pendingId));
+      // Best-effort cleanup across schema variants (ignore legacy differences).
+      const delByPending = await supabase.from('business_photos').delete().eq('pending_id', String(pendingId));
+      if (delByPending.error && String(delByPending.error.message || '').toLowerCase().includes('pending_id')) {
+        await supabase.from('business_photos').delete().eq('business_id', String(pendingId));
+      }
       const { error: delErr } = await supabase
         .from('pending_businesses')
         .delete()
@@ -747,7 +966,7 @@ Deno.serve(async (req) => {
       try {
         const userId = authUser.id;
         const pendingId = body.pendingId;
-        if (!pendingId) return errorResponse(req, 'Missing pendingId', 400);
+        if (!pendingId) return errorResponse(req, 'Missing pendingId', 400, { requestId, action, reason: 'missing_pending_id' });
 
         const { data: existing, error: fetchErr } = await supabase
           .from('pending_businesses')
@@ -756,8 +975,51 @@ Deno.serve(async (req) => {
           .eq('owner_id', userId)
           .single();
 
-        if (fetchErr || !existing) return errorResponse(req, 'Submission not found or access denied', 404);
-        if (existing.status !== 'rejected') return errorResponse(req, 'Only rejected submissions can be resubmitted', 400);
+        if (fetchErr || !existing) {
+          console.error('[manage-business][resubmit] fetch pending row failed', {
+            requestId,
+            pendingId,
+            userId,
+            err: dbErrorForLog(fetchErr as any),
+          });
+          return errorResponse(req, 'Submission not found or access denied', 404, {
+            requestId,
+            action,
+            reason: 'pending_not_found_or_denied',
+            ...(debug ? { dbError: dbErrorForLog(fetchErr as any) } : {}),
+          });
+        }
+        if (existing.status !== 'rejected') {
+          return errorResponse(req, 'Only rejected submissions can be resubmitted', 400, {
+            requestId,
+            action,
+            reason: 'invalid_status',
+            status: existing.status,
+          });
+        }
+
+        const diag: Record<string, unknown> = {};
+        if (debug) {
+          const missing: string[] = [];
+          const name = String(body.name ?? existing.name ?? '').trim();
+          const category = String(body.category ?? existing.category ?? '').trim();
+          const desc = String(body.description ?? existing.description ?? '').trim();
+          const image = String(body.image ?? existing.image ?? '').trim();
+          if (!name) missing.push('name');
+          if (!category) missing.push('category');
+          if (!desc) missing.push('description');
+          if (!image) missing.push('image');
+
+          const photosRaw = Array.isArray(body.photos) ? (body.photos as any[]) : [];
+          const ready = photosRaw.filter((p) => typeof p?.url === 'string' && String(p.url).trim());
+          const noFilePath = ready.filter((p) => !p?.filePath || !String(p.filePath).trim()).length;
+          diag.requiredMissing = missing;
+          diag.photos = { provided: photosRaw.length, withUrl: ready.length, missingFilePath: noFilePath };
+          if (missing.length > 0) {
+            diag.warning =
+              'Some required fields are missing/empty. Client-side validation should prevent this; check payload construction.';
+          }
+        }
 
         const updates: Record<string, any> = {
           name: body.name ?? existing.name,
@@ -793,31 +1055,64 @@ Deno.serve(async (req) => {
 
         if (updateErr) {
           console.error('[manage-business] resubmit update error:', updateErr);
-          return errorResponse(req, 'Resubmit failed: ' + updateErr.message, 500);
+          return errorResponse(req, 'Resubmit failed: ' + updateErr.message, 500, {
+            requestId,
+            action,
+            reason: 'pending_update_failed',
+            ...(debug ? { dbError: dbErrorForLog(updateErr as any), diag } : {}),
+          });
         }
 
-        const photos = (body.photos || []).filter((p: any) => p?.url);
+        const photos = Array.isArray(body.photos) ? body.photos : [];
         if (photos.length > 0) {
-          await supabase.from('business_photos').delete().eq('pending_id', pendingId);
-          const photoRecords = photos.map((p: any, i: number) => ({
-            pending_id: pendingId,
-            url: p.url,
-            file_path: p.filePath || null,
-            uploaded_by: userId,
-            is_main: p.isMain ?? i === 0,
-            status: 'pending',
-          }));
-          const { error: insertErr } = await supabase.from('business_photos').insert(photoRecords);
-          if (insertErr) {
-            console.error('[manage-business] resubmit photo insert error:', insertErr);
-            return errorResponse(req, 'Resubmit succeeded but photo save failed: ' + insertErr.message, 500);
+          const { error: photoErr, mode, warnings, meta } = await replacePendingBusinessPhotos({
+            supabase,
+            pendingId: String(pendingId),
+            userId,
+            photos,
+            debugLabel: body?.debug ? 'resubmit_pending_business' : undefined,
+          });
+          if (photoErr) {
+            console.error('[manage-business] resubmit photo insert error:', photoErr);
+            return errorResponse(req, 'Resubmit succeeded but photo save failed: ' + photoErr.message, 500, {
+              requestId,
+              action,
+              reason: 'photo_attach_failed',
+              ...(debug ? { attachment: { mode, warnings, meta }, diag } : {}),
+            });
+          }
+          if (body?.debug) {
+            console.log('[manage-business][photos][resubmit_pending_business] result', {
+              pendingId,
+              mode,
+              warnings,
+              meta,
+            });
           }
         }
 
-        return jsonResponse(req, { success: true, business: updated });
+        if (debug) {
+          console.log('[manage-business][resubmit] success', {
+            requestId,
+            pendingId,
+            userId,
+            elapsedMs: Date.now() - startMs,
+          });
+        }
+        return jsonResponse(req, { success: true, business: updated, ...(debug ? { requestId, diag } : {}) });
       } catch (err: any) {
-        console.error('[manage-business] resubmit error:', err);
-        return errorResponse(req, 'Resubmit failed: ' + (err?.message || String(err)), 500);
+        const msg = err?.message || String(err);
+        console.error('[manage-business][resubmit] unexpected error', {
+          requestId,
+          message: msg,
+          stack: typeof err?.stack === 'string' ? err.stack : null,
+        });
+        return errorResponse(req, 'Resubmit failed: ' + msg, 500, {
+          requestId,
+          action,
+          reason: 'unexpected_exception',
+          ...(debug ? { stack: typeof err?.stack === 'string' ? err.stack : null } : {}),
+        });
       }
     }
 
@@ -952,23 +1247,25 @@ Deno.serve(async (req) => {
       const validPhotos = photos.filter((p: any) => !!p?.url);
       if (validPhotos.length === 0) return jsonResponse(req, { success: true, inserted: 0 });
 
-      // Replace existing rows for this pending listing to avoid duplicates on retries.
-      await supabase.from('business_photos').delete().eq('pending_id', pendingId);
-
-      const photoRecords = validPhotos.map((p: any, i: number) => ({
-        pending_id: pendingId,
-        url: p.url,
-        file_path: p.filePath || null,
-        uploaded_by: userId,
-        is_main: p.isMain ?? i === 0,
-        status: 'pending',
-      }));
-      const { error: insertErr } = await supabase.from('business_photos').insert(photoRecords);
-      if (insertErr) {
-        console.error('[manage-business] attach_pending_photos insert error:', insertErr);
-        return errorResponse(req, 'Failed to attach photos: ' + insertErr.message, 500);
+      const { inserted, error: photoErr, mode, warnings, meta } = await replacePendingBusinessPhotos({
+        supabase,
+        pendingId: String(pendingId),
+        userId,
+        photos: validPhotos,
+        debugLabel: body?.debug ? 'attach_pending_photos' : undefined,
+      });
+      if (photoErr) {
+        console.error('[manage-business] attach_pending_photos insert error:', photoErr);
+        return errorResponse(req, 'Failed to attach photos: ' + photoErr.message, 500);
       }
-      return jsonResponse(req, { success: true, inserted: photoRecords.length });
+      if (body?.debug) {
+        console.log('[manage-business][photos][attach_pending_photos] result', { pendingId, inserted, mode, warnings, meta });
+      }
+      return jsonResponse(req, {
+        success: true,
+        inserted,
+        ...(body?.debug ? { attachment: { mode, warnings, meta } } : {}),
+      });
     }
 
     // ─── GET_PENDING_EDITS ───
@@ -1010,7 +1307,7 @@ Deno.serve(async (req) => {
 
     // ─── ADMIN_CREATE_BUSINESS ───
     if (action === 'admin_create_business') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const targetOwnerId =
@@ -1050,7 +1347,7 @@ Deno.serve(async (req) => {
 
     // ─── REVIEW_BUSINESS ───
     if (action === 'review_business') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const pendingId = body.businessId; // pending_businesses.id
@@ -1245,10 +1542,17 @@ Deno.serve(async (req) => {
         if (insertedOff?.id) newOfferingId = String(insertedOff.id);
       }
 
+      // Support both schema variants:
+      // - current: `pending_id` links photos to a moderation submission
+      // - legacy: some deployments stored `pending_businesses.id` in `business_id`
+      // - `submission_pending_id` keeps the same pending uuid after `pending_id` is cleared on approve
+      //   (still matchable in a single UPDATE before the pending row is deleted).
+      const pendingPhotoMatch = `pending_id.eq.${pendingId},business_id.eq.${pendingId},submission_pending_id.eq.${pendingId}`;
+
       const { error: rejErr } = await supabase
         .from('business_photos')
         .update({ business_id: liveBusinessId, pending_id: null })
-        .eq('pending_id', pendingId)
+        .or(pendingPhotoMatch)
         .eq('status', 'rejected');
 
       if (rejErr) {
@@ -1270,7 +1574,7 @@ Deno.serve(async (req) => {
       const { error: photoErr } = await supabase
         .from('business_photos')
         .update(approvedPhotoPatch)
-        .eq('pending_id', pendingId)
+        .or(pendingPhotoMatch)
         .neq('status', 'rejected');
 
       if (photoErr) {
@@ -1360,7 +1664,7 @@ Deno.serve(async (req) => {
     // creating a new business_offerings row (or overwrote the primary one). This repairs by
     // inserting a fresh offering row and relinking photos, then deletes the stuck pending row.
     if (action === 'repair_approved_submission') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const pendingId = body.pendingId ?? body.pending_id ?? body.businessId;
@@ -1437,10 +1741,9 @@ Deno.serve(async (req) => {
       };
       if (inserted?.id) relinkPatch.offering_id = String(inserted.id);
 
-      const { error: relinkErr } = await supabase
-        .from('business_photos')
-        .update(relinkPatch)
-        .eq('pending_id', String(pendingId));
+      const pid = String(pendingId);
+      const relinkMatch = `pending_id.eq.${pid},submission_pending_id.eq.${pid},business_id.eq.${pid}`;
+      const { error: relinkErr } = await supabase.from('business_photos').update(relinkPatch).or(relinkMatch);
       if (relinkErr) {
         console.error('[manage-business] repair_approved_submission photos:', relinkErr);
         // Non-fatal: offering exists; return success but warn
@@ -1512,7 +1815,7 @@ Deno.serve(async (req) => {
       const confirmEntire =
         body.confirmDeleteEntireProfile === true || body.confirmDeleteEntireProfile === 'true';
 
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       if (confirmEntire) {
@@ -1622,7 +1925,7 @@ Deno.serve(async (req) => {
         return errorResponse(req, 'Missing businessId or changes');
       }
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), userId, req);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser, req);
       if (denied) return denied;
 
       let ownerIdForEdit = userId;
@@ -1659,7 +1962,7 @@ Deno.serve(async (req) => {
 
     // ─── REVIEW_EDIT ───
     if (action === 'review_edit') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const editId = body.editId;
@@ -1710,7 +2013,7 @@ Deno.serve(async (req) => {
         return errorResponse(req, 'Missing businessId or updates');
       }
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id, req);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser, req);
       if (denied) return denied;
 
       const { error } = await supabase
@@ -1729,7 +2032,7 @@ Deno.serve(async (req) => {
 
       if (!businessId || active === undefined) return errorResponse(req, 'Missing businessId or active');
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id, req);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser, req);
       if (denied) return denied;
 
       const { error } = await supabase
@@ -1792,9 +2095,73 @@ Deno.serve(async (req) => {
       return jsonResponse(req, { success: true });
     }
 
+    // ─── ADMIN_LIST_REVIEWS ─── (admin only)
+    if (action === 'admin_list_reviews') {
+      const denied = await assertAdmin(supabase, authUser, req);
+      if (denied) return denied;
+
+      const limit = Math.min(Math.max(Number(body.limit) || 100, 1), 500);
+      const { data, error } = await supabase
+        .from('reviews')
+        // Avoid implicit joins: some projects don't have FKs between reviews ↔ businesses/offers,
+        // which makes PostgREST relationship embedding fail ("schema cache" error).
+        .select(
+          [
+            'id',
+            'business_id',
+            'offering_id',
+            'user_name',
+            'rating',
+            'comment',
+            'created_at',
+            'has_super_star',
+            'is_public',
+            'moderated_at',
+            'moderated_by',
+            'moderation_reason',
+          ].join(','),
+        )
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { reviews: data || [] });
+    }
+
+    // ─── ADMIN_SET_REVIEW_PUBLIC ─── (admin only)
+    if (action === 'admin_set_review_public') {
+      const denied = await assertAdmin(supabase, authUser, req);
+      if (denied) return denied;
+      const reviewId = String(body.reviewId || '').trim();
+      const isPublic = body.isPublic;
+      const reason = String(body.reason || '').trim();
+      if (!reviewId || typeof isPublic !== 'boolean') {
+        return errorResponse(req, 'Missing reviewId or isPublic');
+      }
+      const updates: Record<string, unknown> = {
+        is_public: isPublic,
+        moderated_at: new Date().toISOString(),
+        moderated_by: authUser.id,
+        moderation_reason: reason || null,
+      };
+      const { error } = await supabase.from('reviews').update(updates).eq('id', reviewId);
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { success: true });
+    }
+
+    // ─── ADMIN_DELETE_REVIEW ─── (admin only)
+    if (action === 'admin_delete_review') {
+      const denied = await assertAdmin(supabase, authUser, req);
+      if (denied) return denied;
+      const reviewId = String(body.reviewId || '').trim();
+      if (!reviewId) return errorResponse(req, 'Missing reviewId');
+      const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { success: true });
+    }
+
     // ─── GET_ALL_PHOTOS ─── (admin only)
     if (action === 'get_all_photos') {
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const { data, error } = await supabase
@@ -1811,7 +2178,7 @@ Deno.serve(async (req) => {
       const photoId = body.photoId;
       if (!photoId) return errorResponse(req, 'Missing photoId');
 
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       const status = action === 'approve_photo' ? 'approved' : 'rejected';
@@ -1829,26 +2196,124 @@ Deno.serve(async (req) => {
       const businessId = body.businessId;
       if (!businessId) return errorResponse(req, 'Missing businessId');
 
-      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser.id, req);
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser, req);
       if (denied) return denied;
 
-      const { data: reviews } = await supabase
-        .from('reviews')
-        .select('id, rating, created_at')
-        .eq('business_id', businessId);
+      const offeringId = String(body.offeringId || '').trim() || null;
+      const rangeDaysRaw = Number(body.rangeDays);
+      const rangeDays = Number.isFinite(rangeDaysRaw) && rangeDaysRaw > 0 ? Math.min(rangeDaysRaw, 365) : 30;
+      const sinceIso = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
 
-      const { data: redemptions } = await supabase
+      const reviewsQ = supabase
+        .from('reviews')
+        .select('id, rating, created_at, has_super_star')
+        .eq('business_id', businessId)
+        .gte('created_at', sinceIso);
+      if (offeringId) reviewsQ.eq('offering_id', offeringId);
+      const { data: reviews, error: revErr } = await reviewsQ;
+      if (revErr) return errorResponse(req, revErr.message, 500);
+
+      const redQ = supabase
         .from('redemptions')
-        .select('id, created_at')
-        .eq('business_id', businessId);
+        .select('id, redeemed_at, saved_amount, offering_id')
+        .eq('business_id', businessId)
+        .gte('redeemed_at', sinceIso);
+      if (offeringId) redQ.eq('offering_id', offeringId);
+      const { data: redemptions, error: redErr } = await redQ;
+      if (redErr) return errorResponse(req, redErr.message, 500);
+
+      // Events table is new; fail-soft if it's not deployed yet.
+      let events: any[] = [];
+      {
+        const evQ = supabase
+          .from('analytics_events')
+          .select('id, event_type, created_at, offering_id')
+          .eq('business_id', businessId)
+          .gte('created_at', sinceIso);
+        if (offeringId) evQ.eq('offering_id', offeringId);
+        const { data: evData, error: evErr } = await evQ;
+        if (evErr) {
+          const msg = String((evErr as any)?.message || evErr);
+          const code = String((evErr as any)?.code || '');
+          const lower = msg.toLowerCase();
+          // Common when migration hasn't been applied yet or PostgREST schema cache hasn't refreshed:
+          // - Postgres: 42P01 (undefined_table)
+          // - PostgREST: PGRST205 / "Could not find the table ... in the schema cache"
+          const isMissingTable =
+            code === '42P01' ||
+            code === 'PGRST205' ||
+            (lower.includes('analytics_events') && lower.includes('does not exist')) ||
+            (lower.includes('analytics_events') && lower.includes('schema cache'));
+          if (!isMissingTable) return errorResponse(req, msg, 500);
+          events = [];
+        } else {
+          events = Array.isArray(evData) ? evData : [];
+        }
+      }
+
+      const safeReviews = Array.isArray(reviews) ? reviews : [];
+      const safeReds = Array.isArray(redemptions) ? redemptions : [];
+      const safeEvents = Array.isArray(events) ? events : [];
+      const reviewCount = safeReviews.length;
+      const superStarCount = safeReviews.filter((r: any) => !!r.has_super_star).length;
+      const avgRating = reviewCount
+        ? safeReviews.reduce((s: number, r: any) => s + (Number(r.rating) || 0), 0) / reviewCount
+        : 0;
+
+      const redemptionCount = safeReds.length;
+      const totalSaved = safeReds.reduce((s: number, r: any) => s + (Number(r.saved_amount) || 0), 0);
+
+      const viewCount = safeEvents.filter((e: any) => e.event_type === 'view_listing').length;
+      const clickCount = safeEvents.filter((e: any) => e.event_type === 'click_listing').length;
+      const requestBookingTapCount = safeEvents.filter((e: any) => e.event_type === 'tap_request_booking').length;
+      const whatsappTapCount = safeEvents.filter((e: any) => e.event_type === 'tap_whatsapp').length;
+
+      // Group redemptions by day (YYYY-MM-DD)
+      const byDay: Record<string, { date: string; count: number; saved: number }> = {};
+      for (const r of safeReds as any[]) {
+        const iso = r.redeemed_at ? String(r.redeemed_at) : '';
+        const day = iso ? new Date(iso).toISOString().slice(0, 10) : null;
+        if (!day) continue;
+        if (!byDay[day]) byDay[day] = { date: day, count: 0, saved: 0 };
+        byDay[day].count += 1;
+        byDay[day].saved += Number(r.saved_amount) || 0;
+      }
+      const redemptionsByDay = Object.values(byDay).sort((a, b) => a.date.localeCompare(b.date));
+
+      // Group events by day + type
+      const evByDay: Record<
+        string,
+        { date: string; views: number; clicks: number; requestBookings: number; whatsappTaps: number }
+      > = {};
+      for (const e of safeEvents as any[]) {
+        const iso = e.created_at ? String(e.created_at) : '';
+        const day = iso ? new Date(iso).toISOString().slice(0, 10) : null;
+        if (!day) continue;
+        if (!evByDay[day]) evByDay[day] = { date: day, views: 0, clicks: 0, requestBookings: 0, whatsappTaps: 0 };
+        if (e.event_type === 'view_listing') evByDay[day].views += 1;
+        if (e.event_type === 'click_listing') evByDay[day].clicks += 1;
+        if (e.event_type === 'tap_request_booking') evByDay[day].requestBookings += 1;
+        if (e.event_type === 'tap_whatsapp') evByDay[day].whatsappTaps += 1;
+      }
+      const eventsByDay = Object.values(evByDay).sort((a, b) => a.date.localeCompare(b.date));
 
       return jsonResponse(req, {
         success: true,
-        reviewCount: reviews?.length || 0,
-        redemptionCount: redemptions?.length || 0,
-        avgRating: reviews?.length
-          ? reviews.reduce((s: number, r: any) => s + (r.rating || 0), 0) / reviews.length
-          : 0,
+        action: 'get_analytics',
+        businessId,
+        offeringId,
+        rangeDays,
+        reviewCount,
+        superStarCount,
+        redemptionCount,
+        totalSaved,
+        avgRating,
+        redemptionsByDay,
+        viewCount,
+        clickCount,
+        requestBookingTapCount,
+        whatsappTapCount,
+        eventsByDay,
       });
     }
 
@@ -1857,7 +2322,7 @@ Deno.serve(async (req) => {
       const targetUserId = body.targetUserId || body.userId;
       if (!targetUserId) return errorResponse(req, 'Missing targetUserId');
 
-      const denied = await assertAdmin(supabase, authUser.id, req);
+      const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
       // Prevent deleting self
@@ -1879,8 +2344,16 @@ Deno.serve(async (req) => {
 
     return errorResponse(req, 'Unknown action: ' + action, 400);
   } catch (err) {
-    console.error('[manage-business] error:', err);
     const msg = err instanceof Error ? err.message : String(err ?? 'Internal server error');
-    return errorResponse(req, msg || 'Internal server error', 500);
+    console.error('[manage-business] error', {
+      requestId,
+      message: msg,
+      stack: err instanceof Error ? err.stack : null,
+      elapsedMs: Date.now() - startMs,
+    });
+    return errorResponse(req, msg || 'Internal server error', 500, {
+      requestId,
+      reason: 'top_level_exception',
+    });
   }
 });

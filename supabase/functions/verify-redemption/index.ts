@@ -41,6 +41,20 @@ function parsePassIdFromQrData(rawQr: string): string | null {
   return null;
 }
 
+/**
+ * AppContext treats `user_profiles.user_type` as the source of truth when it disagrees with `role`.
+ * Some business accounts historically ended up with `user_type = 'business'` but `role` still `tourist`.
+ * Redemption must follow the same rule or legitimate owners get HTTP 403 `scanner_role`.
+ */
+function resolveScannerAppRole(profile: { role?: unknown; user_type?: unknown } | null | undefined): string | null {
+  if (!profile) return null;
+  const ut = String(profile.user_type ?? '').trim().toLowerCase();
+  const r = String(profile.role ?? '').trim().toLowerCase();
+  const preferred = ut || r;
+  if (preferred === 'business' || preferred === 'admin' || preferred === 'tourist') return preferred;
+  return null;
+}
+
 function normalizeDate(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
@@ -139,10 +153,10 @@ function computeTieredBookingTotals(
 
   if (usable.length === 1) {
     const t = usable[0];
-    const pax = a + ch + inf;
+    const payingPax = Math.max(1, a + ch);
     return {
-      totalStandard: pax * t.original_price_vt,
-      totalDeal: pax * t.deal_price_vt,
+      totalStandard: payingPax * t.original_price_vt,
+      totalDeal: payingPax * t.deal_price_vt,
     };
   }
 
@@ -155,7 +169,16 @@ function computeTieredBookingTotals(
 
   const tAdult = pick((l) => /adult|13\+|adulte|senior|grown/.test(l), 0);
   const tChild = pick((l) => /child|kid|enfant|pikinini|minor|2-12|5-12|6-12|7-12|school/.test(l), 1);
-  const tInfant = pick((l) => /infant|baby|b[eé]b[eé]|0-4|0–4|toddler|smol/.test(l), 2);
+  const infantTier = usable.find((t) =>
+    /infant|baby|b[eé]b[eé]|0-4|0–4|toddler|smol/.test(low(t.label)),
+  );
+  const tInfant: PricingTierInput = infantTier ?? {
+    label: '',
+    min_pax: 0,
+    max_pax: null,
+    original_price_vt: 0,
+    deal_price_vt: 0,
+  };
 
   return {
     totalStandard:
@@ -255,7 +278,14 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim();
-    const serviceKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
+    // Service role key resolution:
+    // - Supabase auto-injects `SUPABASE_SERVICE_ROLE_KEY` at runtime — prefer it first so a mistaken
+    //   `APP_SUPABASE_SERVICE_ROLE_KEY` (e.g. anon key pasted) cannot override the correct key.
+    // - `APP_SUPABASE_SERVICE_ROLE_KEY` is only a fallback for rare Dashboard cases where the reserved
+    //   secret cannot be fixed and you must supply the service_role JWT manually under another name.
+    const serviceKey =
+      (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim() ||
+      (Deno.env.get('APP_SUPABASE_SERVICE_ROLE_KEY') ?? '').trim();
     // Dashboard secret bug workaround:
     // Some projects cannot edit/delete reserved `SUPABASE_*` secrets in the Dashboard.
     // Prefer a non-reserved secret name for the anon key (used ONLY to validate caller JWT):
@@ -267,7 +297,7 @@ Deno.serve(async (req) => {
       (Deno.env.get('SUPABASE_ANON_KEY_PUBLIC') ?? '').trim();
     if (!supabaseUrl || !serviceKey) {
       console.error(
-        '[verify-redemption] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY — cannot read public.passes',
+        '[verify-redemption] Missing SUPABASE_URL or service role key (SUPABASE_SERVICE_ROLE_KEY / APP_SUPABASE_SERVICE_ROLE_KEY) — cannot read public.passes',
       );
       return errorResponse('Server configuration error', 500, {
         reason: 'missing_supabase_secrets',
@@ -302,18 +332,99 @@ Deno.serve(async (req) => {
     }
 
     // ─── AUTHZ: Ensure scanner is a business owner or admin ───
-    const { data: scannerProfile, error: profileErr } = await supabase
-      .from('user_profiles')
-      .select('role')
-      .eq('user_id', scannerUser.id)
-      .maybeSingle();
+    // NOTE: Do not use `.maybeSingle()` here — if duplicate `user_profiles` rows exist for the same
+    // `user_id`, PostgREST returns PGRST116 and `profileErr` is set, which previously surfaced as a
+    // misleading HTTP 403 `scanner_role` even when a valid business row exists.
+    let profileRows: { role?: unknown; user_type?: unknown }[] | null = null;
+    let profileErr: { message?: string; code?: string; details?: string; hint?: string } | null = null;
 
-    const scannerRole = scannerProfile?.role as string | undefined;
-    if (profileErr || !scannerRole || !['business', 'admin'].includes(scannerRole)) {
+    {
+      const r1 = await supabase
+        .from('user_profiles')
+        .select('role, user_type')
+        .eq('user_id', scannerUser.id)
+        .limit(5);
+      profileRows = r1.data as typeof profileRows;
+      profileErr = r1.error as typeof profileErr;
+    }
+
+    if (profileErr) {
+      const pe = profileErr;
+      const code = String(pe?.code ?? '');
+      const msg = String(pe?.message ?? '').toLowerCase();
+      // Prod DBs that predate migration `20260403120000_user_profiles_name_full_name_user_type.sql`
+      // do not have `user_type` — PostgREST returns 42703 / "column ... does not exist".
+      const missingUserTypeColumn =
+        code === '42703' || (msg.includes('user_type') && msg.includes('does not exist'));
+      if (missingUserTypeColumn) {
+        console.warn('[verify-redemption] user_profiles.user_type missing — retrying role-only select');
+        const r2 = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('user_id', scannerUser.id)
+          .limit(5);
+        profileRows = r2.data as typeof profileRows;
+        profileErr = r2.error as typeof profileErr;
+      }
+    }
+
+    if (profileErr) {
+      const pe = profileErr;
+      const msgFull = String(pe?.message ?? '');
+      const msgLower = msgFull.toLowerCase();
+      // Runtime-confirmed failure mode: PostgREST returns "Invalid API key" when the Edge Function
+      // `createClient(SUPABASE_URL, serviceKey)` uses a wrong/non-service key (common secret typo).
+      if (msgLower.includes('invalid api key') || msgLower.includes('invalid jwt')) {
+        console.error('[verify-redemption] DB client rejected API key (check Edge secrets)', msgFull);
+        return errorResponse(
+          'Edge Function service role key rejected by Supabase (Invalid API key). Prefer the auto-injected SUPABASE_SERVICE_ROLE_KEY; remove a wrong APP_SUPABASE_SERVICE_ROLE_KEY secret if set, or set APP_SUPABASE_SERVICE_ROLE_KEY to the real service_role JWT from Project Settings → API (same project as SUPABASE_URL).',
+          500,
+          {
+            reason: 'invalid_edge_service_role_key',
+            profileError: msgFull,
+          },
+        );
+      }
+      console.error(
+        '[verify-redemption] scanner profile query failed',
+        JSON.stringify({
+          code: pe?.code ?? null,
+          message: pe?.message ?? null,
+          details: pe?.details ?? null,
+          hint: pe?.hint ?? null,
+        }),
+      );
+      return errorResponse('Scanner profile lookup failed', 500, {
+        reason: 'scanner_profile_query_failed',
+        profileError: pe?.message ?? null,
+        postgresCode: pe?.code ?? null,
+        postgresMessage: pe?.details ?? pe?.message ?? null,
+      });
+    }
+
+    const rowCount = profileRows?.length ?? 0;
+    const scannerProfile = (profileRows?.[0] ?? null) as { role?: unknown; user_type?: unknown } | null;
+    if (rowCount > 1) {
+      console.warn('[verify-redemption] duplicate user_profiles rows for scanner user_id:', scannerUser.id, {
+        rowCount,
+      });
+    }
+
+    if (!scannerProfile) {
+      return errorResponse('Not authorized to verify passes', 403, {
+        reason: 'scanner_no_profile',
+        scannerUserId: scannerUser.id,
+      });
+    }
+
+    const scannerRole = resolveScannerAppRole(scannerProfile);
+    if (!scannerRole || !['business', 'admin'].includes(scannerRole)) {
       return errorResponse('Not authorized to verify passes', 403, {
         reason: 'scanner_role',
         role: scannerRole ?? null,
-        profileError: profileErr?.message ?? null,
+        profileRole: scannerProfile?.role ?? null,
+        profileUserType: scannerProfile?.user_type ?? null,
+        duplicateProfileRows: rowCount > 1 ? rowCount : null,
       });
     }
 
@@ -424,16 +535,21 @@ Deno.serve(async (req) => {
     const party = partyFromProfileRow(profile);
     const totalPartySize = totalPartyPax(party);
     const passMaxPeople = resolvePassMaxPeople(pass as { max_people?: unknown });
+    const passTypeStr = String((pass as { pass_type?: unknown }).pass_type ?? '');
+    /** Dynamic passes: capacity applies to ages 6+ (adults + children); infants free. Legacy passes: all pax. */
+    const headcountAgainstPass =
+      passTypeStr === 'dynamic' ? party.adults + party.children : totalPartySize;
 
     // ─── Party size vs pass capacity (max_people) — server-side enforcement ───
-    // Savings math uses adults+children (+ infants for tiers). The same headcount must
-    // not exceed the pass purchase limit (share bonus included in max_people at buy time).
-    if (canRedeem && passMaxPeople !== null && totalPartySize > passMaxPeople) {
+    if (canRedeem && passMaxPeople !== null && headcountAgainstPass > passMaxPeople) {
       passStatus = 'party_exceeds_pass_capacity';
       canRedeem = false;
       message =
-        `Party size (${totalPartySize}) exceeds this pass capacity (max ${passMaxPeople}). ` +
-        'The tourist should reduce group size in their profile or purchase a pass with a higher limit.';
+        passTypeStr === 'dynamic'
+          ? `People ages 6+ in profile (${headcountAgainstPass}) exceed this pass (${passMaxPeople} max). ` +
+            'Children under 6 may accompany the group for free. Reduce adults/children in profile or buy a larger pass.'
+          : `Party size (${totalPartySize}) exceeds this pass capacity (max ${passMaxPeople}). ` +
+            'The tourist should reduce group size in their profile or purchase a pass with a higher limit.';
     }
 
     const touristName =
@@ -515,7 +631,10 @@ Deno.serve(async (req) => {
           expiresAt: pass.expires_at,
           purchasedAt: pass.purchased_at,
           maxPeople: passMaxPeople,
+          /** Same as maxPeople — people ages 6+ this pass covers (merchant display). */
+          partySize: passMaxPeople,
           totalPartySize,
+          headcountAgainstPass,
         },
         voucher: null,
         redemptionHistory: {
@@ -539,7 +658,9 @@ Deno.serve(async (req) => {
             error: message,
             status: passStatus,
             maxPeople: passMaxPeople,
+            partySize: passMaxPeople,
             totalPartySize,
+            headcountAgainstPass,
           },
           200
         );
@@ -599,8 +720,28 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Prefer per-listing pricing from `business_offerings` when the client sends a UUID
+      // (QR flow); legacy rows redeem against profile `businesses` only.
+      const rawOfferingId = (body as Record<string, unknown>)?.offeringId ??
+        (body as Record<string, unknown>)?.offering_id;
+      const offeringIdCandidate =
+        typeof rawOfferingId === 'string' ? rawOfferingId.trim() : '';
+      let pricingRow: { pricing_tiers: unknown; original_price: unknown; deal_price: unknown } = bizRow;
+      let resolvedOfferingId: string | null = null;
+      if (offeringIdCandidate && PASS_ID_UUID_RE.test(offeringIdCandidate)) {
+        const { data: offRow, error: offErr } = await supabase
+          .from('business_offerings')
+          .select('id, business_id, pricing_tiers, original_price, deal_price')
+          .eq('id', offeringIdCandidate)
+          .maybeSingle();
+        if (!offErr && offRow && String((offRow as { business_id?: string }).business_id ?? '') === String(businessId)) {
+          pricingRow = offRow as typeof pricingRow;
+          resolvedOfferingId = String((offRow as { id?: string }).id ?? offeringIdCandidate);
+        }
+      }
+
       // Server-authoritative savings (ignore client savedAmount to prevent tampering)
-      const computed = computeRedemptionSavings(bizRow, party);
+      const computed = computeRedemptionSavings(pricingRow, party);
       const savedAmount = computed.savedAmount;
 
       const insertRow: Record<string, unknown> = {
@@ -609,6 +750,7 @@ Deno.serve(async (req) => {
         pass_id: pass.id,
         saved_amount: savedAmount,
       };
+      if (resolvedOfferingId) insertRow.offering_id = resolvedOfferingId;
       if (discount_label) insertRow.discount_label = discount_label;
 
       const { data: redemption, error: redErr } = await supabase

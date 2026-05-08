@@ -11,9 +11,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area, LineChart, Line
 } from 'recharts';
-import { PASS_PRODUCTS, passProductIdFromDb, type DbPassType } from '@/data/pricing';
+import { getPassDisplayTitle } from '@/data/pricing';
+import type { DbPassType } from '@/data/passCatalog';
 
-const DB_PASS_ORDER: DbPassType[] = ['daily', 'weekly', 'monthly', 'mega_group'];
+const DB_PASS_ORDER: DbPassType[] = ['dynamic', 'daily', 'weekly', 'monthly', 'mega_group'];
 
 interface PassPurchase {
   id: string;
@@ -73,19 +74,29 @@ interface AdminPurchaseOverviewProps {
 }
 
 const PASS_COLORS: Record<DbPassType, string> = {
+  dynamic: '#0d9488',
   daily: '#0EA5E9',
   weekly: '#8B5CF6',
   monthly: '#F59E0B',
   mega_group: '#C026D3',
 };
 
-const PASS_LABELS: Record<DbPassType, string> = Object.fromEntries(
-  DB_PASS_ORDER.map((db) => [db, PASS_PRODUCTS[passProductIdFromDb(db)!].title]),
-) as Record<DbPassType, string>;
+const PASS_LABELS: Record<DbPassType, string> = {
+  dynamic: getPassDisplayTitle('dynamic', 'en'),
+  daily: 'Archived pass (db: daily)',
+  weekly: 'Archived pass (db: weekly)',
+  monthly: 'Archived pass (db: monthly)',
+  mega_group: 'Archived pass (db: mega_group)',
+};
 
-const PASS_PRICES: Record<DbPassType, number> = Object.fromEntries(
-  DB_PASS_ORDER.map((db) => [db, PASS_PRODUCTS[passProductIdFromDb(db)!].priceAUD]),
-) as Record<DbPassType, number>;
+/** Reference “from” prices for admin copy; dynamic passes use variable pricing at checkout. */
+const PASS_PRICES: Record<DbPassType, number> = {
+  dynamic: 15,
+  daily: 15,
+  weekly: 45,
+  monthly: 99,
+  mega_group: 199,
+};
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
@@ -217,7 +228,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
 
   // Purchase trends over time (group by day)
   const trendData = (() => {
-    const dayMap: Record<string, { date: string; revenue: number; count: number; daily: number; weekly: number; monthly: number; mega_group: number }> = {};
+    const dayMap: Record<string, { date: string; revenue: number; count: number; dynamic: number; daily: number; weekly: number; monthly: number; mega_group: number }> = {};
     
     // Determine how many days to show
     const daysToShow = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 180;
@@ -227,7 +238,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
       const d = new Date();
       d.setDate(d.getDate() - i);
       const key = d.toISOString().split('T')[0];
-      dayMap[key] = { date: key, revenue: 0, count: 0, daily: 0, weekly: 0, monthly: 0, mega_group: 0 };
+      dayMap[key] = { date: key, revenue: 0, count: 0, dynamic: 0, daily: 0, weekly: 0, monthly: 0, mega_group: 0 };
     }
 
     completedPurchases.forEach(p => {
@@ -235,6 +246,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
       if (dayMap[day]) {
         dayMap[day].revenue += Number(p.amount_paid);
         dayMap[day].count += 1;
+        if (p.pass_type === 'dynamic') dayMap[day].dynamic += 1;
         if (p.pass_type === 'daily') dayMap[day].daily += 1;
         if (p.pass_type === 'weekly') dayMap[day].weekly += 1;
         if (p.pass_type === 'monthly') dayMap[day].monthly += 1;
@@ -625,6 +637,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
                   <Tooltip
                     contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }}
                   />
+                  <Bar dataKey="dynamic" name={PASS_LABELS.dynamic} fill={PASS_COLORS.dynamic} radius={[4, 4, 0, 0]} stackId="stack" />
                   <Bar dataKey="daily" name={PASS_LABELS.daily} fill={PASS_COLORS.daily} radius={[4, 4, 0, 0]} stackId="stack" />
                   <Bar dataKey="weekly" name={PASS_LABELS.weekly} fill={PASS_COLORS.weekly} radius={[0, 0, 0, 0]} stackId="stack" />
                   <Bar dataKey="monthly" name={PASS_LABELS.monthly} fill={PASS_COLORS.monthly} radius={[4, 4, 0, 0]} stackId="stack" />

@@ -12,6 +12,7 @@ import {
 import { Star, Heart, MapPin, Clock, Share2, Sparkles } from 'lucide-react';
 import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
+import { trackInteractionEvent } from '@/lib/interactionEvents';
 import { toast } from 'sonner';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
@@ -43,7 +44,18 @@ const iconActionBtn =
   'inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2';
 
 const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false }) => {
-  const { language, favorites, toggleFavorite, setSelectedBusiness, setCurrentView, user, setShowAuth, setAuthMode, dbReviews } = useAppContext();
+  const {
+    language,
+    favorites,
+    toggleFavorite,
+    setSelectedBusiness,
+    setCurrentView,
+    user,
+    setShowAuth,
+    setAuthMode,
+    dbReviews,
+    purchasePass,
+  } = useAppContext();
   const profileId = profileBusinessIdFor(business);
   const embed = primaryEmbeddedOffering(business);
   const dealPrice = effectiveListingDealPrice(business);
@@ -51,10 +63,11 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
   const hasDiscount = listingHasActiveDiscount(business);
   const displayPrice = customerFacingListPrice(business);
   const savings = hasDiscount ? Math.max(0, originalPrice - dealPrice) : 0;
+  const discountLabel = String(business.discount ?? '').trim();
   const discountBadgeText =
-    hasDiscount && business.discount.trim()
-      ? business.discount.trim()
-      : hasDiscount && originalPrice > 0
+    hasDiscount && discountLabel
+      ? discountLabel
+      : hasDiscount && originalPrice > 0 && dealPrice < originalPrice
         ? `${Math.round((1 - dealPrice / originalPrice) * 100)}% OFF`
         : null;
   const cardImage =
@@ -65,13 +78,19 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
   // Compute super star count: use DB field if available, otherwise count from reviews
   const superStarCount = (business.superStarCount && business.superStarCount > 0)
     ? business.superStarCount
-    : dbReviews.filter(r => r.business_id === profileId && r.has_super_star).length;
+    : dbReviews.filter((r: any) => r.business_id === profileId && (r.offering_id ? String(r.offering_id) === String(business.id) : true) && r.has_super_star).length;
 
   const hasWhatsApp = digitsForWaMe(getBusinessWhatsAppRaw(business)).length >= 5;
 
   const viewDetailsLabel = `View details for ${business.name}`;
 
   const handleViewDeal = () => {
+    void trackInteractionEvent({
+      eventType: 'click_listing',
+      businessId: profileId,
+      offeringId: String(business.id),
+      dedupeInSession: false,
+    });
     setSelectedBusiness(business);
     setCurrentView('business-detail');
   };
@@ -88,8 +107,30 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
 
   const handleWhatsApp = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!user) {
+      setShowAuth(true);
+      setAuthMode('signin');
+      return;
+    }
+    if (!user.pass) {
+      toast.error(
+        language === 'en'
+          ? 'Get a StikmNek pass to message businesses on WhatsApp and unlock member rates.'
+          : language === 'fr'
+            ? 'Obtenez un pass StikmNek pour contacter les entreprises sur WhatsApp et bénéficier des tarifs membres.'
+            : 'Yu nidim StikmNek pas blong mesej bisnis long WhatsApp mo kasem praes blong membas.',
+      );
+      void purchasePass();
+      return;
+    }
     const d = digitsForWaMe(getBusinessWhatsAppRaw(business));
     if (d.length < 5) return;
+    void trackInteractionEvent({
+      eventType: 'tap_whatsapp',
+      businessId: profileId,
+      offeringId: String(business.id),
+      dedupeInSession: false,
+    });
     const url = buildBookingInquiryWhatsAppUrl(d, {
       businessName: business.name,
       visitDate: 'To be confirmed',

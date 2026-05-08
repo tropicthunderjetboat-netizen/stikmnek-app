@@ -1,19 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import {
   CheckCircle, Download, Printer, ArrowRight, Receipt,
-  Calendar, CreditCard, Hash, Clock, Shield, Zap, Star, Crown, Copy, Check, Mail, Loader2,
+  Calendar, CreditCard, Hash, Clock, Shield, Ticket, Copy, Check, Mail, Loader2,
   CalendarRange, Users, Share2, Gift, Baby, Sparkles, PartyPopper
 } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  PASS_PRODUCTS,
-  PASS_PRODUCT_ORDER,
-  getPassDisplayTitle,
-  passProductIdFromDb,
-  type PassProductId,
-} from '@/data/pricing';
+import { getPassDisplayTitle, MAX_PARTY_SIZE } from '@/data/pricing';
+import { passProductIdFromDb, type PassProductId } from '@/data/passCatalog';
 import {
   Dialog,
   DialogContent,
@@ -22,7 +17,14 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import TouristProfileForm from '@/components/TouristProfileForm';
+import PostPurchasePassPreferencesDialog from '@/components/PostPurchasePassPreferencesDialog';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
+import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
+import { t, type Language } from '@/data/translations';
+
+function passPrefsPromptStorageKey(receiptNumber: string): string {
+  return `pass_prefs_prompt_v1_${receiptNumber}`;
+}
 
 interface PaymentResult {
   receiptNumber: string;
@@ -42,30 +44,39 @@ interface PaymentResult {
   paypalOrderId?: string;
   shareBonusApplied?: boolean;
   peopleCount?: number;
+  partySize?: number;
+  isExtended?: boolean;
 }
 
-const FALLBACK_PASS_PRODUCT: PassProductId = 'extended_group_adventure';
+const FALLBACK_PASS_PRODUCT: PassProductId = 'dynamic';
 
-const PASS_GROUPS: Record<PassProductId, string> = Object.fromEntries(
-  PASS_PRODUCT_ORDER.map((id) => [id, `Up to ${PASS_PRODUCTS[id].basePeople} people`]),
-) as Record<PassProductId, string>;
+const LEGACY_BASE_PEOPLE: Record<PassProductId, number> = {
+  dynamic: MAX_PARTY_SIZE,
+};
+
+const PASS_GROUPS: Record<PassProductId, string> = {
+  dynamic: `A$15 first guest + A$5/extra (ages 6+, max ${MAX_PARTY_SIZE} per pass)`,
+};
 
 type ShareBonusRow = { extraDays: number; extraPeople: number; extraKids: number; description: string };
 
-const SHARE_BONUSES = Object.fromEntries(
-  PASS_PRODUCT_ORDER.map((id) => {
-    const sb = PASS_PRODUCTS[id].shareBonus;
-    return [
-      id,
-      {
-        extraDays: sb.extraDays ?? 0,
-        extraPeople: sb.extraPeople,
-        extraKids: 0,
-        description: sb.description,
-      } satisfies ShareBonusRow,
-    ];
-  }),
-) as Record<PassProductId, ShareBonusRow>;
+const SHARE_BONUSES: Record<PassProductId, ShareBonusRow> = {
+  dynamic: {
+    extraDays: 7,
+    extraPeople: 0,
+    extraKids: 0,
+    description: 'Share the app after purchase for 7 extra days free — 14 days of deals on your Holiday Pass.',
+  },
+};
+
+function toPassLang(language: string | undefined): Language {
+  return language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+}
+
+function bonusDaysPillLabel(lang: Language, days: number): string {
+  if (days === 7) return t('share.holiday_pill_days', lang);
+  return t('share.extra_days_pill_n', lang).replace('__N__', String(days));
+}
 
 /** LocalStorage keys for share CTA — covers legacy `weekly` receipts and semantic ids. */
 function passShareStorageKeys(raw: string): string[] {
@@ -173,14 +184,16 @@ async function invokeExtendPassWithRetry(
     }
 
     try {
-      // FIXED: No custom Authorization header — let the SDK handle it automatically
       const { data, error } = await supabase.functions.invoke('extend-pass', {
         body: {
           user_id: userId,
           share_proof: shareProof,
           platform: platform,
         },
-        // NO custom headers — SDK sends its own Authorization automatically
+        // Explicit auth header: avoids intermittent “missing Authorization” on some clients.
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
 
 
@@ -238,11 +251,24 @@ type ShareBonusApplied = { days: number; people: number; kids: number };
 const ShareCTA: React.FC<{
   passType: string;
   userId: string;
+  isHolidayPass: boolean;
+  /** Share-for-second-week applies only to extended (7-day) holiday purchases */
+  eligibleForShareProgram: boolean;
+  shareBonusAlreadyApplied: boolean;
   onBonusApplied?: (bonus: ShareBonusApplied) => void;
-}> = ({ passType, userId, onBonusApplied }) => {
+}> = ({
+  passType,
+  userId,
+  isHolidayPass,
+  eligibleForShareProgram,
+  shareBonusAlreadyApplied,
+  onBonusApplied,
+}) => {
   const { language } = useAppContext();
+  const passLang = toPassLang(language);
   const productId = passProductIdFromDb(passType);
   const [shareState, setShareState] = useState<'idle' | 'sharing' | 'success' | 'already-claimed' | 'error'>(() => {
+    if (shareBonusAlreadyApplied) return 'already-claimed';
     try {
       const stored = localStorage.getItem('stikmnek-shared-passes');
       if (stored) {
@@ -254,8 +280,14 @@ const ShareCTA: React.FC<{
   });
   const [retrying, setRetrying] = useState(false);
 
+  useEffect(() => {
+    if (shareBonusAlreadyApplied && shareState !== 'success') {
+      setShareState('already-claimed');
+    }
+  }, [shareBonusAlreadyApplied, shareState]);
+
   const bonus = productId ? SHARE_BONUSES[productId] : undefined;
-  if (!bonus) return null;
+  if (!isHolidayPass || !eligibleForShareProgram || !bonus) return null;
 
   const hasBonus = bonus.extraDays > 0 || bonus.extraPeople > 0 || bonus.extraKids > 0;
   if (!hasBonus) return null;
@@ -271,7 +303,7 @@ const ShareCTA: React.FC<{
 
   const formatBonusParts = (bd: number, bp: number, bk: number): string => {
     const parts: string[] = [];
-    if (bd > 0) parts.push(`+${bd} day${bd > 1 ? 's' : ''}`);
+    if (bd > 0) parts.push(bonusDaysPillLabel(passLang, bd));
     if (bp > 0) parts.push(`+${bp} people`);
     if (bk > 0) parts.push(`+${bk} kid${bk > 1 ? 's' : ''}`);
     return parts.join(', ');
@@ -283,6 +315,16 @@ const ShareCTA: React.FC<{
     errorBody: any,
     statusCode: number | null
   ) => {
+    if (!error && data?.success === false && (data?.share_bonus_ineligible || data?.code === 'no_active_pass')) {
+      const msg =
+        typeof data?.error === 'string'
+          ? data.error
+          : 'Share bonus is not available for this pass. It applies to 7-day holiday passes only.';
+      toast.info(msg, { duration: 6000 });
+      setShareState('idle');
+      return;
+    }
+
     if (!error && data?.success) {
       // ═══ SUCCESS ═══
       const bd = data.bonus?.days ?? bonus.extraDays;
@@ -329,10 +371,15 @@ const ShareCTA: React.FC<{
       return;
     }
 
-    // Generic server error
-    const errorMsg = errorBody?.error || error?.message || 'Unknown error';
+    // Generic server/network error
+    const errorMsg = errorBody?.error || errorBody?.message || error?.message || 'Unknown error';
     console.error('[ShareCTA] extend-pass failed:', errorMsg, { error, errorBody, statusCode });
-    toast.error('Shared successfully, but couldn\'t apply your bonus. Tap "Retry" to try again.', { duration: 6000 });
+    toast.error(
+      typeof errorMsg === 'string' && errorMsg.trim().length > 0
+        ? `Shared successfully, but couldn't apply your bonus: ${errorMsg}`
+        : 'Shared successfully, but couldn\'t apply your bonus. Tap \"Retry\" to try again.',
+      { duration: 7000 }
+    );
     markSharedLocally();
     setShareState('error');
   };
@@ -453,6 +500,7 @@ const ShareCTA: React.FC<{
   };
 
   const isCompleted = shareState === 'success' || shareState === 'already-claimed';
+  const celebratedPostShare = shareState === 'success';
 
   return (
     <div className={`mt-6 rounded-2xl overflow-hidden border transition-all duration-500 ${
@@ -476,12 +524,22 @@ const ShareCTA: React.FC<{
           </div>
           <div>
             <h3 className="text-white font-bold text-base">
-              {isCompleted ? 'Share Bonus Unlocked!' : 'Unlock Your Share Bonus!'}
+              {isCompleted
+                ? celebratedPostShare
+                  ? 'Share Bonus Unlocked!'
+                  : shareBonusAlreadyApplied
+                    ? 'Full discount window active'
+                    : 'Share bonus'
+                : 'Unlock Your Share Bonus!'}
             </h3>
             <p className="text-white/80 text-xs">
               {isCompleted
-                ? 'Your pass has been extended. Enjoy!'
-                : 'Share StikmNek with friends and earn free extras'}
+                ? celebratedPostShare
+                  ? 'Your pass has been extended. Enjoy!'
+                  : shareBonusAlreadyApplied
+                    ? 'Your receipt shows the full calendar range, including any bonus days from checkout.'
+                    : 'This share bonus was already applied to your pass.'
+                : t('share.holiday_cta_header_sub', passLang)}
             </p>
           </div>
         </div>
@@ -498,7 +556,7 @@ const ShareCTA: React.FC<{
                 : 'bg-amber-100 text-amber-800 border border-amber-200'
             }`}>
               <Calendar className="w-3.5 h-3.5" />
-              +{bonus.extraDays} free day{bonus.extraDays > 1 ? 's' : ''}
+              {bonusDaysPillLabel(passLang, bonus.extraDays)}
             </div>
           )}
           {bonus.extraPeople > 0 && (
@@ -525,8 +583,12 @@ const ShareCTA: React.FC<{
 
         <p className={`text-sm mb-4 ${isCompleted ? 'text-emerald-700' : 'text-gray-600'}`}>
           {isCompleted
-            ? 'Thanks for sharing! Your bonus has been applied to your pass.'
-            : bonus.description}
+            ? celebratedPostShare
+              ? 'Thanks for sharing! Your bonus has been applied to your pass.'
+              : shareBonusAlreadyApplied
+                ? 'You already have the longest discount window for this purchase. Open your pass anytime to see valid dates.'
+                : 'You have already claimed the share bonus for this pass.'
+            : t('share.holiday_card_subtext', passLang)}
         </p>
 
         {/* Share button or success state */}
@@ -610,6 +672,7 @@ const PaymentConfirmation: React.FC = () => {
   const { user, setCurrentView, language, userProfile, refreshUserProfile, refreshUserPass, authLoading } = useAppContext();
   const [payment, setPayment] = useState<PaymentResult | null>(null);
   const [showTouristProfileModal, setShowTouristProfileModal] = useState(false);
+  const [showPassPrefsDialog, setShowPassPrefsDialog] = useState(false);
   const [copied, setCopied] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -666,7 +729,7 @@ const PaymentConfirmation: React.FC = () => {
       }
       if (user.passPeopleCount != null && user.passPeopleCount !== prev.peopleCount) {
         next.peopleCount = user.passPeopleCount;
-        next.group = `Up to ${user.passPeopleCount} people`;
+        next.group = `${user.passPeopleCount} guests (ages 6+) · A$15 first + A$5/extra`;
         changed = true;
       }
       if (!changed) return prev;
@@ -686,13 +749,6 @@ const PaymentConfirmation: React.FC = () => {
     payment?.passType,
   ]);
 
-  const displayDayCount = React.useMemo(() => {
-    if (!payment) return 0;
-    const fromDates = inclusiveCalendarDaysBetween(payment.validFrom, payment.validUntil);
-    if (fromDates != null) return fromDates;
-    return payment.days ?? 0;
-  }, [payment?.validFrom, payment?.validUntil, payment?.days]);
-
   // After pass purchase: prompt tourists to complete demographic profile (once)
   useEffect(() => {
     if (!payment || !user?.id || authLoading) {
@@ -707,11 +763,44 @@ const PaymentConfirmation: React.FC = () => {
     setShowTouristProfileModal(!done);
   }, [payment, user?.id, user?.type, userProfile?.post_pass_profile_completed, authLoading]);
 
+  const dismissPassPrefsPrompt = useCallback(() => {
+    try {
+      if (payment?.receiptNumber) {
+        localStorage.setItem(passPrefsPromptStorageKey(payment.receiptNumber), '1');
+      }
+    } catch {
+      /* ignore */
+    }
+    setShowPassPrefsDialog(false);
+  }, [payment?.receiptNumber]);
+
+  // After tourist profile flow (or if already complete): offer to save pass defaults once per receipt
+  useEffect(() => {
+    if (!payment?.receiptNumber || !user?.id || authLoading) {
+      setShowPassPrefsDialog(false);
+      return;
+    }
+    if (user.type !== 'tourist') {
+      setShowPassPrefsDialog(false);
+      return;
+    }
+    if (showTouristProfileModal) {
+      setShowPassPrefsDialog(false);
+      return;
+    }
+    try {
+      if (localStorage.getItem(passPrefsPromptStorageKey(payment.receiptNumber))) return;
+    } catch {
+      return;
+    }
+    setShowPassPrefsDialog(true);
+  }, [payment?.receiptNumber, user?.id, user?.type, authLoading, showTouristProfileModal]);
+
   const handleShareBonusApplied = React.useCallback((bonus: ShareBonusApplied) => {
     setPayment((prev) => {
       if (!prev) return prev;
       const prevPid = passProductIdFromDb(prev.passType);
-      const basePeople = prevPid ? PASS_PRODUCTS[prevPid].basePeople : 4;
+      const basePeople = prevPid ? LEGACY_BASE_PEOPLE[prevPid] : MAX_PARTY_SIZE;
       const newPeople = (prev.peopleCount ?? basePeople) + (bonus.people ?? 0);
       const newValidUntil = addDaysToDate(prev.validUntil, bonus.days ?? 0) || prev.validUntil;
       const spanDays = inclusiveCalendarDaysBetween(prev.validFrom, newValidUntil);
@@ -721,7 +810,7 @@ const PaymentConfirmation: React.FC = () => {
         validUntil: newValidUntil,
         shareBonusApplied: true,
         days: spanDays ?? (prev.days ?? 0) + (bonus.days ?? 0),
-        group: `Up to ${newPeople} people`,
+        group: `${newPeople} guests (ages 6+) · A$15 first + A$5/extra`,
       };
       try {
         localStorage.setItem('lastPayment', JSON.stringify(updated));
@@ -809,26 +898,69 @@ const PaymentConfirmation: React.FC = () => {
   const passLabel = payment.passLabel || getPassDisplayTitle(payment.passType, language);
   const passGroup = payment.group || PASS_GROUPS[passProductId] || '';
   const shareBonusApplied = payment.shareBonusApplied ?? false;
-  const peopleCount = payment.peopleCount ?? PASS_PRODUCTS[passProductId].basePeople;
+  const peopleCount = payment.partySize ?? payment.peopleCount ?? LEGACY_BASE_PEOPLE[passProductId];
 
   const passIcons: Record<PassProductId, React.ReactNode> = {
-    family_explorer: <Zap className="w-6 h-6" />,
-    extended_group_adventure: <Star className="w-6 h-6" />,
-    ultimate_crew_experience: <Crown className="w-6 h-6" />,
-    mega_group_experience: <Crown className="w-6 h-6" />,
+    dynamic: <Ticket className="w-6 h-6" />,
   };
 
   const passColors: Record<PassProductId, string> = {
-    family_explorer: 'from-sky-500 to-blue-600',
-    extended_group_adventure: 'from-teal-500 to-emerald-600',
-    ultimate_crew_experience: 'from-orange-500 to-amber-600',
-    mega_group_experience: 'from-fuchsia-600 to-purple-700',
+    dynamic: 'from-teal-500 to-emerald-600',
   };
 
   const expiryDate = new Date(payment.expiresAt);
   const completedDate = new Date(payment.completedAt);
   const validFromDate = payment.validFrom ? new Date(payment.validFrom) : null;
   const validUntilDate = payment.validUntil ? new Date(payment.validUntil) : null;
+
+  const passMask = getHolidayPassMaskDisplay({
+    validFrom: payment.validFrom,
+    validUntil: payment.validUntil,
+    shareBonusApplied: payment.shareBonusApplied,
+    isExtendedPass: payment.isExtended ?? null,
+  });
+  const truthSpanDays = passMask.truthSpanDays || (payment.days ?? 0);
+  const isHolidayPass = passMask.isHolidayPass;
+  const showHolidayFirstWeekOnly = passMask.showFirstWeekOnly;
+  const receiptDiscountUntilStr = passMask.displayUntilDateStr;
+  const receiptDiscountDayCount = passMask.displayDayCount || (payment.days ?? 0);
+
+  const shareProgramEligible =
+    Boolean(payment.isExtended) || (payment.isExtended == null && truthSpanDays >= 7);
+
+  const receiptDiscountUntilDate =
+    receiptDiscountUntilStr && /^\d{4}-\d{2}-\d{2}$/.test(receiptDiscountUntilStr)
+      ? new Date(`${receiptDiscountUntilStr}T12:00:00`)
+      : validUntilDate;
+
+  const passDurationMainText = (() => {
+    if (!isHolidayPass) {
+      return truthSpanDays <= 1 ? '24 hours' : `${truthSpanDays} day${truthSpanDays === 1 ? '' : 's'}`;
+    }
+    if (shareBonusApplied) {
+      if (truthSpanDays >= 14) return '14 days (including bonus)';
+      if (truthSpanDays > 7) return `${truthSpanDays} days (including bonus)`;
+      return `${truthSpanDays} day${truthSpanDays === 1 ? '' : 's'} (including bonus)`;
+    }
+    return '7 days';
+  })();
+
+  const passLang = toPassLang(language);
+
+  const passDurationSubline = (() => {
+    if (!isHolidayPass) return null;
+    if (shareBonusApplied) return 'Includes bonus days from your share (or from checkout).';
+    return t('share.receipt_holiday_subline_pending', passLang);
+  })();
+
+  const receiptHeaderHolidayLine =
+    isHolidayPass && !shareBonusApplied
+      ? t('share.receipt_header_holiday_pending', passLang)
+      : isHolidayPass && shareBonusApplied
+        ? truthSpanDays >= 14
+          ? '14-day discount window (including share bonus)'
+          : 'Extended discount window (including share bonus)'
+        : null;
 
   const formatDateShort = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const formatDateLong = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' });
@@ -859,7 +991,7 @@ ITEM DETAILS
 ─────────────────────────────────────
 Pass: ${passLabel}
 Group: ${passGroup}
-Duration: ${displayDayCount || '?'} day(s)
+Duration: ${passDurationMainText}
 Valid for: ${peopleCount} people
 Share Bonus Applied: ${shareBonusApplied ? 'Yes' : 'No'}
 
@@ -867,7 +999,7 @@ Share Bonus Applied: ${shareBonusApplied ? 'Yes' : 'No'}
 DISCOUNT VALIDITY PERIOD
 ─────────────────────────────────────
 Valid From: ${validFromDate ? formatDateLong(validFromDate) : 'N/A'}
-Valid Until: ${validUntilDate ? formatDateLong(validUntilDate) : formatDateLong(expiryDate)}
+Valid Until: ${receiptDiscountUntilDate ? formatDateLong(receiptDiscountUntilDate) : formatDateLong(expiryDate)}
 
 ─────────────────────────────────────
 PAYMENT DETAILS
@@ -953,6 +1085,23 @@ Enjoy your deals in Vanuatu!
         </DialogContent>
       </Dialog>
 
+      {user?.id ? (
+        <PostPurchasePassPreferencesDialog
+          open={showPassPrefsDialog}
+          onOpenChange={(next) => {
+            if (!next) dismissPassPrefsPrompt();
+            else setShowPassPrefsDialog(true);
+          }}
+          language={language}
+          userId={user.id}
+          partySize={payment.partySize ?? 1}
+          isExtended={Boolean(payment.isExtended)}
+          onSaved={async () => {
+            await refreshUserProfile();
+          }}
+        />
+      ) : null}
+
       <div className="max-w-2xl mx-auto px-4 sm:px-6">
         {/* Success Animation */}
         <div className="text-center mb-8">
@@ -996,6 +1145,11 @@ Enjoy your deals in Vanuatu!
                       {passGroup}
                     </p>
                   )}
+                  {receiptHeaderHolidayLine && (
+                    <p className="text-white/85 text-[11px] mt-1.5 font-semibold leading-snug max-w-[14rem] sm:max-w-none">
+                      {receiptHeaderHolidayLine}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="text-right">
@@ -1025,11 +1179,16 @@ Enjoy your deals in Vanuatu!
             </div>
 
             {/* ═══ DISCOUNT VALIDITY DATE RANGE ═══ */}
-            <div className="p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200">
+            <div className="p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 ring-1 ring-teal-100/80">
               <div className="flex items-center gap-2 mb-3">
                 <CalendarRange className="w-5 h-5 text-teal-600" />
                 <span className="text-sm font-bold text-teal-800">Discount Validity Period</span>
               </div>
+              {showHolidayFirstWeekOnly && (
+                <p className="text-[11px] font-semibold text-teal-700 mb-2 -mt-1">
+                  Showing your included first week of deal access (7 days)
+                </p>
+              )}
               <div className="flex items-center gap-3">
                 <div className="flex-1 bg-white rounded-lg p-3 border border-teal-200 shadow-sm">
                   <p className="text-[10px] text-gray-400 font-semibold uppercase">Valid From</p>
@@ -1039,14 +1198,16 @@ Enjoy your deals in Vanuatu!
                 </div>
                 <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
                   <div className="px-3 py-1 rounded-full bg-teal-600 text-white text-[10px] font-bold shadow-sm">
-                    {displayDayCount || '?'} day{displayDayCount > 1 ? 's' : ''}
+                    {receiptDiscountDayCount || '?'} day{receiptDiscountDayCount !== 1 ? 's' : ''}
                   </div>
                   <div className="w-8 h-0.5 bg-teal-300 rounded-full" />
                 </div>
                 <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200 shadow-sm">
                   <p className="text-[10px] text-gray-400 font-semibold uppercase">Valid Until</p>
                   <p className="text-sm font-bold text-gray-900 mt-0.5">
-                    {validUntilDate ? formatDateShort(validUntilDate) : formatDateShort(expiryDate)}
+                    {receiptDiscountUntilDate
+                      ? formatDateShort(receiptDiscountUntilDate)
+                      : formatDateShort(expiryDate)}
                   </p>
                 </div>
               </div>
@@ -1078,15 +1239,15 @@ Enjoy your deals in Vanuatu!
                 <p className="text-xs text-gray-400">{completedDate.toLocaleTimeString()}</p>
               </div>
 
-              <div className="p-4 rounded-xl bg-gray-50">
+              <div className="p-4 rounded-xl bg-gray-50 ring-1 ring-teal-100/60">
                 <div className="flex items-center gap-2 mb-2">
-                  <Clock className="w-4 h-4 text-gray-400" />
-                  <span className="text-xs text-gray-400 font-medium">Pass Duration</span>
+                  <Clock className="w-4 h-4 text-teal-600" />
+                  <span className="text-xs text-gray-500 font-semibold">Pass Duration</span>
                 </div>
                 <p className="text-sm font-semibold text-gray-900">
-                  {displayDayCount || '?'} day{displayDayCount > 1 ? 's' : ''}
-                  {shareBonusApplied && (
-                    <span className="block text-xs font-medium text-emerald-600 mt-0.5">Includes Share Bonus days</span>
+                  {passDurationMainText}
+                  {passDurationSubline && (
+                    <span className="block text-xs font-medium text-teal-700 mt-1 leading-snug">{passDurationSubline}</span>
                   )}
                 </p>
               </div>
@@ -1195,6 +1356,9 @@ Enjoy your deals in Vanuatu!
           <ShareCTA
             passType={payment.passType}
             userId={user.id}
+            isHolidayPass={isHolidayPass}
+            eligibleForShareProgram={shareProgramEligible}
+            shareBonusAlreadyApplied={shareBonusApplied}
             onBonusApplied={handleShareBonusApplied}
           />
         )}

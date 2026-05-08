@@ -10,6 +10,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
+import {
+  calculatePassPriceAud,
+  dynamicPassInclusiveDays,
+  parsePartySizeAndExtended,
+  validUntilOffsetDays,
+} from '../_shared/pricingDynamic.ts';
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
@@ -99,17 +105,6 @@ async function getAuthUser(
 }
 
 const SUPERSTAR_PRICE_AUD = 5.0;
-
-// Pass configuration (keep in sync with pricing.ts and paypal-capture)
-const PASS_DAYS: Record<DbPassType, number> = { daily: 1, weekly: 6, monthly: 6, mega_group: 7 };
-const PASS_MAX_PEOPLE: Record<DbPassType, number> = { daily: 4, weekly: 4, monthly: 7, mega_group: 20 };
-const PASS_PRICES_AUD: Record<DbPassType, number> = { daily: 15, weekly: 45, monthly: 99, mega_group: 199 };
-const SHARE_BONUS: Record<DbPassType, { extraPeople: number; extraDays: number }> = {
-  daily: { extraPeople: 2, extraDays: 0 },
-  weekly: { extraPeople: 2, extraDays: 1 },
-  monthly: { extraPeople: 1, extraDays: 1 },
-  mega_group: { extraPeople: 0, extraDays: 5 },
-};
 
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T00:00:00');
@@ -254,26 +249,13 @@ Deno.serve(async (req) => {
         }, 501);
       }
 
-      const rawPassType = String(body?.passType ?? body?.pass_type ?? '').trim();
       const startDate = body?.startDate ?? body?.start_date;
-
-      const passTypeDb = normalizePassTypeToDb(rawPassType);
-      if (!passTypeDb) {
-        const hint =
-          rawPassType === '' ? '(empty)' : JSON.stringify(rawPassType);
-        return errorResponse(req, `Missing or invalid passType: ${hint}`, 400, {
-          reason: 'invalid_pass_type',
-          receivedPassType: rawPassType === '' ? null : rawPassType,
-        });
-      }
 
       if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
         return errorResponse(req, 'Missing or invalid startDate (YYYY-MM-DD)', 400);
       }
 
       // ─── Server-side: start date must not be before today's calendar date (UTC) ───
-      // Compare date-only fields at UTC midnight so behavior is stable regardless of
-      // Edge runtime region; YYYY-MM-DD is appended as Z to avoid local-TZ parsing quirks.
       const startMs = utcStartOfCalendarDayMs(startDate);
       if (Number.isNaN(startMs)) {
         return errorResponse(req, 'Missing or invalid startDate (YYYY-MM-DD)', 400);
@@ -282,7 +264,6 @@ Deno.serve(async (req) => {
       if (startMs < todayStartMs) {
         return errorResponse(req, 'Purchase start date cannot be in the past.', 400);
       }
-      // Latest allowed first day of pass: today + 30 calendar days (UTC midnight boundaries).
       const maxStartMs = utcAddCalendarDays(todayStartMs, 30);
       if (startMs > maxStartMs) {
         return errorResponse(
@@ -292,32 +273,33 @@ Deno.serve(async (req) => {
         );
       }
 
-      const passType = passTypeDb;
-      const baseDays = PASS_DAYS[passType] ?? 1;
-      const baseMaxPeople = PASS_MAX_PEOPLE[passType] ?? 4;
-      const amount = PASS_PRICES_AUD[passType] ?? 0;
+      const parsed = parsePartySizeAndExtended(body as Record<string, unknown>);
+      if (!parsed) {
+        return errorResponse(req, 'Missing or invalid partySize (integer 1–6)', 400, {
+          reason: 'invalid_party_size',
+        });
+      }
+      const { partySize, isExtended } = parsed;
+      const amount = calculatePassPriceAud(partySize, isExtended);
+      const passTypeDb: DbPassType = 'dynamic';
 
-      // If the user unlocked share bonus before purchase, apply it automatically and consume the flag.
-      let applyShareBonus = false;
-      try {
-        const { data: profileRow } = await supabase
+      let grantSecondWeek = false;
+      if (isExtended) {
+        const { data: profRow, error: profErr } = await supabase
           .from('user_profiles')
           .select('share_bonus_unlocked')
           .eq('user_id', authUser.id)
           .maybeSingle();
-        applyShareBonus = Boolean(profileRow?.share_bonus_unlocked);
-      } catch {}
+        if (profErr) console.error('process-card-payment: profile share flag', profErr);
+        grantSecondWeek = !!(profRow as { share_bonus_unlocked?: boolean } | null)?.share_bonus_unlocked;
+      }
 
-      const bonus = SHARE_BONUS[passType] ?? { extraPeople: 0, extraDays: 0 };
-      const days = applyShareBonus ? (baseDays + (bonus.extraDays || 0)) : baseDays;
-      const maxPeople = applyShareBonus ? (baseMaxPeople + (bonus.extraPeople || 0)) : baseMaxPeople;
-
-      // MOCK charge: in production you would call a real gateway here (Stripe/PayPal).
-      // For now we assume the card charge succeeded if we reached this point.
-
+      const maxPeople = partySize;
       const validFrom = startDate;
-      const validUntil = addDays(startDate, days);
+      const validUntil = addDays(startDate, validUntilOffsetDays(isExtended, grantSecondWeek));
       const expiresAt = endOfDayDate(validUntil);
+      const inclusiveDays = dynamicPassInclusiveDays(isExtended, grantSecondWeek);
+      const shareBonusApplied = isExtended && grantSecondWeek;
       const receiptNumber = body?.receiptNumber ?? `STK-${Date.now().toString(36).toUpperCase()}`;
 
       // ─── Idempotency: payment_transaction_id / client idempotency key (stored in payment_session_id) ───
@@ -356,7 +338,9 @@ Deno.serve(async (req) => {
             success: true,
             idempotentReplay: true,
             receiptNumber: `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
-            passType: semanticPassIdFromDb(normalizePassTypeToDb(String(ep.pass_type ?? '')) ?? passType),
+            passType: semanticPassIdFromDb(
+              (normalizePassTypeToDb(String(ep.pass_type ?? '')) ?? 'dynamic') as DbPassType,
+            ),
             amount: Number(ep.amount_paid) || amount,
             currency: (ep.currency as string) || 'AUD',
             expiresAt: exAt,
@@ -378,7 +362,7 @@ Deno.serve(async (req) => {
         valid_until: validUntil,
         expires_at: expiresAt,
         max_people: maxPeople,
-        share_bonus_applied: applyShareBonus,
+        share_bonus_applied: shareBonusApplied,
         amount_paid: amount,
         currency: 'AUD',
         payment_provider: 'card-mock',
@@ -393,6 +377,23 @@ Deno.serve(async (req) => {
         .single();
 
       if (insertErr) {
+        if (
+          typeof insertErr.message === 'string' &&
+          insertErr.message.includes('passes_pass_type_check')
+        ) {
+          console.error(
+            'process-card-payment: passes.pass_type does not allow `dynamic`. Apply migration 20260505180000_ensure_passes_pass_type_dynamic (or 20260504120000_add_dynamic_pass_type).',
+          );
+          return errorResponse(
+            req,
+            'Pass could not be saved: database needs the latest pass type update. Please contact support or apply Supabase migrations, then retry.',
+            500,
+            {
+              reason: 'pass_type_constraint',
+              postgresCode: insertErr.code ?? null,
+            },
+          );
+        }
         // Unique violation: concurrent insert with same idempotency key — return existing row.
         if (insertErr.code === '23505' && rawTxnId) {
           const { data: racedPass } = await supabase
@@ -415,7 +416,9 @@ Deno.serve(async (req) => {
               success: true,
               idempotentReplay: true,
               receiptNumber: `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
-              passType: semanticPassIdFromDb(normalizePassTypeToDb(String(ep.pass_type ?? '')) ?? passType),
+              passType: semanticPassIdFromDb(
+              (normalizePassTypeToDb(String(ep.pass_type ?? '')) ?? 'dynamic') as DbPassType,
+            ),
               amount: Number(ep.amount_paid) || amount,
               currency: (ep.currency as string) || 'AUD',
               expiresAt: exAt,
@@ -435,25 +438,27 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (applyShareBonus) {
-        // Consume the pre-purchase share bonus so it can't be reused.
-        await supabase
+      if (grantSecondWeek) {
+        const { error: clrErr } = await supabase
           .from('user_profiles')
           .update({ share_bonus_unlocked: false, updated_at: new Date().toISOString() })
           .eq('user_id', authUser.id);
+        if (clrErr) console.error('process-card-payment: clear share_bonus_unlocked', clrErr);
       }
 
       return jsonResponse(req, {
         success: true,
         receiptNumber,
-        passType: semanticPassIdFromDb(passType),
+        passType: semanticPassIdFromDb(passTypeDb),
+        passLabel: 'StikmNek Pass',
         amount,
         currency: 'AUD',
         expiresAt,
         validFrom,
         validUntil,
-        days,
-        shareBonusApplied: applyShareBonus,
+        days: inclusiveDays,
+        shareBonusApplied,
+        group: `Up to ${partySize} people (ages 6+)`,
         sessionId: insertedPass?.id ?? receiptNumber,
         purchasedAt: insertedPass?.purchased_at ?? new Date().toISOString(),
         paymentTransactionId: paymentTxnId,

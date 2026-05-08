@@ -13,7 +13,14 @@ import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { effectiveBusinessCoords } from '@/lib/urlHelpers';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
-import MarkerClusterGroup from 'react-leaflet-cluster';
+import MarkerClusterGroupImport from 'react-leaflet-cluster';
+
+/** CJS default interop: some production bundles expose `{ default: Component }` as the namespace object (#130: invalid element type object). */
+const MarkerClusterGroup = (
+  typeof MarkerClusterGroupImport === 'function'
+    ? MarkerClusterGroupImport
+    : (MarkerClusterGroupImport as { default?: unknown }).default
+) as typeof MarkerClusterGroupImport;
 
 type RadiusFilter = 'all' | 500 | 1000 | 5000;
 

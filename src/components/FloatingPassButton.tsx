@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { getPassDisplayTitle, type PassProductId } from '@/data/pricing';
+import { getPassDisplayTitle } from '@/data/pricing';
+import type { PassProductId } from '@/data/passCatalog';
 import { QrCode, X, Calendar, Shield, Ticket, Copy, Check, ChevronUp } from 'lucide-react';
 
 const FloatingPassButton: React.FC = () => {
@@ -22,33 +23,15 @@ const FloatingPassButton: React.FC = () => {
   if (currentView === 'checkout' || currentView === 'payment-confirmation' || currentView === 'admin') return null;
 
   const passColors: Record<PassProductId, { gradient: string; bg: string; border: string; shadow: string }> = {
-    family_explorer: {
-      gradient: 'from-sky-500 to-blue-600',
-      bg: 'bg-sky-50',
-      border: 'border-sky-200',
-      shadow: 'shadow-sky-300/50',
-    },
-    extended_group_adventure: {
+    dynamic: {
       gradient: 'from-teal-500 to-emerald-600',
       bg: 'bg-teal-50',
       border: 'border-teal-200',
       shadow: 'shadow-teal-300/50',
     },
-    ultimate_crew_experience: {
-      gradient: 'from-orange-500 to-amber-600',
-      bg: 'bg-orange-50',
-      border: 'border-orange-200',
-      shadow: 'shadow-orange-300/50',
-    },
-    mega_group_experience: {
-      gradient: 'from-fuchsia-600 to-purple-700',
-      bg: 'bg-fuchsia-50',
-      border: 'border-fuchsia-200',
-      shadow: 'shadow-fuchsia-300/50',
-    },
   };
 
-  const colors = passColors[user.pass] || passColors.extended_group_adventure;
+  const colors = passColors[user.pass] ?? passColors.dynamic;
   const passTitle = getPassDisplayTitle(user.pass, language);
 
   /** QR encodes only the pass UUID — verify-redemption loads holder name + validity from DB. */

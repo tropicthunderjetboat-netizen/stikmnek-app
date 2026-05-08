@@ -8,14 +8,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
-import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
-
-const PASS_PRICES_AUD: Record<DbPassType, number> = {
-  daily: 15,
-  weekly: 45,
-  monthly: 99,
-  mega_group: 199,
-};
+import { semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
+import { calculatePassPriceAud, parsePartySizeAndExtended } from '../_shared/pricingDynamic.ts';
 
 async function getPayPalAccessToken(sandbox: boolean): Promise<string> {
   const clientId = Deno.env.get('PAYPAL_CLIENT_ID');
@@ -79,20 +73,20 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const rawPassType = String(body?.passType ?? body?.pass_type ?? '').trim();
-    const passTypeDb = normalizePassTypeToDb(rawPassType);
     const startDate = body?.startDate ?? body?.start_date;
     const returnUrl = body?.returnUrl ?? body?.return_url;
     const cancelUrl = body?.cancelUrl ?? body?.cancel_url;
+    const parsed = parsePartySizeAndExtended(body as Record<string, unknown>);
 
-    if (!passTypeDb || !startDate) {
-      return errorResponse('Missing passType or startDate', 400);
+    if (!startDate) {
+      return errorResponse('Missing startDate', 400);
     }
-
-    const amount = PASS_PRICES_AUD[passTypeDb];
-    if (amount == null) {
-      return errorResponse('Invalid passType', 400);
+    if (!parsed) {
+      return errorResponse('Missing or invalid partySize (1-6) or isExtended', 400);
     }
+    const { partySize, isExtended } = parsed;
+    const passTypeDb: DbPassType = 'dynamic';
+    const amount = calculatePassPriceAud(partySize, isExtended);
 
     const mode = (Deno.env.get('PAYPAL_MODE') ?? Deno.env.get('PAYPAL_SANDBOX') ?? 'sandbox').toString().toLowerCase();
     const sandbox = mode !== 'live' && mode !== 'production' && mode !== 'false';
@@ -104,12 +98,12 @@ Deno.serve(async (req) => {
       intent: 'CAPTURE',
       purchase_units: [
         {
-          reference_id: `pass_${passTypeDb}_${startDate}`,
+          reference_id: `pass_dynamic_${partySize}p_${isExtended ? '7d' : '1d'}_${startDate}`,
           amount: {
             currency_code: 'AUD',
             value: amount.toFixed(2),
           },
-          description: `StikmNek ${semanticId} pass — valid from ${startDate}`,
+          description: `StikmNek Pass — ${partySize} pax (${isExtended ? '7d' : '24h'}) from ${startDate}`,
         },
       ],
       application_context: {
@@ -155,6 +149,8 @@ Deno.serve(async (req) => {
       amount,
       currency: 'AUD',
       passType: semanticId,
+      partySize,
+      isExtended,
       startDate,
     });
   } catch (err: any) {

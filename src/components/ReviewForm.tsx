@@ -7,6 +7,7 @@ import { t } from '@/data/translations';
 
 interface ReviewFormProps {
   businessId: string;
+  offeringId?: string | null;
   businessName?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -47,6 +48,7 @@ function formatExpiry(value: string): string {
 
 const ReviewForm: React.FC<ReviewFormProps> = ({
   businessId,
+  offeringId = null,
   businessName,
   onSuccess,
   onCancel,
@@ -232,7 +234,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     try {
       // Standard 1-5: rating is 1-5. Superstar: rating is 6 (after purchase). Pass as-is.
       const wasSuperStar = rating === 6;
-      await submitReview(businessId, rating, comment.trim(), wasSuperStar);
+      await submitReview(businessId, rating, comment.trim(), wasSuperStar, offeringId);
       setSubmitted(true);
       setLastSubmittedSuperStar(wasSuperStar);
       setRating(0);

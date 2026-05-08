@@ -1,0 +1,255 @@
+{
+  "generatedAt": "2026-04-26T03:21:36.153Z",
+  "totals": {
+    "rawKB": 2559.01,
+    "gzipKB": 662.32
+  },
+  "files": [
+    {
+      "name": "index-BIknOnJs.js",
+      "type": "js",
+      "rawKB": 392.86,
+      "gzipKB": 109.44
+    },
+    {
+      "name": "vendor-maps-C8Nnydqj.js",
+      "type": "js",
+      "rawKB": 323.59,
+      "gzipKB": 99.09
+    },
+    {
+      "name": "vendor-recharts-Bmo-MrcG.js",
+      "type": "js",
+      "rawKB": 385.65,
+      "gzipKB": 98.88
+    },
+    {
+      "name": "vendor-quill-D20DCDsS.js",
+      "type": "js",
+      "rawKB": 230.92,
+      "gzipKB": 51.58
+    },
+    {
+      "name": "vendor-supabase-BkHEX4Nk.js",
+      "type": "js",
+      "rawKB": 181.79,
+      "gzipKB": 46.73
+    },
+    {
+      "name": "BusinessOwnerDashboard-CwvC3WXv.js",
+      "type": "js",
+      "rawKB": 180.25,
+      "gzipKB": 40.06
+    },
+    {
+      "name": "vendor-radix-D1m1kmPi.js",
+      "type": "js",
+      "rawKB": 81.04,
+      "gzipKB": 26.57
+    },
+    {
+      "name": "index-CjN0ZTAg.css",
+      "type": "css",
+      "rawKB": 155.75,
+      "gzipKB": 21.95
+    },
+    {
+      "name": "AdminPanel-Jccj6-2h.js",
+      "type": "js",
+      "rawKB": 73.63,
+      "gzipKB": 14.88
+    },
+    {
+      "name": "BusinessListingForm-BkV0d_CW.js",
+      "type": "js",
+      "rawKB": 50.85,
+      "gzipKB": 14.59
+    },
+    {
+      "name": "BusinessDetail-cYprr-EB.js",
+      "type": "js",
+      "rawKB": 49.23,
+      "gzipKB": 13.52
+    },
+    {
+      "name": "vendor-icons-Du9sDogc.js",
+      "type": "js",
+      "rawKB": 35.88,
+      "gzipKB": 12.09
+    },
+    {
+      "name": "dist-DofN1Jk8.js",
+      "type": "js",
+      "rawKB": 31.05,
+      "gzipKB": 8.87
+    },
+    {
+      "name": "HelpCenter-5CJT5wNL.js",
+      "type": "js",
+      "rawKB": 27.49,
+      "gzipKB": 8.72
+    },
+    {
+      "name": "DiagnosticPanel-DrT8psgy.js",
+      "type": "js",
+      "rawKB": 30.68,
+      "gzipKB": 8.54
+    },
+    {
+      "name": "PaymentCheckout-Dxx6e0DA.js",
+      "type": "js",
+      "rawKB": 31.18,
+      "gzipKB": 8.03
+    },
+    {
+      "name": "vendor-react-l3jbFVAC.js",
+      "type": "js",
+      "rawKB": 21.01,
+      "gzipKB": 7.74
+    },
+    {
+      "name": "AdminUserManager-BE0gUZiN.js",
+      "type": "js",
+      "rawKB": 31.72,
+      "gzipKB": 7.03
+    },
+    {
+      "name": "utils-Yrrq4t-K.js",
+      "type": "js",
+      "rawKB": 20.19,
+      "gzipKB": 6.87
+    },
+    {
+      "name": "Dashboard-Dw0keX8u.js",
+      "type": "js",
+      "rawKB": 28.1,
+      "gzipKB": 6.51
+    },
+    {
+      "name": "AdminPurchaseOverview-DSftn6Sa.js",
+      "type": "js",
+      "rawKB": 24.66,
+      "gzipKB": 6.04
+    },
+    {
+      "name": "MapView-C4RrU9R8.js",
+      "type": "js",
+      "rawKB": 22.11,
+      "gzipKB": 5.76
+    },
+    {
+      "name": "EmailNotificationCenter-DajK-bLj.js",
+      "type": "js",
+      "rawKB": 22,
+      "gzipKB": 5.39
+    },
+    {
+      "name": "EmailReceiptManager-CqFcMxrR.js",
+      "type": "js",
+      "rawKB": 20.67,
+      "gzipKB": 4.76
+    },
+    {
+      "name": "PassEditor-BsOsgRvx.js",
+      "type": "js",
+      "rawKB": 25.29,
+      "gzipKB": 4.58
+    },
+    {
+      "name": "vendor-quill-CTQaZtmg.css",
+      "type": "css",
+      "rawKB": 21.49,
+      "gzipKB": 3.4
+    },
+    {
+      "name": "DashboardAnalytics-Dyt-OiUm.js",
+      "type": "js",
+      "rawKB": 13.13,
+      "gzipKB": 3.04
+    },
+    {
+      "name": "PricingDiscountFields-BeKNfZjZ.js",
+      "type": "js",
+      "rawKB": 10.59,
+      "gzipKB": 2.89
+    },
+    {
+      "name": "perf-B4poWHcm.js",
+      "type": "js",
+      "rawKB": 6.46,
+      "gzipKB": 2.73
+    },
+    {
+      "name": "PricingTiersEditor-By-gTiO1.js",
+      "type": "js",
+      "rawKB": 7,
+      "gzipKB": 2.61
+    },
+    {
+      "name": "errorLogger-D1oOKVxG.js",
+      "type": "js",
+      "rawKB": 6.41,
+      "gzipKB": 2.16
+    },
+    {
+      "name": "supabase-CXHBEU8S.js",
+      "type": "js",
+      "rawKB": 3.63,
+      "gzipKB": 1.62
+    },
+    {
+      "name": "BusinessDetailMap-xOEPQCf5.js",
+      "type": "js",
+      "rawKB": 2.08,
+      "gzipKB": 1.08
+    },
+    {
+      "name": "pricing-DZSbVjwr.js",
+      "type": "js",
+      "rawKB": 2.78,
+      "gzipKB": 0.95
+    },
+    {
+      "name": "urlHelpers-DRQKKR0H.js",
+      "type": "js",
+      "rawKB": 2.21,
+      "gzipKB": 0.87
+    },
+    {
+      "name": "BusinessDescriptionEditor-Bpou8Y3A.js",
+      "type": "js",
+      "rawKB": 1.32,
+      "gzipKB": 0.63
+    },
+    {
+      "name": "vendor-query-wDcdqt4D.js",
+      "type": "js",
+      "rawKB": 0.88,
+      "gzipKB": 0.55
+    },
+    {
+      "name": "LazyBusinessDescriptionEditor-CMxTek48.js",
+      "type": "js",
+      "rawKB": 1,
+      "gzipKB": 0.53
+    },
+    {
+      "name": "rolldown-runtime-BYbx6iT9.js",
+      "type": "js",
+      "rawKB": 0.81,
+      "gzipKB": 0.46
+    },
+    {
+      "name": "vendor-maps-d9yiDMe6.css",
+      "type": "css",
+      "rawKB": 1.17,
+      "gzipKB": 0.37
+    },
+    {
+      "name": "offeringPhotoPartition-C93KClmV.js",
+      "type": "js",
+      "rawKB": 0.46,
+      "gzipKB": 0.23
+    }
+  ]
+}

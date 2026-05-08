@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Store, Loader2, AlertCircle, Globe } from 'lucide-react';
+import { Store, Loader2, AlertCircle, Globe, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,18 @@ import PhotoUploader, { type UploadedPhoto } from '@/components/PhotoUploader';
 import LocationMapPicker from '@/components/LocationMapPicker';
 import WebsiteUrlInput from '@/components/WebsiteUrlInput';
 import { parseLatLngFromMapUrl, normalizeWebsiteForStorage } from '@/lib/urlHelpers';
+import { validateBusinessProfileOnboarding } from '@/lib/businessOnboardingValidation';
+import OnboardingSteps from '@/components/OnboardingSteps';
+
+/** Maps `validateBusinessProfileOnboarding` error keys → local `errors` state keys used by this form. */
+const PROFILE_VALIDATION_KEY_TO_FORM: Record<string, string> = {
+  businessName: 'businessName',
+  ownerName: 'ownerName',
+  email: 'businessEmail',
+  phone: 'businessPhone',
+  whatsapp: 'whatsappNumber',
+  address: 'address',
+};
 
 const CompleteBusinessProfile: React.FC = () => {
   const {
@@ -60,22 +72,36 @@ const CompleteBusinessProfile: React.FC = () => {
     setAddress((userProfile.business_location || '').trim());
   }, [userProfile, user]);
 
-  const validate = () => {
-    const e: Record<string, string> = {};
-    if (!businessName.trim()) e.businessName = 'Required';
-    if (!ownerName.trim()) e.ownerName = 'Required';
-    if (!businessEmail.trim() || !businessEmail.includes('@')) e.businessEmail = 'Valid email required';
-    if (!businessPhone.trim()) e.businessPhone = 'Required';
-    if (!whatsappNumber.trim()) e.whatsappNumber = 'Required';
-    if (!address.trim()) e.address = 'Required';
-    setErrors(e);
-    return Object.keys(e).length === 0;
+  /**
+   * Client-side profile validation (on submit only).
+   * Rules live in `@/lib/businessOnboardingValidation` so listing/dashboard flows stay aligned.
+   */
+  const runProfileValidation = (): boolean => {
+    const { valid, errors: validationErrors } = validateBusinessProfileOnboarding({
+      businessName,
+      ownerName,
+      email: businessEmail,
+      phone: businessPhone,
+      whatsapp: whatsappNumber,
+      address,
+    });
+    if (valid) {
+      setErrors({});
+      return true;
+    }
+    const next: Record<string, string> = {};
+    for (const [key, message] of Object.entries(validationErrors)) {
+      const formKey = PROFILE_VALIDATION_KEY_TO_FORM[key];
+      if (formKey && message) next[formKey] = message;
+    }
+    setErrors(next);
+    return false;
   };
 
   const handleSubmit = async (ev: React.FormEvent) => {
     ev.preventDefault();
     if (!user?.id) return;
-    if (!validate()) {
+    if (!runProfileValidation()) {
       toast.error(
         language === 'en' ? 'Please fix the errors below.' : language === 'fr' ? 'Corrigez les erreurs ci-dessous.' : 'Fiksem ol erro',
       );
@@ -92,7 +118,9 @@ const CompleteBusinessProfile: React.FC = () => {
         description: '',
         description_fr: '',
         description_bi: '',
+        // `image` is deprecated for listings, but kept as fallback for older reads.
         image: logoUrl,
+        logo_url: logoUrl,
         discount: '',
         original_price: 0,
         deal_price: 0,
@@ -175,6 +203,10 @@ const CompleteBusinessProfile: React.FC = () => {
 
   if (!user?.id) return null;
 
+  const handleExitForNow = () => {
+    setCurrentView('home');
+  };
+
   const copy = businessOnboardingResume
     ? {
         title:
@@ -209,11 +241,32 @@ const CompleteBusinessProfile: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-b from-white to-emerald-50/40 pt-20 pb-16">
       <div className="max-w-xl mx-auto px-4">
         <div className="bg-white rounded-2xl border border-emerald-100 shadow-lg overflow-hidden">
-          <div className="p-6 sm:p-8 bg-gradient-to-r from-emerald-600 to-teal-700 text-white">
+          <div className="relative p-6 sm:p-8 bg-gradient-to-r from-emerald-600 to-teal-700 text-white">
+            <button
+              type="button"
+              onClick={handleExitForNow}
+              className="absolute right-4 top-4 sm:right-6 sm:top-6 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/25 transition hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              aria-label={
+                language === 'en'
+                  ? 'Exit and finish later'
+                  : language === 'fr'
+                    ? 'Quitter et terminer plus tard'
+                    : 'Go aot, finisim bihain'
+              }
+              title={
+                language === 'en'
+                  ? 'Exit — you can resume from My dashboard when you are ready'
+                  : language === 'fr'
+                    ? 'Quitter — reprenez depuis Mon tableau de bord quand vous voulez'
+                    : 'Go aot — yu ken go hed long dashboard taem yu redi'
+              }
+            >
+              <X className="h-5 w-5" strokeWidth={2.25} />
+            </button>
             <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-3">
               <Store className="w-6 h-6" />
             </div>
-            <h1 className="text-2xl font-extrabold">{copy.title}</h1>
+            <h1 className="text-2xl font-extrabold pr-12">{copy.title}</h1>
             <p className="text-white/80 text-sm mt-1">{copy.subtitle}</p>
           </div>
 
@@ -237,6 +290,15 @@ const CompleteBusinessProfile: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-4">
+            <div className="mb-6 border-b border-emerald-100/90 pb-6 sm:mb-8 sm:pb-8">
+              <OnboardingSteps
+                currentStep={2}
+                completedSteps={[1]}
+                variant="default"
+                language={language}
+              />
+            </div>
+
             <div>
               <Label htmlFor="cbp-business-name">
                 {language === 'en' ? 'Business name' : language === 'fr' ? "Nom de l'entreprise" : 'Nem blong bisnis'}
@@ -400,24 +462,46 @@ const CompleteBusinessProfile: React.FC = () => {
               </div>
             )}
 
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-95"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  {language === 'en' ? 'Saving…' : language === 'fr' ? 'Enregistrement…' : 'Sevem…'}
-                </>
-              ) : language === 'en' ? (
-                'Save & continue'
-              ) : language === 'fr' ? (
-                'Enregistrer et continuer'
-              ) : (
-                'Sevem mo go'
-              )}
-            </Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={submitting}
+                onClick={handleExitForNow}
+                className="w-full sm:w-auto shrink-0 border-emerald-200 text-emerald-800 hover:bg-emerald-50"
+              >
+                {language === 'en'
+                  ? 'Finish later'
+                  : language === 'fr'
+                    ? 'Terminer plus tard'
+                    : 'Finisim bihain'}
+              </Button>
+              <Button
+                type="submit"
+                disabled={submitting}
+                className="w-full sm:min-w-[12rem] sm:flex-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-95"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {language === 'en' ? 'Saving…' : language === 'fr' ? 'Enregistrement…' : 'Sevem…'}
+                  </>
+                ) : language === 'en' ? (
+                  'Save & continue'
+                ) : language === 'fr' ? (
+                  'Enregistrer et continuer'
+                ) : (
+                  'Sevem mo go'
+                )}
+              </Button>
+            </div>
+            <p className="text-center text-xs text-gray-500">
+              {language === 'en'
+                ? 'You can return anytime — open My dashboard and we will prompt you to finish setup.'
+                : language === 'fr'
+                  ? 'Revenez quand vous voulez : ouvrez Mon tableau de bord pour reprendre la configuration.'
+                  : 'Yu ken kam bak eni taem — openem dashboard bae i askem yu blong finisim setapem.'}
+            </p>
           </form>
         </div>
       </div>

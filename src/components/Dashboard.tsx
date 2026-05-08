@@ -1,42 +1,100 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { getPassDisplayTitle, type PassProductId } from '@/data/pricing';
+import { getPassDisplayTitle } from '@/data/pricing';
+import type { PassProductId } from '@/data/passCatalog';
 import { t } from '@/data/translations';
 import { businesses as localBusinesses } from '@/data/businesses';
+import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import { partyCountsFromTouristProfile, computeRedemptionSavingsForListing } from '@/lib/redemptionSavings';
+import { APPROX_VTU_PER_AUD, approximateVatuFromAud } from '@/lib/passValueDisplay';
+import type { Business } from '@/data/businesses';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 import {
   Ticket, Heart, History, QrCode, Calendar, ChevronRight, Wifi,
   LayoutDashboard, TrendingUp, BarChart3,
-  MapPin, Star, Zap, Target, Clock, Flame,
+  MapPin, Star, Zap, Target, Clock, Flame, Users, Share2, Loader2, Pencil,
+  Wallet, Sparkles, PartyPopper,
 } from 'lucide-react';
 
 import QRCodeDisplay from './QRCodeDisplay';
 
 type DashboardTab = 'overview' | 'analytics';
 
+function resolveListingForRedemption(
+  r: { businessId: string; offeringId: string | null },
+  listings: Business[],
+): Business | undefined {
+  if (r.offeringId) {
+    const byOffering = listings.find((b) => b.id === r.offeringId);
+    if (byOffering) return byOffering;
+  }
+  return listings.find((b) => profileBusinessIdFor(b) === r.businessId);
+}
+
 const Dashboard: React.FC = () => {
   const {
-    language, user, favorites, redemptions, setSelectedBusiness, setCurrentView, dbBusinesses,
-    refreshRedemptions,
+    language, user, userProfile, favorites, redemptions, setSelectedBusiness, setCurrentView, dbBusinesses,
+    refreshRedemptions, purchasePass, refreshUserPass,
   } = useAppContext();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+  const [shareBusy, setShareBusy] = useState(false);
 
   useEffect(() => {
     void refreshRedemptions();
-  }, [refreshRedemptions]);
-
-  if (!user) return null;
+    void refreshUserPass();
+  }, [refreshRedemptions, refreshUserPass]);
 
   const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
   const favBizs = allBusinesses.filter(b => favorites.includes(b.id));
-  const totalSaved = redemptions.reduce((sum, r) => sum + r.saved, 0);
+
+  const party = useMemo(() => partyCountsFromTouristProfile(userProfile), [userProfile]);
+
+  /** When `saved_amount` was missing in DB (legacy redemptions), estimate from listing + profile party. */
+  const redemptionsForAnalytics = useMemo(() => {
+    return redemptions.map((r) => {
+      if (r.saved > 0) return r;
+      const listing = resolveListingForRedemption(r, allBusinesses);
+      if (!listing) return r;
+      const { savedAmount } = computeRedemptionSavingsForListing(
+        {
+          pricing_tiers: listing.pricingTiers ?? null,
+          original_price: listing.originalPrice,
+          deal_price: listing.dealPrice,
+        },
+        party,
+      );
+      return savedAmount > 0 ? { ...r, saved: savedAmount } : r;
+    });
+  }, [redemptions, allBusinesses, party]);
+
+  const totalSaved = useMemo(
+    () => redemptionsForAnalytics.reduce((sum, r) => sum + r.saved, 0),
+    [redemptionsForAnalytics],
+  );
+
+  const passVtApprox = useMemo(() => {
+    const aud = user?.passAmountPaidAud;
+    if (aud == null || !Number.isFinite(aud) || aud <= 0) return null;
+    return approximateVatuFromAud(aud);
+  }, [user?.passAmountPaidAud]);
+
+  const netSavingsVsPassVtApprox =
+    passVtApprox != null ? totalSaved - passVtApprox : null;
+
+  /** Deal savings in VT strictly exceed approximate pass cost — show celebration. */
+  const isPassCostBeaten =
+    netSavingsVsPassVtApprox != null && netSavingsVsPassVtApprox > 0;
 
   // Analytics data
   const analytics = useMemo(() => {
-    const uniqueBusinesses = new Set(redemptions.map(r => r.businessId));
+    const uniqueBusinesses = new Set(redemptionsForAnalytics.map(r => r.businessId));
     const categoryBreakdown: Record<string, { count: number; saved: number }> = {};
 
-    redemptions.forEach(r => {
-      const biz = allBusinesses.find(b => b.id === r.businessId);
+    redemptionsForAnalytics.forEach(r => {
+      const biz = resolveListingForRedemption(r, allBusinesses) ??
+        allBusinesses.find((b) => profileBusinessIdFor(b) === r.businessId);
       if (biz) {
         if (!categoryBreakdown[biz.category]) {
           categoryBreakdown[biz.category] = { count: 0, saved: 0 };
@@ -53,16 +111,19 @@ const Dashboard: React.FC = () => {
 
     // Most visited businesses
     const bizVisitCount: Record<string, number> = {};
-    redemptions.forEach(r => {
+    redemptionsForAnalytics.forEach(r => {
       bizVisitCount[r.businessId] = (bizVisitCount[r.businessId] || 0) + 1;
     });
     const topBusinesses = Object.entries(bizVisitCount)
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
-      .map(([id, count]) => ({ business: allBusinesses.find(b => b.id === id), count }));
+      .map(([id, count]) => ({
+        business: allBusinesses.find((b) => profileBusinessIdFor(b) === id),
+        count,
+      }));
 
     // Streak calculation
-    const dates = [...new Set(redemptions.map(r => r.date))].sort().reverse();
+    const dates = [...new Set(redemptionsForAnalytics.map(r => r.date))].sort().reverse();
     let streak = 0;
     for (let i = 0; i < dates.length; i++) {
       const expected = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
@@ -74,17 +135,15 @@ const Dashboard: React.FC = () => {
       uniqueBusinesses: uniqueBusinesses.size,
       topCategories,
       topBusinesses,
-      avgSavingsPerDeal: redemptions.length > 0 ? totalSaved / redemptions.length : 0,
+      avgSavingsPerDeal:
+        redemptionsForAnalytics.length > 0 ? totalSaved / redemptionsForAnalytics.length : 0,
       streak,
-      totalDeals: redemptions.length,
+      totalDeals: redemptionsForAnalytics.length,
     };
-  }, [redemptions, allBusinesses, totalSaved]);
+  }, [redemptionsForAnalytics, allBusinesses, totalSaved]);
 
   const passColors: Record<PassProductId, string> = {
-    family_explorer: 'from-sky-500 to-blue-600',
-    extended_group_adventure: 'from-teal-500 to-emerald-600',
-    ultimate_crew_experience: 'from-orange-500 to-amber-600',
-    mega_group_experience: 'from-fuchsia-600 to-purple-700',
+    dynamic: 'from-teal-500 to-emerald-600',
   };
 
   const categoryLabels: Record<string, string> = {
@@ -109,6 +168,127 @@ const Dashboard: React.FC = () => {
     overview: { en: 'Overview', fr: 'Aperçu', bi: 'Ovaviu' },
     analytics: { en: 'My Analytics', fr: 'Mes analyses', bi: 'Analitiks blong mi' },
   };
+
+  const holidayPassUi = useMemo(
+    () =>
+      getHolidayPassMaskDisplay({
+        validFrom: user?.passValidFrom,
+        validUntil: user?.passValidUntil,
+        shareBonusApplied: user?.shareBonusApplied,
+        isExtendedPass: null,
+      }),
+    [user?.passValidFrom, user?.passValidUntil, user?.shareBonusApplied],
+  );
+
+  const displayPassExpiryLabel =
+    user && holidayPassUi.showFirstWeekOnly
+      ? holidayPassUi.displayUntilDateStr || user.passExpiry
+      : user?.passExpiry;
+
+  const fmtPassDate = useCallback(
+    (isoDate: string | null | undefined) => {
+      if (!isoDate) return '-';
+      const d = String(isoDate).slice(0, 10);
+      const loc = language === 'fr' ? 'fr-FR' : 'en-US';
+      return new Date(`${d}T12:00:00`).toLocaleDateString(loc, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    },
+    [language],
+  );
+
+  const passLang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+
+  const handleUnlockSecondWeek = useCallback(async () => {
+    if (!user?.id || shareBusy) return;
+    setShareBusy(true);
+    try {
+      let shareSucceeded = false;
+      const shareData = {
+        title: 'StikmNek',
+        text: t('share.holiday_navigator_body', passLang),
+        url: typeof window !== 'undefined' ? window.location.origin : '',
+      };
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+          shareSucceeded = true;
+        } catch (e: unknown) {
+          const name = e && typeof e === 'object' && 'name' in e ? String((e as { name?: string }).name) : '';
+          if (name === 'AbortError') {
+            setShareBusy(false);
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+            shareSucceeded = true;
+            toast.success('Link copied — claiming bonus…');
+          } catch {
+            toast.error('Could not share or copy link.');
+            return;
+          }
+        }
+      } else {
+        try {
+          await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+          shareSucceeded = true;
+          toast.success('Link copied — claiming bonus…');
+        } catch {
+          toast.error('Could not copy link.');
+          return;
+        }
+      }
+      if (!shareSucceeded) return;
+
+      const { data, error } = await supabase.functions.invoke('extend-pass', {
+        body: {
+          user_id: user!.id,
+          share_proof: `dash_${Date.now()}_passcard`,
+          platform: 'dashboard',
+        },
+      });
+      if (error) {
+        toast.error(typeof error.message === 'string' ? error.message : 'Could not apply bonus');
+        return;
+      }
+      const d = data as {
+        success?: boolean;
+        already_claimed?: boolean;
+        share_bonus_ineligible?: boolean;
+        code?: string;
+        error?: string;
+        bonus?: { days?: number };
+      };
+      if (d?.share_bonus_ineligible || d?.code === 'no_active_pass') {
+        toast.info(d.error || 'Share bonus is only available on a 7-day holiday pass.');
+        return;
+      }
+      if (d?.already_claimed) {
+        toast.info('Share bonus already applied.');
+        await refreshUserPass();
+        return;
+      }
+      if (d?.success) {
+        const bd = d.bonus?.days ?? 0;
+        if (bd > 0) {
+          toast.success('Second week unlocked!');
+        } else {
+          toast.info(d.error || 'No bonus applied for this pass.');
+        }
+        await refreshUserPass();
+        return;
+      }
+      toast.error(d?.error ?? 'Could not apply bonus');
+    } finally {
+      setShareBusy(false);
+    }
+  }, [user?.id, shareBusy, refreshUserPass, passLang]);
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20 pb-16">
@@ -180,12 +360,45 @@ const Dashboard: React.FC = () => {
                 <p className="text-2xl font-bold text-gray-900">{redemptions.length}</p>
                 <p className="text-xs text-gray-500">{language === 'en' ? 'Redeemed' : language === 'fr' ? 'Utilisés' : 'Yusim'}</p>
               </div>
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 shadow-sm border border-green-100 text-left">
-                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mb-2">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
+              <div
+                className={`rounded-xl p-4 text-left shadow-sm ${
+                  isPassCostBeaten
+                    ? 'border-2 border-amber-300/80 bg-gradient-to-br from-amber-50 via-emerald-50 to-teal-50 shadow-md shadow-emerald-100/70 ring-1 ring-fuchsia-200/40'
+                    : totalSaved > 0
+                      ? 'border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50'
+                      : 'border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50'
+                }`}
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <div
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                      totalSaved > 0
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm'
+                        : 'bg-green-100'
+                    }`}
+                  >
+                    <TrendingUp className={`h-5 w-5 ${totalSaved > 0 ? 'text-white' : 'text-green-600'}`} />
+                  </div>
+                  {isPassCostBeaten && (
+                    <Sparkles className="h-5 w-5 text-amber-500" aria-hidden />
+                  )}
                 </div>
-                <p className="text-2xl font-bold text-green-700">{totalSaved.toLocaleString()}<span className="text-xs font-semibold text-green-500 ml-1">VT</span></p>
-                <p className="text-xs text-green-600 font-medium">
+                <p className="text-2xl font-black tracking-tight">
+                  {totalSaved > 0 ? (
+                    <>
+                      <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                        {totalSaved.toLocaleString()}
+                      </span>
+                      <span className="ml-1 text-sm font-bold text-teal-600/90">VT</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-green-700">0</span>
+                      <span className="ml-1 text-xs font-semibold text-green-500">VT</span>
+                    </>
+                  )}
+                </p>
+                <p className="text-xs font-semibold text-emerald-800">
                   {language === 'en' ? 'Total saved (redemptions)' : language === 'fr' ? 'Total économisé (utilisations)' : 'Total sevem (redim)'}
                 </p>
               </div>
@@ -200,7 +413,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   {user.pass ? (
                     <div className="p-5">
-                      <div className={`relative bg-gradient-to-r ${passColors[user.pass] || passColors.extended_group_adventure} rounded-2xl p-6 text-white overflow-hidden`}>
+                      <div className={`relative bg-gradient-to-r ${passColors[user.pass] ?? passColors.dynamic} rounded-2xl p-6 text-white overflow-hidden`}>
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-8 translate-x-8" />
                         <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-6 -translate-x-6" />
                         <div className="relative">
@@ -209,27 +422,75 @@ const Dashboard: React.FC = () => {
                             <QrCode className="w-6 h-6 text-white/80" />
                           </div>
                           <h4 className="text-2xl font-bold mb-1 leading-snug">{user.pass ? getPassDisplayTitle(user.pass, language) : ''}</h4>
+                          {holidayPassUi.isHolidayPass && (
+                            <p className="text-xs font-bold text-white/90 mb-1">
+                              {holidayPassUi.showFirstWeekOnly
+                                ? t('share.dashboard_coverage_pill', passLang)
+                                : language === 'fr'
+                                  ? `${holidayPassUi.truthSpanDays} jours (bonus inclus)`
+                                  : language === 'bi'
+                                    ? `${holidayPassUi.truthSpanDays} dei (bonus)`
+                                    : `${holidayPassUi.truthSpanDays} days (bonus included)`}
+                            </p>
+                          )}
                           <div className="flex items-center gap-4 text-sm text-white/80">
-                            <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{language === 'en' ? 'Expires: ' : 'Expire: '}{user.passExpiry}</span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {language === 'en' ? 'Expires: ' : language === 'fr' ? 'Expire le : ' : 'Expire: '}
+                              {fmtPassDate(displayPassExpiryLabel ?? null)}
+                            </span>
                           </div>
                           {(user.passValidFrom || user.passValidUntil) && (
-                            <div className="mt-3 p-3 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20">
+                            <div className="mt-3 p-3 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20 ring-1 ring-white/10">
                               <p className="text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1.5">
                                 {language === 'en' ? 'Discount Validity Period' : language === 'fr' ? 'Période de validité' : 'Taem blong Diskount'}
                               </p>
+                              {holidayPassUi.showFirstWeekOnly && (
+                                <p className="text-[10px] font-semibold text-white/85 mb-1.5">
+                                  {t('share.dashboard_week1_validity', passLang)}
+                                </p>
+                              )}
                               <div className="flex items-center gap-3 text-sm">
                                 <div className="flex-1">
                                   <p className="text-[10px] text-white/60">{language === 'en' ? 'Valid From' : language === 'fr' ? 'Valide du' : 'Stat'}</p>
-                                  <p className="font-bold text-white">{user.passValidFrom ? new Date(user.passValidFrom + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</p>
+                                  <p className="font-bold text-white">{fmtPassDate(user.passValidFrom)}</p>
                                 </div>
                                 <div className="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-bold">
                                   {language === 'en' ? 'to' : language === 'fr' ? 'au' : 'go'}
                                 </div>
                                 <div className="flex-1 text-right">
                                   <p className="text-[10px] text-white/60">{language === 'en' ? 'Valid Until' : language === 'fr' ? 'Valide jusqu\'au' : 'Finis'}</p>
-                                  <p className="font-bold text-white">{user.passValidUntil ? new Date(user.passValidUntil + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</p>
+                                  <p className="font-bold text-white">
+                                    {fmtPassDate(
+                                      holidayPassUi.showFirstWeekOnly
+                                        ? holidayPassUi.displayUntilDateStr
+                                        : user.passValidUntil,
+                                    )}
+                                  </p>
                                 </div>
                               </div>
+                            </div>
+                          )}
+                          {holidayPassUi.isHolidayPass && holidayPassUi.showFirstWeekOnly && (
+                            <div className="mt-3">
+                              <button
+                                type="button"
+                                onClick={() => void handleUnlockSecondWeek()}
+                                disabled={shareBusy}
+                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/20 hover:bg-white/30 border border-white/30 text-white text-sm font-bold backdrop-blur-sm disabled:opacity-60 transition-colors"
+                              >
+                                {shareBusy ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    {language === 'fr' ? 'Partage…' : language === 'bi' ? 'Serem…' : 'Sharing…'}
+                                  </>
+                                ) : (
+                                  <>
+                                    <Share2 className="w-4 h-4" />
+                                    {t('share.dashboard_unlock_button', passLang)}
+                                  </>
+                                )}
+                              </button>
                             </div>
                           )}
                           <div className="mt-3 flex items-center gap-2">
@@ -242,7 +503,11 @@ const Dashboard: React.FC = () => {
                   ) : (
                     <div className="p-8 text-center">
                       <p className="text-gray-400 mb-4">{t('dash.nopass', language)}</p>
-                      <button onClick={() => setCurrentView('passes')} className="px-6 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => void purchasePass()}
+                        className="px-6 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors"
+                      >
                         {t('hero.cta', language)}
                       </button>
                     </div>
@@ -253,7 +518,7 @@ const Dashboard: React.FC = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                   <div className="p-5 border-b border-gray-100 flex items-center justify-between">
                     <h3 className="font-bold text-gray-900 flex items-center gap-2"><History className="w-5 h-5 text-purple-600" />{t('dash.history', language)}</h3>
-                    {redemptions.length > 0 && (
+                    {redemptionsForAnalytics.length > 0 && (
                       <button
                         type="button"
                         onClick={() => setActiveTab('analytics')}
@@ -264,13 +529,15 @@ const Dashboard: React.FC = () => {
                       </button>
                     )}
                   </div>
-                  {redemptions.length > 0 ? (
+                  {redemptionsForAnalytics.length > 0 ? (
                     <div className="divide-y divide-gray-100">
-                      {redemptions.slice(0, 5).map((r, i) => {
-                        const biz = allBusinesses.find(b => b.id === r.businessId);
+                      {redemptionsForAnalytics.slice(0, 5).map((r, i) => {
+                        const biz =
+                          resolveListingForRedemption(r, allBusinesses) ??
+                          allBusinesses.find((b) => profileBusinessIdFor(b) === r.businessId);
                         if (!biz) return null;
                         return (
-                          <div key={i} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                          <div key={`${r.businessId}-${r.date}-${i}`} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors cursor-pointer"
                             onClick={() => { setSelectedBusiness(biz); setCurrentView('business-detail'); }}>
                             <img src={biz.image} alt={biz.name} className="w-12 h-12 rounded-xl object-cover" />
                             <div className="flex-1 min-w-0">
@@ -285,13 +552,13 @@ const Dashboard: React.FC = () => {
                           </div>
                         );
                       })}
-                      {redemptions.length > 5 && (
+                      {redemptionsForAnalytics.length > 5 && (
                         <button
                           type="button"
                           onClick={() => setActiveTab('analytics')}
                           className="w-full p-3 text-center text-sm text-teal-600 font-semibold hover:bg-teal-50 transition-colors"
                         >
-                          {language === 'en' ? `More stats (${redemptions.length} redemptions)` : language === 'fr' ? `Plus de stats (${redemptions.length})` : `Moa stats (${redemptions.length})`}
+                          {language === 'en' ? `More stats (${redemptionsForAnalytics.length} redemptions)` : language === 'fr' ? `Plus de stats (${redemptionsForAnalytics.length})` : `Moa stats (${redemptionsForAnalytics.length})`}
                         </button>
                       )}
                     </div>
@@ -309,7 +576,51 @@ const Dashboard: React.FC = () => {
                   <QRCodeDisplay />
                 )}
 
-                {/* Savings quick glance → analytics */}
+                {/* Travel party — profile drives checkout party size */}
+                {user.type === 'tourist' && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="p-5 border-b border-gray-100">
+                      <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                        <Users className="w-5 h-5 text-teal-600" />
+                        {language === 'en'
+                          ? 'Your travel party'
+                          : language === 'fr'
+                            ? 'Votre groupe de voyage'
+                            : 'Grup blong travel'}
+                      </h3>
+                    </div>
+                    <div className="p-5">
+                      <p className="text-xs text-gray-500 mb-4">
+                        {language === 'en'
+                          ? 'Checkout uses this headcount (ages 6+) from your profile — update it anytime before you buy a pass.'
+                          : language === 'fr'
+                            ? 'Le paiement utilise ces voyageurs (6 ans et +) depuis votre profil.'
+                            : 'Checkout i yusim namba long profil blong yu (6+).'}
+                      </p>
+                      <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4 space-y-2 mb-4">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">{language === 'en' ? 'Adults' : language === 'fr' ? 'Adultes' : 'Adult'}</span>
+                          <span className="font-bold text-gray-900">{userProfile?.num_adults ?? '—'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">
+                            {language === 'en' ? 'Children (6+)' : language === 'fr' ? 'Enfants (6+)' : 'Pikinini (6+)'}
+                          </span>
+                          <span className="font-bold text-gray-900">{userProfile?.num_children ?? '—'}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentView('complete-profile')}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors"
+                      >
+                        <Pencil className="w-4 h-4" />
+                        {language === 'en' ? 'Edit profile' : language === 'fr' ? 'Modifier le profil' : 'Edit profil'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {totalSaved > 0 && (
                   <button
                     type="button"
@@ -386,15 +697,40 @@ const Dashboard: React.FC = () => {
         {activeTab === 'analytics' && (
           <div className="space-y-6">
             {/* Analytics Header */}
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white relative overflow-hidden">
+            <div
+              className={`rounded-2xl p-6 text-white relative overflow-hidden ${
+                isPassCostBeaten
+                  ? 'bg-gradient-to-r from-violet-600 via-fuchsia-600 to-amber-500 shadow-lg shadow-fuchsia-300/30'
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600'
+              }`}
+            >
               <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-24 translate-x-24" />
+              {isPassCostBeaten && (
+                <Sparkles className="absolute top-4 right-20 w-6 h-6 text-yellow-200/90 animate-pulse" aria-hidden />
+              )}
               <div className="relative flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center">
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                    isPassCostBeaten ? 'bg-white/25 ring-2 ring-white/40' : 'bg-white/15'
+                  }`}
+                >
                   <BarChart3 className="w-7 h-7" />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold">{language === 'en' ? 'Your Travel Analytics' : 'Vos analyses de voyage'}</h2>
-                  <p className="text-white/70 text-sm">{language === 'en' ? 'Insights into your StikmNek activity' : 'Aperçu de votre activité StikmNek'}</p>
+                  <p className="text-white/80 text-sm">
+                    {isPassCostBeaten
+                      ? language === 'en'
+                        ? 'Your deal savings are ahead of your pass — keep stacking the wins!'
+                        : language === 'fr'
+                          ? 'Vos économies dépassent le pass — continuez comme ça !'
+                          : 'Sevin i win long pass — go hed!'
+                      : language === 'en'
+                        ? 'Insights into your StikmNek activity'
+                        : language === 'fr'
+                          ? 'Aperçu de votre activité StikmNek'
+                          : 'Lukim wetem yu bin du long StikmNek'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -408,12 +744,38 @@ const Dashboard: React.FC = () => {
                 <p className="text-2xl font-bold text-gray-900">{analytics.uniqueBusinesses}</p>
                 <p className="text-xs text-gray-500">{language === 'en' ? 'Places Visited' : 'Lieux visités'}</p>
               </div>
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center mb-2">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
+              <div
+                className={`rounded-xl p-4 shadow-sm border ${
+                  analytics.totalDeals > 0
+                    ? 'border-emerald-200/90 bg-gradient-to-br from-emerald-50 via-white to-teal-50 shadow-md shadow-emerald-100/60'
+                    : 'border-gray-100 bg-white'
+                }`}
+              >
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 ${
+                    analytics.totalDeals > 0 ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm' : 'bg-green-50'
+                  }`}
+                >
+                  <TrendingUp className={`w-5 h-5 ${analytics.totalDeals > 0 ? 'text-white' : 'text-green-600'}`} />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{analytics.avgSavingsPerDeal > 0 ? Math.round(analytics.avgSavingsPerDeal).toLocaleString() : '0'}<span className="text-xs text-gray-400 ml-1">VT</span></p>
-                <p className="text-xs text-gray-500">{language === 'en' ? 'Avg. Savings/Deal' : 'Écon. moy./offre'}</p>
+                <p className="text-2xl font-black tracking-tight">
+                  {analytics.totalDeals > 0 ? (
+                    <>
+                      <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                        {Math.round(analytics.avgSavingsPerDeal).toLocaleString()}
+                      </span>
+                      <span className="text-sm font-bold text-teal-600/80 ml-1">VT</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-gray-900">0</span>
+                      <span className="text-xs text-gray-400 ml-1">VT</span>
+                    </>
+                  )}
+                </p>
+                <p className={`text-xs font-semibold ${analytics.totalDeals > 0 ? 'text-emerald-800' : 'text-gray-500'}`}>
+                  {language === 'en' ? 'Avg. Savings/Deal' : 'Écon. moy./offre'}
+                </p>
               </div>
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                 <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center mb-2">
@@ -422,21 +784,189 @@ const Dashboard: React.FC = () => {
                 <p className="text-2xl font-bold text-gray-900">{analytics.streak}</p>
                 <p className="text-xs text-gray-500">{language === 'en' ? 'Day Streak' : 'Jours consécutifs'}</p>
               </div>
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mb-2">
-                  <Zap className="w-5 h-5 text-purple-600" />
+              <div
+                className={`rounded-xl p-4 shadow-sm border ${
+                  isPassCostBeaten
+                    ? 'border-amber-200 bg-gradient-to-br from-amber-50 via-fuchsia-50/40 to-violet-50 shadow-md shadow-amber-100/80'
+                    : 'border-gray-100 bg-white'
+                }`}
+              >
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 ${
+                    isPassCostBeaten ? 'bg-gradient-to-br from-amber-400 to-fuchsia-600 text-white' : 'bg-purple-50'
+                  }`}
+                >
+                  <Zap className={`w-5 h-5 ${isPassCostBeaten ? 'text-white' : 'text-purple-600'}`} />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{analytics.totalDeals}</p>
-                <p className="text-xs text-gray-500">{language === 'en' ? 'Total Deals Used' : 'Total offres utilisées'}</p>
+                <p
+                  className={`text-2xl font-black ${isPassCostBeaten ? 'text-fuchsia-800' : 'text-gray-900'}`}
+                >
+                  {analytics.totalDeals}
+                </p>
+                <p className={`text-xs font-semibold ${isPassCostBeaten ? 'text-amber-900/80' : 'text-gray-500'}`}>
+                  {language === 'en'
+                    ? 'Total Deals Used'
+                    : language === 'fr'
+                      ? 'Total offres utilisées'
+                      : 'Total deals'}
+                </p>
               </div>
             </div>
+
+            {(user.passId || (user.passAmountPaidAud ?? 0) > 0 || totalSaved > 0) && (
+              <div
+                className={`relative rounded-2xl overflow-hidden ${
+                  isPassCostBeaten
+                    ? 'border-2 border-amber-300/90 shadow-xl shadow-amber-200/50 ring-1 ring-fuchsia-300/30'
+                    : 'border border-emerald-100 shadow-sm'
+                } bg-white`}
+              >
+                <div
+                  className={`relative border-b p-5 ${
+                    isPassCostBeaten
+                      ? 'border-white/25 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white'
+                      : 'border-emerald-50 bg-emerald-50/50'
+                  }`}
+                >
+                  {isPassCostBeaten && (
+                    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-t-2xl" aria-hidden>
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+                        <span
+                          key={i}
+                          className={`absolute top-4 h-2 w-2 rounded-sm opacity-90 animate-confetti-drift ${
+                            i % 3 === 0 ? 'bg-amber-200' : i % 3 === 1 ? 'bg-white' : 'bg-fuchsia-200'
+                          }`}
+                          style={{
+                            left: `${6 + ((i * 17) % 88)}%`,
+                            animationDelay: `${i * 0.1}s`,
+                            animationDuration: `${2.1 + (i % 4) * 0.25}s`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <div className="relative z-[1] flex flex-wrap items-start justify-between gap-3">
+                    <h3 className="font-bold flex items-center gap-2 text-lg">
+                      {isPassCostBeaten ? (
+                        <PartyPopper className="h-6 w-6 shrink-0 text-amber-200" aria-hidden />
+                      ) : (
+                        <Wallet className={`h-5 w-5 shrink-0 ${isPassCostBeaten ? '' : 'text-emerald-700'}`} />
+                      )}
+                      <span className={isPassCostBeaten ? 'drop-shadow-sm' : 'text-gray-900'}>
+                        {language === 'en'
+                          ? isPassCostBeaten
+                            ? 'You beat the pass cost!'
+                            : 'Pass vs deal savings'
+                          : language === 'fr'
+                            ? isPassCostBeaten
+                              ? 'Le pass est amorti !'
+                              : 'Pass et économies'
+                            : isPassCostBeaten
+                              ? 'Yu win long pem blong pass!'
+                              : 'Pass mo sevin long deals'}
+                      </span>
+                    </h3>
+                    {isPassCostBeaten && (
+                      <Sparkles className="h-8 w-8 shrink-0 text-yellow-200 animate-pulse" aria-hidden />
+                    )}
+                  </div>
+                  {isPassCostBeaten && (
+                    <p className="relative z-[1] mt-2 text-sm font-semibold text-white/95 animate-celebration-rise drop-shadow">
+                      {language === 'en'
+                        ? 'Every VT here is holiday money back in your pocket — epic work!'
+                        : language === 'fr'
+                          ? 'Chaque VT compte : bravo pour vos économies !'
+                          : 'Ol VT ia i helpem pocket blong yu — gudfala wok!'}
+                    </p>
+                  )}
+                  <p
+                    className={`relative z-[1] text-xs leading-relaxed ${
+                      isPassCostBeaten ? 'mt-2 text-white/85' : 'mt-1.5 text-gray-600'
+                    }`}
+                  >
+                    {language === 'en'
+                      ? `Illustrative only: pass payments are in ${user.passCurrency || 'AUD'}; deal savings are in VT. We use about ${APPROX_VTU_PER_AUD} VT per 1 AUD so you can compare — not a bank rate.`
+                      : language === 'fr'
+                        ? `À titre indicatif : paiement du pass en ${user.passCurrency || 'AUD'}, économies en VT (~${APPROX_VTU_PER_AUD} VT pour 1 AUD).`
+                        : `Ol namba ia i rid guides nomo — pass i pem long ${user.passCurrency || 'AUD'}, deals long VT (~${APPROX_VTU_PER_AUD} VT / 1 AUD).`}
+                  </p>
+                </div>
+                <div className={`space-y-4 p-5 text-sm ${isPassCostBeaten ? 'bg-gradient-to-b from-emerald-50/90 via-white to-amber-50/40' : ''}`}>
+                  {(user.passAmountPaidAud ?? 0) > 0 ? (
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <span className="shrink-0 text-gray-600">
+                        {language === 'en' ? 'Pass price paid' : language === 'fr' ? 'Prix du pass' : 'Pem blong pass'}
+                      </span>
+                      <div className="text-right sm:max-w-[60%]">
+                        <p className="font-semibold text-gray-900">
+                          {(user.passCurrency || 'AUD') === 'AUD'
+                            ? `A$${Number(user.passAmountPaidAud).toFixed(2)}`
+                            : `${user.passCurrency || 'AUD'} ${Number(user.passAmountPaidAud).toFixed(2)}`}
+                        </p>
+                        {passVtApprox != null && (
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {language === 'en' ? '≈' : '≈'} {passVtApprox.toLocaleString()} VT
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      {language === 'en'
+                        ? 'Pass purchase amount will show here after your next checkout syncs.'
+                        : language === 'fr'
+                          ? 'Le montant payé pour le pass apparaîtra après le prochain paiement.'
+                          : 'Pem blong pass bae i kam afta checkout i sink.'}
+                    </p>
+                  )}
+                  <div className="flex flex-col gap-2 border-t border-gray-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="font-medium text-gray-700">
+                      {language === 'en' ? 'Deal savings (redemptions)' : language === 'fr' ? 'Économies (offres)' : 'Sevin long deals'}
+                    </span>
+                    <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-xl font-black text-transparent">
+                      {totalSaved.toLocaleString()} VT
+                    </span>
+                  </div>
+                  {netSavingsVsPassVtApprox != null && (
+                    <div className="flex flex-col gap-2 border-t border-gray-200/80 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="font-medium text-gray-800">
+                        {language === 'en'
+                          ? 'Approx. balance (savings − pass in VT)'
+                          : language === 'fr'
+                            ? 'Solde indicatif (économies − pass en VT)'
+                            : 'Balans rid (sevin − pass long VT)'}
+                      </span>
+                      {isPassCostBeaten ? (
+                        <div className="animate-savings-glow rounded-xl bg-white/90 px-4 py-2 text-center shadow-inner ring-2 ring-emerald-400/40 sm:text-right">
+                          <span className="block bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 bg-clip-text text-2xl font-black text-transparent">
+                            +{netSavingsVsPassVtApprox.toLocaleString()} VT
+                          </span>
+                          <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-emerald-700/90">
+                            {language === 'en' ? 'Ahead of your pass' : language === 'fr' ? 'Au-delà du pass' : 'Antap long pass'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span
+                          className={`text-lg font-black ${
+                            netSavingsVsPassVtApprox >= 0 ? 'text-emerald-700' : 'text-amber-700'
+                          }`}
+                        >
+                          {netSavingsVsPassVtApprox >= 0 ? '+' : ''}
+                          {netSavingsVsPassVtApprox.toLocaleString()} VT
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Category Breakdown */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="p-5 border-b border-gray-100">
                 <h3 className="font-bold text-gray-900 flex items-center gap-2">
                   <Target className="w-5 h-5 text-indigo-600" />
-                  {language === 'en' ? 'Spending by Category' : 'Dépenses par catégorie'}
+                  {language === 'en' ? 'Savings by category' : 'Économies par catégorie'}
                 </h3>
               </div>
               <div className="p-5">
@@ -457,7 +987,9 @@ const Dashboard: React.FC = () => {
                                 <p className="text-[10px] text-gray-400">{data.count} {language === 'en' ? 'deals' : 'offres'}</p>
                               </div>
                             </div>
-                            <p className="text-sm font-bold text-green-600">{data.saved.toLocaleString()} VT</p>
+                            <p className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-base font-extrabold text-transparent">
+                              {data.saved.toLocaleString()} VT
+                            </p>
                           </div>
                           <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                             <div className={`h-full rounded-full bg-gradient-to-r ${categoryColors[cat] || 'from-gray-400 to-gray-600'} transition-all duration-700`} style={{ width: `${pct}%` }} />
