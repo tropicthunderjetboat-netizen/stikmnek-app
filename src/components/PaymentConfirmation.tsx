@@ -184,14 +184,16 @@ async function invokeExtendPassWithRetry(
     }
 
     try {
-      // FIXED: No custom Authorization header — let the SDK handle it automatically
       const { data, error } = await supabase.functions.invoke('extend-pass', {
         body: {
           user_id: userId,
           share_proof: shareProof,
           platform: platform,
         },
-        // NO custom headers — SDK sends its own Authorization automatically
+        // Explicit auth header: avoids intermittent “missing Authorization” on some clients.
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       });
 
 
@@ -369,10 +371,15 @@ const ShareCTA: React.FC<{
       return;
     }
 
-    // Generic server error
-    const errorMsg = errorBody?.error || error?.message || 'Unknown error';
+    // Generic server/network error
+    const errorMsg = errorBody?.error || errorBody?.message || error?.message || 'Unknown error';
     console.error('[ShareCTA] extend-pass failed:', errorMsg, { error, errorBody, statusCode });
-    toast.error('Shared successfully, but couldn\'t apply your bonus. Tap "Retry" to try again.', { duration: 6000 });
+    toast.error(
+      typeof errorMsg === 'string' && errorMsg.trim().length > 0
+        ? `Shared successfully, but couldn't apply your bonus: ${errorMsg}`
+        : 'Shared successfully, but couldn\'t apply your bonus. Tap \"Retry\" to try again.',
+      { duration: 7000 }
+    );
     markSharedLocally();
     setShareState('error');
   };
