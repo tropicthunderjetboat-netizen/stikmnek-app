@@ -2235,12 +2235,15 @@ Deno.serve(async (req) => {
         if (evErr) {
           const msg = String((evErr as any)?.message || evErr);
           const code = String((evErr as any)?.code || '');
-          // Common when migration hasn't been applied yet:
+          const lower = msg.toLowerCase();
+          // Common when migration hasn't been applied yet or PostgREST schema cache hasn't refreshed:
           // - Postgres: 42P01 (undefined_table)
-          // - message includes 'relation "analytics_events" does not exist'
+          // - PostgREST: PGRST205 / "Could not find the table ... in the schema cache"
           const isMissingTable =
             code === '42P01' ||
-            msg.toLowerCase().includes('analytics_events') && msg.toLowerCase().includes('does not exist');
+            code === 'PGRST205' ||
+            (lower.includes('analytics_events') && lower.includes('does not exist')) ||
+            (lower.includes('analytics_events') && lower.includes('schema cache'));
           if (!isMissingTable) return errorResponse(req, msg, 500);
           events = [];
         } else {
