@@ -62,6 +62,42 @@ function formatWhatsAppDisplay(number: string): string {
   return cleaned;
 }
 
+/** Explains the multi-offering dropdown (trading / profile name, not the listing title). */
+function detailOfferingSwitcherLabel(
+  language: string,
+  category: string,
+  profileDisplayName: string,
+): string {
+  const name = profileDisplayName.trim();
+  const fallback =
+    language === 'fr' ? 'cet établissement' : language === 'bi' ? 'bisnis ia' : 'this business';
+  const host = name || fallback;
+  const c = (category || '').toLowerCase();
+  if (language === 'fr') {
+    if (c === 'tours') return `Autres circuits et excursions proposés par ${host}`;
+    if (c === 'activities') return `Autres activités proposées par ${host}`;
+    if (c === 'dining') return `Autres offres restauration de ${host}`;
+    if (c === 'shopping') return `Autres offres de ${host}`;
+    if (c === 'spa') return `Autres offres spa & bien-être de ${host}`;
+    if (c === 'accommodation') return `Autres hébergements de ${host}`;
+    return `Autres annonces de ${host}`;
+  }
+  if (language === 'bi') {
+    if (c === 'tours' || c === 'activities')
+      return `Narafa tua mo aktiviti we ${host} i ofarem`;
+    return `Narafa ofa from ${host}`;
+  }
+  if (c === 'tours')
+    return `Other tours offered by ${host}`;
+  if (c === 'activities')
+    return `Other activities offered by ${host}`;
+  if (c === 'dining') return `Other dining offers from ${host}`;
+  if (c === 'shopping') return `Other offers from ${host}`;
+  if (c === 'spa') return `Other spa & wellness offers from ${host}`;
+  if (c === 'accommodation') return `Other stays from ${host}`;
+  return `Other listings from ${host}`;
+}
+
 const BusinessDetail: React.FC = () => {
   const {
     language, selectedBusiness, setCurrentView, setSelectedBusiness,
@@ -514,12 +550,26 @@ const BusinessDetail: React.FC = () => {
           </div>
         )}
         {profileOfferings.length > 1 && (
-          <div className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-            <label htmlFor="detail-offering-select" className="text-xs font-semibold text-gray-600 uppercase tracking-wide shrink-0">
-              {language === 'en' ? 'Deal' : language === 'fr' ? 'Offre' : 'Dil'}
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+            <label
+              htmlFor="detail-offering-select"
+              className="block text-sm font-semibold text-gray-900 leading-snug sm:max-w-md shrink-0"
+            >
+              {detailOfferingSwitcherLabel(
+                language,
+                biz.category,
+                String(biz.profileName || profileOfferings[0]?.profileName || '').trim(),
+              )}
             </label>
             <select
               id="detail-offering-select"
+              aria-label={
+                language === 'en'
+                  ? 'Choose another listing from this business'
+                  : language === 'fr'
+                    ? 'Choisir une autre annonce'
+                    : 'Jus wan narafa listing'
+              }
               value={biz.id}
               onChange={(e) => {
                 const next = profileOfferings.find((o) => o.id === e.target.value);
