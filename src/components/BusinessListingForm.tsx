@@ -1354,11 +1354,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </p>
             )}
           </div>
-          {/* ─── Pricing & Discount (flat VT only — tiered categories use the per-person editor below) ─── */}
-          {!categoryUsesTieredPricing(form.category) && (
+          {/* ─── Pricing & Discount (VT) ─── */}
           <div
             className={`p-5 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border ${
-              fieldErrors.pricing && !categoryUsesTieredPricing(form.category)
+              fieldErrors.pricing
                 ? 'border-red-300 ring-1 ring-red-200'
                 : 'border-teal-100'
             }`}
@@ -1373,11 +1372,17 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </span>
             </div>
             <p className="text-xs text-gray-500 mb-4">
-              {language === 'en'
-                ? 'Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.'
-                : language === 'fr'
-                ? 'Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.'
-                : 'Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'}
+              {categoryUsesTieredPricing(form.category)
+                ? language === 'en'
+                  ? 'Enter a single per-person price in Vatu (VT) (used if you add no tiers). Discount is optional — businesses offering discounts get featured priority.'
+                  : language === 'fr'
+                    ? "Entrez un prix unique par personne en Vatu (VT) (utilisé si vous n’ajoutez pas de paliers). La remise est optionnelle — les entreprises offrant des remises sont prioritaires."
+                    : 'Putum wan praes long Vatu (VT) (hem i wok sapos yu no putum tiers). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'
+                : language === 'en'
+                  ? 'Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.'
+                  : language === 'fr'
+                    ? 'Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.'
+                    : 'Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'}
             </p>
 
 
@@ -1525,14 +1530,13 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 </div>
               </div>
             )}
-            {fieldErrors.pricing && !categoryUsesTieredPricing(form.category) && (
+            {fieldErrors.pricing && (
               <p className="text-sm text-red-600 mt-3 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
                 {fieldErrors.pricing}
               </p>
             )}
           </div>
-          )}
 
           {categoryUsesTieredPricing(form.category) && (
             <div
