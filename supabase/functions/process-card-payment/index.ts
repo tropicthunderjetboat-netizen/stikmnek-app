@@ -13,9 +13,9 @@ import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '..
 import {
   calculatePassPriceAud,
   dynamicPassInclusiveDays,
-  parsePartySizeAndExtended,
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
+import { parsePassPartyWithProfileFallback } from '../_shared/resolvePassPartyFromRequest.ts';
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
@@ -273,8 +273,8 @@ Deno.serve(async (req) => {
         );
       }
 
-      const b = body as Record<string, unknown>;
-      const parsed = parsePartySizeAndExtended(b);
+      const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+      const parsed = await parsePassPartyWithProfileFallback(b, supabase, authUser.id);
       if (!parsed) {
         const partyReceived = b.partySize ?? b.party_size ?? null;
         const safeKeys =

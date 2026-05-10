@@ -15,9 +15,9 @@ import { semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
 import {
   calculatePassPriceAud,
   dynamicPassInclusiveDays,
-  parsePartySizeAndExtended,
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
+import { parsePassPartyWithProfileFallback } from '../_shared/resolvePassPartyFromRequest.ts';
 
 function passTypeToBrandDisplay(passType: string): string {
   if (String(passType).toLowerCase() === 'dynamic') return 'StikmNek Pass';
@@ -194,7 +194,11 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const paypalOrderId = body?.paypalOrderId ?? body?.orderId;
     const startDate = body?.startDate ?? body?.start_date;
-    const parsed = parsePartySizeAndExtended(body as Record<string, unknown>);
+    const parsed = await parsePassPartyWithProfileFallback(
+      (body && typeof body === 'object' ? body : {}) as Record<string, unknown>,
+      supabase,
+      user.id,
+    );
 
     if (!paypalOrderId) {
       return errorResponse('Missing paypalOrderId', 400);

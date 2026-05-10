@@ -9,7 +9,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
-import { calculatePassPriceAud, parsePartySizeAndExtended } from '../_shared/pricingDynamic.ts';
+import { calculatePassPriceAud } from '../_shared/pricingDynamic.ts';
+import { parsePassPartyWithProfileFallback } from '../_shared/resolvePassPartyFromRequest.ts';
 
 async function getPayPalAccessToken(sandbox: boolean): Promise<string> {
   const clientId = Deno.env.get('PAYPAL_CLIENT_ID');
@@ -76,7 +77,11 @@ Deno.serve(async (req) => {
     const startDate = body?.startDate ?? body?.start_date;
     const returnUrl = body?.returnUrl ?? body?.return_url;
     const cancelUrl = body?.cancelUrl ?? body?.cancel_url;
-    const parsed = parsePartySizeAndExtended(body as Record<string, unknown>);
+    const parsed = await parsePassPartyWithProfileFallback(
+      (body && typeof body === 'object' ? body : {}) as Record<string, unknown>,
+      supabase,
+      user.id,
+    );
 
     if (!startDate) {
       return errorResponse('Missing startDate', 400);
