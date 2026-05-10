@@ -273,7 +273,11 @@ const ListYourBusinessCta: React.FC = () => {
                         : 'I stret long fon'}
                   </span>
                   <span className="inline-flex items-center rounded-lg bg-black/20 px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-white/95 ring-1 ring-white/10">
-                    {language === 'en' ? 'Port Vila +' : language === 'fr' ? 'Port-Vila +' : 'Port Vila +'}
+                    {language === 'en'
+                      ? 'Vanuatu wide'
+                      : language === 'fr'
+                        ? 'Tout le Vanuatu'
+                        : 'Vanuatu wide'}
                   </span>
                 </div>
               </div>

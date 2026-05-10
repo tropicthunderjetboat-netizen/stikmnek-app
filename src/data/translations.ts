@@ -49,9 +49,9 @@ export const translations: Record<string, Record<Language, string>> = {
     bi: 'Kostomem yor travel long fleksibel pricing',
   },
   'pass.build_how_desc': {
-    en: 'On Passes, pricing starts at A$15 for the first guest (ages 6+), A$5 each for guests 2–6, then A$10 for the 7th and A$5 each up to 20 per pass. Add A$15 for the 7-day whole-trip option. Pick 24-hour or holiday coverage and checkout — your total updates instantly.',
-    fr: 'Dans Passes, tarifs à partir de 15 $ AUD pour la 1re personne (6 ans +), 5 $ pour les pers. 2 à 6, puis 10 $ pour la 7e et 5 $ jusqu’à 20 par pass. +15 $ pour l’option séjour 7 jours. Choisissez 24 h ou vacances — le total se met à jour instantanément.',
-    bi: 'Long Pas, praes i stat long A$15 fes man (6+), A$5 long man 2–6, mo A$10 long 7fala mo A$5 kasem 20 long wan pas. +A$15 blong 7-dei ful trip. Jusum 24 owa o holiday, mo pei — total i apdet stretwe.',
+    en: 'Sign up, add how many people are travelling, your travel dates, pay with a credit card, and start saving.',
+    fr: 'Inscrivez-vous, indiquez le nombre de participants, vos dates de voyage, payez par carte de crédit, et commencez à économiser.',
+    bi: 'Sign ap, putem hu mas i travelem, dat blong trip, pei wetem kredit kad, mo stat sevem.',
   },
 
   // Pass pricing card (package UI)
