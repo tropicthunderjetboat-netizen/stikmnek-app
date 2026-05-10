@@ -7,6 +7,7 @@ export const VIEW_MODES = [
   'map',
   'passes',
   'dashboard',
+  'my-favorites',
   'admin',
   'business-detail',
   'checkout',

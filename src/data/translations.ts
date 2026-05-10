@@ -558,6 +558,21 @@ export const translations: Record<string, Record<Language, string>> = {
   'dash.title': { en: 'My Dashboard', fr: 'Mon tableau de bord', bi: 'Dasbod Blong Mi' },
   'dash.passes': { en: 'My Passes', fr: 'Mes pass', bi: 'Pas Blong Mi' },
   'dash.favorites': { en: 'Favorites', fr: 'Favoris', bi: 'Favrit' },
+  'dash.favorites_list_heading': {
+    en: 'Your saved places',
+    fr: 'Vos adresses enregistrées',
+    bi: 'Ples we yu sevem',
+  },
+  'dash.favorites_list_empty': {
+    en: 'Browse deals and tap the heart on a listing to save it here.',
+    fr: 'Parcourez les offres et touchez le cœur sur une annonce pour l’enregistrer ici.',
+    bi: 'Lukluk long ol diskaon mo tap long hating blong sevem long hia.',
+  },
+  'dash.favorites_back_dashboard': {
+    en: 'Back to dashboard',
+    fr: 'Retour au tableau de bord',
+    bi: 'Go bak long dasbod',
+  },
   'dash.history': { en: 'Redemption History', fr: 'Historique d\'utilisation', bi: 'Histri blong Yusim' },
   'dash.nopass': { en: 'No active pass. Get one to start saving!', fr: 'Pas de pass actif. Obtenez-en un pour commencer à économiser!', bi: 'No gat aktiv pas. Karem wan blong stat sevem!' },
   'dash.pass_prefs_title': { en: 'Pass checkout defaults', fr: 'Préférences d’achat du pass', bi: 'Pas checkout difolt' },

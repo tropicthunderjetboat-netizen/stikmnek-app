@@ -356,11 +356,20 @@ const Dashboard: React.FC = () => {
                 <p className="text-2xl font-bold text-gray-900">{user.pass ? '1' : '0'}</p>
                 <p className="text-xs text-gray-500">{t('dash.passes', language)}</p>
               </div>
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mb-2"><Heart className="w-5 h-5 text-red-500" /></div>
+              <button
+                type="button"
+                onClick={() => setCurrentView('my-favorites')}
+                className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-left w-full transition-all hover:border-red-200 hover:shadow-md hover:bg-red-50/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+              >
+                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mb-2">
+                  <Heart className="w-5 h-5 text-red-500" />
+                </div>
                 <p className="text-2xl font-bold text-gray-900">{favorites.length}</p>
-                <p className="text-xs text-gray-500">{t('dash.favorites', language)}</p>
-              </div>
+                <p className="text-xs text-gray-500 flex items-center gap-1">
+                  {t('dash.favorites', language)}
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-400" aria-hidden />
+                </p>
+              </button>
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                 <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mb-2"><History className="w-5 h-5 text-purple-600" /></div>
                 <p className="text-2xl font-bold text-gray-900">{redemptions.length}</p>

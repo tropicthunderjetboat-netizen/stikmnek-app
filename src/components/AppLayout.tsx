@@ -27,6 +27,7 @@ import CompleteBusinessProfile from './CompleteBusinessProfile';
 
 // ── Lazy-loaded route components ──
 const Dashboard = React.lazy(() => import('./Dashboard'));
+const MyFavoritesList = React.lazy(() => import('./MyFavoritesList'));
 const AdminPanel = React.lazy(() => import('./AdminPanel'));
 const PaymentCheckout = React.lazy(() => import('./PaymentCheckout'));
 const BusinessOwnerDashboard = React.lazy(() => import('./BusinessOwnerDashboard'));
@@ -137,8 +138,8 @@ const AppLayout: React.FC = () => {
       return;
     }
 
-    // Prevent business users from accessing tourist dashboard
-    if (role === 'business' && currentView === 'dashboard') {
+    // Prevent business users from accessing tourist dashboard / favorites
+    if (role === 'business' && (currentView === 'dashboard' || currentView === 'my-favorites')) {
       setCurrentView('business-dashboard');
       return;
     }
@@ -261,6 +262,8 @@ const AppLayout: React.FC = () => {
         );
       case 'dashboard':
         return <Dashboard />;
+      case 'my-favorites':
+        return <MyFavoritesList />;
       case 'admin':
         return <AdminPanel />;
       case 'checkout':
