@@ -3,6 +3,7 @@ import { ArrowLeft, Heart, ChevronRight, MapPin } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as localBusinesses } from '@/data/businesses';
 import { t } from '@/data/translations';
+import { businessesMatchingFavoriteKeys } from '@/lib/favoritesUi';
 
 const MyFavoritesList: React.FC = () => {
   const {
@@ -15,7 +16,7 @@ const MyFavoritesList: React.FC = () => {
 
   const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
   const favBizs = useMemo(
-    () => allBusinesses.filter((b) => favorites.includes(b.id)),
+    () => businessesMatchingFavoriteKeys(allBusinesses, favorites),
     [allBusinesses, favorites],
   );
 

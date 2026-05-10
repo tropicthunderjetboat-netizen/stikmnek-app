@@ -5,9 +5,11 @@ import { Business } from '@/data/businesses';
 import { supabase, directProfileInsert, SUPABASE_URL, ENDPOINTS } from '@/lib/supabase';
 import {
   mapJoinedOfferingToBusiness,
+  profileBusinessIdFor,
   splitBusinessListingsViewRow,
   BUSINESS_LISTINGS_VIEW_COLUMNS,
 } from '@/lib/businessOfferingMap';
+import { favoriteKeysFromDbRows, favoriteKeyForOffering, favoriteKeyForProfile } from '@/lib/favoritesUi';
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
@@ -279,8 +281,10 @@ interface AppContextType {
   signUpBusiness: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
+  /** Encoded keys: `off:<offering_uuid>` or `biz:<profile_businesses.id>` (see favoritesUi). */
   favorites: string[];
-  toggleFavorite: (id: string) => void;
+  /** Pass a `Business` listing for per-deal favorites, or a profile id string for map “whole venue”. */
+  toggleFavorite: (target: Business | string) => Promise<void>;
   cart: CartItem | null;
   setCart: (item: CartItem | null) => void;
   /** Opens checkout; optional `isExtended` / `partySize` override profile defaults. */
@@ -557,14 +561,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data, error } = await supabase
         .from('favorites')
-        .select('business_id')
+        .select('business_id, offering_id')
         .eq('user_id', userId);
       if (error) throw error;
       if (data) {
-        setFavorites(data.map((f: any) => f.business_id));
+        setFavorites(
+          favoriteKeysFromDbRows(
+            data as { business_id: string; offering_id?: string | null }[],
+          ),
+        );
       }
     } catch (err) {
       console.error('Failed to load favorites:', err);
+      try {
+        const { data, error } = await supabase
+          .from('favorites')
+          .select('business_id')
+          .eq('user_id', userId);
+        if (error) throw error;
+        if (data) {
+          setFavorites(
+            (data as { business_id: string }[]).map((f) => favoriteKeyForProfile(String(f.business_id))),
+          );
+        }
+      } catch (e2) {
+        console.error('Failed to load favorites (fallback):', e2);
+      }
     }
   }, []);
 
@@ -1469,23 +1491,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   // TOGGLE FAVORITE
   // ═══════════════════════════════════════════════════════════
-  const toggleFavorite = useCallback(async (id: string) => {
-    if (!user) {
-      setShowAuth(true);
-      setAuthMode('signin');
-      return;
-    }
-    const isFav = favorites.includes(id);
-    if (isFav) {
-      setFavorites(prev => prev.filter(f => f !== id));
-      toast.success('Removed from favorites');
-      await supabase.from('favorites').delete().eq('user_id', user.id).eq('business_id', id);
-    } else {
-      setFavorites(prev => [...prev, id]);
+  const toggleFavorite = useCallback(
+    async (target: Business | string) => {
+      if (!user) {
+        setShowAuth(true);
+        setAuthMode('signin');
+        return;
+      }
+      let profileId: string;
+      let offeringId: string | null;
+      if (typeof target === 'string') {
+        profileId = target;
+        offeringId = null;
+      } else {
+        profileId = profileBusinessIdFor(target);
+        offeringId = target.id !== profileId ? target.id : null;
+      }
+      const key = offeringId ? favoriteKeyForOffering(offeringId) : favoriteKeyForProfile(profileId);
+      const isFav = favorites.includes(key);
+
+      if (isFav) {
+        setFavorites((prev) => prev.filter((f) => f !== key));
+        toast.success('Removed from favorites');
+        if (offeringId) {
+          await supabase.from('favorites').delete().eq('user_id', user.id).eq('offering_id', offeringId);
+        } else {
+          await supabase
+            .from('favorites')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('business_id', profileId)
+            .is('offering_id', null);
+        }
+        return;
+      }
+
+      setFavorites((prev) => [...prev, key]);
       toast.success('Added to favorites');
-      await supabase.from('favorites').insert({ user_id: user.id, business_id: id });
-    }
-  }, [user, favorites]);
+      const insertRow: { user_id: string; business_id: string; offering_id?: string | null } = {
+        user_id: user.id,
+        business_id: profileId,
+      };
+      if (offeringId) {
+        insertRow.offering_id = offeringId;
+        await supabase
+          .from('favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('business_id', profileId)
+          .is('offering_id', null);
+      }
+      const { error } = await supabase.from('favorites').insert(insertRow);
+      if (error) {
+        setFavorites((prev) => prev.filter((f) => f !== key));
+        console.error('[toggleFavorite] insert failed:', error);
+        toast.error(error.message || 'Could not save favorite');
+      }
+    },
+    [user, favorites],
+  );
 
   // ═══════════════════════════════════════════════════════════
   // PURCHASE PASS

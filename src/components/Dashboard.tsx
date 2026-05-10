@@ -6,6 +6,7 @@ import { t } from '@/data/translations';
 import { businesses as localBusinesses } from '@/data/businesses';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import { businessesMatchingFavoriteKeys } from '@/lib/favoritesUi';
 import { partyCountsFromTouristProfile, computeRedemptionSavingsForListing } from '@/lib/redemptionSavings';
 import { APPROX_VTU_PER_AUD, approximateAudFromVatu, approximateVatuFromAud } from '@/lib/passValueDisplay';
 import type { Business } from '@/data/businesses';
@@ -47,7 +48,10 @@ const Dashboard: React.FC = () => {
   }, [refreshRedemptions, refreshUserPass]);
 
   const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
-  const favBizs = allBusinesses.filter(b => favorites.includes(b.id));
+  const favBizs = useMemo(
+    () => businessesMatchingFavoriteKeys(allBusinesses, favorites),
+    [allBusinesses, favorites],
+  );
 
   const party = useMemo(() => partyCountsFromTouristProfile(userProfile), [userProfile]);
 

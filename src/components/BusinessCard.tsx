@@ -16,6 +16,7 @@ import { trackInteractionEvent } from '@/lib/interactionEvents';
 import { toast } from 'sonner';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import { isListingFavorited } from '@/lib/favoritesUi';
 
 interface BusinessCardProps {
   business: Business;
@@ -102,7 +103,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
       setAuthMode('signin');
       return;
     }
-    toggleFavorite(profileId);
+    void toggleFavorite(business);
   };
 
   const handleWhatsApp = (e: React.MouseEvent) => {
@@ -168,7 +169,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
   };
 
 
-  const isFav = favorites.includes(profileId);
+  const isFav = isListingFavorited(favorites, business);
   const desc =
     language === 'fr'
       ? (business.descriptionFr ||
