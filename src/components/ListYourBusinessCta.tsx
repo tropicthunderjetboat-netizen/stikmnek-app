@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
-import { Store, ArrowRight, Sparkles, Users, BadgePercent } from 'lucide-react';
+import { Store, ArrowRight, Sparkles, Users, Gift } from 'lucide-react';
 
 /**
  * Replaces the removed home-page listing form: prompts business owners to sign up / sign in
@@ -49,20 +49,20 @@ const ListYourBusinessCta: React.FC = () => {
   const bullets =
     language === 'en'
       ? [
-          { t: 'Zero listing fee — ever', Icon: BadgePercent },
+          { t: 'List your products or business for FREE!', Icon: Gift },
           { t: 'WhatsApp-ready leads', Icon: Sparkles },
-          { t: 'Reach visitors before they land', Icon: Users },
+          { t: 'Reach visitors before they arrive!', Icon: Users },
         ]
       : language === 'fr'
         ? [
-            { t: 'Aucun frais d’annonce', Icon: BadgePercent },
+            { t: 'Listez vos produits ou votre entreprise GRATUITEMENT !', Icon: Gift },
             { t: 'Contacts prêts pour WhatsApp', Icon: Sparkles },
-            { t: 'Touchez les voyageurs en amont', Icon: Users },
+            { t: 'Touchez les visiteurs avant leur arrivée !', Icon: Users },
           ]
         : [
-            { t: 'No listing fee', Icon: BadgePercent },
+            { t: 'Listem ol product o bisnis blong yu — FREE!', Icon: Gift },
             { t: 'WhatsApp leads', Icon: Sparkles },
-            { t: 'Rijim turis bifo oli kam', Icon: Users },
+            { t: 'Rijim turis bifo oli arrive!', Icon: Users },
           ];
 
   const cta =
@@ -79,31 +79,33 @@ const ListYourBusinessCta: React.FC = () => {
           : 'Get started';
 
   return (
-    <section className="relative py-16 sm:py-20 overflow-hidden border-t border-teal-200/40">
-      {/* Background */}
+    <section className="relative py-16 sm:py-20 overflow-hidden border-t border-cyan-200/60">
+      {/* Island-inspired backdrop: sky → lagoon → reef */}
       <div
-        className="absolute inset-0 bg-gradient-to-br from-teal-600 via-emerald-600 to-cyan-700"
+        className="absolute inset-0 bg-gradient-to-b from-sky-200 via-cyan-300 to-teal-700"
         aria-hidden
       />
       <div
-        className="absolute inset-0 opacity-[0.12] bg-[radial-gradient(circle_at_20%_30%,white,transparent_45%),radial-gradient(circle_at_80%_70%,white,transparent_40%)]"
+        className="absolute inset-0 bg-gradient-to-br from-amber-100/50 via-transparent to-emerald-700/35"
         aria-hidden
       />
       <div
-        className="absolute inset-0 opacity-[0.35] bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%221%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')]"
+        className="absolute inset-0 opacity-90 bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(255,255,255,0.75),transparent_55%),radial-gradient(circle_at_90%_15%,rgba(251,191,36,0.45),transparent_42%),radial-gradient(circle_at_5%_85%,rgba(16,185,129,0.25),transparent_45%)]"
         aria-hidden
       />
+      {/* Colourful small green “reef tiles” mosaic */}
       <div
-        className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-amber-300/25 blur-3xl"
+        className="absolute inset-0 opacity-[0.55] mix-blend-multiply bg-[length:36px_36px] bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2236%22%20height%3D%2236%22%3E%3Crect%20width%3D%2236%22%20height%3D%2236%22%20fill%3D%22none%22%2F%3E%3Crect%20x%3D%222%22%20y%3D%222%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221.5%22%20fill%3D%22%23059669%22%20fill-opacity%3D%220.35%22%2F%3E%3Crect%20x%3D%2211%22%20y%3D%223%22%20width%3D%226%22%20height%3D%226%22%20rx%3D%221.5%22%20fill%3D%22%2310b981%22%20fill-opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%2219%22%20y%3D%222%22%20width%3D%228%22%20height%3D%227%22%20rx%3D%221.5%22%20fill%3D%22%2322c55e%22%20fill-opacity%3D%220.32%22%2F%3E%3Crect%20x%3D%2227%22%20y%3D%2211%22%20width%3D%227%22%20height%3D%226%22%20rx%3D%221.5%22%20fill%3D%22%23047857%22%20fill-opacity%3D%220.38%22%2F%3E%3Crect%20x%3D%223%22%20y%3D%2212%22%20width%3D%226%22%20height%3D%228%22%20rx%3D%221.5%22%20fill%3D%22%2314b8a6%22%20fill-opacity%3D%220.36%22%2F%3E%3Crect%20x%3D%2212%22%20y%3D%2212%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221.5%22%20fill%3D%22%2365a30d%22%20fill-opacity%3D%220.28%22%2F%3E%3Crect%20x%3D%2221%22%20y%3D%2213%22%20width%3D%226%22%20height%3D%226%22%20rx%3D%221.5%22%20fill%3D%22%230d9488%22%20fill-opacity%3D%220.42%22%2F%3E%3Crect%20x%3D%222%22%20y%3D%2222%22%20width%3D%228%22%20height%3D%227%22%20rx%3D%221.5%22%20fill%3D%22%2316a34a%22%20fill-opacity%3D%220.3%22%2F%3E%3Crect%20x%3D%2212%22%20y%3D%2223%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221.5%22%20fill%3D%22%23059669%22%20fill-opacity%3D%220.34%22%2F%3E%3Crect%20x%3D%2222%22%20y%3D%2222%22%20width%3D%226%22%20height%3D%228%22%20rx%3D%221.5%22%20fill%3D%22%234ade80%22%20fill-opacity%3D%220.25%22%2F%3E%3C%2Fsvg%3E')]"
         aria-hidden
       />
+      {/* Soft horizon haze */}
       <div
-        className="absolute -bottom-32 -left-16 w-96 h-96 rounded-full bg-teal-300/20 blur-3xl"
+        className="absolute inset-0 opacity-30 bg-[linear-gradient(180deg,transparent_0%,rgba(255,255,255,0.15)_40%,rgba(6,182,212,0.12)_100%)]"
         aria-hidden
       />
 
       <div className="relative max-w-4xl mx-auto px-4 sm:px-6">
-        <div className="rounded-3xl border border-white/25 bg-white/[0.97] shadow-2xl shadow-teal-900/25 backdrop-blur-sm overflow-hidden">
+        <div className="rounded-3xl border border-white/40 bg-white/[0.96] shadow-2xl shadow-teal-900/20 backdrop-blur-sm overflow-hidden ring-1 ring-cyan-100/80">
           <div className="grid lg:grid-cols-[1.15fr_0.85fr] gap-0">
             <div className="px-6 py-10 sm:px-10 sm:py-12 text-left">
               <div className="inline-flex items-center gap-2 rounded-full bg-teal-50 border border-teal-100/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-teal-800 mb-5">
@@ -169,9 +171,13 @@ const ListYourBusinessCta: React.FC = () => {
             </div>
 
             {/* Accent column */}
-            <div className="relative min-h-[200px] lg:min-h-0 bg-gradient-to-br from-teal-600 via-emerald-600 to-teal-800 p-8 sm:p-10 flex flex-col justify-between">
+            <div className="relative min-h-[200px] lg:min-h-0 bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-900 p-8 sm:p-10 flex flex-col justify-between">
               <div
-                className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_30%_20%,white,transparent_50%)]"
+                className="absolute inset-0 opacity-25 bg-[length:28px_28px] mix-blend-overlay bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2228%22%20height%3D%2228%22%3E%3Crect%20x%3D%221%22%20y%3D%221%22%20width%3D%225%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%23fff%22%20fill-opacity%3D%220.12%22%2F%3E%3Crect%20x%3D%2215%22%20y%3D%228%22%20width%3D%225%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%23fff%22%20fill-opacity%3D%220.1%22%2F%3E%3Crect%20x%3D%228%22%20y%3D%2216%22%20width%3D%225%22%20height%3D%225%22%20rx%3D%221%22%20fill%3D%22%23fff%22%20fill-opacity%3D%220.14%22%2F%3E%3C%2Fsvg%3E')]"
+                aria-hidden
+              />
+              <div
+                className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_30%_15%,rgba(255,255,255,0.5),transparent_55%)]"
                 aria-hidden
               />
               <div className="relative">
