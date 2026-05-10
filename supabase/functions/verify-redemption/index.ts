@@ -743,12 +743,14 @@ Deno.serve(async (req) => {
       // Server-authoritative savings (ignore client savedAmount to prevent tampering)
       const computed = computeRedemptionSavings(pricingRow, party);
       const savedAmount = computed.savedAmount;
+      const dealAmountVt = Math.max(0, Math.round(Number(computed.totalDeal) || 0));
 
       const insertRow: Record<string, unknown> = {
         user_id: touristUserId,
         business_id: businessId,
         pass_id: pass.id,
         saved_amount: savedAmount,
+        deal_amount_vt: dealAmountVt,
       };
       if (resolvedOfferingId) insertRow.offering_id = resolvedOfferingId;
       if (discount_label) insertRow.discount_label = discount_label;
@@ -756,7 +758,7 @@ Deno.serve(async (req) => {
       const { data: redemption, error: redErr } = await supabase
         .from('redemptions')
         .insert(insertRow)
-        .select('id, redeemed_at, saved_amount, discount_label')
+        .select('id, redeemed_at, saved_amount, deal_amount_vt, discount_label')
         .single();
 
       if (redErr || !redemption) {

@@ -2215,7 +2215,7 @@ Deno.serve(async (req) => {
 
       const redQ = supabase
         .from('redemptions')
-        .select('id, redeemed_at, saved_amount, offering_id')
+        .select('id, redeemed_at, saved_amount, deal_amount_vt, offering_id')
         .eq('business_id', businessId)
         .gte('redeemed_at', sinceIso);
       if (offeringId) redQ.eq('offering_id', offeringId);
@@ -2262,6 +2262,16 @@ Deno.serve(async (req) => {
 
       const redemptionCount = safeReds.length;
       const totalSaved = safeReds.reduce((s: number, r: any) => s + (Number(r.saved_amount) || 0), 0);
+      const redemptionsMissingDealAmount = safeReds.filter(
+        (r: any) => r.deal_amount_vt === null || r.deal_amount_vt === undefined,
+      ).length;
+      const totalDealAmount = safeReds.reduce((s: number, r: any) => {
+        if (r.deal_amount_vt === null || r.deal_amount_vt === undefined) return s;
+        return s + (Number(r.deal_amount_vt) || 0);
+      }, 0);
+      const redemptionsWithDealAmount = redemptionCount - redemptionsMissingDealAmount;
+      const avgDealPerRedemption =
+        redemptionsWithDealAmount > 0 ? totalDealAmount / redemptionsWithDealAmount : 0;
 
       const viewCount = safeEvents.filter((e: any) => e.event_type === 'view_listing').length;
       const clickCount = safeEvents.filter((e: any) => e.event_type === 'click_listing').length;
@@ -2269,14 +2279,17 @@ Deno.serve(async (req) => {
       const whatsappTapCount = safeEvents.filter((e: any) => e.event_type === 'tap_whatsapp').length;
 
       // Group redemptions by day (YYYY-MM-DD)
-      const byDay: Record<string, { date: string; count: number; saved: number }> = {};
+      const byDay: Record<string, { date: string; count: number; saved: number; deal: number }> = {};
       for (const r of safeReds as any[]) {
         const iso = r.redeemed_at ? String(r.redeemed_at) : '';
         const day = iso ? new Date(iso).toISOString().slice(0, 10) : null;
         if (!day) continue;
-        if (!byDay[day]) byDay[day] = { date: day, count: 0, saved: 0 };
+        if (!byDay[day]) byDay[day] = { date: day, count: 0, saved: 0, deal: 0 };
         byDay[day].count += 1;
         byDay[day].saved += Number(r.saved_amount) || 0;
+        if (r.deal_amount_vt !== null && r.deal_amount_vt !== undefined) {
+          byDay[day].deal += Number(r.deal_amount_vt) || 0;
+        }
       }
       const redemptionsByDay = Object.values(byDay).sort((a, b) => a.date.localeCompare(b.date));
 
@@ -2307,6 +2320,9 @@ Deno.serve(async (req) => {
         superStarCount,
         redemptionCount,
         totalSaved,
+        totalDealAmount,
+        avgDealPerRedemption,
+        redemptionsMissingDealAmount,
         avgRating,
         redemptionsByDay,
         viewCount,
