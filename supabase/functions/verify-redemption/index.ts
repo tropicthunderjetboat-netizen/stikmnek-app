@@ -249,6 +249,22 @@ function computeRedemptionSavings(
 
 const BEARER_PREFIX = /^Bearer\s+/i;
 
+/**
+ * When `deal_amount_vt` exists in code but the project DB or PostgREST schema cache is not updated yet,
+ * inserts fail with a message referencing this column. Retry without it so redemptions still work;
+ * owner analytics for VT deal volume stay empty until migration + schema reload.
+ */
+function isRedemptionsDealAmountColumnUnavailable(err: { message?: string; code?: string } | null): boolean {
+  const msg = String(err?.message ?? '').toLowerCase();
+  if (!msg.includes('deal_amount_vt')) return false;
+  return (
+    msg.includes('schema cache') ||
+    msg.includes('could not find') ||
+    msg.includes('does not exist') ||
+    msg.includes('unknown column')
+  );
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getSafeCorsHeaders(req);
   const jsonResponse = (data: object, status = 200) =>
@@ -755,11 +771,33 @@ Deno.serve(async (req) => {
       if (resolvedOfferingId) insertRow.offering_id = resolvedOfferingId;
       if (discount_label) insertRow.discount_label = discount_label;
 
-      const { data: redemption, error: redErr } = await supabase
+      const selectWithDeal =
+        'id, redeemed_at, saved_amount, deal_amount_vt, discount_label' as const;
+      const selectLegacy = 'id, redeemed_at, saved_amount, discount_label' as const;
+
+      const firstAttempt = await supabase
         .from('redemptions')
         .insert(insertRow)
-        .select('id, redeemed_at, saved_amount, deal_amount_vt, discount_label')
+        .select(selectWithDeal)
         .single();
+
+      let redemption: Record<string, unknown> | null =
+        (firstAttempt.data as Record<string, unknown> | null) ?? null;
+      let redErr = firstAttempt.error;
+
+      if (redErr && isRedemptionsDealAmountColumnUnavailable(redErr)) {
+        console.warn(
+          '[verify-redemption] deal_amount_vt not available on redemptions (apply migration + reload PostgREST schema); retrying insert without it',
+        );
+        const { deal_amount_vt: _omit, ...insertWithoutDeal } = insertRow;
+        const retry = await supabase
+          .from('redemptions')
+          .insert(insertWithoutDeal)
+          .select(selectLegacy)
+          .single();
+        redemption = (retry.data as Record<string, unknown> | null) ?? null;
+        redErr = retry.error;
+      }
 
       if (redErr || !redemption) {
         console.error('[verify-redemption] insert redemption error:', redErr);
