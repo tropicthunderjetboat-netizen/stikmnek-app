@@ -1,13 +1,16 @@
 /**
  * Dynamic StikmNek pass pricing — keep in sync with `src/data/pricing.ts`.
- * Price = BASE + (partySize - 1) * GUEST_FEE + (isExtended ? EXTEND : 0)
+ *
+ * Headcount: A$15 + A$5×(guests 2–6) + A$10 for 7th + A$5×(guests 8–20) + (extended ? A$15 : 0)
  */
 
 export const BASE_PRICE_AUD = 15;
 export const GUEST_FEE_AUD = 5;
-export const EXTEND_FEE_AUD = 10;
+export const SEVENTH_GUEST_PREMIUM_AUD = 5;
+export const SEVENTH_GUEST_HEAD_CHARGE_AUD = GUEST_FEE_AUD + SEVENTH_GUEST_PREMIUM_AUD;
+export const EXTEND_FEE_AUD = 15;
 export const MIN_PARTY_SIZE = 1;
-export const MAX_PARTY_SIZE = 6;
+export const MAX_PARTY_SIZE = 20;
 
 /** Inclusive calendar days: day pass = 1; holiday = 7; +share = 14. */
 export const DYNAMIC_PASS_SPAN_DAYS = { standard: 1, extended: 7, extendedWithShare: 14 } as const;
@@ -25,7 +28,14 @@ export function parseBooleanExtended(value: unknown): boolean {
 
 export function calculatePassPriceAud(partySize: number, isExtended: boolean): number {
   const p = clampPartySize(partySize);
-  return BASE_PRICE_AUD + (p - 1) * GUEST_FEE_AUD + (isExtended ? EXTEND_FEE_AUD : 0);
+  let headcountAud = BASE_PRICE_AUD;
+  if (p >= 2) {
+    headcountAud += Math.min(p - 1, 5) * GUEST_FEE_AUD;
+  }
+  if (p >= 7) {
+    headcountAud += SEVENTH_GUEST_HEAD_CHARGE_AUD + (p - 7) * GUEST_FEE_AUD;
+  }
+  return headcountAud + (isExtended ? EXTEND_FEE_AUD : 0);
 }
 
 /** Inclusive span for dynamic pass (Option A: 7+7). */

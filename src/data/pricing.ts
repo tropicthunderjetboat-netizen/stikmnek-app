@@ -2,7 +2,8 @@
  * StikmNek dynamic pass pricing (single product model).
  * Legacy DB `pass_type` values (daily/weekly/…) remain for existing rows — see `passCatalog.ts`.
  *
- * Formula: BASE + (partySize - 1) * GUEST_FEE + (isExtended ? EXTEND : 0)
+ * Headcount (ages 6+): A$15 first guest + A$5 each for guests 2–6 + A$10 for the 7th guest +
+ * A$5 each for guests 8–20. Whole-trip add-on: +A$15.
  * — Keep in sync with `supabase/functions/_shared/pricingDynamic.ts`.
  */
 
@@ -19,9 +20,13 @@ export { passProductIdFromDb, toDbPassType, PASS_PRODUCT_ORDER };
 
 export const BASE_PRICE_AUD = 15;
 export const GUEST_FEE_AUD = 5;
-export const EXTEND_FEE_AUD = 10;
+/** Extra vs a normal +A$5 step: the 7th paying guest is +A$10 instead of +A$5. */
+export const SEVENTH_GUEST_PREMIUM_AUD = 5;
+/** Total AUD added for the 7th paying guest (A$5 slot + A$5 premium = A$10). */
+export const SEVENTH_GUEST_HEAD_CHARGE_AUD = GUEST_FEE_AUD + SEVENTH_GUEST_PREMIUM_AUD;
+export const EXTEND_FEE_AUD = 15;
 export const MIN_PARTY_SIZE = 1;
-export const MAX_PARTY_SIZE = 6;
+export const MAX_PARTY_SIZE = 20;
 
 export function clampPartySize(n: number): number {
   if (!Number.isFinite(n)) return MIN_PARTY_SIZE;
@@ -29,13 +34,38 @@ export function clampPartySize(n: number): number {
   return Math.min(MAX_PARTY_SIZE, Math.max(MIN_PARTY_SIZE, x));
 }
 
+/**
+ * Pass price in AUD for the given paying party (ages 6+) and duration.
+ * Does not include payment processing fees.
+ */
 export function calculatePassPrice(partySize: number, isExtended: boolean): number {
   const p = clampPartySize(partySize);
-  return BASE_PRICE_AUD + (p - 1) * GUEST_FEE_AUD + (isExtended ? EXTEND_FEE_AUD : 0);
+  let headcountAud = BASE_PRICE_AUD;
+  if (p >= 2) {
+    headcountAud += Math.min(p - 1, 5) * GUEST_FEE_AUD;
+  }
+  if (p >= 7) {
+    headcountAud += SEVENTH_GUEST_HEAD_CHARGE_AUD + (p - 7) * GUEST_FEE_AUD;
+  }
+  return headcountAud + (isExtended ? EXTEND_FEE_AUD : 0);
+}
+
+/** AUD for guests 2 through 6 only (five slots at GUEST_FEE each when filled). */
+export function extraGuestsFeeThroughSixthAud(partySize: number): number {
+  const p = clampPartySize(partySize);
+  if (p <= 1) return 0;
+  return Math.min(p - 1, 5) * GUEST_FEE_AUD;
+}
+
+/** AUD for 7th guest onward (includes +A$10 for 7th vs a normal +A$5 step). */
+export function extraGuestsFeeFromSeventhAud(partySize: number): number {
+  const p = clampPartySize(partySize);
+  if (p < 7) return 0;
+  return SEVENTH_GUEST_HEAD_CHARGE_AUD + (p - 7) * GUEST_FEE_AUD;
 }
 
 /**
- * Inclusive calendar span: day pass = 1; holiday (+A$10) = 7;
+ * Inclusive calendar span: day pass = 1; holiday (+A$15) = 7;
  * if user already unlocked Share before purchase, holiday becomes 14 at checkout.
  */
 export function passInclusiveCalendarDays(

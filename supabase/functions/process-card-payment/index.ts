@@ -275,7 +275,7 @@ Deno.serve(async (req) => {
 
       const parsed = parsePartySizeAndExtended(body as Record<string, unknown>);
       if (!parsed) {
-        return errorResponse(req, 'Missing or invalid partySize (integer 1–6)', 400, {
+        return errorResponse(req, 'Missing or invalid partySize (integer 1–20)', 400, {
           reason: 'invalid_party_size',
         });
       }

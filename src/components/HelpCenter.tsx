@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { BASE_PRICE_AUD, EXTEND_FEE_AUD, GUEST_FEE_AUD, MAX_PARTY_SIZE } from '@/data/pricing';
+import {
+  BASE_PRICE_AUD,
+  EXTEND_FEE_AUD,
+  GUEST_FEE_AUD,
+  MAX_PARTY_SIZE,
+  SEVENTH_GUEST_HEAD_CHARGE_AUD,
+} from '@/data/pricing';
 import {
   HelpCircle, Book, Store, Shield, Users, ChevronDown, ChevronRight,
   Search, ArrowLeft, MapPin, CreditCard, QrCode, Star, Camera,
@@ -38,7 +44,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
 
   const passProductSummary = useMemo(
     () =>
-      `StikmNek Pass (AUD): $${BASE_PRICE_AUD} for the first person + $${GUEST_FEE_AUD} per additional guest (ages 6+, up to ${MAX_PARTY_SIZE} per pass); 24-hour day pass or 7-day holiday pass (+$${EXTEND_FEE_AUD} for the holiday period)`,
+      `StikmNek Pass (AUD): $${BASE_PRICE_AUD} first person (ages 6+), $${GUEST_FEE_AUD} each for guests 2–6, $${SEVENTH_GUEST_HEAD_CHARGE_AUD} for the 7th, then $${GUEST_FEE_AUD} each up to ${MAX_PARTY_SIZE} per pass; 24-hour day pass or 7-day holiday pass (+$${EXTEND_FEE_AUD} for the holiday period)`,
     [],
   );
 
@@ -50,7 +56,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       {
         step: '2',
         title: t('passSelection.title', helpLang),
-        desc: `Open Passes, set your group (ages 6+, up to ${MAX_PARTY_SIZE} per pass), choose 24-hour or 7-day holiday access, pick a start date, and pay ($${BASE_PRICE_AUD} first person + $${GUEST_FEE_AUD} per extra guest; +$${EXTEND_FEE_AUD} for the holiday period). PayPal or card where enabled.`,
+        desc: `Open Passes, set your group (ages 6+, up to ${MAX_PARTY_SIZE} per pass), choose 24-hour or 7-day holiday access, pick a start date, and pay (tiered: $${BASE_PRICE_AUD} first, $${GUEST_FEE_AUD} for 2–6, $${SEVENTH_GUEST_HEAD_CHARGE_AUD} on 7th, then $${GUEST_FEE_AUD} each; +$${EXTEND_FEE_AUD} holiday period). PayPal or card where enabled.`,
       },
       { step: '3', title: 'Browse Deals', desc: 'Explore dining, tours, activities, spa, shopping, and accommodation on Deals and Map' },
       { step: '4', title: 'Show Your QR Code', desc: 'Present your pass QR code at a partner business; staff scan it in StikmNek' },

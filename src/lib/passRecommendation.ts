@@ -5,7 +5,7 @@ import type { UserProfile } from '@/contexts/AppContext';
 import type { PassProductId } from '@/data/passCatalog';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 
-const DYNAMIC_MAX_PARTY = 6;
+const DYNAMIC_MAX_PARTY = 20;
 const DYNAMIC_MAX_TRIP_DAYS = 14;
 
 export interface PassTripGuidance {
@@ -25,7 +25,7 @@ function clampInt(n: unknown, fallback: number): number {
 
 /**
  * Feasibility for guidance / support hint uses **adults + children only** (infants excluded).
- * Dynamic passes allow up to 6 paying guests per pass (ages 6+); trip length guidance uses up to 14 calendar days.
+ * Dynamic passes allow up to 20 paying guests per pass (ages 6+); trip length guidance uses up to 14 calendar days.
  */
 export function getPassTripGuidance(
   userProfile: UserProfile,

@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
       return errorResponse('Missing paypalOrderId', 400);
     }
     if (!parsed) {
-      return errorResponse('Missing or invalid partySize (1-6) or isExtended', 400);
+      return errorResponse('Missing or invalid partySize (1-20) or isExtended', 400);
     }
     const { partySize, isExtended } = parsed;
     if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {

@@ -71,7 +71,7 @@ export interface UserProfile {
   post_pass_profile_completed?: boolean;
   /** If true, user has unlocked Share Bonus before buying a pass; consumed on purchase. */
   share_bonus_unlocked?: boolean;
-  /** Checkout default group size (1–6); column `user_profiles.party_size` (nullable). */
+  /** Checkout default group size (1–20); column `user_profiles.party_size` (nullable). */
   party_size?: number | null;
   /** Checkout default pass length; column `user_profiles.preferred_pass_duration` enum. */
   preferred_pass_duration?: 'short' | 'extended' | null;

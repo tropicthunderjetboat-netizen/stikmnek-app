@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       return errorResponse('Missing startDate', 400);
     }
     if (!parsed) {
-      return errorResponse('Missing or invalid partySize (1-6) or isExtended', 400);
+      return errorResponse('Missing or invalid partySize (1-20) or isExtended', 400);
     }
     const { partySize, isExtended } = parsed;
     const passTypeDb: DbPassType = 'dynamic';

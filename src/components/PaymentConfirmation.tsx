@@ -55,7 +55,7 @@ const LEGACY_BASE_PEOPLE: Record<PassProductId, number> = {
 };
 
 const PASS_GROUPS: Record<PassProductId, string> = {
-  dynamic: `A$15 first guest + A$5/extra (ages 6+, max ${MAX_PARTY_SIZE} per pass)`,
+  dynamic: `A$15 first (6+) + A$5 (guests 2–6) + A$10 on 7th + A$5 each to ${MAX_PARTY_SIZE}; +A$15 whole-trip`,
 };
 
 type ShareBonusRow = { extraDays: number; extraPeople: number; extraKids: number; description: string };
@@ -729,7 +729,7 @@ const PaymentConfirmation: React.FC = () => {
       }
       if (user.passPeopleCount != null && user.passPeopleCount !== prev.peopleCount) {
         next.peopleCount = user.passPeopleCount;
-        next.group = `${user.passPeopleCount} guests (ages 6+) · A$15 first + A$5/extra`;
+        next.group = `${user.passPeopleCount} guests (ages 6+, max ${MAX_PARTY_SIZE}/pass) · tiered pass pricing`;
         changed = true;
       }
       if (!changed) return prev;
