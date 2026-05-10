@@ -273,10 +273,23 @@ Deno.serve(async (req) => {
         );
       }
 
-      const parsed = parsePartySizeAndExtended(body as Record<string, unknown>);
+      const b = body as Record<string, unknown>;
+      const parsed = parsePartySizeAndExtended(b);
       if (!parsed) {
+        const partyReceived = b.partySize ?? b.party_size ?? null;
+        const safeKeys =
+          b && typeof b === 'object'
+            ? Object.keys(b).filter((k) => !/^card/i.test(k) && k !== 'cardCvv' && k !== 'cardExpiry')
+            : [];
+        console.warn('[process-card-payment] invalid_party_size', {
+          partyReceived,
+          type: typeof partyReceived,
+          safeKeys,
+        });
         return errorResponse(req, 'Missing or invalid partySize (integer 1-20)', 400, {
           reason: 'invalid_party_size',
+          partyReceived,
+          bodyKeys: safeKeys,
         });
       }
       const { partySize, isExtended } = parsed;

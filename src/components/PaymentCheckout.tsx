@@ -603,6 +603,14 @@ const PaymentCheckout: React.FC = () => {
         paymentTransactionId: getOrCreatePassPurchaseIdempotencyKey(),
       };
 
+      console.info('[PaymentCheckout] process-card-payment (no card data)', {
+        partyForPay,
+        cartParty: cart?.partySize,
+        stateParty: partySize,
+        isExtended,
+        startDate: payStartDate,
+      });
+
       const { data, error } = await supabase.functions.invoke('process-card-payment', {
         body: invokeBody,
       });
@@ -615,10 +623,23 @@ const PaymentCheckout: React.FC = () => {
         const status = getInvokeStatus(error);
         const body = await getInvokeErrorBody(error);
         const fromBody = typeof body?.error === 'string' ? body.error : null;
-        const serverError =
+        let serverError =
           fromBody ??
           (typeof data?.error === 'string' ? data.error : null) ??
           (typeof data?.message === 'string' ? data.message : null);
+        if (body?.reason === 'invalid_party_size' && (body.partyReceived !== undefined || body.bodyKeys)) {
+          const hint = [
+            typeof body.partyReceived !== 'undefined'
+              ? `Server saw partySize: ${JSON.stringify(body.partyReceived)}`
+              : null,
+            Array.isArray(body.bodyKeys) && body.bodyKeys.length
+              ? `Keys: ${(body.bodyKeys as string[]).join(', ')}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
+          if (hint) serverError = `${serverError ?? 'Payment failed'} (${hint})`;
+        }
 
         if (status === 401) {
           console.warn(
