@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, Shield, Lock, Check, Loader2,
   ChevronRight, Calendar, CalendarRange, Info,
-  Users, CreditCard, AlertCircle, CheckCircle, Ticket, Zap,
+  Users, CreditCard, AlertCircle, CheckCircle, Ticket, Zap, Sparkles,
 } from 'lucide-react';
 
 import {
@@ -418,41 +418,36 @@ const PaymentCheckout: React.FC = () => {
 
   const coverageUi = useMemo(() => {
     const cal = daysCount;
+    const passWindowBadge = t('checkout.period_badge_pass_window', checkoutLang).replace('__CAL__', String(cal));
+    const calendarNote = t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal));
+
     if (!isExtended) {
       return {
         periodBadge: t('checkout.period_badge_one_day', checkoutLang),
         periodSub: null as string | null,
+        windowTripHint: null as string | null,
         endHelper: t('checkout.end_date_helper_short', checkoutLang),
         orderDealsLine: t('checkout.order_summary_deals_short', checkoutLang),
         summaryPrimary: t('checkout.period_badge_one_day', checkoutLang),
-        summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
-        paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+        summarySecondary: calendarNote,
+        paymentBarSecondary: calendarNote,
       };
     }
     const legal = t('checkout.period_legal_extended', checkoutLang).replace('__CAL__', String(cal));
-    if (tripNights != null && tripNights >= 1) {
-      const nightsBadge = t('checkout.period_badge_trip_nights', checkoutLang).replace(
-        '__NIGHTS__',
-        String(tripNights),
-      );
-      return {
-        periodBadge: nightsBadge,
-        periodSub: legal,
-        endHelper: t('checkout.end_date_helper_extended', checkoutLang).replace('__CAL__', String(cal)),
-        orderDealsLine: t('checkout.order_summary_deals_extended', checkoutLang).replace('__CAL__', String(cal)),
-        summaryPrimary: nightsBadge,
-        summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
-        paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
-      };
-    }
+    const windowTripHint =
+      tripNights != null && tripNights >= 1
+        ? t('checkout.window_trip_hint', checkoutLang).replace('__NIGHTS__', String(tripNights))
+        : null;
+
     return {
-      periodBadge: t('checkout.period_badge_extended_generic', checkoutLang),
+      periodBadge: passWindowBadge,
       periodSub: legal,
+      windowTripHint,
       endHelper: t('checkout.end_date_helper_extended', checkoutLang).replace('__CAL__', String(cal)),
       orderDealsLine: t('checkout.order_summary_deals_extended', checkoutLang).replace('__CAL__', String(cal)),
-      summaryPrimary: t('checkout.period_badge_extended_generic', checkoutLang),
-      summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
-      paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+      summaryPrimary: passWindowBadge,
+      summarySecondary: calendarNote,
+      paymentBarSecondary: calendarNote,
     };
   }, [isExtended, tripNights, daysCount, checkoutLang, grantSecondWeekPreview]);
 
@@ -929,97 +924,124 @@ const PaymentCheckout: React.FC = () => {
                   />
                   </div>
 
-                  <div className="border-t border-gray-100 pt-6 mt-2">
-                    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-4">
-                      {t('checkout.section_dates', checkoutLang)}
-                    </h4>
-                  {/* Start Date Picker */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-teal-600" />
-                      Discounts Valid From (Start Date)
-                    </label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      min={minStartDate}
-                      max={maxStartDate}
-                      onChange={(e) => {
-                        startDateTouchedRef.current = true;
-                        setStartDate(e.target.value);
-                      }}
-                      className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer hover:border-teal-300"
-                    />
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      You can start your pass up to 30 days from today (UTC calendar, same as checkout validation)
-                    </p>
-                  </div>
-
-                  {/* End Date (Auto-calculated) */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-orange-500" />
-                      Discounts Valid Until (End Date)
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium ml-1">Auto-calculated</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={endDate}
-                        readOnly
-                        className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-100 bg-gray-50 text-sm font-medium text-gray-600 cursor-not-allowed"
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <Lock className="w-4 h-4 text-gray-300" />
+                  <div className="mt-6 pt-2">
+                    <div className="rounded-2xl border-2 border-teal-300/80 bg-gradient-to-br from-teal-50/95 via-white to-emerald-50/90 p-5 sm:p-6 shadow-[0_20px_50px_-20px_rgba(13,148,136,0.45)] ring-1 ring-teal-200/60">
+                      <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6 pb-5 border-b border-teal-200/60">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-600 text-white shadow-lg shadow-teal-700/25">
+                          <CalendarRange className="w-6 h-6" aria-hidden />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-base sm:text-lg font-black uppercase tracking-wide text-teal-950">
+                            {t('checkout.section_dates', checkoutLang)}
+                          </h4>
+                          <p className="text-sm text-teal-900/90 mt-1.5 leading-snug font-medium">
+                            {t('checkout.section_dates_sub', checkoutLang)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      {coverageUi.endHelper}
-                    </p>
-                  </div>
 
-                  {/* Date Range Preview */}
-                  <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
-                    <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider mb-3">Your discount window</p>
-                    <div className="flex flex-col sm:flex-row sm:items-stretch gap-4">
-                      <div className="flex-1 bg-white rounded-lg p-3 border border-teal-200 shadow-sm">
-                        <p className="text-[10px] text-gray-400 font-medium uppercase">Start</p>
-                        <p className="text-sm font-bold text-gray-900 mt-0.5">{formatDate(startDate)}</p>
+                      <div className="space-y-5">
+                        {/* Start Date Picker */}
+                        <div className="rounded-xl bg-white/95 border border-teal-200/90 p-4 shadow-sm">
+                          <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-teal-600 shrink-0" />
+                            Discounts Valid From (Start Date)
+                          </label>
+                          <input
+                            type="date"
+                            value={startDate}
+                            min={minStartDate}
+                            max={maxStartDate}
+                            onChange={(e) => {
+                              startDateTouchedRef.current = true;
+                              setStartDate(e.target.value);
+                            }}
+                            className="w-full px-4 py-3.5 rounded-xl border-2 border-teal-100 bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer hover:border-teal-300"
+                          />
+                          <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                            You can start your pass up to 30 days from today (UTC calendar, same as checkout validation)
+                          </p>
+                        </div>
+
+                        {/* End Date (Auto-calculated) */}
+                        <div className="rounded-xl bg-white/95 border border-orange-200/80 p-4 shadow-sm">
+                          <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2 flex-wrap">
+                            <Calendar className="w-4 h-4 text-orange-500 shrink-0" />
+                            Discounts Valid Until (End Date)
+                            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-orange-50 text-orange-800 font-bold border border-orange-200/80">
+                              Auto-calculated
+                            </span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="date"
+                              value={endDate}
+                              readOnly
+                              className="w-full px-4 py-3.5 rounded-xl border-2 border-orange-100/90 bg-orange-50/40 text-sm font-medium text-gray-700 cursor-not-allowed"
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              <Lock className="w-4 h-4 text-orange-300" />
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-2 leading-relaxed">{coverageUi.endHelper}</p>
+                        </div>
                       </div>
-                      <div className="flex sm:flex-col items-center justify-center gap-1 flex-shrink-0 px-2">
-                        <div className="px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold shadow-sm text-center leading-snug max-w-[11rem]">
-                          {coverageUi.periodBadge}
+
+                      {/* Date range preview — focal card */}
+                      <div className="mt-6 rounded-2xl bg-gradient-to-b from-emerald-100/80 via-teal-50/90 to-white p-4 sm:p-5 border-2 border-emerald-400/55 shadow-inner shadow-emerald-900/10">
+                        <p className="text-[11px] font-black text-teal-950 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-amber-500 shrink-0" aria-hidden />
+                          {t('checkout.discount_window_card_title', checkoutLang)}
+                        </p>
+                        <div className="flex flex-col sm:flex-row sm:items-stretch gap-4">
+                          <div className="flex-1 bg-white rounded-xl p-3.5 border-2 border-teal-300/50 shadow-md">
+                            <p className="text-[10px] text-teal-700 font-bold uppercase tracking-wider">
+                              {t('checkout.window_label_start', checkoutLang)}
+                            </p>
+                            <p className="text-sm font-bold text-gray-900 mt-1">{formatDate(startDate)}</p>
+                          </div>
+                          <div className="flex sm:flex-col items-center justify-center gap-2 flex-shrink-0 px-1">
+                            <div className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs font-black shadow-md text-center leading-snug max-w-[12.5rem] ring-1 ring-white/30">
+                              {coverageUi.periodBadge}
+                            </div>
+                            {coverageUi.windowTripHint && (
+                              <p className="text-[10px] text-slate-600 text-center leading-snug max-w-[13rem] font-medium">
+                                {coverageUi.windowTripHint}
+                              </p>
+                            )}
+                            {coverageUi.periodSub && (
+                              <p className="text-[10px] text-teal-900/85 text-center leading-snug max-w-[13rem] mt-0.5 hidden sm:block font-medium">
+                                {coverageUi.periodSub}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex-1 bg-white rounded-xl p-3.5 border-2 border-orange-300/50 shadow-md">
+                            <p className="text-[10px] text-orange-800 font-bold uppercase tracking-wider">
+                              {t('checkout.window_label_end', checkoutLang)}
+                            </p>
+                            <p className="text-sm font-bold text-gray-900 mt-1">{formatDate(endDate)}</p>
+                          </div>
                         </div>
                         {coverageUi.periodSub && (
-                          <p className="text-[10px] text-teal-800/90 text-center leading-snug max-w-[12rem] mt-1 hidden sm:block">
+                          <p className="text-[10px] text-teal-900/85 text-center leading-snug mt-3 sm:hidden font-medium px-1">
                             {coverageUi.periodSub}
                           </p>
                         )}
-                      </div>
-                      <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200 shadow-sm">
-                        <p className="text-[10px] text-gray-400 font-medium uppercase">End</p>
-                        <p className="text-sm font-bold text-gray-900 mt-0.5">{formatDate(endDate)}</p>
+
+                        {startDate === minStartDate && (
+                          <p className="text-xs text-teal-800 mt-4 flex items-center gap-2 rounded-lg bg-white/70 border border-teal-200/60 px-3 py-2.5 font-semibold">
+                            <Zap className="w-3.5 h-3.5 flex-shrink-0 text-amber-500" />
+                            Starting on the earliest available day — discounts activate right after purchase.
+                          </p>
+                        )}
+                        {startDate > minStartDate && (
+                          <p className="text-xs text-teal-800 mt-4 flex items-center gap-2 rounded-lg bg-white/70 border border-teal-200/60 px-3 py-2.5 font-semibold">
+                            <Calendar className="w-3.5 h-3.5 flex-shrink-0 text-teal-600" />
+                            Your discounts will activate on {formatDate(startDate)}.
+                          </p>
+                        )}
                       </div>
                     </div>
-                    {coverageUi.periodSub && (
-                      <p className="text-[10px] text-teal-800/90 text-center leading-snug mt-3 sm:hidden">
-                        {coverageUi.periodSub}
-                      </p>
-                    )}
-
-                    {startDate === minStartDate && (
-                      <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5 flex-shrink-0" />
-                        Starting on the earliest available day — discounts activate right after purchase.
-                      </p>
-                    )}
-                    {startDate > minStartDate && (
-                      <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                        Your discounts will activate on {formatDate(startDate)}.
-                      </p>
-                    )}
-                  </div>
                   </div>
                 </div>
 

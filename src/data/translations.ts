@@ -436,6 +436,28 @@ export const translations: Record<string, Record<Language, string>> = {
   },
   'checkout.section_pass_group': { en: 'Pass & group', fr: 'Pass et groupe', bi: 'Pas mo grup' },
   'checkout.section_dates': { en: 'When discounts apply', fr: 'Quand les réductions s’appliquent', bi: 'Taem diskount i ap' },
+  'checkout.section_dates_sub': {
+    en: 'Pick when deal discounts turn on — the end date is set automatically from your pass type.',
+    fr: 'Choisissez l’activation des réductions — la fin est calculée selon votre type de pass.',
+    bi: 'Jusum taem diskount i stat — det blong finis i kam otomatik long taem blong pas.',
+  },
+  'checkout.discount_window_card_title': {
+    en: 'Your discount window',
+    fr: 'Votre fenêtre de réductions',
+    bi: 'Windo blong diskount',
+  },
+  'checkout.period_badge_pass_window': {
+    en: '__CAL__-day deal access',
+    fr: '__CAL__ j. d’accès aux offres',
+    bi: '__CAL__ dei blong akses long dils',
+  },
+  'checkout.window_trip_hint': {
+    en: 'Your trip is __NIGHTS__ nights — align your start date with when you want to use deals.',
+    fr: 'Votre séjour : __NIGHTS__ nuits — alignez la date de début avec l’usage des offres.',
+    bi: 'Trip blong yu __NIGHTS__ naet — josem det blong stat wetem taem yu laik yusum dils.',
+  },
+  'checkout.window_label_start': { en: 'Start', fr: 'Début', bi: 'Stat' },
+  'checkout.window_label_end': { en: 'End', fr: 'Fin', bi: 'Finis' },
   'checkout.order_summary_deals_short': {
     en: 'Unlimited deal redemptions for your chosen coverage window.',
     fr: 'Offres illimitées pendant la période choisie.',
