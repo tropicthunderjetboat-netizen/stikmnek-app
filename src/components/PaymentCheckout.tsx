@@ -132,6 +132,23 @@ function describeFunctionsFetchFailure(error: unknown): string | null {
   return null;
 }
 
+/** True when the browser never got an HTTP response (network, CORS, blocked request, wrong URL). */
+function isPaymentInvokeTransportFailure(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { name?: string; message?: string };
+  if (e.name === 'FunctionsFetchError') return true;
+  const m = `${e.message ?? ''}`.toLowerCase();
+  return (
+    m.includes('failed to fetch') ||
+    m.includes('networkerror') ||
+    m.includes('network request failed') ||
+    m.includes('load failed')
+  );
+}
+
+const PAYMENT_TRANSPORT_FAILURE_HINT =
+  'We could not reach the payment service (the request never completed). This is usually not your card being declined. Try: refresh and pay again, switch networks, disable ad blockers or strict privacy extensions for this site, or use a private window. If it keeps happening, confirm the app is built with the correct Supabase project URL and that the process-card-payment Edge Function is deployed (Supabase Dashboard → Edge Functions → Logs).';
+
 // ═══ CARD FORMATTING HELPERS ═══
 function formatCardNumber(value: string): string {
   const digits = value.replace(/\D/g, '').substring(0, 16);
@@ -650,6 +667,10 @@ const PaymentCheckout: React.FC = () => {
 
         if (serverError) {
           throw new Error(serverError);
+        }
+        if (isPaymentInvokeTransportFailure(error)) {
+          const detail = describeFunctionsFetchFailure(error);
+          throw new Error(detail ? `${PAYMENT_TRANSPORT_FAILURE_HINT} (${detail})` : PAYMENT_TRANSPORT_FAILURE_HINT);
         }
         const fetchDetail = describeFunctionsFetchFailure(error);
         const errMsg = fetchDetail

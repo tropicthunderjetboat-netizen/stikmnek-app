@@ -15,9 +15,9 @@ import { semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
 import {
   calculatePassPriceAud,
   dynamicPassInclusiveDays,
-  parsePassPartyWithProfileFallback,
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
+import { parsePassPartyWithProfileFallback } from '../_shared/parsePassPartyWithProfileFallback.ts';
 
 function passTypeToBrandDisplay(passType: string): string {
   if (String(passType).toLowerCase() === 'dynamic') return 'StikmNek Pass';
