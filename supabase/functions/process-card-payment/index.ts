@@ -13,9 +13,9 @@ import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '..
 import {
   calculatePassPriceAud,
   dynamicPassInclusiveDays,
+  parsePassPartyWithProfileFallback,
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
-import { parsePassPartyWithProfileFallback } from '../_shared/resolvePassPartyFromRequest.ts';
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;

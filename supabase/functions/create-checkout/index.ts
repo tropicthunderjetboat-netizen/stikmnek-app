@@ -9,8 +9,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
-import { calculatePassPriceAud } from '../_shared/pricingDynamic.ts';
-import { parsePassPartyWithProfileFallback } from '../_shared/resolvePassPartyFromRequest.ts';
+import { calculatePassPriceAud, parsePassPartyWithProfileFallback } from '../_shared/pricingDynamic.ts';
 
 async function getPayPalAccessToken(sandbox: boolean): Promise<string> {
   const clientId = Deno.env.get('PAYPAL_CLIENT_ID');
