@@ -37,7 +37,7 @@ export function partyFromValidityApi(party?: {
   };
 }
 
-function hasUsableTieredPricing(pricingTiers: unknown): boolean {
+export function hasUsableTieredPricing(pricingTiers: unknown): boolean {
   const tiers = pricingTiersFromDb(pricingTiers);
   return tiers.some(
     (t) =>

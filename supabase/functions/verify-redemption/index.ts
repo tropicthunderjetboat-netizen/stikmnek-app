@@ -101,6 +101,108 @@ function totalPartyPax(p: PartyCounts): number {
   return p.adults + p.children + p.infants;
 }
 
+/**
+ * Optional merchant override for this visit (savings + stored VT amounts).
+ * Prefer activityAdults / activityChildren / activityInfants so tiered per-person rates match.
+ * Legacy: activityPax6Plus only → all ages 6+ billed as adults (fine for flat per-person deals).
+ */
+function resolveActivityRedeemParty(
+  body: Record<string, unknown>,
+  profileParty: PartyCounts,
+  passTypeStr: string,
+  passMaxPeople: number | null,
+  totalPartySize: number,
+): { party: PartyCounts; error: string | null; reason?: string } {
+  const profileSixPlus = Math.max(0, profileParty.adults + profileParty.children);
+  const profileTotal = Math.max(1, totalPartySize);
+  const passCap = passMaxPeople != null && passMaxPeople > 0 ? passMaxPeople : null;
+
+  const maxSixPlusAllowed = (): number => {
+    const capProfile = passTypeStr === 'dynamic' ? Math.max(1, profileSixPlus) : profileTotal;
+    return passCap != null ? Math.min(passCap, capProfile) : capProfile;
+  };
+
+  const maxTotalPaxAllowed = (): number => {
+    const capProfile = profileTotal;
+    return passCap != null ? Math.min(passCap, capProfile) : capProfile;
+  };
+
+  const rawA = body.activityAdults ?? body.activity_adults;
+  const rawC = body.activityChildren ?? body.activity_children;
+  const rawI = body.activityInfants ?? body.activity_infants;
+
+  const activityFieldPresent = (v: unknown) => v !== undefined && v !== null && v !== '';
+  const explicitSent =
+    activityFieldPresent(rawA) || activityFieldPresent(rawC) || activityFieldPresent(rawI);
+
+  if (explicitSent) {
+    const a = Math.max(0, Math.floor(Number(rawA ?? 0)));
+    const c = Math.max(0, Math.floor(Number(rawC ?? 0)));
+    const inf = Math.max(0, Math.floor(Number(rawI ?? 0)));
+    if (a + c < 1) {
+      return {
+        party: profileParty,
+        error: 'This visit needs at least one person ages 6+ (adults or children).',
+        reason: 'invalid_activity_party',
+      };
+    }
+    const mx6 = maxSixPlusAllowed();
+    if (a + c > mx6) {
+      return {
+        party: profileParty,
+        error:
+          passTypeStr === 'dynamic'
+            ? `Ages 6+ on this visit (${a + c}) cannot exceed ${mx6} (pass limit and profile).`
+            : `People ages 6+ on this visit (${a + c}) cannot exceed ${mx6} (pass limit and profile).`,
+        reason: 'activity_pax_over_cap',
+      };
+    }
+    if (inf > profileParty.infants) {
+      return {
+        party: profileParty,
+        error: `Infants on this visit (${inf}) cannot exceed ${profileParty.infants} on the tourist profile.`,
+        reason: 'activity_infants_over_profile',
+      };
+    }
+    if (passTypeStr !== 'dynamic') {
+      const mtot = maxTotalPaxAllowed();
+      if (a + c + inf > mtot) {
+        return {
+          party: profileParty,
+          error: `Total people on this visit (${a + c + inf}) cannot exceed ${mtot} (pass limit and profile).`,
+          reason: 'activity_total_over_cap',
+        };
+      }
+    }
+    return { party: { adults: a, children: c, infants: inf }, error: null };
+  }
+
+  const raw = body.activityPax6Plus ?? body.activity_pax_6_plus;
+  if (raw === undefined || raw === null || raw === '') {
+    return { party: profileParty, error: null };
+  }
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n) || n < 1) {
+    return {
+      party: profileParty,
+      error: 'Invalid activity party size (activityPax6Plus must be a positive integer).',
+      reason: 'invalid_activity_pax',
+    };
+  }
+  const maxAllowed = maxSixPlusAllowed();
+  if (n > maxAllowed) {
+    return {
+      party: profileParty,
+      error:
+        passTypeStr === 'dynamic'
+          ? `This visit cannot include more than ${maxAllowed} people ages 6+ (smaller of pass limit and profile group).`
+          : `This visit cannot include more than ${maxAllowed} people ages 6+ (pass limit and profile).`,
+      reason: 'activity_pax_over_cap',
+    };
+  }
+  return { party: { adults: n, children: 0, infants: 0 }, error: null };
+}
+
 /** Enforce redemption only when > 0; null = treat as unlimited (legacy row or missing column). */
 function resolvePassMaxPeople(passRow: { max_people?: unknown }): number | null {
   const m = passRow.max_people;
@@ -732,8 +834,23 @@ Deno.serve(async (req) => {
         }
       }
 
+      const bodyObj = body as Record<string, unknown>;
+      const activityResolved = resolveActivityRedeemParty(
+        bodyObj,
+        party,
+        passTypeStr,
+        passMaxPeople,
+        totalPartySize,
+      );
+      if (activityResolved.error) {
+        return errorResponse(activityResolved.error, 400, {
+          reason: activityResolved.reason ?? 'bad_activity_pax',
+        });
+      }
+      const redeemParty = activityResolved.party;
+
       // Server-authoritative savings (ignore client savedAmount to prevent tampering)
-      const computed = computeRedemptionSavings(pricingRow, party);
+      const computed = computeRedemptionSavings(pricingRow, redeemParty);
       const savedAmount = computed.savedAmount;
       const dealAmountVt = Math.max(0, Math.round(Number(computed.totalDeal) || 0));
 
@@ -821,9 +938,9 @@ Deno.serve(async (req) => {
             savingsLine: computed.savingsLine,
             isTieredPricing: computed.isTiered,
             party: {
-              adults: party.adults,
-              children: party.children,
-              infants: party.infants,
+              adults: redeemParty.adults,
+              children: redeemParty.children,
+              infants: redeemParty.infants,
             },
           },
         },

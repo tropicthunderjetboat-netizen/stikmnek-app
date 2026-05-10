@@ -386,7 +386,15 @@ const getFailureConfig = (status: string) => {
   }
 };
 
-type RedeemSubStep = 'none' | 'pick_offer' | 'no_offers';
+type RedeemSubStep = 'none' | 'confirm_activity_pax' | 'pick_offer' | 'no_offers';
+
+/** Max people ages 6+ allowed for this redemption visit (pass cap ∧ profile group). */
+function maxActivityPax6PlusForRedeem(check: ValidityResult): number {
+  const prof = partyFromValidityApi(check.party);
+  const profileSix = Math.max(1, prof.adults + prof.children);
+  const passMax = typeof check.pass?.maxPeople === 'number' && check.pass.maxPeople > 0 ? check.pass.maxPeople : null;
+  return passMax != null ? Math.min(passMax, profileSix) : profileSix;
+}
 
 const QRScanner: React.FC<QRScannerProps> = ({
   onClose,
@@ -416,6 +424,10 @@ const QRScanner: React.FC<QRScannerProps> = ({
 
   /** After pass is valid, owner picks which listing / offer was redeemed */
   const [redeemSubStep, setRedeemSubStep] = useState<RedeemSubStep>('none');
+  /** This-visit headcount (merchant); must match server caps — tiered listings use adult/child/infant rates. */
+  const [activityAdults, setActivityAdults] = useState(1);
+  const [activityChildren, setActivityChildren] = useState(0);
+  const [activityInfants, setActivityInfants] = useState(0);
   const [ownerListings, setOwnerListings] = useState<OwnerListingOffer[]>([]);
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
   const [pendingRedeemQr, setPendingRedeemQr] = useState<string | null>(null);
@@ -533,6 +545,9 @@ const QRScanner: React.FC<QRScannerProps> = ({
         savedAmount: preview.savedAmount,
         originalPrice: preview.totalStandard,
         dealPrice: preview.totalDeal,
+        activityAdults: party.adults,
+        activityChildren: party.children,
+        activityInfants: party.infants,
         verifiedBy: user?.id,
       },
     });
@@ -589,14 +604,8 @@ const QRScanner: React.FC<QRScannerProps> = ({
     toast.success('Discount redeemed successfully!');
   };
 
-  const proceedAfterPassValidForRedeem = async (rawData: string, checkData: ValidityResult) => {
-    if (!user?.id) {
-      toast.error('You must be signed in to redeem.');
-      setResult({ success: false, error: 'Not signed in.' });
-      return;
-    }
-
-    const party = partyFromValidityApi(checkData.party);
+  const fetchOwnerListingsForCurrentUser = useCallback(async (): Promise<OwnerListingOffer[] | null> => {
+    if (!user?.id) return null;
 
     type OfferingJoin = {
       id?: string;
@@ -661,7 +670,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
         console.error('[QRScanner] load owner listings (edge):', mbErr);
         toast.error('Could not load your listings.');
         setResult({ success: false, error: 'Could not load your active listings.' });
-        return;
+        return null;
       }
 
       const mbPayload = mbData as { businesses?: Record<string, unknown>[]; error?: string };
@@ -669,7 +678,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
         console.error('[QRScanner] load owner listings:', mbPayload.error);
         toast.error('Could not load your listings.');
         setResult({ success: false, error: 'Could not load your active listings.' });
-        return;
+        return null;
       }
 
       const rawList = mbPayload.businesses ?? [];
@@ -692,33 +701,106 @@ const QRScanner: React.FC<QRScannerProps> = ({
         .sort((a, b) => a.name.localeCompare(b.name));
     }
 
-    if (rows.length === 0) {
-      setPendingRedeemQr(rawData);
-      setRedeemSubStep('no_offers');
-      setVerifiedForOfferFlow(checkData);
+    return rows;
+  }, [user?.id]);
+
+  const proceedAfterPassValidForRedeem = async (rawData: string, checkData: ValidityResult) => {
+    if (!user?.id) {
+      toast.error('You must be signed in to redeem.');
+      setResult({ success: false, error: 'Not signed in.' });
       return;
     }
-
-    if (rows.length === 1) {
-      await executeRedeemForListing(rawData, rows[0], party);
-      return;
-    }
-
     setPendingRedeemQr(rawData);
-    setOwnerListings(rows);
-    const preferredFromOffering =
-      preferredOfferingId && rows.some((r) => r.id === preferredOfferingId)
-        ? preferredOfferingId
-        : null;
-    const singleOnProfile =
-      preferredBusinessId &&
-      rows.filter((r) => r.profileBusinessId === preferredBusinessId).length === 1
-        ? rows.find((r) => r.profileBusinessId === preferredBusinessId)!.id
-        : null;
-    const preferred = preferredFromOffering || singleOnProfile;
-    setSelectedListingId(preferred);
-    setRedeemSubStep('pick_offer');
     setVerifiedForOfferFlow(checkData);
+    const prof = partyFromValidityApi(checkData.party);
+    let a = prof.adults;
+    let c = prof.children;
+    let inf = prof.infants;
+    if (a + c < 1) {
+      a = 1;
+      c = 0;
+    }
+    setActivityAdults(a);
+    setActivityChildren(c);
+    setActivityInfants(inf);
+    setRedeemSubStep('confirm_activity_pax');
+    setVerifying(false);
+  };
+
+  const continueRedeemAfterActivityPartyConfirm = async () => {
+    const rawData = pendingRedeemQr;
+    const checkData = verifiedForOfferFlow;
+    if (!user?.id || !rawData || !checkData) {
+      toast.error('Something went wrong. Scan the code again.');
+      handleReset();
+      return;
+    }
+    const capSix = maxActivityPax6PlusForRedeem(checkData);
+    const prof = partyFromValidityApi(checkData.party);
+    const isDynamic = String(checkData.pass?.type ?? '').toLowerCase() === 'dynamic';
+    const a = Math.max(0, Math.floor(Number(activityAdults)) || 0);
+    const c = Math.max(0, Math.floor(Number(activityChildren)) || 0);
+    const inf = Math.max(0, Math.floor(Number(activityInfants)) || 0);
+    if (a + c < 1) {
+      toast.error('Enter at least one adult or child (ages 6+).');
+      return;
+    }
+    if (a + c > capSix) {
+      toast.error(`Ages 6+ on this visit cannot exceed ${capSix} (pass and profile).`);
+      return;
+    }
+    if (inf > prof.infants) {
+      toast.error(`Infants cannot exceed ${prof.infants} on the tourist profile.`);
+      return;
+    }
+    if (!isDynamic) {
+      const passMax =
+        typeof checkData.pass?.maxPeople === 'number' && checkData.pass.maxPeople > 0
+          ? checkData.pass.maxPeople
+          : null;
+      const profileTotal = Math.max(1, prof.adults + prof.children + prof.infants);
+      const maxTot = passMax != null ? Math.min(passMax, profileTotal) : profileTotal;
+      if (a + c + inf > maxTot) {
+        toast.error(`Total people this visit cannot exceed ${maxTot} for this pass.`);
+        return;
+      }
+    }
+    const redeemParty: PartyCounts = { adults: a, children: c, infants: inf };
+    setActivityAdults(a);
+    setActivityChildren(c);
+    setActivityInfants(inf);
+
+    setVerifying(true);
+    try {
+      const rows = await fetchOwnerListingsForCurrentUser();
+      if (rows === null) return;
+
+      if (rows.length === 0) {
+        setRedeemSubStep('no_offers');
+        return;
+      }
+
+      if (rows.length === 1) {
+        await executeRedeemForListing(rawData, rows[0], redeemParty);
+        return;
+      }
+
+      setOwnerListings(rows);
+      const preferredFromOffering =
+        preferredOfferingId && rows.some((r) => r.id === preferredOfferingId)
+          ? preferredOfferingId
+          : null;
+      const singleOnProfile =
+        preferredBusinessId &&
+        rows.filter((r) => r.profileBusinessId === preferredBusinessId).length === 1
+          ? rows.find((r) => r.profileBusinessId === preferredBusinessId)!.id
+          : null;
+      const preferred = preferredFromOffering || singleOnProfile;
+      setSelectedListingId(preferred);
+      setRedeemSubStep('pick_offer');
+    } finally {
+      setVerifying(false);
+    }
   };
 
   // Handle scanned QR data
@@ -860,6 +942,9 @@ const QRScanner: React.FC<QRScannerProps> = ({
     setVerifyStep(0);
     setShowSuccessAnimation(false);
     setRedeemSubStep('none');
+    setActivityAdults(1);
+    setActivityChildren(0);
+    setActivityInfants(0);
     setOwnerListings([]);
     setSelectedListingId(null);
     setPendingRedeemQr(null);
@@ -911,7 +996,11 @@ const QRScanner: React.FC<QRScannerProps> = ({
     }
     const listing = ownerListings.find((l) => l.id === selectedListingId);
     if (!listing) return;
-    const party = partyFromValidityApi(verifiedForOfferFlow?.party);
+    const party: PartyCounts = {
+      adults: Math.max(0, Math.floor(activityAdults)),
+      children: Math.max(0, Math.floor(activityChildren)),
+      infants: Math.max(0, Math.floor(activityInfants)),
+    };
     setVerifying(true);
     try {
       await executeRedeemForListing(raw, listing, party);
@@ -924,7 +1013,10 @@ const QRScanner: React.FC<QRScannerProps> = ({
   };
 
   const hasBarcodeDetector = 'BarcodeDetector' in window;
-  const inOfferFlow = redeemSubStep === 'pick_offer' || redeemSubStep === 'no_offers';
+  const inOfferFlow =
+    redeemSubStep === 'confirm_activity_pax' ||
+    redeemSubStep === 'pick_offer' ||
+    redeemSubStep === 'no_offers';
   const hasResult = !!(result || validityResult);
 
   // ═══ VERIFY STEP LABELS ═══
@@ -1817,6 +1909,107 @@ const QRScanner: React.FC<QRScannerProps> = ({
             </form>
           )}
 
+          {/* ═══ HOW MANY PEOPLE THIS VISIT (ages 6+) — before listing / redeem ═══ */}
+          {redeemSubStep === 'confirm_activity_pax' && verifiedForOfferFlow && !result && (
+            <div className="space-y-4">
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Users className="w-5 h-5 text-emerald-600" />
+                  <span className="text-sm font-extrabold text-emerald-900">How many people for this visit?</span>
+                </div>
+                <p className="text-xs text-emerald-800">
+                  {verifiedForOfferFlow.tourist?.name} · {getPassDisplayTitle(verifiedForOfferFlow.pass?.type || 'dynamic', 'en')}
+                </p>
+                {(() => {
+                  const p = partyFromValidityApi(verifiedForOfferFlow.party);
+                  const cap = maxActivityPax6PlusForRedeem(verifiedForOfferFlow);
+                  return (
+                    <p className="text-[11px] text-emerald-900 font-semibold mt-2 pt-2 border-t border-emerald-200/80">
+                      Profile group: {p.adults} adult{p.adults !== 1 ? 's' : ''}
+                      {p.children > 0 ? `, ${p.children} child${p.children !== 1 ? 'ren' : ''}` : ''}
+                      {p.infants > 0 ? `, ${p.infants} infant${p.infants !== 1 ? 's' : ''}` : ''} (infants under 6 free)
+                      <span className="block font-normal text-emerald-800/90 mt-0.5">
+                        Enter who is on this visit. Max {cap} people ages 6+ (pass and profile). Tiered deals use adult vs child rates; flat deals use the 6+ total only.
+                      </span>
+                    </p>
+                  );
+                })()}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label htmlFor="act-adults" className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
+                    Adults (6+)
+                  </label>
+                  <input
+                    id="act-adults"
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={activityAdults}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (Number.isFinite(v)) setActivityAdults(v);
+                      else if (e.target.value === '') setActivityAdults(0);
+                    }}
+                    className="w-full px-2 py-2 rounded-lg border-2 border-gray-200 text-center font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="act-children" className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
+                    Children (6+)
+                  </label>
+                  <input
+                    id="act-children"
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={activityChildren}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (Number.isFinite(v)) setActivityChildren(v);
+                      else if (e.target.value === '') setActivityChildren(0);
+                    }}
+                    className="w-full px-2 py-2 rounded-lg border-2 border-gray-200 text-center font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="act-infants" className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
+                    Infants (under 6)
+                  </label>
+                  <input
+                    id="act-infants"
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={activityInfants}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (Number.isFinite(v)) setActivityInfants(v);
+                      else if (e.target.value === '') setActivityInfants(0);
+                    }}
+                    className="w-full px-2 py-2 rounded-lg border-2 border-gray-200 text-center font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={verifying}
+                onClick={() => void continueRedeemAfterActivityPartyConfirm()}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
+                Continue
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           {/* ═══ OFFER SELECTION (after pass verified, redeem flow) ═══ */}
           {redeemSubStep === 'pick_offer' && verifiedForOfferFlow && !result && (
             <div className="space-y-4">
@@ -1832,10 +2025,14 @@ const QRScanner: React.FC<QRScannerProps> = ({
                   const p = partyFromValidityApi(verifiedForOfferFlow.party);
                   return (
                     <p className="text-[11px] text-emerald-900 font-semibold mt-2 pt-2 border-t border-emerald-200/80">
-                      Group on profile: {p.adults} adult{p.adults !== 1 ? 's' : ''}
+                      Profile group: {p.adults} adult{p.adults !== 1 ? 's' : ''}
                       {p.children > 0 ? `, ${p.children} child${p.children !== 1 ? 'ren' : ''}` : ''}
                       {p.infants > 0 ? `, ${p.infants} infant${p.infants !== 1 ? 's' : ''}` : ''}
-                      <span className="block font-normal text-emerald-800/90 mt-0.5">Savings below use this party size (from tourist profile).</span>
+                      <span className="block font-normal text-emerald-800/90 mt-0.5">
+                        This visit: <strong>{activityAdults}</strong> adult{activityAdults !== 1 ? 's' : ''},{' '}
+                        <strong>{activityChildren}</strong> child{activityChildren !== 1 ? 'ren' : ''} (6+),{' '}
+                        <strong>{activityInfants}</strong> infant{activityInfants !== 1 ? 's' : ''} — savings use these counts (same VT the server stores).
+                      </span>
                     </p>
                   );
                 })()}
@@ -1845,7 +2042,11 @@ const QRScanner: React.FC<QRScannerProps> = ({
                 {ownerListings.map((listing) => {
                   const selected = selectedListingId === listing.id;
                   const line = formatOfferDiscountLine(listing);
-                  const party = partyFromValidityApi(verifiedForOfferFlow.party);
+                  const party: PartyCounts = {
+                    adults: Math.max(0, Math.floor(activityAdults)),
+                    children: Math.max(0, Math.floor(activityChildren)),
+                    infants: Math.max(0, Math.floor(activityInfants)),
+                  };
                   const savings = computeRedemptionSavingsForListing(listing, party);
                   return (
                     <button
