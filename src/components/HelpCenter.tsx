@@ -79,7 +79,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       {
         question: 'Can I use my pass at multiple businesses?',
         answer:
-          'Yes. You can visit different partner businesses while your pass is active. You may redeem once per business per calendar day (you cannot scan twice at the same venue on the same day). Across your trip you can use many businesses.',
+          'Yes. You can visit different partner businesses while your pass is active, and you may return to the same venue more than once on the same day (for example breakfast and later happy hour) as long as your pass is valid and each redemption is recorded by staff when you use the deal.',
         icon: <Store className="w-4 h-4" />,
       },
       {
@@ -292,7 +292,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
     {
       question: 'It says I already redeemed at this business today',
       answer:
-        'StikmNek allows one redemption per business per calendar day for your pass. If you already scanned at that venue today, try again tomorrow or visit a different partner. If you think this is a mistake, contact support with your account email.',
+        'Older versions of the app blocked a second scan at the same venue on the same day. That limit has been removed so you can use your pass again the same day (each visit still needs a fresh scan). Update the app or ask staff to try again. If the message persists, contact support with your account email.',
       icon: <AlertCircle className="w-4 h-4" />,
     },
     { question: 'My QR code is not scanning', answer: 'Ensure your screen brightness is at maximum. Try zooming in on the QR code. If the issue persists, take a screenshot and show it to the business. You can also try refreshing the page to regenerate the QR code.' },

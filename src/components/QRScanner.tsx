@@ -94,6 +94,8 @@ interface ValidityResult {
   } | null;
   redemptionHistory: {
     alreadyRedeemedToday: boolean;
+    /** Same-day scan count at this venue (informational). */
+    redemptionsTodayCount?: number;
     totalRedemptionsAtBusiness: number;
     lastRedemptions: string[];
   };
@@ -366,7 +368,15 @@ const getFailureConfig = (status: string) => {
     case 'not_yet_valid':
       return { icon: <Timer className="w-7 h-7" />, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-200', title: 'Not Yet Active', suggestion: 'The pass has a future start date. Ask the tourist to return when their pass becomes active.' };
     case 'already_redeemed_today':
-      return { icon: <History className="w-7 h-7" />, color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-200', title: 'Already Redeemed Today', suggestion: 'Each pass allows one redemption per business per day. The tourist can return tomorrow.' };
+      return {
+        icon: <History className="w-7 h-7" />,
+        color: 'text-orange-500',
+        bg: 'bg-orange-50',
+        border: 'border-orange-200',
+        title: 'Redemption blocked',
+        suggestion:
+          'Same-day limits were removed — if you still see this, refresh the app or try again. For help, contact StikmNek support.',
+      };
     case 'inactive':
       return { icon: <Ban className="w-7 h-7" />, color: 'text-gray-500', bg: 'bg-gray-50', border: 'border-gray-200', title: 'Pass Inactive', suggestion: 'This pass has been deactivated. The tourist should contact support.' };
     case 'party_exceeds_pass_capacity':
@@ -1508,9 +1518,13 @@ const QRScanner: React.FC<QRScannerProps> = ({
                 <History className="w-3.5 h-3.5" />Redemption History
               </p>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Redeemed Today</span>
-                <span className={`text-sm font-bold ${validityResult.redemptionHistory.alreadyRedeemedToday ? 'text-orange-600' : 'text-gray-900'}`}>
-                  {validityResult.redemptionHistory.alreadyRedeemedToday ? 'Yes (limit reached)' : 'No'}
+                <span className="text-sm text-gray-600">Visits today (this venue)</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {typeof validityResult.redemptionHistory.redemptionsTodayCount === 'number'
+                    ? validityResult.redemptionHistory.redemptionsTodayCount
+                    : validityResult.redemptionHistory.alreadyRedeemedToday
+                      ? '1+'
+                      : '0'}
                 </span>
               </div>
               <div className="flex items-center justify-between">

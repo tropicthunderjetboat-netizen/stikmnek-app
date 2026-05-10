@@ -293,7 +293,15 @@ function mergeListingBusinessForEdit(selected: UnifiedBusiness, fromDb: Business
     location: firstNonEmptyStr(uBiz.location, fromDb.location),
     lat: Number(uBiz.lat) || Number(fromDb.lat) || 0,
     lng: Number(uBiz.lng) || Number(fromDb.lng) || 0,
-    hours: firstNonEmptyStr(uBiz.hours, fromDb.hours),
+    hours: firstNonEmptyStr(
+      uBiz.hours,
+      fromDb
+        ? businessHoursFromProfileRow({
+            hours: fromDb.hours ?? '',
+            opening_hours: (fromDb as unknown as Record<string, unknown>).opening_hours,
+          })
+        : '',
+    ),
     phone: firstNonEmptyStr(uBiz.phone, fromDb.phone),
     contactEmail:
       firstNonEmptyStr(uBiz.contactEmail ?? undefined, fromDb.contactEmail ?? undefined) || null,

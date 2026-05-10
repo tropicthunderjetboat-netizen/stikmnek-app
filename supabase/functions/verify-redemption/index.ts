@@ -577,6 +577,8 @@ Deno.serve(async (req) => {
 
     // Redemption history (per business & pass)
     let alreadyRedeemedToday = false;
+    /** Count of redemptions at this venue today (local calendar window). Informational only — same-day repeat scans are allowed. */
+    let redemptionsTodayCount = 0;
     let totalRedemptionsAtBusiness = 0;
     let lastRedemptions: string[] = [];
 
@@ -611,7 +613,8 @@ Deno.serve(async (req) => {
         .gte('redeemed_at', startOfDay.toISOString())
         .lte('redeemed_at', endOfDay.toISOString());
 
-      alreadyRedeemedToday = !!(todayRedemptions && todayRedemptions.length > 0);
+      redemptionsTodayCount = todayRedemptions?.length ?? 0;
+      alreadyRedeemedToday = redemptionsTodayCount > 0;
 
       const { count, data: recent } = await supabase
         .from('redemptions')
@@ -655,6 +658,7 @@ Deno.serve(async (req) => {
         voucher: null,
         redemptionHistory: {
           alreadyRedeemedToday,
+          redemptionsTodayCount,
           totalRedemptionsAtBusiness,
           lastRedemptions,
         },
@@ -680,34 +684,6 @@ Deno.serve(async (req) => {
           },
           200
         );
-      }
-
-      // Block duplicate redemption same tourist + business + calendar day (matches check_voucher_validity)
-      {
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
-        const endOfDay = new Date();
-        endOfDay.setHours(23, 59, 59, 999);
-
-        const { data: dupToday } = await supabase
-          .from('redemptions')
-          .select('id')
-          .eq('user_id', touristUserId)
-          .eq('business_id', businessId)
-          .gte('redeemed_at', startOfDay.toISOString())
-          .lte('redeemed_at', endOfDay.toISOString())
-          .limit(1);
-
-        if (dupToday && dupToday.length > 0) {
-          return jsonResponse(
-            {
-              success: false,
-              error: 'This pass was already redeemed at this business today.',
-              status: 'already_redeemed_today',
-            },
-            200
-          );
-        }
       }
 
       const discountLabelRaw = body?.discount ?? body?.discountLabel ?? '';

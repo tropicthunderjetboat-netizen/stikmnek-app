@@ -24,7 +24,7 @@ import {
   pricingTiersFromDb,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
-import { normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
+import { businessHoursFromProfileRow, normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
 import { syncEmbeddedEditGalleryPhotos } from '@/lib/syncEmbeddedListingPhotos';
 import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
 import { fetchApprovedPhotosForOffering, photoRowsToUploadedPhotos } from '@/lib/fetchApprovedPhotosForOffering';
@@ -261,6 +261,14 @@ type EditBaseline = {
   category: string;
 };
 
+/** Prefer `hours`, then DB `opening_hours` when the profile row split them across columns. */
+function hoursPrefillFromBusiness(b: Business): string {
+  return businessHoursFromProfileRow({
+    hours: b.hours ?? '',
+    opening_hours: (b as unknown as { opening_hours?: unknown }).opening_hours,
+  });
+}
+
 function buildEditBaseline(b: Business): EditBaseline {
   const rawTiers = b.pricingTiers ?? null;
   const tiered = categoryUsesTieredPricing(asCategoryKey(b.category));
@@ -273,7 +281,7 @@ function buildEditBaseline(b: Business): EditBaseline {
   const cat = asCategoryKey(String(b.category || 'dining'));
   return {
     description: b.description || '',
-    hours: b.hours || '',
+    hours: hoursPrefillFromBusiness(b),
     phone: b.phone || '',
     email: ((b.contactEmail as string) || '').trim(),
     discount: (b.discount || '').trim(),
@@ -533,7 +541,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       address: b.location || '',
       phone: b.phone || '',
       email: (b.contactEmail || '').trim() || user?.email || '',
-      hours: b.hours || '',
+      hours: hoursPrefillFromBusiness(b),
       whatsappNumber: (b.whatsappNumber || b.whatsapp_number || '').trim(),
       mapUrl: mapUrlPrefill,
       website: displayWebsiteForInput(b.website ?? null),
