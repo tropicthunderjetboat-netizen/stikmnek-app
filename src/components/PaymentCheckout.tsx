@@ -577,12 +577,24 @@ const PaymentCheckout: React.FC = () => {
       const payStartDate =
         startDate < minPay ? minPay : startDate > maxPay ? maxPay : startDate;
 
+      const fromState = Number(partySize);
+      const fromCart = cart != null ? Number(cart.partySize) : NaN;
+      const rawPartyCount = Number.isFinite(fromState)
+        ? fromState
+        : Number.isFinite(fromCart)
+          ? fromCart
+          : 1;
+      const partyForPay = clampPartySize(Math.floor(rawPartyCount) || 1);
+
       const invokeBody = {
         action: 'purchase_pass' as const,
         passType: 'dynamic',
-        partySize,
-        isExtended,
+        partySize: partyForPay,
+        party_size: partyForPay,
+        isExtended: Boolean(isExtended),
+        is_extended: Boolean(isExtended),
         startDate: payStartDate,
+        start_date: payStartDate,
         cardNumber: cardNumber.replace(/\s/g, ''),
         cardExpiry,
         cardCvv,
@@ -658,7 +670,7 @@ const PaymentCheckout: React.FC = () => {
           days: data.days,
           shareBonusApplied: Boolean(data.shareBonusApplied),
           group: data.group || groupLabel,
-          partySize,
+          partySize: partyForPay,
           isExtended,
           sessionId: data.sessionId,
           completedAt: new Date().toISOString(),
@@ -823,7 +835,7 @@ const PaymentCheckout: React.FC = () => {
                           onChange={(e) => handlePartySizeChange(Number(e.target.value))}
                           className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                         >
-                          {[1, 2, 3, 4, 5, 6].map((n) => (
+                          {Array.from({ length: MAX_PARTY_SIZE }, (_, i) => i + 1).map((n) => (
                             <option key={n} value={n}>
                               {n} {n === 1 ? 'person' : 'people'}
                             </option>

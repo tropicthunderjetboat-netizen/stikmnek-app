@@ -56,13 +56,28 @@ export function validUntilOffsetDays(
   return dynamicPassInclusiveDays(isExtended, grantSecondWeekFromPrepurchaseShare) - 1;
 }
 
+/** Parse party count from request (camelCase, snake_case, string/number). */
+function coercePartyCount(raw: unknown): number | null {
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw === 'string') {
+    const t = raw.trim();
+    if (t === '') return null;
+    const n = Math.floor(Number(t));
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof raw === 'number' && Number.isFinite(raw)) return Math.floor(raw);
+  if (typeof raw === 'boolean') return raw ? 1 : null;
+  const n = Math.floor(Number(raw));
+  return Number.isFinite(n) ? n : null;
+}
+
 export function parsePartySizeAndExtended(body: Record<string, unknown>): {
   partySize: number;
   isExtended: boolean;
 } | null {
-  const rawParty = body.partySize ?? body.party_size;
-  const n = Math.floor(Number(rawParty));
-  if (!Number.isFinite(n) || n < MIN_PARTY_SIZE || n > MAX_PARTY_SIZE) return null;
+  const rawParty = body.partySize ?? body.party_size ?? body['PartySize'];
+  const n = coercePartyCount(rawParty);
+  if (n === null || n < MIN_PARTY_SIZE || n > MAX_PARTY_SIZE) return null;
   const extRaw = body.isExtended ?? body.is_extended;
   if (extRaw === undefined || extRaw === null || extRaw === '') {
     return { partySize: n, isExtended: false };
