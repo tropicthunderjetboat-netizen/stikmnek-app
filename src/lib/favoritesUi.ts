@@ -1,6 +1,25 @@
 import type { Business } from '@/data/businesses';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 
+/** PostgREST / DB: `offering_id` missing, wrong, or not yet in schema cache after migration. */
+export function isDuplicateFavoriteRowError(err: { message?: string; code?: string } | null): boolean {
+  if (!err) return false;
+  if (String(err.code) === '23505') return true;
+  return /duplicate key/i.test(String(err.message ?? ''));
+}
+
+export function isFavoritesOfferingSchemaError(err: { message?: string; code?: string } | null): boolean {
+  if (!err) return false;
+  const m = String(err.message ?? '').toLowerCase();
+  const c = String(err.code ?? '');
+  return (
+    c === 'PGRST204' ||
+    m.includes('offering_id') ||
+    (m.includes('schema cache') && m.includes('favorites')) ||
+    (m.includes('column') && m.includes('offering_id'))
+  );
+}
+
 /** Client-side favorite token (matches loadFavorites / toggleFavorite). */
 export function favoriteKeyForProfile(profileId: string): string {
   return `biz:${profileId}`;
@@ -46,11 +65,14 @@ export function businessesMatchingFavoriteKeys(all: Business[], favoriteKeys: st
     } else if (key.startsWith('biz:')) {
       const pid = key.slice(4);
       if (seenBizFallback.has(pid)) continue;
-      const first = all.find((x) => profileBusinessIdFor(x) === pid);
-      if (first) {
-        out.push(first);
-        seenBizFallback.add(pid);
+      const rows = all.filter((x) => profileBusinessIdFor(x) === pid);
+      for (const b of rows) {
+        if (!seenOffering.has(b.id)) {
+          out.push(b);
+          seenOffering.add(b.id);
+        }
       }
+      if (rows.length > 0) seenBizFallback.add(pid);
     }
   }
   return out;

@@ -9,7 +9,13 @@ import {
   splitBusinessListingsViewRow,
   BUSINESS_LISTINGS_VIEW_COLUMNS,
 } from '@/lib/businessOfferingMap';
-import { favoriteKeysFromDbRows, favoriteKeyForOffering, favoriteKeyForProfile } from '@/lib/favoritesUi';
+import {
+  favoriteKeysFromDbRows,
+  favoriteKeyForOffering,
+  favoriteKeyForProfile,
+  isDuplicateFavoriteRowError,
+  isFavoritesOfferingSchemaError,
+} from '@/lib/favoritesUi';
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
@@ -1508,20 +1514,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         offeringId = target.id !== profileId ? target.id : null;
       }
       const key = offeringId ? favoriteKeyForOffering(offeringId) : favoriteKeyForProfile(profileId);
-      const isFav = favorites.includes(key);
+      const bizKey = favoriteKeyForProfile(profileId);
+      const isFav = favorites.includes(key) || (offeringId != null && favorites.includes(bizKey));
+      const favoritesAtOpen = favorites;
 
       if (isFav) {
-        setFavorites((prev) => prev.filter((f) => f !== key));
+        setFavorites((prev) => prev.filter((f) => f !== key && f !== bizKey));
         toast.success('Removed from favorites');
         if (offeringId) {
-          await supabase.from('favorites').delete().eq('user_id', user.id).eq('offering_id', offeringId);
+          let { error } = await supabase
+            .from('favorites')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('offering_id', offeringId);
+          if (error && isFavoritesOfferingSchemaError(error)) {
+            ({ error } = await supabase
+              .from('favorites')
+              .delete()
+              .eq('user_id', user.id)
+              .eq('business_id', profileId));
+          }
+          if (error) {
+            setFavorites(favoritesAtOpen);
+            toast.error(error.message || 'Could not remove favorite');
+            return;
+          }
         } else {
-          await supabase
+          let { error } = await supabase
             .from('favorites')
             .delete()
             .eq('user_id', user.id)
             .eq('business_id', profileId)
             .is('offering_id', null);
+          if (error && isFavoritesOfferingSchemaError(error)) {
+            ({ error } = await supabase
+              .from('favorites')
+              .delete()
+              .eq('user_id', user.id)
+              .eq('business_id', profileId));
+          }
+          if (error) {
+            setFavorites(favoritesAtOpen);
+            toast.error(error.message || 'Could not remove favorite');
+            return;
+          }
         }
         return;
       }
@@ -1534,14 +1570,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       if (offeringId) {
         insertRow.offering_id = offeringId;
-        await supabase
+        const delLegacy = await supabase
           .from('favorites')
           .delete()
           .eq('user_id', user.id)
           .eq('business_id', profileId)
           .is('offering_id', null);
+        if (delLegacy.error && !isFavoritesOfferingSchemaError(delLegacy.error)) {
+          console.warn('[toggleFavorite] pre-delete legacy favorite:', delLegacy.error);
+        }
       }
-      const { error } = await supabase.from('favorites').insert(insertRow);
+      let { error } = await supabase.from('favorites').insert(insertRow);
+      if (error && offeringId && isFavoritesOfferingSchemaError(error)) {
+        const legacy = await supabase
+          .from('favorites')
+          .insert({ user_id: user.id, business_id: profileId });
+        error = legacy.error;
+        if (!legacy.error) {
+          setFavorites((prev) => {
+            const withoutOff = prev.filter((f) => f !== key);
+            return withoutOff.includes(bizKey) ? withoutOff : [...withoutOff, bizKey];
+          });
+          return;
+        }
+        if (legacy.error && isDuplicateFavoriteRowError(legacy.error)) {
+          setFavorites((prev) => {
+            const withoutOff = prev.filter((f) => f !== key);
+            return withoutOff.includes(bizKey) ? withoutOff : [...withoutOff, bizKey];
+          });
+          return;
+        }
+      }
       if (error) {
         setFavorites((prev) => prev.filter((f) => f !== key));
         console.error('[toggleFavorite] insert failed:', error);
