@@ -7,7 +7,7 @@ import { businesses as localBusinesses } from '@/data/businesses';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { partyCountsFromTouristProfile, computeRedemptionSavingsForListing } from '@/lib/redemptionSavings';
-import { APPROX_VTU_PER_AUD, approximateVatuFromAud } from '@/lib/passValueDisplay';
+import { APPROX_VTU_PER_AUD, approximateAudFromVatu, approximateVatuFromAud } from '@/lib/passValueDisplay';
 import type { Business } from '@/data/businesses';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -82,6 +82,12 @@ const Dashboard: React.FC = () => {
 
   const netSavingsVsPassVtApprox =
     passVtApprox != null ? totalSaved - passVtApprox : null;
+
+  const totalSavedAudApprox = totalSaved > 0 ? approximateAudFromVatu(totalSaved) : 0;
+  const netBalanceAudApprox =
+    netSavingsVsPassVtApprox != null && netSavingsVsPassVtApprox !== 0
+      ? approximateAudFromVatu(netSavingsVsPassVtApprox)
+      : null;
 
   /** Deal savings in VT strictly exceed approximate pass cost — show celebration. */
   const isPassCostBeaten =
@@ -398,6 +404,20 @@ const Dashboard: React.FC = () => {
                     </>
                   )}
                 </p>
+                {totalSaved > 0 && (
+                  <p className="mt-1 text-sm font-extrabold leading-tight">
+                    <span className="bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
+                      ≈ A$
+                      {totalSavedAudApprox.toLocaleString('en-AU', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                    <span className="ml-1 text-[9px] font-bold uppercase text-gray-500">
+                      {language === 'en' ? 'approx.' : language === 'fr' ? 'env.' : 'rid.'}
+                    </span>
+                  </p>
+                )}
                 <p className="text-xs font-semibold text-emerald-800">
                   {language === 'en' ? 'Total saved (redemptions)' : language === 'fr' ? 'Total économisé (utilisations)' : 'Total sevem (redim)'}
                 </p>
@@ -923,9 +943,29 @@ const Dashboard: React.FC = () => {
                     <span className="font-medium text-gray-700">
                       {language === 'en' ? 'Deal savings (redemptions)' : language === 'fr' ? 'Économies (offres)' : 'Sevin long deals'}
                     </span>
-                    <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-xl font-black text-transparent">
-                      {totalSaved.toLocaleString()} VT
-                    </span>
+                    <div className="text-right">
+                      <span className="block bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-xl font-black text-transparent">
+                        {totalSaved.toLocaleString()} VT
+                      </span>
+                      {totalSaved > 0 && (
+                        <div className="mt-1.5 flex flex-col items-end gap-0.5">
+                          <span className="block bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 bg-clip-text text-base font-extrabold tracking-tight text-transparent drop-shadow-sm sm:text-lg">
+                            ≈ A$
+                            {totalSavedAudApprox.toLocaleString('en-AU', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                          <span className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
+                            {language === 'en'
+                              ? `Approx. AUD (~${APPROX_VTU_PER_AUD} VT = 1 AUD)`
+                              : language === 'fr'
+                                ? `AUD indicatif (~${APPROX_VTU_PER_AUD} VT = 1 AUD)`
+                                : `Rid AUD (~${APPROX_VTU_PER_AUD} VT = 1 AUD)`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {netSavingsVsPassVtApprox != null && (
                     <div className="flex flex-col gap-2 border-t border-gray-200/80 pt-4 sm:flex-row sm:items-center sm:justify-between">
@@ -937,23 +977,67 @@ const Dashboard: React.FC = () => {
                             : 'Balans rid (sevin − pass long VT)'}
                       </span>
                       {isPassCostBeaten ? (
-                        <div className="animate-savings-glow rounded-xl bg-white/90 px-4 py-2 text-center shadow-inner ring-2 ring-emerald-400/40 sm:text-right">
+                        <div className="animate-savings-glow rounded-xl bg-white/90 px-4 py-3 text-center shadow-inner ring-2 ring-emerald-400/40 sm:text-right">
                           <span className="block bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-600 bg-clip-text text-2xl font-black text-transparent">
                             +{netSavingsVsPassVtApprox.toLocaleString()} VT
                           </span>
-                          <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wide text-emerald-700/90">
+                          {netBalanceAudApprox != null && (
+                            <>
+                              <span className="mt-1.5 block bg-gradient-to-r from-amber-600 via-orange-500 to-rose-600 bg-clip-text text-lg font-extrabold tracking-tight text-transparent sm:text-xl">
+                                ≈ A$
+                                {Math.abs(netBalanceAudApprox).toLocaleString('en-AU', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </span>
+                              <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-wide text-gray-500">
+                                {language === 'en'
+                                  ? `Approximate — same ~${APPROX_VTU_PER_AUD} VT per 1 AUD`
+                                  : language === 'fr'
+                                    ? `Indicatif — même ~${APPROX_VTU_PER_AUD} VT pour 1 AUD`
+                                    : `Rid nomo — semak ~${APPROX_VTU_PER_AUD} VT long 1 AUD`}
+                              </span>
+                            </>
+                          )}
+                          <span className="mt-1.5 block text-[10px] font-bold uppercase tracking-wide text-emerald-700/90">
                             {language === 'en' ? 'Ahead of your pass' : language === 'fr' ? 'Au-delà du pass' : 'Antap long pass'}
                           </span>
                         </div>
                       ) : (
-                        <span
-                          className={`text-lg font-black ${
-                            netSavingsVsPassVtApprox >= 0 ? 'text-emerald-700' : 'text-amber-700'
-                          }`}
-                        >
-                          {netSavingsVsPassVtApprox >= 0 ? '+' : ''}
-                          {netSavingsVsPassVtApprox.toLocaleString()} VT
-                        </span>
+                        <div className="text-right">
+                          <span
+                            className={`block text-lg font-black ${
+                              netSavingsVsPassVtApprox >= 0 ? 'text-emerald-700' : 'text-amber-700'
+                            }`}
+                          >
+                            {netSavingsVsPassVtApprox >= 0 ? '+' : ''}
+                            {netSavingsVsPassVtApprox.toLocaleString()} VT
+                          </span>
+                          {netBalanceAudApprox != null && (
+                            <div className="mt-1 flex flex-col items-end gap-0.5">
+                              <span
+                                className={`block text-base font-extrabold ${
+                                  netSavingsVsPassVtApprox >= 0
+                                    ? 'bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent'
+                                    : 'bg-gradient-to-r from-amber-700 to-rose-700 bg-clip-text text-transparent'
+                                }`}
+                              >
+                                ≈ {netSavingsVsPassVtApprox >= 0 ? '' : '−'}A$
+                                {Math.abs(netBalanceAudApprox).toLocaleString('en-AU', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </span>
+                              <span className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
+                                {language === 'en'
+                                  ? `Approx. AUD (~${APPROX_VTU_PER_AUD} VT/AUD)`
+                                  : language === 'fr'
+                                    ? `AUD indicatif (~${APPROX_VTU_PER_AUD} VT/AUD)`
+                                    : `Rid AUD (~${APPROX_VTU_PER_AUD} VT/AUD)`}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
