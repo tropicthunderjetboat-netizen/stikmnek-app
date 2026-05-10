@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
-import { Store, ArrowRight, Sparkles, Users, Gift } from 'lucide-react';
+import { ArrowRight, Sparkles, Users, Gift, ListOrdered } from 'lucide-react';
 
 /** Multicolour micro-tile mosaic (same SVG as vibrant redesign; reads as confetti on a green base). */
 const COLOUR_TILES_BG =
@@ -82,6 +82,41 @@ const ListYourBusinessCta: React.FC = () => {
         : user?.type === 'business'
           ? 'Submit a listing'
           : 'Get started';
+
+  const processIntro =
+    language === 'en'
+      ? { kicker: 'How it works', title: 'List from your phone — a few quick steps' }
+      : language === 'fr'
+        ? { kicker: 'Comment ça marche', title: 'Tout depuis votre téléphone, en quelques étapes' }
+        : { kicker: 'Hao i wok', title: 'Long fon — ol step i isi' };
+
+  const processSteps: string[] =
+    language === 'en'
+      ? [
+          'Log in (or create a free business account).',
+          'Upload photos and add a short description.',
+          'Set your price and discount.',
+          'Add your contacts — phone, email & WhatsApp.',
+          'Submit for approval.',
+          'Once approved, your deal is live!',
+        ]
+      : language === 'fr'
+        ? [
+            'Connectez-vous (ou créez un compte entreprise gratuit).',
+            'Ajoutez des photos et une courte description.',
+            'Indiquez votre prix et votre remise.',
+            'Ajoutez vos contacts : téléphone, e-mail et WhatsApp.',
+            'Envoyez pour validation.',
+            'Une fois validé, votre offre est en ligne !',
+          ]
+        : [
+            'Log in (o mekem fri bisnis akaont).',
+            'Uploadem foto mo wan smol description.',
+            'Putem price mo discount.',
+            'Putem kontak — fon, email mo WhatsApp.',
+            'Submitem blong approval.',
+            'Taim oli approvem, deal blong yu i stap LIVE!',
+          ];
 
   return (
     <section className="relative py-16 sm:py-20 overflow-hidden border-t border-teal-200/50">
@@ -175,7 +210,7 @@ const ListYourBusinessCta: React.FC = () => {
               </div>
             </div>
 
-            <div className="relative min-h-[220px] lg:min-h-0 bg-gradient-to-br from-teal-600 via-emerald-600 to-teal-800 p-8 sm:p-10 flex flex-col justify-between">
+            <div className="relative min-h-[280px] lg:min-h-0 bg-gradient-to-br from-teal-600 via-emerald-600 to-teal-800 p-6 sm:p-8 flex flex-col">
               <div
                 className="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_28%_18%,rgba(255,255,255,0.45),transparent_50%)]"
                 aria-hidden
@@ -185,32 +220,62 @@ const ListYourBusinessCta: React.FC = () => {
                 aria-hidden
               />
 
-              <div className="relative">
-                <div className="w-16 h-16 mb-6 rounded-2xl bg-white/15 backdrop-blur-sm border border-white/25 flex items-center justify-center shadow-lg">
-                  <Store className="w-8 h-8 text-white" aria-hidden />
+              <div className="relative flex-1 min-h-0 flex flex-col">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/30 backdrop-blur-sm">
+                    <ListOrdered className="h-5 w-5 text-white" aria-hidden />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-teal-100/90 mb-1">
+                      {processIntro.kicker}
+                    </p>
+                    <h3 className="text-base sm:text-lg font-bold text-white leading-snug">
+                      {processIntro.title}
+                    </h3>
+                  </div>
                 </div>
-                <p className="text-white/95 text-lg sm:text-xl font-bold leading-snug mb-2">
-                  {language === 'en'
-                    ? 'Your next guests are browsing right now.'
-                    : language === 'fr'
-                      ? 'Vos prochains clients consultent l’appli maintenant.'
-                      : 'Nex guest oli lukluk long app naoia.'}
-                </p>
-                <p className="text-teal-100/90 text-sm leading-relaxed">
-                  {language === 'en'
-                    ? 'Join StikmNek — simple onboarding, friendly review, then you’re live.'
-                    : language === 'fr'
-                      ? 'Rejoignez StikmNek — inscription simple, validation bienveillante, puis vous êtes en ligne.'
-                      : 'Joinem StikmNek — isi onboarding, review gudfala, afta yu stap live.'}
-                </p>
-              </div>
-              <div className="relative mt-8 flex flex-wrap gap-2">
-                <span className="inline-flex items-center rounded-lg bg-black/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white/90 border border-white/10">
-                  {language === 'en' ? 'Port Vila & beyond' : language === 'fr' ? 'Port-Vila & plus' : 'Port Vila mo'}
-                </span>
-                <span className="inline-flex items-center rounded-lg bg-black/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white/90 border border-white/10">
-                  {language === 'en' ? 'Deals & discounts' : language === 'fr' ? 'Offres & promos' : 'Ol dil'}
-                </span>
+
+                <ul
+                  className="list-none space-y-2.5 sm:space-y-3 flex-1 overflow-y-auto pr-1 [scrollbar-width:thin] m-0 p-0"
+                  aria-label={processIntro.title}
+                >
+                  {processSteps.map((step, i) => {
+                    const isLast = i === processSteps.length - 1;
+                    return (
+                      <li key={i} className="flex gap-3 items-start">
+                        <span
+                          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black tabular-nums ${
+                            isLast
+                              ? 'bg-amber-300 text-teal-900 ring-2 ring-amber-100/80 shadow-md'
+                              : 'bg-black/20 text-white ring-1 ring-white/25'
+                          }`}
+                        >
+                          {i + 1}
+                        </span>
+                        <span
+                          className={`text-[13px] sm:text-sm leading-snug pt-0.5 ${
+                            isLast ? 'text-white font-semibold' : 'text-teal-50/95 font-medium'
+                          }`}
+                        >
+                          {step}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+
+                <div className="relative mt-5 pt-4 border-t border-white/15 flex flex-wrap gap-2">
+                  <span className="inline-flex items-center rounded-lg bg-black/20 px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-white/95 ring-1 ring-white/10">
+                    {language === 'en'
+                      ? 'Made for mobile'
+                      : language === 'fr'
+                        ? 'Pensé pour le mobile'
+                        : 'I stret long fon'}
+                  </span>
+                  <span className="inline-flex items-center rounded-lg bg-black/20 px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-white/95 ring-1 ring-white/10">
+                    {language === 'en' ? 'Port Vila +' : language === 'fr' ? 'Port-Vila +' : 'Port Vila +'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
