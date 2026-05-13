@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
-import { ArrowRight, Sparkles, Users, Gift, ListOrdered } from 'lucide-react';
+import { ArrowRight, Sparkles, Users, Gift, ListOrdered, PartyPopper } from 'lucide-react';
 
 /** Multicolour micro-tile mosaic (same SVG as vibrant redesign; reads as confetti on a green base). */
 const COLOUR_TILES_BG =
@@ -244,13 +244,19 @@ const ListYourBusinessCta: React.FC = () => {
                     return (
                       <li key={i} className="flex gap-3 items-start">
                         <span
-                          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black tabular-nums ${
+                          className={`relative mt-0.5 flex shrink-0 items-center justify-center rounded-full font-black tabular-nums leading-none select-none ${
                             isLast
-                              ? 'bg-amber-300 text-teal-900 ring-2 ring-amber-100/80 shadow-md'
-                              : 'bg-black/20 text-white ring-1 ring-white/25'
+                              ? 'size-8 min-h-8 min-w-8 aspect-square bg-gradient-to-br from-amber-200 via-orange-400 to-rose-500 text-white text-sm shadow-[0_4px_14px_-2px_rgba(249,115,22,0.55)] ring-2 ring-white/70 ring-offset-2 ring-offset-teal-800/80'
+                              : 'size-7 min-h-7 min-w-7 aspect-square bg-black/20 text-white text-xs ring-1 ring-white/25'
                           }`}
                         >
-                          {i + 1}
+                          {isLast && (
+                            <PartyPopper
+                              className="pointer-events-none absolute -right-1 -top-1 h-3.5 w-3.5 text-amber-100 drop-shadow-md opacity-95"
+                              aria-hidden
+                            />
+                          )}
+                          <span className={isLast ? 'relative z-[1]' : undefined}>{i + 1}</span>
                         </span>
                         <span
                           className={`text-[13px] sm:text-sm leading-snug pt-0.5 ${
