@@ -1561,10 +1561,32 @@ const PaymentCheckout: React.FC = () => {
                   </div>
 
                   {paypalHostedCardEnabled && paypalCardEligible === false && !paypalSdkError && (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
-                      PayPal Advanced Card payments are not available in this browser or for this account.
-                      Set <code className="text-xs bg-white px-1 rounded">VITE_PAYPAL_CLIENT_ID</code> to a merchant
-                      profile with Expanded Checkout enabled, refresh, and try again.
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 space-y-2">
+                      <p className="font-semibold text-gray-800">PayPal is not offering hosted card fields for this session</p>
+                      <p>
+                        Your site already has a client ID (the PayPal SDK loaded). This message means PayPal returned
+                        “not eligible” for Advanced Card / Expanded Checkout — usually a merchant or app setting, not a
+                        missing <code className="text-xs bg-white px-1 rounded">VITE_PAYPAL_CLIENT_ID</code>.
+                      </p>
+                      <ul className="list-disc pl-5 space-y-1 text-gray-600">
+                        <li>
+                          In{' '}
+                          <a
+                            className="text-teal-700 underline font-medium"
+                            href="https://developer.paypal.com/dashboard/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            PayPal Developer
+                          </a>
+                          : same REST app as this client ID → enable **Advanced** / **Expanded** credit and debit card
+                          payments for your **business** account (complete any onboarding PayPal shows).
+                        </li>
+                        <li>
+                          Use a **sandbox** client ID while testing, and match Edge <code className="text-xs bg-white px-1 rounded">PAYPAL_MODE</code> (sandbox vs live).
+                        </li>
+                        <li>Try another browser, or turn off ad blockers / strict tracking protection that block PayPal scripts or iframes.</li>
+                      </ul>
                     </div>
                   )}
 
