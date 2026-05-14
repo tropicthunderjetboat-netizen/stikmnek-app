@@ -184,11 +184,11 @@ export async function diagnoseAuthConfig(): Promise<DiagnosticResult[]> {
       results.push({
         test: 'Email Confirmation Setting',
         status: 'warn',
-        message: 'EMAIL CONFIRMATION IS REQUIRED. Users must click the email link before they appear as "confirmed" in auth.users. If SendGrid is not configured in Supabase Auth > SMTP, confirmation emails will NOT be sent and users will be stuck in limbo.',
+        message: 'EMAIL CONFIRMATION IS REQUIRED. Users must click the email link before they appear as "confirmed" in auth.users. If custom SMTP is not configured in Supabase Auth (or the built-in mailer fails), confirmation emails may not arrive and users can be stuck unconfirmed.',
         details: {
           emailEnabled: data.external.email,
           autoconfirm: data.mailer_autoconfirm,
-          fix: 'Go to Supabase Dashboard > Authentication > Settings > Email and either: (1) Configure custom SMTP with your SendGrid credentials, or (2) Enable "Confirm email" toggle OFF to auto-confirm users.',
+          fix: 'Go to Supabase Dashboard > Authentication > Settings > Email and either: (1) Configure custom SMTP (e.g. Resend SMTP credentials) so confirmation mail delivers, or (2) Turn OFF "Confirm email" to auto-confirm users.',
         },
         timestamp: ts(),
       });

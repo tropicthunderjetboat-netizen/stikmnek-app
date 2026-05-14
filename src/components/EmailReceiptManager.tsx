@@ -217,24 +217,29 @@ const EmailReceiptManager: React.FC<Props> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* SendGrid Status Banner */}
+      {/* Resend: verify sending domain + from address */}
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h4 className="text-sm font-bold text-amber-900">SendGrid Sender Verification Required</h4>
+            <h4 className="text-sm font-bold text-amber-900">Resend — domain & sender</h4>
             <p className="text-xs text-amber-700 mt-1 leading-relaxed">
-              Your SendGrid account requires a verified sender identity before emails can be delivered. 
-              The current <code className="px-1.5 py-0.5 bg-amber-100 rounded text-amber-800 font-mono text-[10px]">no-reply@stikmnek.com</code> address 
-              is not verified.
+              Transactional mail uses <strong>Resend</strong>. Add and verify your domain at Resend, then set{' '}
+              <code className="px-1.5 py-0.5 bg-amber-100 rounded text-amber-800 font-mono text-[10px]">RESEND_API_KEY</code> and{' '}
+              <code className="px-1.5 py-0.5 bg-amber-100 rounded text-amber-800 font-mono text-[10px]">RESEND_FROM_EMAIL</code>{' '}
+              (e.g. <code className="px-1 py-0.5 bg-amber-100 rounded font-mono text-[10px]">no-reply@stikmnek.com</code>) in Supabase Edge Function secrets.
             </p>
             <div className="mt-3 space-y-2">
-              <p className="text-xs font-semibold text-amber-800">To fix this:</p>
+              <p className="text-xs font-semibold text-amber-800">Setup:</p>
               <ol className="text-xs text-amber-700 space-y-1.5 ml-4 list-decimal">
-                <li>Go to <a href="https://app.sendgrid.com/settings/sender_auth" target="_blank" rel="noopener noreferrer" className="text-amber-900 underline font-semibold inline-flex items-center gap-0.5">SendGrid Sender Authentication <ExternalLink className="w-3 h-3" /></a></li>
-                <li>Click <strong>"Verify a Single Sender"</strong> and add your email (e.g., <code className="px-1 py-0.5 bg-amber-100 rounded font-mono text-[10px]">Vanuatuwatersports@gmail.com</code>)</li>
-                <li>Check your inbox and click the verification link</li>
-                <li>Update the <code className="px-1 py-0.5 bg-amber-100 rounded font-mono text-[10px]">from</code> email in the edge function to match</li>
+                <li>
+                  <a href="https://resend.com/domains" target="_blank" rel="noopener noreferrer" className="text-amber-900 underline font-semibold inline-flex items-center gap-0.5">
+                    Resend Domains <ExternalLink className="w-3 h-3" />
+                  </a>{' '}
+                  — add <code className="font-mono text-[10px]">stikmnek.com</code> and complete DNS records
+                </li>
+                <li>Create an API key and add it as <code className="font-mono text-[10px]">RESEND_API_KEY</code> for functions <code className="font-mono text-[10px]">send-email</code>, <code className="font-mono text-[10px]">manage-business</code>, <code className="font-mono text-[10px]">paypal-capture</code></li>
+                <li>Match <code className="font-mono text-[10px]">RESEND_FROM_EMAIL</code> to an address on the verified domain</li>
               </ol>
             </div>
           </div>
@@ -457,24 +462,42 @@ const EmailReceiptManager: React.FC<Props> = ({ onBack }) => {
                   {/* Detailed error info */}
                   {sendResult.details && !sendResult.success && (
                     <div className="mt-3 space-y-2">
-                      {sendResult.details.sendgrid && (
+                      {(sendResult.details.resend || sendResult.details.sendgrid) && (
                         <div className="p-3 bg-white/60 rounded-xl">
-                          <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">SendGrid Response</p>
+                          <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">Email API response</p>
                           <p className="text-xs text-red-700 font-mono break-all">
-                            Status {sendResult.details.sendgrid.statusCode}: {
-                              (() => {
-                                try {
-                                  const parsed = JSON.parse(sendResult.details.sendgrid.response || '{}');
-                                  return parsed.errors?.[0]?.message || sendResult.details.sendgrid.error;
-                                } catch { return sendResult.details.sendgrid.error; }
-                              })()
-                            }
+                            {(() => {
+                              const d = sendResult.details.resend ?? sendResult.details.sendgrid;
+                              const code = d?.statusCode ?? d?.status;
+                              const raw = d?.response ?? d?.body ?? '';
+                              try {
+                                const parsed = JSON.parse(raw || '{}');
+                                return `Status ${code}: ${parsed.message ?? parsed.errors?.[0]?.message ?? d?.error ?? raw}`;
+                              } catch {
+                                return `Status ${code}: ${d?.error ?? raw}`;
+                              }
+                            })()}
+                          </p>
+                        </div>
+                      )}
+                      {typeof sendResult.details === 'string' && sendResult.details.trim() && (
+                        <div className="p-3 bg-white/60 rounded-xl">
+                          <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">Email API response</p>
+                          <p className="text-xs text-red-700 font-mono break-all">
+                            {(() => {
+                              try {
+                                const parsed = JSON.parse(sendResult.details);
+                                return parsed.message ?? parsed.error ?? sendResult.details;
+                              } catch {
+                                return sendResult.details;
+                              }
+                            })()}
                           </p>
                         </div>
                       )}
                       {sendResult.details.gateway && (
                         <div className="p-3 bg-white/60 rounded-xl">
-                          <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">Gateway/Resend Response</p>
+                          <p className="text-[10px] font-bold text-red-800 uppercase tracking-wider mb-1">Gateway response</p>
                           <p className="text-xs text-red-700 font-mono break-all">
                             Status {sendResult.details.gateway.statusCode}: {
                               (() => {

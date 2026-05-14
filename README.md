@@ -36,7 +36,7 @@ StikmNek is a full-stack web application that connects tourists in Vanuatu with 
 - **Admin Panel**: Approve/reject listings, manage users, view platform statistics
 - **Review System**: Star ratings, text reviews, business owner responses, SuperStar reviews
 - **Payment Processing**: PayPal integration (sandbox + live modes)
-- **Email Notifications**: SendGrid-powered transactional emails
+- **Email Notifications**: Resend-powered transactional emails
 - **Multi-language Support**: English, French, Bislama
 - **Geolocation**: Nearby deals, proximity alerts, interactive Leaflet map
 - **PWA**: Offline support, installable, service worker caching
@@ -64,7 +64,7 @@ StikmNek is a full-stack web application that connects tourists in Vanuatu with 
 │  └──────────────┘  └──────────────┘                          │
 ├─────────────────────────────────────────────────────────────┤
 │                  External Services                           │
-│  PayPal (Payments) | SendGrid (Email) | Sentry (Errors)     │
+│  PayPal (Payments) | Resend (Email) | Sentry (Errors)       │
 │  Google Analytics (Tracking)                                 │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -92,7 +92,7 @@ StikmNek is a full-stack web application that connects tourists in Vanuatu with 
 | Charts | Recharts |
 | Backend | Supabase (PostgreSQL, Edge Functions, Auth, Storage, Realtime) |
 | Payments | PayPal REST API v2 |
-| Email | SendGrid v3 API |
+| Email | Resend REST API |
 | Monitoring | Sentry (via relay), Custom ErrorLogger |
 | Analytics | Google Analytics 4, Custom analytics module |
 | PWA | Service Worker, Web App Manifest |
@@ -242,7 +242,7 @@ Extends an existing pass duration.
 Verifies QR code and records deal redemption.
 
 ### `send-email`
-SendGrid email delivery for notifications.
+Resend email delivery for notifications (pass confirmation, booking inquiries, etc.).
 
 ### `upload-photo`
 Handles business photo uploads to Supabase Storage.
@@ -413,7 +413,9 @@ Set via Supabase dashboard or CLI:
 ```bash
 supabase secrets set SENTRY_DSN=<your-dsn>
 supabase secrets set GA_MEASUREMENT_ID=<your-id>
-supabase secrets set SENDGRID_API_KEY=<your-key>
+supabase secrets set RESEND_API_KEY=<your-key>
+supabase secrets set RESEND_FROM_EMAIL=no-reply@yourdomain.com
+# Optional: RESEND_FROM_NAME=StikmNek
 supabase secrets set PAYPAL_CLIENT_ID=<your-id>
 supabase secrets set PAYPAL_CLIENT_SECRET=<your-secret>
 supabase secrets set PAYPAL_MODE=live
@@ -432,7 +434,9 @@ supabase secrets set PAYPAL_MODE=live
 | `PAYPAL_CLIENT_ID` | PayPal | PayPal app client ID |
 | `PAYPAL_CLIENT_SECRET` | PayPal | PayPal app secret key |
 | `PAYPAL_MODE` | PayPal | "sandbox" or "live" |
-| `SENDGRID_API_KEY` | SendGrid | Email delivery API key |
+| `RESEND_API_KEY` | Resend | Transactional email API key (required for `send-email`, `manage-business`, `paypal-capture`) |
+| `RESEND_FROM_EMAIL` | Resend | Verified sender address (e.g. `no-reply@stikmnek.com`) |
+| `RESEND_FROM_NAME` | Resend | Display name for the From header (optional) |
 | `SENTRY_DSN` | Sentry | Error tracking DSN |
 | `GA_MEASUREMENT_ID` | Google | Analytics measurement ID |
 | `GATEWAY_API_KEY` | Internal | API gateway key |
@@ -447,7 +451,7 @@ supabase secrets set PAYPAL_MODE=live
 - [ ] Business signup → Listing submission → Admin approval → Live listing
 - [ ] Business edit → Admin review → Changes applied
 - [ ] PayPal payment flow (sandbox mode)
-- [ ] Email notifications (SendGrid)
+- [ ] Email notifications (Resend: domain verified, secrets set)
 - [ ] QR code generation and scanning
 - [ ] Map view with geolocation
 - [ ] Multi-language switching

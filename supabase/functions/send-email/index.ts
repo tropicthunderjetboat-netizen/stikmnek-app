@@ -2,18 +2,24 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { normalizePassTypeToDb } from '../_shared/passTypes.ts';
+import {
+  getResendApiKey,
+  getTransactionalFromHeader,
+  parseResendErrorMessage,
+  sendResendEmail,
+} from '../_shared/resend.ts';
 
 /**
  * send-email Edge Function
- * Handles email notifications via SendGrid.
+ * Transactional email via Resend (https://resend.com).
  * Required secrets (Supabase → Project Settings → Edge Functions → Secrets):
- *   SENDGRID_API_KEY — your SendGrid API key
- * Optional (defaults shown):
- *   SENDGRID_FROM_EMAIL — default no-reply@stikmnek.com (must be verified in SendGrid)
- *   SENDGRID_FROM_NAME — default "StikmNek"
- *   SUPABASE_SERVICE_ROLE_KEY — required for send_booking_inquiry (pass check, business row, owner email)
+ *   RESEND_API_KEY — Resend API key (re_…)
  * Optional:
- *   BOOKING_INQUIRY_BCC — comma-separated emails to BCC on every booking inquiry (e.g. ops inbox for debugging)
+ *   RESEND_FROM_EMAIL — default no-reply@stikmnek.com (domain must be verified in Resend)
+ *   RESEND_FROM_NAME — default "StikmNek"
+ *   Legacy migration: if RESEND_FROM_* unset, SENDGRID_FROM_EMAIL / SENDGRID_FROM_NAME are still read.
+ *   SUPABASE_SERVICE_ROLE_KEY — required for send_booking_inquiry (pass check, business row, owner email)
+ *   BOOKING_INQUIRY_BCC — comma-separated emails to BCC on every booking inquiry (e.g. ops inbox)
  *   PASS_CONFIRMATION_EMAIL_OVERRIDE — if set, send_pass_confirmation delivers to this address instead of the
  *     purchaser’s auth email (for one-off QA). Remove after testing.
  * CORS: CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
@@ -28,24 +34,6 @@ function jsonResponse(req: Request, data: object, status = 200) {
 
 function errorResponse(req: Request, message: string, status = 400, extra?: Record<string, unknown>) {
   return jsonResponse(req, { success: false, error: message, errorCode: status, ...extra }, status);
-}
-
-/** Parse SendGrid v3 JSON error body for a short operator-facing message. */
-function userFacingSendGridError(status: number, errText: string): string {
-  try {
-    const parsed = JSON.parse(errText) as { errors?: { message?: string }[] };
-    const first = parsed?.errors?.[0]?.message;
-    if (first && typeof first === 'string' && first.trim()) return first.trim();
-  } catch {
-    /* ignore */
-  }
-  if (status === 401 || status === 403) {
-    return 'SendGrid rejected the request (check API key and sender authentication).';
-  }
-  if (status === 400) {
-    return 'SendGrid rejected the recipient (invalid, blocked, or non-existent address is common).';
-  }
-  return `Email could not be sent (SendGrid HTTP ${status}).`;
 }
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
@@ -262,22 +250,21 @@ Deno.serve(async (req) => {
 
     // ─── HEALTH ───
     if (action === 'health_check') {
-      const hasKey = !!Deno.env.get('SENDGRID_API_KEY');
+      const hasKey = !!getResendApiKey();
       return jsonResponse(req, {
         success: true,
-        sendgrid_configured: hasKey,
-        message: hasKey ? 'SendGrid configured' : 'SENDGRID_API_KEY not set - emails will not send',
+        resend_configured: hasKey,
+        message: hasKey ? 'Resend configured' : 'RESEND_API_KEY not set - emails will not send',
       });
     }
 
     // ─── SEND_BUSINESS_DECISION ───
     if (action === 'send_business_decision') {
-      const apiKey = Deno.env.get('SENDGRID_API_KEY');
-      if (!apiKey) {
-        console.warn('[send-email] SENDGRID_API_KEY not set - skipping email');
+      if (!getResendApiKey()) {
+        console.warn('[send-email] RESEND_API_KEY not set - skipping email');
         return jsonResponse(req, {
           success: false,
-          error: 'Email not configured. Set SENDGRID_API_KEY in Supabase secrets.',
+          error: 'Email not configured. Set RESEND_API_KEY in Supabase secrets.',
         });
       }
 
@@ -309,38 +296,21 @@ Deno.serve(async (req) => {
         ? `<p>Congratulations! Your business listing "${safeBusinessName}" has been approved and is now live on StikmNek.</p>${notesBlock}`
         : `<p>Your business listing "${safeBusinessName}" was not approved at this time.</p>${notesBlock}<p>Please contact support if you have questions.</p>`;
 
-      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          personalizations: [{ to: [{ email: emailStr }] }],
-          from: {
-            email: Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com',
-            name: Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek',
-          },
-          subject,
-          content: [{ type: 'text/html', value: html }],
-        }),
+      const res = await sendResendEmail({
+        to: emailStr,
+        subject,
+        html,
       });
 
       if (!res.ok) {
-        let errText = '';
-        try {
-          errText = await res.text();
-        } catch (e) {
-          errText = '(could not read response body)';
-        }
-        const logMsg = `[send-email] SendGrid send_business_decision FAILED status=${res.status} body=${errText}`;
+        const errText = res.body;
+        const logMsg = `[send-email] Resend send_business_decision FAILED status=${res.status} body=${errText}`;
         console.error(logMsg);
-        const userMsg = userFacingSendGridError(res.status, errText);
-        // HTTP 200 so the browser client receives JSON instead of a generic "non-2xx" invoke error.
+        const userMsg = parseResendErrorMessage(res.status, errText);
         return jsonResponse(req, {
           success: false,
           error: userMsg,
-          sendgridStatus: res.status,
+          resendStatus: res.status,
           details: errText.slice(0, 1200),
         });
       }
@@ -349,18 +319,19 @@ Deno.serve(async (req) => {
     }
 
     // ─── SEND_PASS_CONFIRMATION (receipt email after pass purchase) ───
-    // Called from PaymentConfirmation page when user lands on receipt. Requires SENDGRID_API_KEY.
-    // From address should be a verified sender in SendGrid (e.g. no-reply@stikmnek.com).
+    // Called from PaymentConfirmation page when user lands on receipt. Requires RESEND_API_KEY.
+    // From address must use a domain verified in Resend (e.g. no-reply@stikmnek.com).
     if (action === 'send_pass_confirmation') {
       console.log('[send-email] send_pass_confirmation: started');
 
-      const apiKey = Deno.env.get('SENDGRID_API_KEY');
-      const fromEnv = Deno.env.get('SENDGRID_FROM_EMAIL');
-      console.log('[send-email] SENDGRID_API_KEY present:', !!apiKey);
-      console.log('[send-email] SENDGRID_FROM_EMAIL from env:', fromEnv ?? '(not set, will use default)');
+      console.log('[send-email] RESEND_API_KEY present:', !!getResendApiKey());
+      console.log(
+        '[send-email] RESEND_FROM_EMAIL from env:',
+        Deno.env.get('RESEND_FROM_EMAIL') ?? Deno.env.get('SENDGRID_FROM_EMAIL') ?? '(not set, will use default)',
+      );
 
-      if (!apiKey) {
-        const msg = 'Email not configured. Set SENDGRID_API_KEY in Supabase Edge Function secrets.';
+      if (!getResendApiKey()) {
+        const msg = 'Email not configured. Set RESEND_API_KEY in Supabase Edge Function secrets.';
         console.error('[send-email] send_pass_confirmation FAILED: ' + msg);
         return jsonResponse(req, { success: false, error: msg }, 500);
       }
@@ -388,16 +359,13 @@ Deno.serve(async (req) => {
 
       const passLabel = passTypeToBrandDisplay(pass_type);
 
-      const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
-      const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
-
       /** Temporary: set PASS_CONFIRMATION_EMAIL_OVERRIDE in Supabase secrets to receive test receipts at a real inbox. Remove after verification. */
       const emailOverride = (Deno.env.get('PASS_CONFIRMATION_EMAIL_OVERRIDE') ?? '').trim();
       const toEmail = emailOverride || user_email;
       if (emailOverride) {
         console.warn('[send-email] PASS_CONFIRMATION_EMAIL_OVERRIDE active — sending pass confirmation to:', emailOverride, '(not to user account email)');
       }
-      console.log('[send-email] From address:', fromEmail, '| To:', toEmail);
+      console.log('[send-email] From (Resend):', getTransactionalFromHeader(), '| To:', toEmail);
 
       const subject = `StikmNek receipt — ${passLabel}`;
       const safeName = escapeHtml(user_name || '');
@@ -535,48 +503,25 @@ Deno.serve(async (req) => {
 </html>
       `.trim();
 
-      const sgBody = {
-        personalizations: [{ to: [{ email: toEmail, name: user_name ?? undefined }] }],
-        from: { email: fromEmail, name: fromName },
+      const res = await sendResendEmail({
+        to: toEmail,
         subject,
-        content: [{ type: 'text/html', value: html }],
-      };
-      console.log('[send-email] Calling SendGrid API...');
-      let res: Response;
-      try {
-        res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(sgBody),
-        });
-      } catch (fetchErr: unknown) {
-        const fetchMsg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-        const logMsg = `[send-email] SendGrid fetch threw: ${fetchMsg}`;
-        console.error(logMsg);
-        return jsonResponse(
-          req,
-          { success: false, error: 'SendGrid request failed', details: fetchMsg },
-          500,
-        );
-      }
+        html,
+      });
 
-      console.log('[send-email] SendGrid response status:', res.status);
+      console.log('[send-email] Resend response status:', res.status);
 
       if (!res.ok) {
-        let errText = '';
-        try {
-          errText = await res.text();
-        } catch (e) {
-          errText = '(could not read response body)';
-        }
-        const logMsg = `[send-email] SendGrid send_pass_confirmation FAILED status=${res.status} body=${errText}`;
+        const errText = res.body;
+        const logMsg = `[send-email] Resend send_pass_confirmation FAILED status=${res.status} body=${errText}`;
         console.error(logMsg);
         return jsonResponse(
           req,
-          { success: false, error: `SendGrid error: ${res.status}`, details: errText },
+          {
+            success: false,
+            error: parseResendErrorMessage(res.status, errText),
+            details: errText,
+          },
           500,
         );
       }
@@ -585,16 +530,15 @@ Deno.serve(async (req) => {
       return jsonResponse(req, { success: true, sent: true, deliveredTo: toEmail, override: Boolean(emailOverride) });
     }
 
-    // ─── SEND_BOOKING_INQUIRY (tourist → business owner via SendGrid) ───
+    // ─── SEND_BOOKING_INQUIRY (tourist → business owner via Resend) ───
     if (action === 'send_booking_inquiry') {
       console.log('[send-email] send_booking_inquiry: started');
 
-      const apiKey = Deno.env.get('SENDGRID_API_KEY');
-      console.log('[send-email] SENDGRID_API_KEY present:', !!apiKey);
-      if (!apiKey) {
+      console.log('[send-email] RESEND_API_KEY present:', !!getResendApiKey());
+      if (!getResendApiKey()) {
         return jsonResponse(req, {
           success: false,
-          error: 'Email not configured. Set SENDGRID_API_KEY in Supabase secrets.',
+          error: 'Email not configured. Set RESEND_API_KEY in Supabase secrets.',
         }, 500);
       }
 
@@ -740,70 +684,52 @@ Deno.serve(async (req) => {
     </div>
       `.trim();
 
-      const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
-      const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
-
-      console.log('[send-email] From address:', fromEmail, '| To (business):', maskEmailForLog(ownerEmail));
+      console.log('[send-email] From (Resend):', getTransactionalFromHeader(), '| To (business):', maskEmailForLog(ownerEmail));
 
       const bccRaw = Deno.env.get('BOOKING_INQUIRY_BCC')?.trim();
       const bccList = bccRaw
         ? bccRaw.split(',').map((e) => e.trim()).filter((e) => e.includes('@'))
         : [];
-
-      const personalization: Record<string, unknown> = {
-        to: [{ email: ownerEmail }],
-      };
       if (bccList.length > 0) {
-        personalization.bcc = bccList.map((email) => ({ email }));
         console.log('[send-email] BCC count:', bccList.length);
       }
 
-      const mailPayload: Record<string, unknown> = {
-        personalizations: [personalization],
-        from: { email: fromEmail, name: fromName },
+      const reply =
+        typeof tourist_email === 'string' && tourist_email.trim()
+          ? {
+            email: tourist_email.trim(),
+            name: typeof tourist_name === 'string' && tourist_name.trim() ? tourist_name.trim() : undefined,
+          }
+          : undefined;
+
+      console.log('[send-email] Calling Resend API (booking inquiry)...');
+      const res = await sendResendEmail({
+        to: ownerEmail,
         subject,
-        content: [{ type: 'text/html', value: html }],
-      };
-
-      const reply = typeof tourist_email === 'string' && tourist_email.trim();
-      if (reply) {
-        mailPayload.reply_to = {
-          email: tourist_email.trim(),
-          name: typeof tourist_name === 'string' && tourist_name.trim() ? tourist_name.trim() : undefined,
-        };
-      }
-
-      console.log('[send-email] Calling SendGrid API (booking inquiry)...');
-      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(mailPayload),
+        html,
+        bcc: bccList.length > 0 ? bccList : undefined,
+        replyTo: reply,
       });
 
       const sgStatus = res.status;
-      console.log('[send-email] SendGrid response status:', sgStatus);
+      console.log('[send-email] Resend response status:', sgStatus);
 
       if (!res.ok) {
-        let errText = '';
-        try {
-          errText = await res.text();
-        } catch {
-          errText = '(could not read response body)';
-        }
-        console.error('[send-email] SendGrid send_booking_inquiry FAILED status=', sgStatus, 'body=', errText);
+        const errText = res.body;
+        console.error('[send-email] Resend send_booking_inquiry FAILED status=', sgStatus, 'body=', errText);
         return jsonResponse(
           req,
-          { success: false, error: `SendGrid error: ${sgStatus}`, details: errText },
+          {
+            success: false,
+            error: parseResendErrorMessage(sgStatus, errText),
+            details: errText,
+          },
           500,
         );
       }
 
-      const msgId = res.headers.get('x-message-id') ?? res.headers.get('X-Message-Id');
-      if (msgId) {
-        console.log('[send-email] SendGrid X-Message-Id:', msgId);
+      if (res.id) {
+        console.log('[send-email] Resend email id:', res.id);
       }
       console.log('[send-email] send_booking_inquiry: completed OK (HTTP', sgStatus, ')');
 

@@ -18,6 +18,7 @@ import {
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
 import { parsePassPartyWithProfileFallback } from '../_shared/parsePassPartyWithProfileFallback.ts';
+import { getResendApiKey, sendResendEmail } from '../_shared/resend.ts';
 
 function passTypeToBrandDisplay(passType: string): string {
   if (String(passType).toLowerCase() === 'dynamic') return 'StikmNek Pass';
@@ -51,14 +52,10 @@ async function sendReceiptEmail(params: {
   validFrom: string;
   validUntil: string;
 }): Promise<{ sent: boolean; skipped?: boolean; error?: string }> {
-  const apiKey = Deno.env.get('SENDGRID_API_KEY');
-  if (!apiKey) {
-    console.warn('[paypal-capture] SENDGRID_API_KEY not set - skipping receipt email');
-    return { sent: false, skipped: true, error: 'SENDGRID_API_KEY not set' };
+  if (!getResendApiKey()) {
+    console.warn('[paypal-capture] RESEND_API_KEY not set - skipping receipt email');
+    return { sent: false, skipped: true, error: 'RESEND_API_KEY not set' };
   }
-
-  const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
-  const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
 
   const passLabel = passTypeToBrandDisplay(params.passType);
 
@@ -95,28 +92,15 @@ async function sendReceiptEmail(params: {
     </div>
   `;
 
-  const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      personalizations: [
-        {
-          to: [{ email: params.toEmail, name: params.toName ?? undefined }],
-          subject,
-        },
-      ],
-      from: { email: fromEmail, name: fromName },
-      content: [{ type: 'text/html', value: html }],
-    }),
+  const res = await sendResendEmail({
+    to: params.toEmail,
+    subject,
+    html,
   });
 
   if (!res.ok) {
-    const errText = await res.text();
-    console.error('[paypal-capture] SendGrid receipt error:', res.status, errText);
-    return { sent: false, error: `SendGrid error: ${res.status}` };
+    console.error('[paypal-capture] Resend receipt error:', res.status, res.body);
+    return { sent: false, error: `Resend error: ${res.status}` };
   }
 
   return { sent: true };
