@@ -4,8 +4,8 @@
  * Handles business listing submission, admin review, edits, and related operations.
  * Uses SUPABASE_SERVICE_ROLE_KEY to bypass RLS for secure database operations.
  *
- * Email (initial listing approval): requires SENDGRID_API_KEY (same as send-email / paypal-capture).
- * Optional: SENDGRID_FROM_EMAIL (default stikmnek@gmail.com if unset), SENDGRID_FROM_NAME, APP_BASE_URL (default https://www.stikmnek.com).
+ * Email (listing approval / live notice): requires RESEND_API_KEY (same as send-email / paypal-capture).
+ * Optional: RESEND_FROM_EMAIL, RESEND_FROM_NAME (or legacy SENDGRID_FROM_*), APP_BASE_URL (default https://www.stikmnek.com).
  * CORS: set CORS_ALLOWED_ORIGINS (comma-separated origins) in Edge Function secrets.
  * If unset, Access-Control-Allow-Origin is *. If set, request Origin must match an entry (see getSafeCorsHeaders).
  *
@@ -16,6 +16,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
+import { getResendApiKey, sendResendEmail } from '../_shared/resend.ts';
 import { purgePublicDataForAuthUser } from './purge-user.ts';
 
 const CATEGORIES = ['dining', 'accommodation', 'tours', 'activities', 'shopping', 'transport', 'services', 'other'];
@@ -498,7 +499,7 @@ async function resolveOwnerNotificationEmail(
 }
 
 /**
- * SendGrid: congratulatory email when a brand-new business listing is first approved.
+ * Resend: congratulatory email when a brand-new business listing is first approved.
  * Best-effort: logs on failure; does not throw (approval already persisted).
  */
 async function sendInitialListingLiveEmail(params: {
@@ -506,14 +507,11 @@ async function sendInitialListingLiveEmail(params: {
   businessName: string;
   listingUrl: string;
 }): Promise<{ sent: boolean; skipped?: boolean; error?: string }> {
-  const apiKey = Deno.env.get('SENDGRID_API_KEY');
-  if (!apiKey) {
-    console.warn('[manage-business] SENDGRID_API_KEY not set — skipping listing-live email');
-    return { sent: false, skipped: true, error: 'SENDGRID_API_KEY not set' };
+  if (!getResendApiKey()) {
+    console.warn('[manage-business] RESEND_API_KEY not set — skipping listing-live email');
+    return { sent: false, skipped: true, error: 'RESEND_API_KEY not set' };
   }
 
-  const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'stikmnek@gmail.com';
-  const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
   const subject = 'Congratulations! Your StikmNek Listing is Live!';
 
   const nameEsc = escapeHtmlEmail(params.businessName);
@@ -571,32 +569,33 @@ async function sendInitialListingLiveEmail(params: {
   const plain = plainLines.join('\n');
 
   try {
-    const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        personalizations: [{ to: [{ email: params.toEmail }] }],
-        from: { email: fromEmail, name: fromName },
-        subject,
-        content: [
-          { type: 'text/plain', value: plain },
-          { type: 'text/html', value: html },
-        ],
-      }),
+    const listingTpl = Deno.env.get('RESEND_TEMPLATE_LISTING_LIVE')?.trim();
+    const res = await sendResendEmail({
+      to: params.toEmail,
+      subject,
+      ...(listingTpl
+        ? {
+          template: {
+            id: listingTpl,
+            variables: {
+              BUSINESS_NAME: params.businessName,
+              LISTING_URL: params.listingUrl,
+              BADGE_URL: LISTING_LIVE_BADGE_URL,
+              SOCIAL_HASHTAG_LINE: tagLine,
+            },
+          },
+        }
+        : { html, text: plain }),
     });
 
     if (!res.ok) {
-      const errText = await res.text();
-      console.error('[manage-business] SendGrid listing-live email FAILED:', res.status, errText);
-      return { sent: false, error: `SendGrid error: ${res.status}` };
+      console.error('[manage-business] Resend listing-live email FAILED:', res.status, res.body);
+      return { sent: false, error: `Resend error: ${res.status}` };
     }
     return { sent: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[manage-business] SendGrid listing-live email fetch error:', msg);
+    console.error('[manage-business] Resend listing-live email fetch error:', msg);
     return { sent: false, error: msg };
   }
 }
@@ -604,7 +603,7 @@ async function sendInitialListingLiveEmail(params: {
 const DECISION_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * SendGrid: short admin decision notice (matches legacy `send-email` send_business_decision copy).
+ * Resend: short admin decision notice (matches `send-email` send_business_decision copy).
  * Best-effort only — never throws.
  */
 async function sendAdminDecisionNotificationEmail(params: {
@@ -613,18 +612,15 @@ async function sendAdminDecisionNotificationEmail(params: {
   decision: 'approved' | 'rejected';
   adminNotes: string;
 }): Promise<{ sent: boolean; skipped?: boolean; error?: string }> {
-  const apiKey = Deno.env.get('SENDGRID_API_KEY');
-  if (!apiKey) {
-    console.warn('[manage-business] SENDGRID_API_KEY not set — skipping admin decision email');
-    return { sent: false, skipped: true, error: 'SENDGRID_API_KEY not set' };
+  if (!getResendApiKey()) {
+    console.warn('[manage-business] RESEND_API_KEY not set — skipping admin decision email');
+    return { sent: false, skipped: true, error: 'RESEND_API_KEY not set' };
   }
   const emailStr = String(params.toEmail ?? '').trim();
   if (!emailStr || !DECISION_EMAIL_RE.test(emailStr)) {
     return { sent: false, error: 'Invalid recipient' };
   }
 
-  const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
-  const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
   const subjectName = String(params.businessName ?? '').replace(/[\r\n\x00]/g, ' ').trim().slice(0, 200);
   const subject = params.decision === 'approved'
     ? `Your business "${subjectName}" has been approved!`
@@ -637,29 +633,34 @@ async function sendAdminDecisionNotificationEmail(params: {
     ? `<p>Congratulations! Your business listing "${safeBusinessName}" has been approved and is now live on StikmNek.</p>${notesBlock}`
     : `<p>Your business listing "${safeBusinessName}" was not approved at this time.</p>${notesBlock}<p>Please contact support if you have questions.</p>`;
 
+  const decisionTpl = params.decision === 'approved'
+    ? Deno.env.get('RESEND_TEMPLATE_BUSINESS_APPROVED')?.trim()
+    : Deno.env.get('RESEND_TEMPLATE_BUSINESS_REJECTED')?.trim();
+
   try {
-    const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        personalizations: [{ to: [{ email: emailStr }] }],
-        from: { email: fromEmail, name: fromName },
-        subject,
-        content: [{ type: 'text/html', value: html }],
-      }),
+    const res = await sendResendEmail({
+      to: emailStr,
+      subject,
+      ...(decisionTpl
+        ? {
+          template: {
+            id: decisionTpl,
+            variables: {
+              BUSINESS_NAME: String(params.businessName ?? '').replace(/[\r\n\x00]/g, ' ').trim(),
+              ADMIN_NOTES: String(params.adminNotes ?? '').replace(/[\r\n\x00]/g, ' ').trim(),
+            },
+          },
+        }
+        : { html }),
     });
     if (!res.ok) {
-      const errText = await res.text();
-      console.error('[manage-business] SendGrid decision email FAILED:', res.status, errText);
-      return { sent: false, error: `SendGrid error: ${res.status}` };
+      console.error('[manage-business] Resend decision email FAILED:', res.status, res.body);
+      return { sent: false, error: `Resend error: ${res.status}` };
     }
     return { sent: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error('[manage-business] SendGrid decision email fetch error:', msg);
+    console.error('[manage-business] Resend decision email fetch error:', msg);
     return { sent: false, error: msg };
   }
 }
@@ -2215,7 +2216,7 @@ Deno.serve(async (req) => {
 
       const redQ = supabase
         .from('redemptions')
-        .select('id, redeemed_at, saved_amount, offering_id')
+        .select('id, redeemed_at, saved_amount, deal_amount_vt, offering_id')
         .eq('business_id', businessId)
         .gte('redeemed_at', sinceIso);
       if (offeringId) redQ.eq('offering_id', offeringId);
@@ -2262,6 +2263,16 @@ Deno.serve(async (req) => {
 
       const redemptionCount = safeReds.length;
       const totalSaved = safeReds.reduce((s: number, r: any) => s + (Number(r.saved_amount) || 0), 0);
+      const redemptionsMissingDealAmount = safeReds.filter(
+        (r: any) => r.deal_amount_vt === null || r.deal_amount_vt === undefined,
+      ).length;
+      const totalDealAmount = safeReds.reduce((s: number, r: any) => {
+        if (r.deal_amount_vt === null || r.deal_amount_vt === undefined) return s;
+        return s + (Number(r.deal_amount_vt) || 0);
+      }, 0);
+      const redemptionsWithDealAmount = redemptionCount - redemptionsMissingDealAmount;
+      const avgDealPerRedemption =
+        redemptionsWithDealAmount > 0 ? totalDealAmount / redemptionsWithDealAmount : 0;
 
       const viewCount = safeEvents.filter((e: any) => e.event_type === 'view_listing').length;
       const clickCount = safeEvents.filter((e: any) => e.event_type === 'click_listing').length;
@@ -2269,14 +2280,17 @@ Deno.serve(async (req) => {
       const whatsappTapCount = safeEvents.filter((e: any) => e.event_type === 'tap_whatsapp').length;
 
       // Group redemptions by day (YYYY-MM-DD)
-      const byDay: Record<string, { date: string; count: number; saved: number }> = {};
+      const byDay: Record<string, { date: string; count: number; saved: number; deal: number }> = {};
       for (const r of safeReds as any[]) {
         const iso = r.redeemed_at ? String(r.redeemed_at) : '';
         const day = iso ? new Date(iso).toISOString().slice(0, 10) : null;
         if (!day) continue;
-        if (!byDay[day]) byDay[day] = { date: day, count: 0, saved: 0 };
+        if (!byDay[day]) byDay[day] = { date: day, count: 0, saved: 0, deal: 0 };
         byDay[day].count += 1;
         byDay[day].saved += Number(r.saved_amount) || 0;
+        if (r.deal_amount_vt !== null && r.deal_amount_vt !== undefined) {
+          byDay[day].deal += Number(r.deal_amount_vt) || 0;
+        }
       }
       const redemptionsByDay = Object.values(byDay).sort((a, b) => a.date.localeCompare(b.date));
 
@@ -2307,6 +2321,9 @@ Deno.serve(async (req) => {
         superStarCount,
         redemptionCount,
         totalSaved,
+        totalDealAmount,
+        avgDealPerRedemption,
+        redemptionsMissingDealAmount,
         avgRating,
         redemptionsByDay,
         viewCount,

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { MapPin, Mail, Phone, Send, Shield, Globe, HelpCircle, Book, FileText, Lock, Cookie, Database, RefreshCw } from 'lucide-react';
+import { MapPin, Mail, Phone, Shield, Globe, HelpCircle, Book, FileText, Lock, Cookie, Database, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 // App version - bump this on every deploy so users can verify they have latest code
@@ -12,18 +12,7 @@ const CONTACT_EMAIL = 'stikmnek@gmail.com';
 
 const Footer: React.FC = () => {
   const { language } = useAppContext();
-  const [email, setEmail] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
-
-  const handleNewsletter = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !email.includes('@')) {
-      toast.error(language === 'en' ? 'Please enter a valid email' : 'Veuillez entrer un email valide');
-      return;
-    }
-    toast.success(language === 'en' ? 'Subscribed successfully!' : 'Abonnement réussi!');
-    setEmail('');
-  };
 
   // Force clear all caches and reload - nuclear option for stuck PWA users
   const handleForceUpdate = async () => {
@@ -74,47 +63,6 @@ const Footer: React.FC = () => {
 
   return (
     <footer className="bg-gray-900 text-white" role="contentinfo">
-      {/* Newsletter */}
-      <div className="border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
-            <div className="text-center lg:text-left">
-              <h3 className="text-2xl font-bold mb-2">
-                {language === 'en' ? 'Get the Best Deals in Your Inbox' :
-                 language === 'fr' ? 'Recevez les meilleures offres dans votre boîte mail' :
-                 'Karem Beswan Dils Long Imel Blong Yu'}
-              </h3>
-              <p className="text-gray-400 text-sm">
-                {language === 'en' ? 'Subscribe for weekly deals and travel tips for Vanuatu' :
-                 language === 'fr' ? 'Abonnez-vous pour des offres hebdomadaires et des conseils de voyage pour le Vanuatu' :
-                 'Sabaeskraeb blong wikli dils mo trevel tips blong Vanuatu'}
-              </p>
-
-            </div>
-            <form onSubmit={handleNewsletter} className="flex w-full max-w-md" aria-label="Newsletter subscription">
-              <label htmlFor="newsletter-email" className="sr-only">Email address</label>
-              <input
-                id="newsletter-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={language === 'en' ? 'Enter your email' : 'Entrez votre email'}
-                className="flex-1 px-4 py-3 rounded-l-xl bg-gray-800 border border-gray-700 text-white placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                aria-required="true"
-              />
-              <button
-                type="submit"
-                className="px-6 py-3 rounded-r-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-semibold text-sm hover:from-teal-700 hover:to-emerald-700 transition-all flex items-center gap-2"
-                aria-label="Subscribe to newsletter"
-              >
-                <Send className="w-4 h-4" />
-                {language === 'en' ? 'Subscribe' : language === 'fr' ? 'S\'abonner' : 'Sabaeskraeb'}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-
       {/* Main Footer */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">

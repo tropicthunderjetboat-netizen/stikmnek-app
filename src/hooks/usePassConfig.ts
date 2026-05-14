@@ -101,9 +101,9 @@ const DEFAULT_PASSES: PassConfig[] = [
     features: [
       {
         id: 'f1',
-        text: 'Covers up to 6 people per pass',
-        textFr: 'Jusqu’à 6 personnes par pass',
-        textBi: 'Kasem antap 6 man long wan pas',
+        text: `Covers up to ${MAX_PARTY_SIZE} people per pass`,
+        textFr: `Jusqu’à ${MAX_PARTY_SIZE} personnes par pass`,
+        textBi: `Kasem antap ${MAX_PARTY_SIZE} man long wan pas`,
       },
       { id: 'f2', text: '24-hour day pass or 7-day holiday pass', textFr: 'Pass 24 h ou pass vacances 7 jours', textBi: '24 owa o 7 dei holiday pas' },
       { id: 'f3', text: 'QR code redemptions', textFr: 'Utilisations QR code', textBi: 'QR kod' },

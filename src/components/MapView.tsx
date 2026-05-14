@@ -10,6 +10,7 @@ import {
 
 import { formatDistance, estimateWalkingTime, estimateDrivingTime } from '@/hooks/useGeolocation';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import { isListingFavorited } from '@/lib/favoritesUi';
 import { effectiveBusinessCoords } from '@/lib/urlHelpers';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
@@ -266,7 +267,7 @@ const MapView: React.FC = () => {
 
     // Apply favorites filter
     if (showFavoritesOnly) {
-      result = result.filter((biz) => favorites.includes(profileBusinessIdFor(biz)));
+      result = result.filter((biz) => isListingFavorited(favorites, biz));
     }
 
     // Apply radius filter
@@ -583,7 +584,7 @@ const MapView: React.FC = () => {
             >
               {businessesWithMapCoords.map(({ biz, c }) => {
                 const dist = getDistanceTo(c.lat, c.lng);
-                const isFav = favorites.includes(profileBusinessIdFor(biz));
+                const isFav = isListingFavorited(favorites, biz);
                 return (
                   <Marker
                     key={biz.id}
@@ -604,7 +605,10 @@ const MapView: React.FC = () => {
                           />
                           {/* Favorite heart button on popup image */}
                           <button
-                            onClick={(e) => { e.stopPropagation(); toggleFavorite(profileBusinessIdFor(biz)); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void toggleFavorite(biz);
+                            }}
                             className={`absolute top-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-md ${
                               isFav
                                 ? 'bg-red-500 text-white hover:bg-red-600'
@@ -645,7 +649,10 @@ const MapView: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-1.5">
                               <button
-                                onClick={(e) => { e.stopPropagation(); toggleFavorite(profileBusinessIdFor(biz)); }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void toggleFavorite(biz);
+                                }}
                                 className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                                   isFav
                                     ? 'bg-red-50 text-red-500 hover:bg-red-100'
@@ -679,7 +686,7 @@ const MapView: React.FC = () => {
 
           {/* Selected Business Detail Card (bottom overlay) */}
           {selectedMapBiz && (() => {
-            const isSelectedFav = favorites.includes(profileBusinessIdFor(selectedMapBiz));
+            const isSelectedFav = isListingFavorited(favorites, selectedMapBiz);
             return (
             <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-[1000]">
               <div className="relative">
@@ -693,7 +700,7 @@ const MapView: React.FC = () => {
                 </button>
                 {/* Favorite heart button on detail card image */}
                 <button
-                  onClick={() => toggleFavorite(profileBusinessIdFor(selectedMapBiz))}
+                  onClick={() => void toggleFavorite(selectedMapBiz)}
                   className={`absolute top-2 left-2 w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-lg ${
                     isSelectedFav
                       ? 'bg-red-500 text-white hover:bg-red-600 scale-110'
@@ -766,7 +773,7 @@ const MapView: React.FC = () => {
                   <div className="flex items-center gap-2">
                     {/* Favorite button in action row */}
                     <button
-                      onClick={() => toggleFavorite(profileBusinessIdFor(selectedMapBiz))}
+                      onClick={() => void toggleFavorite(selectedMapBiz)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                         isSelectedFav
                           ? 'bg-red-50 text-red-500 border border-red-200 hover:bg-red-100'

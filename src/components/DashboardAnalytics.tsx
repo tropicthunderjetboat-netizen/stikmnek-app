@@ -13,9 +13,11 @@ type AnalyticsResponse = {
   reviewCount: number;
   superStarCount: number;
   redemptionCount: number;
-  totalSaved: number;
+  totalDealAmount: number;
+  avgDealPerRedemption: number;
+  redemptionsMissingDealAmount: number;
   avgRating: number;
-  redemptionsByDay: { date: string; count: number; saved: number }[];
+  redemptionsByDay: { date: string; count: number; saved: number; deal?: number }[];
   viewCount?: number;
   clickCount?: number;
   requestBookingTapCount?: number;
@@ -56,7 +58,9 @@ const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({ selectedBusines
             reviewCount: Number(data?.reviewCount) || 0,
             superStarCount: Number(data?.superStarCount) || 0,
             redemptionCount: Number(data?.redemptionCount) || 0,
-            totalSaved: Number(data?.totalSaved) || 0,
+            totalDealAmount: Number(data?.totalDealAmount) || 0,
+            avgDealPerRedemption: Number(data?.avgDealPerRedemption) || 0,
+            redemptionsMissingDealAmount: Number(data?.redemptionsMissingDealAmount) || 0,
             avgRating: Number(data?.avgRating) || 0,
             redemptionsByDay: Array.isArray(data?.redemptionsByDay) ? data.redemptionsByDay : [],
             viewCount: Number(data?.viewCount) || 0,
@@ -78,11 +82,18 @@ const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({ selectedBusines
   }, [profileId, offeringId, rangeDays]);
 
   const redemptionCount = analytics?.redemptionCount ?? 0;
-  const totalSaved = analytics?.totalSaved ?? 0;
+  const totalDealAmount = analytics?.totalDealAmount ?? 0;
+  const avgDealPerRedemption = analytics?.avgDealPerRedemption ?? 0;
+  const redemptionsMissingDealAmount = analytics?.redemptionsMissingDealAmount ?? 0;
   const avgRating = analytics?.avgRating ?? 0;
   const reviewCount = analytics?.reviewCount ?? 0;
   const superStarCount = analytics?.superStarCount ?? 0;
-  const avgSavedPerRedemption = redemptionCount > 0 ? totalSaved / redemptionCount : 0;
+  const avgDealDisplay =
+    redemptionCount === 0
+      ? '—'
+      : redemptionsMissingDealAmount === redemptionCount
+        ? '—'
+        : Math.round(avgDealPerRedemption).toLocaleString();
 
   const viewCount = analytics?.viewCount ?? 0;
   const clickCount = analytics?.clickCount ?? 0;
@@ -91,14 +102,49 @@ const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({ selectedBusines
   const conversionRate = viewCount > 0 ? (clickCount / viewCount) * 100 : 0;
 
   const chartData = useMemo(() => {
-    const rows = analytics?.eventsByDay ?? [];
-    return rows.map((r) => ({
-      date: String(r.date).slice(5), // MM-DD
-      views: Number(r.views) || 0,
-      clicks: Number(r.clicks) || 0,
-      whatsapp: Number(r.whatsappTaps) || 0,
-      bookings: Number(r.requestBookings) || 0,
-    }));
+    const evRows = analytics?.eventsByDay ?? [];
+    const redRows = analytics?.redemptionsByDay ?? [];
+    const byDate = new Map<
+      string,
+      { dateFull: string; views: number; clicks: number; whatsapp: number; bookings: number; dealVt: number }
+    >();
+    for (const r of evRows) {
+      const d = String(r.date);
+      byDate.set(d, {
+        dateFull: d,
+        views: Number(r.views) || 0,
+        clicks: Number(r.clicks) || 0,
+        whatsapp: Number(r.whatsappTaps) || 0,
+        bookings: Number(r.requestBookings) || 0,
+        dealVt: 0,
+      });
+    }
+    for (const r of redRows) {
+      const d = String(r.date);
+      const deal = Number(r.deal) || 0;
+      const prev = byDate.get(d);
+      if (prev) prev.dealVt += deal;
+      else {
+        byDate.set(d, {
+          dateFull: d,
+          views: 0,
+          clicks: 0,
+          whatsapp: 0,
+          bookings: 0,
+          dealVt: deal,
+        });
+      }
+    }
+    return [...byDate.values()]
+      .sort((a, b) => a.dateFull.localeCompare(b.dateFull))
+      .map((row) => ({
+        date: row.dateFull.slice(5),
+        views: row.views,
+        clicks: row.clicks,
+        whatsapp: row.whatsapp,
+        bookings: row.bookings,
+        dealVt: row.dealVt,
+      }));
   }, [analytics]);
 
   return (
@@ -128,22 +174,22 @@ const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({ selectedBusines
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           {
-            label: 'Redemptions',
+            label: 'Pass redemptions',
             value: redemptionCount.toLocaleString(),
             icon: <ShoppingBag className="w-4 h-4 text-teal-600" />,
             bg: 'bg-teal-50',
           },
           {
-            label: 'Total saved (VT)',
-            value: Math.round(totalSaved).toLocaleString(),
-            icon: <DollarSign className="w-4 h-4 text-green-600" />,
-            bg: 'bg-green-50',
+            label: 'StikmNek deal volume (VT)',
+            value: Math.round(totalDealAmount).toLocaleString(),
+            icon: <DollarSign className="w-4 h-4 text-violet-600" />,
+            bg: 'bg-violet-50',
           },
           {
-            label: 'Avg saved / redemption',
-            value: Math.round(avgSavedPerRedemption).toLocaleString(),
-            icon: <DollarSign className="w-4 h-4 text-emerald-600" />,
-            bg: 'bg-emerald-50',
+            label: 'Avg deal / redemption (VT)',
+            value: avgDealDisplay,
+            icon: <DollarSign className="w-4 h-4 text-purple-600" />,
+            bg: 'bg-purple-50',
           },
           {
             label: 'Avg rating',
@@ -168,15 +214,23 @@ const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({ selectedBusines
         ))}
       </div>
 
+      {redemptionsMissingDealAmount > 0 ? (
+        <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+          {redemptionsMissingDealAmount} pass redemption{redemptionsMissingDealAmount === 1 ? '' : 's'} in this range
+          do not include VT deal totals (recorded before this metric). New scans include member-rate volume for
+          analytics.
+        </p>
+      ) : null}
+
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h3 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
               <ShoppingBag className="w-4 h-4 text-teal-600" />
-              Views & actions over time
+              Views & deal volume over time
             </h3>
             <p className="text-xs text-gray-400">
-              {`Conversion: ${conversionRate.toFixed(1)}% · WhatsApp taps: ${whatsappTapCount.toLocaleString()} · Booking taps: ${requestBookingTapCount.toLocaleString()} · Reviews: ${reviewCount.toLocaleString()}${superStarCount ? ` (${superStarCount} Super Star)` : ''}`}
+              {`Teal: listing views · Violet: StikmNek deal VT (redemptions) · Conversion: ${conversionRate.toFixed(1)}% · WhatsApp: ${whatsappTapCount.toLocaleString()} · Booking taps: ${requestBookingTapCount.toLocaleString()} · Reviews: ${reviewCount.toLocaleString()}${superStarCount ? ` (${superStarCount} Super Star)` : ''}`}
             </p>
           </div>
           {loading ? (
@@ -195,12 +249,34 @@ const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({ selectedBusines
                   <stop offset="5%" stopColor="#0d9488" stopOpacity={0.18} />
                   <stop offset="95%" stopColor="#0d9488" stopOpacity={0} />
                 </linearGradient>
+                <linearGradient id="dealGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+                </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <YAxis yAxisId="left" tick={{ fontSize: 11 }} allowDecimals={false} width={36} />
+              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} width={44} />
               <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
-              <Area type="monotone" dataKey="views" stroke="#0d9488" strokeWidth={2} fill="url(#cntGrad)" />
+              <Area
+                yAxisId="left"
+                type="monotone"
+                dataKey="views"
+                name="Views"
+                stroke="#0d9488"
+                strokeWidth={2}
+                fill="url(#cntGrad)"
+              />
+              <Area
+                yAxisId="right"
+                type="monotone"
+                dataKey="dealVt"
+                name="Deal VT"
+                stroke="#7c3aed"
+                strokeWidth={2}
+                fill="url(#dealGrad)"
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>

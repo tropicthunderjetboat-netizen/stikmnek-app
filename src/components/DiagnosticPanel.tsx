@@ -412,7 +412,7 @@ ORDER BY t.tgname;`}
 -- Also check: Edge Functions > Settings > Secrets
 -- Verify SUPABASE_SERVICE_ROLE_KEY is set
 -- Verify SENTRY_DSN is set (for Sentry relay)
--- Verify SENDGRID_API_KEY is set (for email sending)`}
+-- Verify RESEND_API_KEY is set (for transactional email from edge functions)`}
               </pre>
             </div>
 

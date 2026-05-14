@@ -16,8 +16,8 @@ export async function updateUserPassPreferences(
   data: UpdatePassPreferencesInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   if (data.partySize != null) {
-    if (!Number.isInteger(data.partySize) || data.partySize < 1 || data.partySize > 6) {
-      return { ok: false, error: 'party_size must be an integer from 1 to 6, or null' };
+    if (!Number.isInteger(data.partySize) || data.partySize < 1 || data.partySize > 20) {
+      return { ok: false, error: 'party_size must be an integer from 1 to 20, or null' };
     }
   }
   if (data.preferredDuration != null && !isPassDuration(data.preferredDuration)) {

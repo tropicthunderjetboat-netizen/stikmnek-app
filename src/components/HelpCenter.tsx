@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { BASE_PRICE_AUD, EXTEND_FEE_AUD, GUEST_FEE_AUD, MAX_PARTY_SIZE } from '@/data/pricing';
+import {
+  BASE_PRICE_AUD,
+  EXTEND_FEE_AUD,
+  GUEST_FEE_AUD,
+  MAX_PARTY_SIZE,
+  SEVENTH_GUEST_HEAD_CHARGE_AUD,
+} from '@/data/pricing';
 import {
   HelpCircle, Book, Store, Shield, Users, ChevronDown, ChevronRight,
   Search, ArrowLeft, MapPin, CreditCard, QrCode, Star, Camera,
@@ -38,7 +44,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
 
   const passProductSummary = useMemo(
     () =>
-      `StikmNek Pass (AUD): $${BASE_PRICE_AUD} for the first person + $${GUEST_FEE_AUD} per additional guest (ages 6+, up to ${MAX_PARTY_SIZE} per pass); 24-hour day pass or 7-day holiday pass (+$${EXTEND_FEE_AUD} for the holiday period)`,
+      `StikmNek Pass (AUD): $${BASE_PRICE_AUD} first person (ages 6+), $${GUEST_FEE_AUD} each for guests 2–6, $${SEVENTH_GUEST_HEAD_CHARGE_AUD} for the 7th, then $${GUEST_FEE_AUD} each up to ${MAX_PARTY_SIZE} per pass; 24-hour day pass or 7-day holiday pass (+$${EXTEND_FEE_AUD} for the holiday period)`,
     [],
   );
 
@@ -50,7 +56,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       {
         step: '2',
         title: t('passSelection.title', helpLang),
-        desc: `Open Passes, set your group (ages 6+, up to ${MAX_PARTY_SIZE} per pass), choose 24-hour or 7-day holiday access, pick a start date, and pay ($${BASE_PRICE_AUD} first person + $${GUEST_FEE_AUD} per extra guest; +$${EXTEND_FEE_AUD} for the holiday period). PayPal or card where enabled.`,
+        desc: `Open Passes, set your group (ages 6+, up to ${MAX_PARTY_SIZE} per pass), choose 24-hour or 7-day holiday access, pick a start date, and pay (tiered: $${BASE_PRICE_AUD} first, $${GUEST_FEE_AUD} for 2–6, $${SEVENTH_GUEST_HEAD_CHARGE_AUD} on 7th, then $${GUEST_FEE_AUD} each; +$${EXTEND_FEE_AUD} holiday period). PayPal or card where enabled.`,
       },
       { step: '3', title: 'Browse Deals', desc: 'Explore dining, tours, activities, spa, shopping, and accommodation on Deals and Map' },
       { step: '4', title: 'Show Your QR Code', desc: 'Present your pass QR code at a partner business; staff scan it in StikmNek' },
@@ -79,7 +85,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       {
         question: 'Can I use my pass at multiple businesses?',
         answer:
-          'Yes. You can visit different partner businesses while your pass is active. You may redeem once per business per calendar day (you cannot scan twice at the same venue on the same day). Across your trip you can use many businesses.',
+          'Yes. You can visit different partner businesses while your pass is active, and you may return to the same venue more than once on the same day (for example breakfast and later happy hour) as long as your pass is valid and each redemption is recorded by staff when you use the deal.',
         icon: <Store className="w-4 h-4" />,
       },
       {
@@ -292,7 +298,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
     {
       question: 'It says I already redeemed at this business today',
       answer:
-        'StikmNek allows one redemption per business per calendar day for your pass. If you already scanned at that venue today, try again tomorrow or visit a different partner. If you think this is a mistake, contact support with your account email.',
+        'Older versions of the app blocked a second scan at the same venue on the same day. That limit has been removed so you can use your pass again the same day (each visit still needs a fresh scan). Update the app or ask staff to try again. If the message persists, contact support with your account email.',
       icon: <AlertCircle className="w-4 h-4" />,
     },
     { question: 'My QR code is not scanning', answer: 'Ensure your screen brightness is at maximum. Try zooming in on the QR code. If the issue persists, take a screenshot and show it to the business. You can also try refreshing the page to regenerate the QR code.' },

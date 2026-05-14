@@ -13,9 +13,10 @@ import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '..
 import {
   calculatePassPriceAud,
   dynamicPassInclusiveDays,
-  parsePartySizeAndExtended,
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
+import { parsePassPartyWithProfileFallback } from '../_shared/parsePassPartyWithProfileFallback.ts';
+import { transactionalPassProductNameEn } from '../_shared/passDisplay.ts';
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
@@ -273,10 +274,23 @@ Deno.serve(async (req) => {
         );
       }
 
-      const parsed = parsePartySizeAndExtended(body as Record<string, unknown>);
+      const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+      const parsed = await parsePassPartyWithProfileFallback(b, supabase, authUser.id);
       if (!parsed) {
-        return errorResponse(req, 'Missing or invalid partySize (integer 1–6)', 400, {
+        const partyReceived = b.partySize ?? b.party_size ?? null;
+        const safeKeys =
+          b && typeof b === 'object'
+            ? Object.keys(b).filter((k) => !/^card/i.test(k) && k !== 'cardCvv' && k !== 'cardExpiry')
+            : [];
+        console.warn('[process-card-payment] invalid_party_size', {
+          partyReceived,
+          type: typeof partyReceived,
+          safeKeys,
+        });
+        return errorResponse(req, 'Missing or invalid partySize (integer 1-20)', 400, {
           reason: 'invalid_party_size',
+          partyReceived,
+          bodyKeys: safeKeys,
         });
       }
       const { partySize, isExtended } = parsed;
@@ -450,7 +464,7 @@ Deno.serve(async (req) => {
         success: true,
         receiptNumber,
         passType: semanticPassIdFromDb(passTypeDb),
-        passLabel: 'StikmNek Pass',
+        passLabel: transactionalPassProductNameEn(),
         amount,
         currency: 'AUD',
         expiresAt,

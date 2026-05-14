@@ -5,6 +5,8 @@ import {
   GUEST_FEE_AUD,
   calculatePassPrice,
   clampPartySize,
+  extraGuestsFeeFromSeventhAud,
+  extraGuestsFeeThroughSixthAud,
 } from '@/data/pricing';
 import { t } from '@/data/translations';
 import type { Language } from '@/data/translations';
@@ -31,17 +33,23 @@ const CheckoutPricingSummary: React.FC<CheckoutPricingSummaryProps> = ({
 }) => {
   const p = clampPartySize(partySize);
   const totalPrice = calculatePassPrice(p, isExtended);
-  const extraGuestCount = Math.max(0, p - 1);
-  const extraGuestTotal = extraGuestCount * GUEST_FEE_AUD;
+  const feeThroughSix = extraGuestsFeeThroughSixthAud(p);
+  const feeFromSeven = extraGuestsFeeFromSeventhAud(p);
+  const guests2to6Count = p <= 1 ? 0 : Math.min(p - 1, 5);
+  const guestsFrom7Count = p < 7 ? 0 : p - 6;
   const potentialSavings = p * 10;
 
   const pad = variant === 'sidebar' ? 'p-3' : 'p-4';
   const textMain = variant === 'sidebar' ? 'text-xs' : 'text-sm';
   const textTotal = variant === 'sidebar' ? 'text-base' : 'text-lg';
 
-  const extraRowLabel = t('checkout.extra_guests_row', language)
-    .replace('__COUNT__', String(extraGuestCount))
+  const extraRow26Label = t('checkout.extra_guests_2_6_row', language)
+    .replace('__COUNT__', String(guests2to6Count))
     .replace('__FEE__', String(GUEST_FEE_AUD));
+
+  const extraRow7Label = t('checkout.extra_guests_from_7_row', language)
+    .replace('__COUNT__', String(guestsFrom7Count))
+    .replace('__P__', String(p));
 
   const savingsLine = t('checkout.potential_savings', language).replace('__AMOUNT__', String(potentialSavings));
 
@@ -55,10 +63,17 @@ const CheckoutPricingSummary: React.FC<CheckoutPricingSummaryProps> = ({
           <span className="font-semibold tabular-nums shrink-0">A${BASE_PRICE_AUD}</span>
         </div>
 
-        {extraGuestCount > 0 && (
+        {feeThroughSix > 0 && (
           <div className="flex justify-between gap-3 text-gray-700">
-            <span>{extraRowLabel}</span>
-            <span className="font-semibold tabular-nums shrink-0">+A${extraGuestTotal}</span>
+            <span>{extraRow26Label}</span>
+            <span className="font-semibold tabular-nums shrink-0">+A${feeThroughSix.toFixed(0)}</span>
+          </div>
+        )}
+
+        {feeFromSeven > 0 && (
+          <div className="flex justify-between gap-3 text-gray-700">
+            <span>{extraRow7Label}</span>
+            <span className="font-semibold tabular-nums shrink-0">+A${feeFromSeven.toFixed(0)}</span>
           </div>
         )}
 

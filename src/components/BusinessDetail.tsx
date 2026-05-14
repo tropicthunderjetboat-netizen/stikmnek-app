@@ -42,6 +42,7 @@ import {
   legacyUntaggedPhotoBelongsToOffering,
   supplementUntaggedPhotosForRecentNewestOffering,
 } from '@/lib/offeringPhotoPartition';
+import { isListingFavorited } from '@/lib/favoritesUi';
 import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
@@ -442,7 +443,7 @@ const BusinessDetail: React.FC = () => {
         ? `${Math.round((1 - dealPx / origPx) * 100)}% OFF`
         : null;
   const isListingOwner = Boolean(user?.id && biz.ownerId && user.id === biz.ownerId);
-  const isFav = favorites.includes(profileId);
+  const isFav = isListingFavorited(favorites, biz);
   /** Same rule as booking: only pass holders get WhatsApp (avoids discount leakage). */
   const canUseWhatsAppContact = Boolean(user?.pass);
 
@@ -1117,7 +1118,14 @@ const BusinessDetail: React.FC = () => {
               )}
 
               <div className="flex gap-2">
-                <button onClick={() => { if (!user) { setShowAuth(true); return; } toggleFavorite(profileId); }}
+                <button
+                  onClick={() => {
+                    if (!user) {
+                      setShowAuth(true);
+                      return;
+                    }
+                    void toggleFavorite(biz);
+                  }}
                   className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors ${isFav ? 'border-red-200 bg-red-50 text-red-600' : 'border-gray-200 text-gray-600 hover:border-teal-300'}`}>
                   <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
                   {t('biz.save', language)}

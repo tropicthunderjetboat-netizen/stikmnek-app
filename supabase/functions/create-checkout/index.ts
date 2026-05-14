@@ -9,7 +9,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
-import { calculatePassPriceAud, parsePartySizeAndExtended } from '../_shared/pricingDynamic.ts';
+import { calculatePassPriceAud } from '../_shared/pricingDynamic.ts';
+import { parsePassPartyWithProfileFallback } from '../_shared/parsePassPartyWithProfileFallback.ts';
 
 async function getPayPalAccessToken(sandbox: boolean): Promise<string> {
   const clientId = Deno.env.get('PAYPAL_CLIENT_ID');
@@ -76,13 +77,17 @@ Deno.serve(async (req) => {
     const startDate = body?.startDate ?? body?.start_date;
     const returnUrl = body?.returnUrl ?? body?.return_url;
     const cancelUrl = body?.cancelUrl ?? body?.cancel_url;
-    const parsed = parsePartySizeAndExtended(body as Record<string, unknown>);
+    const parsed = await parsePassPartyWithProfileFallback(
+      (body && typeof body === 'object' ? body : {}) as Record<string, unknown>,
+      supabase,
+      user.id,
+    );
 
     if (!startDate) {
       return errorResponse('Missing startDate', 400);
     }
     if (!parsed) {
-      return errorResponse('Missing or invalid partySize (1-6) or isExtended', 400);
+      return errorResponse('Missing or invalid partySize (1-20) or isExtended', 400);
     }
     const { partySize, isExtended } = parsed;
     const passTypeDb: DbPassType = 'dynamic';
@@ -136,10 +141,13 @@ Deno.serve(async (req) => {
     const orderData = await orderRes.json();
     const orderId = orderData.id;
     const approveLink = orderData.links?.find((l: any) => l.rel === 'approve');
-    const approvalUrl = approveLink?.href;
+    const approvalUrl = approveLink?.href ?? null;
 
-    if (!orderId || !approvalUrl) {
-      return errorResponse('PayPal did not return approval URL', 502, { reason: 'paypal_missing_approval_link' });
+    if (!orderId) {
+      return errorResponse('PayPal did not return an order id', 502, { reason: 'paypal_missing_order_id' });
+    }
+    if (!approvalUrl) {
+      console.warn('[create-checkout] PayPal returned no approve link (OK for Card Fields / wallet-less flows)');
     }
 
     return jsonResponse({

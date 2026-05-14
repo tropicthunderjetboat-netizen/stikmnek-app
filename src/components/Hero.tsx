@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { touristFacingOfferings } from '@/data/businesses';
-import { ArrowRight, MapPin, Star, Users } from 'lucide-react';
+import { MapPin, Sparkles } from 'lucide-react';
 
 const Hero: React.FC = () => {
   const navigate = useNavigate();
@@ -76,19 +76,22 @@ const Hero: React.FC = () => {
             {t('hero.subtitle', language)}
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 mb-12">
+          <div className="flex flex-col gap-3 mb-12 w-full max-w-md">
             <button
               type="button"
               onClick={openTouristSignup}
-              className="group flex items-center justify-center gap-2 px-8 py-4 sm:py-5 rounded-xl bg-orange-500 text-white font-bold text-lg hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/35 hover:shadow-orange-500/50 hover:-translate-y-0.5 sm:flex-1 sm:min-h-[3.5rem]"
+              className="group flex w-full items-center justify-center gap-2 px-8 py-4 sm:py-5 rounded-xl bg-orange-500 text-white font-bold text-lg hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/35 hover:shadow-orange-500/50 hover:-translate-y-0.5 min-h-[3.25rem]"
             >
+              <Sparkles className="w-5 h-5 shrink-0 text-amber-100 opacity-95 group-hover:scale-110 transition-transform" aria-hidden />
               {t('hero.ctaTourist', language)}
-              <ArrowRight className="w-5 h-5 shrink-0 group-hover:translate-x-1 transition-transform" />
             </button>
+            <p className="text-center text-xs text-white/55 sm:text-left sm:pl-1">
+              {t('hero.businessOwnersHint', language)}
+            </p>
             <button
               type="button"
               onClick={scrollToListBusiness}
-              className="flex items-center justify-center gap-2 px-8 py-4 sm:py-5 rounded-xl border-[3px] border-white bg-transparent text-white font-bold text-lg hover:bg-white/10 transition-all sm:flex-1 sm:min-h-[3.5rem]"
+              className="flex w-full items-center justify-center gap-2 px-8 py-3.5 sm:py-4 rounded-xl border-2 border-white/90 bg-white/5 text-white font-semibold text-base hover:bg-white/15 transition-all min-h-[3rem] backdrop-blur-[2px]"
             >
               {t('hero.ctaBusiness', language)}
             </button>

@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   ArrowLeft, Shield, Lock, Check, Loader2,
   ChevronRight, Calendar, CalendarRange, Info,
-  Users, CreditCard, AlertCircle, CheckCircle, Ticket, Zap,
+  Users, CreditCard, AlertCircle, CheckCircle, Ticket, Zap, Sparkles,
 } from 'lucide-react';
 
 import {
@@ -130,6 +130,57 @@ function describeFunctionsFetchFailure(error: unknown): string | null {
     }
   }
   return null;
+}
+
+/** True when the browser never got an HTTP response (network, CORS, blocked request, wrong URL). */
+function isPaymentInvokeTransportFailure(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { name?: string; message?: string };
+  if (e.name === 'FunctionsFetchError') return true;
+  const m = `${e.message ?? ''}`.toLowerCase();
+  return (
+    m.includes('failed to fetch') ||
+    m.includes('networkerror') ||
+    m.includes('network request failed') ||
+    m.includes('load failed')
+  );
+}
+
+const PAYMENT_TRANSPORT_FAILURE_HINT =
+  'We could not reach the payment service (the request never completed). This is usually not your card being declined. Try: refresh and pay again, switch networks, disable ad blockers or strict privacy extensions for this site, or use a private window. If it keeps happening, confirm the app is built with the correct Supabase project URL and that the process-card-payment Edge Function is deployed (Supabase Dashboard → Edge Functions → Logs).';
+
+/** PayPal Expanded Checkout: load JS SDK with Card Fields only (no redirect). */
+function loadPayPalCardSdk(clientId: string): Promise<void> {
+  const winPaypal = () => (window as unknown as { paypal?: { CardFields?: unknown } }).paypal;
+  if (winPaypal()?.CardFields) return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    const markReady = () => {
+      if (winPaypal()?.CardFields) resolve();
+      else reject(new Error('PayPal SDK loaded but CardFields is not available'));
+    };
+
+    const existing = document.querySelector('script[data-stikmnek-paypal-sdk]') as HTMLScriptElement | null;
+    if (existing) {
+      if (winPaypal()?.CardFields) {
+        resolve();
+        return;
+      }
+      existing.addEventListener('load', markReady);
+      existing.addEventListener('error', () => reject(new Error('PayPal SDK failed to load')));
+      return;
+    }
+
+    const s = document.createElement('script');
+    s.src =
+      `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}` +
+      '&currency=AUD&intent=capture&components=card-fields';
+    s.async = true;
+    s.dataset.stikmnekPaypalSdk = '1';
+    s.onload = () => markReady();
+    s.onerror = () => reject(new Error('PayPal SDK failed to load'));
+    document.head.appendChild(s);
+  });
 }
 
 // ═══ CARD FORMATTING HELPERS ═══
@@ -277,6 +328,31 @@ const PaymentCheckout: React.FC = () => {
   const cardNumberRef = useRef<HTMLInputElement>(null);
   const expiryRef = useRef<HTMLInputElement>(null);
   const cvvRef = useRef<HTMLInputElement>(null);
+
+  const paypalClientId = String(import.meta.env.VITE_PAYPAL_CLIENT_ID ?? '').trim();
+  const paypalHostedCardEnabled = paypalClientId.length > 0;
+
+  const paypalNameFieldRef = useRef<HTMLDivElement>(null);
+  const paypalNumberFieldRef = useRef<HTMLDivElement>(null);
+  const paypalExpiryFieldRef = useRef<HTMLDivElement>(null);
+  const paypalCvvFieldRef = useRef<HTMLDivElement>(null);
+  const paypalCardFieldsHandleRef = useRef<{
+    submit: (opts: {
+      billingAddress: Record<string, string | undefined>;
+      contingencies?: string[];
+    }) => Promise<void>;
+  } | null>(null);
+  const [paypalCardEligible, setPaypalCardEligible] = useState<boolean | null>(null);
+  const [paypalSdkError, setPaypalSdkError] = useState<string | null>(null);
+
+  const [billingLine1, setBillingLine1] = useState('');
+  const [billingLine2, setBillingLine2] = useState('');
+  const [billingCity, setBillingCity] = useState('');
+  const [billingState, setBillingState] = useState('');
+  const [billingPostal, setBillingPostal] = useState('');
+  const [billingCountryCode, setBillingCountryCode] = useState('AU');
+  const [billingErrors, setBillingErrors] = useState<Record<string, string>>({});
+
   /** Previous `cart.partySize` for oversize → capped sync (keep warning visible after cap). */
   const prevCartPartySizeRef = useRef<number | null>(null);
   /** One-time merge of demographics + trip length into cart when profile loads (reduces re-typing). */
@@ -309,6 +385,21 @@ const PaymentCheckout: React.FC = () => {
     () => cart != null && Number(cart.partySize) > MAX_PARTY_SIZE,
   );
   const [showPartyEditor, setShowPartyEditor] = useState(false);
+
+  const paySessionRef = useRef({
+    startDate,
+    partySize,
+    cartPartySize: cart?.partySize,
+    isExtended,
+  });
+  useEffect(() => {
+    paySessionRef.current = {
+      startDate,
+      partySize,
+      cartPartySize: cart?.partySize,
+      isExtended,
+    };
+  }, [startDate, partySize, cart?.partySize, isExtended]);
 
   const handlePartySizeChange = (value: number) => {
     if (!cart) return;
@@ -418,41 +509,36 @@ const PaymentCheckout: React.FC = () => {
 
   const coverageUi = useMemo(() => {
     const cal = daysCount;
+    const passWindowBadge = t('checkout.period_badge_pass_window', checkoutLang).replace('__CAL__', String(cal));
+    const calendarNote = t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal));
+
     if (!isExtended) {
       return {
         periodBadge: t('checkout.period_badge_one_day', checkoutLang),
         periodSub: null as string | null,
+        windowTripHint: null as string | null,
         endHelper: t('checkout.end_date_helper_short', checkoutLang),
         orderDealsLine: t('checkout.order_summary_deals_short', checkoutLang),
         summaryPrimary: t('checkout.period_badge_one_day', checkoutLang),
-        summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
-        paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+        summarySecondary: calendarNote,
+        paymentBarSecondary: calendarNote,
       };
     }
     const legal = t('checkout.period_legal_extended', checkoutLang).replace('__CAL__', String(cal));
-    if (tripNights != null && tripNights >= 1) {
-      const nightsBadge = t('checkout.period_badge_trip_nights', checkoutLang).replace(
-        '__NIGHTS__',
-        String(tripNights),
-      );
-      return {
-        periodBadge: nightsBadge,
-        periodSub: legal,
-        endHelper: t('checkout.end_date_helper_extended', checkoutLang).replace('__CAL__', String(cal)),
-        orderDealsLine: t('checkout.order_summary_deals_extended', checkoutLang).replace('__CAL__', String(cal)),
-        summaryPrimary: nightsBadge,
-        summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
-        paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
-      };
-    }
+    const windowTripHint =
+      tripNights != null && tripNights >= 1
+        ? t('checkout.window_trip_hint', checkoutLang).replace('__NIGHTS__', String(tripNights))
+        : null;
+
     return {
-      periodBadge: t('checkout.period_badge_extended_generic', checkoutLang),
+      periodBadge: passWindowBadge,
       periodSub: legal,
+      windowTripHint,
       endHelper: t('checkout.end_date_helper_extended', checkoutLang).replace('__CAL__', String(cal)),
       orderDealsLine: t('checkout.order_summary_deals_extended', checkoutLang).replace('__CAL__', String(cal)),
-      summaryPrimary: t('checkout.period_badge_extended_generic', checkoutLang),
-      summarySecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
-      paymentBarSecondary: t('checkout.summary_calendar_note', checkoutLang).replace('__CAL__', String(cal)),
+      summaryPrimary: passWindowBadge,
+      summarySecondary: calendarNote,
+      paymentBarSecondary: calendarNote,
     };
   }, [isExtended, tripNights, daysCount, checkoutLang, grantSecondWeekPreview]);
 
@@ -508,6 +594,297 @@ const PaymentCheckout: React.FC = () => {
       </div>
     );
   }
+
+  function resolvePayContextFromRef() {
+    const { startDate: sd, partySize: ps, cartPartySize, isExtended: ext } = paySessionRef.current;
+    const minPay = earliestPassStartDateIso();
+    const maxPay = latestPassStartDateUtc();
+    const payStartDate = sd < minPay ? minPay : sd > maxPay ? maxPay : sd;
+    const fromState = Number(ps);
+    const fromCart = cartPartySize != null ? Number(cartPartySize) : NaN;
+    const rawPartyCount = Number.isFinite(fromState) ? fromState : Number.isFinite(fromCart) ? fromCart : 1;
+    const partyForPay = clampPartySize(Math.floor(rawPartyCount) || 1);
+    return { payStartDate, partyForPay, isExtended: Boolean(ext) };
+  }
+
+  const validatePayPalBilling = (): boolean => {
+    const err: Record<string, string> = {};
+    if (!billingLine1.trim()) err.line1 = 'Street address is required';
+    if (!billingCity.trim()) err.city = 'City is required';
+    if (!billingState.trim()) err.state = 'State / region is required';
+    if (!billingPostal.trim()) err.postal = 'Postal code is required';
+    if (!billingCountryCode.trim() || billingCountryCode.trim().length !== 2) {
+      err.country = 'Country code is required (e.g. AU)';
+    }
+    setBillingErrors(err);
+    return Object.keys(err).length === 0;
+  };
+
+  useEffect(() => {
+    if (!paypalHostedCardEnabled || step !== 'payment') {
+      setPaypalCardEligible(null);
+      setPaypalSdkError(null);
+      paypalCardFieldsHandleRef.current = null;
+      return;
+    }
+
+    let cancelled = false;
+
+    const clearHostedFieldMounts = () => {
+      for (const r of [paypalNameFieldRef, paypalNumberFieldRef, paypalExpiryFieldRef, paypalCvvFieldRef]) {
+        if (r.current) r.current.innerHTML = '';
+      }
+    };
+
+    (async () => {
+      setPaypalSdkError(null);
+      setPaypalCardEligible(null);
+      paypalCardFieldsHandleRef.current = null;
+      clearHostedFieldMounts();
+
+      try {
+        await loadPayPalCardSdk(paypalClientId);
+        if (cancelled) return;
+
+        type FieldRenderer = { render: (el: HTMLElement) => Promise<void> };
+        type CardFieldsHandle = {
+          isEligible: () => boolean;
+          NameField: () => FieldRenderer;
+          NumberField: () => FieldRenderer;
+          ExpiryField: () => FieldRenderer;
+          CVVField: () => FieldRenderer;
+          submit: (opts: {
+            billingAddress: Record<string, string | undefined>;
+            contingencies?: string[];
+          }) => Promise<void>;
+        };
+
+        const paypal = (window as unknown as { paypal?: { CardFields: (cfg: Record<string, unknown>) => CardFieldsHandle } })
+          .paypal;
+        if (!paypal?.CardFields) {
+          throw new Error('PayPal SDK did not expose CardFields');
+        }
+
+        const cardField = paypal.CardFields({
+          style: {
+            input: { 'font-size': '16px', color: '#111827' },
+          },
+          createOrder: async () => {
+            const token = await ensureFreshSession();
+            if (!token) throw new Error('SESSION_EXPIRED');
+
+            const { payStartDate, partyForPay, isExtended: ext } = resolvePayContextFromRef();
+
+            const { data, error } = await supabase.functions.invoke('create-checkout', {
+              body: {
+                startDate: payStartDate,
+                start_date: payStartDate,
+                partySize: partyForPay,
+                party_size: partyForPay,
+                isExtended: ext,
+                is_extended: ext,
+              },
+            });
+
+            if (error) {
+              const body = await getInvokeErrorBody(error);
+              const serverError =
+                (typeof body?.error === 'string' && body.error) ||
+                error.message ||
+                'Could not start payment';
+              console.error('[PaymentCheckout] create-checkout error', getInvokeStatus(error), body, error);
+              throw new Error(serverError);
+            }
+            const orderId = (data as Record<string, unknown> | null)?.orderId ?? (data as Record<string, unknown> | null)?.order_id;
+            if (!(data as Record<string, unknown> | null)?.success || !orderId) {
+              const msg =
+                typeof (data as Record<string, unknown> | null)?.error === 'string'
+                  ? String((data as Record<string, unknown>).error)
+                  : 'Could not start payment';
+              throw new Error(msg);
+            }
+            return String(orderId);
+          },
+          onApprove: async (data: { orderID?: string }) => {
+            const orderId = String(data?.orderID ?? '');
+            if (!orderId) throw new Error('Missing PayPal order');
+
+            const token = await ensureFreshSession();
+            if (!token) throw new Error('SESSION_EXPIRED');
+
+            const { payStartDate, partyForPay, isExtended: ext } = resolvePayContextFromRef();
+            let referralCode: string | null = null;
+            try {
+              referralCode = localStorage.getItem('stikmnek-referral-code');
+            } catch {
+              referralCode = null;
+            }
+
+            const { data: capData, error: capErr } = await supabase.functions.invoke('paypal-capture', {
+              body: {
+                paypalOrderId: orderId,
+                startDate: payStartDate,
+                partySize: partyForPay,
+                party_size: partyForPay,
+                isExtended: ext,
+                is_extended: ext,
+                referralCode,
+                paymentTransactionId: getOrCreatePassPurchaseIdempotencyKey(),
+              },
+            });
+
+            if (capErr) {
+              const status = getInvokeStatus(capErr);
+              const body = await getInvokeErrorBody(capErr);
+              const fromBody = typeof body?.error === 'string' ? body.error : null;
+              let serverError =
+                fromBody ??
+                (typeof (capData as Record<string, unknown> | null)?.error === 'string'
+                  ? String((capData as Record<string, unknown>).error)
+                  : null) ??
+                (typeof (capData as Record<string, unknown> | null)?.message === 'string'
+                  ? String((capData as Record<string, unknown>).message)
+                  : null);
+              if (isPaymentInvokeTransportFailure(capErr)) {
+                const detail = describeFunctionsFetchFailure(capErr);
+                throw new Error(
+                  detail ? `${PAYMENT_TRANSPORT_FAILURE_HINT} (${detail})` : PAYMENT_TRANSPORT_FAILURE_HINT,
+                );
+              }
+              if (serverError) throw new Error(serverError);
+              throw new Error(capErr.message || 'Capture failed');
+            }
+
+            const ok = capData as Record<string, unknown> | null;
+            if (!ok?.success) {
+              throw new Error(typeof ok?.error === 'string' ? String(ok.error) : 'Payment capture failed');
+            }
+
+            setPaymentResult(capData);
+            setStep('success');
+
+            const paymentResultData = {
+              receiptNumber: ok.receiptNumber,
+              passType: ok.passType,
+              passLabel: ok.passLabel || passLabel,
+              amount: ok.amount,
+              currency: ok.currency || 'AUD',
+              paymentMethod: ok.paymentMethod || 'paypal',
+              expiresAt: ok.expiresAt,
+              validFrom: ok.validFrom,
+              validUntil: ok.validUntil,
+              days: ok.days,
+              shareBonusApplied: Boolean(ok.shareBonusApplied),
+              group: ok.group || `Up to ${partyForPay} people (ages 6+)`,
+              partySize: partyForPay,
+              isExtended: ext,
+              sessionId: ok.sessionId,
+              completedAt: new Date().toISOString(),
+              cardLast4: ok.cardLast4,
+              paypalOrderId: orderId,
+            };
+            localStorage.setItem('lastPayment', JSON.stringify(paymentResultData));
+            try {
+              localStorage.removeItem('stikmnek-referral-code');
+            } catch {
+              /* ignore */
+            }
+            localStorage.removeItem('paypalPending');
+            localStorage.removeItem('pendingPayment');
+
+            toast.success('Payment successful! Your pass is now active.');
+            setTimeout(() => {
+              refreshUserPass();
+            }, 1000);
+            setTimeout(() => {
+              setCart(null);
+              setCurrentView('payment-confirmation');
+            }, 2500);
+          },
+          onError: (err: unknown) => {
+            console.error('[PaymentCheckout] PayPal CardFields onError', err);
+          },
+        });
+
+        if (!cardField.isEligible()) {
+          if (!cancelled) setPaypalCardEligible(false);
+          return;
+        }
+
+        const ne = paypalNameFieldRef.current;
+        const nu = paypalNumberFieldRef.current;
+        const ex = paypalExpiryFieldRef.current;
+        const cv = paypalCvvFieldRef.current;
+        if (!ne || !nu || !ex || !cv) {
+          throw new Error('Card field containers not ready');
+        }
+
+        await cardField.NameField().render(ne);
+        await cardField.NumberField().render(nu);
+        await cardField.ExpiryField().render(ex);
+        await cardField.CVVField().render(cv);
+        paypalCardFieldsHandleRef.current = cardField;
+
+        if (!cancelled) setPaypalCardEligible(true);
+      } catch (e: unknown) {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : 'PayPal failed to initialize';
+        setPaypalSdkError(msg);
+        setPaypalCardEligible(false);
+        console.error('[PaymentCheckout] PayPal SDK init', e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      paypalCardFieldsHandleRef.current = null;
+      clearHostedFieldMounts();
+    };
+  }, [
+    paypalHostedCardEnabled,
+    paypalClientId,
+    step,
+    passLabel,
+    refreshUserPass,
+    setCart,
+    setCurrentView,
+  ]);
+
+  const handlePayPalHostedPay = async () => {
+    if (!paypalCardFieldsHandleRef.current) return;
+    if (!validatePayPalBilling()) return;
+
+    setProcessing(true);
+    setPaymentError(null);
+    setStep('processing');
+    try {
+      await paypalCardFieldsHandleRef.current.submit({
+        contingencies: ['SCA_WHEN_REQUIRED'],
+        billingAddress: {
+          addressLine1: billingLine1.trim(),
+          addressLine2: billingLine2.trim() || '',
+          adminArea1: billingState.trim(),
+          adminArea2: billingCity.trim(),
+          postalCode: billingPostal.trim(),
+          countryCode: billingCountryCode.trim().toUpperCase(),
+        },
+      });
+    } catch (err: unknown) {
+      let errorMsg = err instanceof Error ? err.message : 'Failed to process payment. Please try again.';
+      if (errorMsg === 'SESSION_EXPIRED') {
+        toast.error('Your session has expired. Please sign in again.');
+        setShowAuth(true);
+        setAuthMode('signin');
+        errorMsg = 'Your session has expired. Please sign in again.';
+      } else {
+        toast.error(errorMsg);
+      }
+      setPaymentError(errorMsg);
+      setStep('payment');
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   // ═══ CARD VALIDATION ═══
   const validateCard = (): boolean => {
@@ -582,12 +959,24 @@ const PaymentCheckout: React.FC = () => {
       const payStartDate =
         startDate < minPay ? minPay : startDate > maxPay ? maxPay : startDate;
 
+      const fromState = Number(partySize);
+      const fromCart = cart != null ? Number(cart.partySize) : NaN;
+      const rawPartyCount = Number.isFinite(fromState)
+        ? fromState
+        : Number.isFinite(fromCart)
+          ? fromCart
+          : 1;
+      const partyForPay = clampPartySize(Math.floor(rawPartyCount) || 1);
+
       const invokeBody = {
         action: 'purchase_pass' as const,
         passType: 'dynamic',
-        partySize,
-        isExtended,
+        partySize: partyForPay,
+        party_size: partyForPay,
+        isExtended: Boolean(isExtended),
+        is_extended: Boolean(isExtended),
         startDate: payStartDate,
+        start_date: payStartDate,
         cardNumber: cardNumber.replace(/\s/g, ''),
         cardExpiry,
         cardCvv,
@@ -595,6 +984,14 @@ const PaymentCheckout: React.FC = () => {
         referralCode,
         paymentTransactionId: getOrCreatePassPurchaseIdempotencyKey(),
       };
+
+      console.info('[PaymentCheckout] process-card-payment (no card data)', {
+        partyForPay,
+        cartParty: cart?.partySize,
+        stateParty: partySize,
+        isExtended,
+        startDate: payStartDate,
+      });
 
       const { data, error } = await supabase.functions.invoke('process-card-payment', {
         body: invokeBody,
@@ -608,10 +1005,23 @@ const PaymentCheckout: React.FC = () => {
         const status = getInvokeStatus(error);
         const body = await getInvokeErrorBody(error);
         const fromBody = typeof body?.error === 'string' ? body.error : null;
-        const serverError =
+        let serverError =
           fromBody ??
           (typeof data?.error === 'string' ? data.error : null) ??
           (typeof data?.message === 'string' ? data.message : null);
+        if (body?.reason === 'invalid_party_size' && (body.partyReceived !== undefined || body.bodyKeys)) {
+          const hint = [
+            typeof body.partyReceived !== 'undefined'
+              ? `Server saw partySize: ${JSON.stringify(body.partyReceived)}`
+              : null,
+            Array.isArray(body.bodyKeys) && body.bodyKeys.length
+              ? `Keys: ${(body.bodyKeys as string[]).join(', ')}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' · ');
+          if (hint) serverError = `${serverError ?? 'Payment failed'} (${hint})`;
+        }
 
         if (status === 401) {
           console.warn(
@@ -622,6 +1032,10 @@ const PaymentCheckout: React.FC = () => {
 
         if (serverError) {
           throw new Error(serverError);
+        }
+        if (isPaymentInvokeTransportFailure(error)) {
+          const detail = describeFunctionsFetchFailure(error);
+          throw new Error(detail ? `${PAYMENT_TRANSPORT_FAILURE_HINT} (${detail})` : PAYMENT_TRANSPORT_FAILURE_HINT);
         }
         const fetchDetail = describeFunctionsFetchFailure(error);
         const errMsg = fetchDetail
@@ -663,7 +1077,7 @@ const PaymentCheckout: React.FC = () => {
           days: data.days,
           shareBonusApplied: Boolean(data.shareBonusApplied),
           group: data.group || groupLabel,
-          partySize,
+          partySize: partyForPay,
           isExtended,
           sessionId: data.sessionId,
           completedAt: new Date().toISOString(),
@@ -828,7 +1242,7 @@ const PaymentCheckout: React.FC = () => {
                           onChange={(e) => handlePartySizeChange(Number(e.target.value))}
                           className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                         >
-                          {[1, 2, 3, 4, 5, 6].map((n) => (
+                          {Array.from({ length: MAX_PARTY_SIZE }, (_, i) => i + 1).map((n) => (
                             <option key={n} value={n}>
                               {n} {n === 1 ? 'person' : 'people'}
                             </option>
@@ -929,97 +1343,124 @@ const PaymentCheckout: React.FC = () => {
                   />
                   </div>
 
-                  <div className="border-t border-gray-100 pt-6 mt-2">
-                    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-4">
-                      {t('checkout.section_dates', checkoutLang)}
-                    </h4>
-                  {/* Start Date Picker */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-teal-600" />
-                      Discounts Valid From (Start Date)
-                    </label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      min={minStartDate}
-                      max={maxStartDate}
-                      onChange={(e) => {
-                        startDateTouchedRef.current = true;
-                        setStartDate(e.target.value);
-                      }}
-                      className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer hover:border-teal-300"
-                    />
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      You can start your pass up to 30 days from today (UTC calendar, same as checkout validation)
-                    </p>
-                  </div>
-
-                  {/* End Date (Auto-calculated) */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-orange-500" />
-                      Discounts Valid Until (End Date)
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium ml-1">Auto-calculated</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={endDate}
-                        readOnly
-                        className="w-full px-4 py-3.5 rounded-xl border-2 border-gray-100 bg-gray-50 text-sm font-medium text-gray-600 cursor-not-allowed"
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <Lock className="w-4 h-4 text-gray-300" />
+                  <div className="mt-6 pt-2">
+                    <div className="rounded-2xl border-2 border-teal-300/80 bg-gradient-to-br from-teal-50/95 via-white to-emerald-50/90 p-5 sm:p-6 shadow-[0_20px_50px_-20px_rgba(13,148,136,0.45)] ring-1 ring-teal-200/60">
+                      <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6 pb-5 border-b border-teal-200/60">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-600 text-white shadow-lg shadow-teal-700/25">
+                          <CalendarRange className="w-6 h-6" aria-hidden />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-base sm:text-lg font-black uppercase tracking-wide text-teal-950">
+                            {t('checkout.section_dates', checkoutLang)}
+                          </h4>
+                          <p className="text-sm text-teal-900/90 mt-1.5 leading-snug font-medium">
+                            {t('checkout.section_dates_sub', checkoutLang)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      {coverageUi.endHelper}
-                    </p>
-                  </div>
 
-                  {/* Date Range Preview */}
-                  <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
-                    <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider mb-3">Your discount window</p>
-                    <div className="flex flex-col sm:flex-row sm:items-stretch gap-4">
-                      <div className="flex-1 bg-white rounded-lg p-3 border border-teal-200 shadow-sm">
-                        <p className="text-[10px] text-gray-400 font-medium uppercase">Start</p>
-                        <p className="text-sm font-bold text-gray-900 mt-0.5">{formatDate(startDate)}</p>
+                      <div className="space-y-5">
+                        {/* Start Date Picker */}
+                        <div className="rounded-xl bg-white/95 border border-teal-200/90 p-4 shadow-sm">
+                          <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-teal-600 shrink-0" />
+                            Discounts Valid From (Start Date)
+                          </label>
+                          <input
+                            type="date"
+                            value={startDate}
+                            min={minStartDate}
+                            max={maxStartDate}
+                            onChange={(e) => {
+                              startDateTouchedRef.current = true;
+                              setStartDate(e.target.value);
+                            }}
+                            className="w-full px-4 py-3.5 rounded-xl border-2 border-teal-100 bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer hover:border-teal-300"
+                          />
+                          <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                            You can start your pass up to 30 days from today (UTC calendar, same as checkout validation)
+                          </p>
+                        </div>
+
+                        {/* End Date (Auto-calculated) */}
+                        <div className="rounded-xl bg-white/95 border border-orange-200/80 p-4 shadow-sm">
+                          <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2 flex-wrap">
+                            <Calendar className="w-4 h-4 text-orange-500 shrink-0" />
+                            Discounts Valid Until (End Date)
+                            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-orange-50 text-orange-800 font-bold border border-orange-200/80">
+                              Auto-calculated
+                            </span>
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="date"
+                              value={endDate}
+                              readOnly
+                              className="w-full px-4 py-3.5 rounded-xl border-2 border-orange-100/90 bg-orange-50/40 text-sm font-medium text-gray-700 cursor-not-allowed"
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              <Lock className="w-4 h-4 text-orange-300" />
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-2 leading-relaxed">{coverageUi.endHelper}</p>
+                        </div>
                       </div>
-                      <div className="flex sm:flex-col items-center justify-center gap-1 flex-shrink-0 px-2">
-                        <div className="px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold shadow-sm text-center leading-snug max-w-[11rem]">
-                          {coverageUi.periodBadge}
+
+                      {/* Date range preview — focal card */}
+                      <div className="mt-6 rounded-2xl bg-gradient-to-b from-emerald-100/80 via-teal-50/90 to-white p-4 sm:p-5 border-2 border-emerald-400/55 shadow-inner shadow-emerald-900/10">
+                        <p className="text-[11px] font-black text-teal-950 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-amber-500 shrink-0" aria-hidden />
+                          {t('checkout.discount_window_card_title', checkoutLang)}
+                        </p>
+                        <div className="flex flex-col sm:flex-row sm:items-stretch gap-4">
+                          <div className="flex-1 bg-white rounded-xl p-3.5 border-2 border-teal-300/50 shadow-md">
+                            <p className="text-[10px] text-teal-700 font-bold uppercase tracking-wider">
+                              {t('checkout.window_label_start', checkoutLang)}
+                            </p>
+                            <p className="text-sm font-bold text-gray-900 mt-1">{formatDate(startDate)}</p>
+                          </div>
+                          <div className="flex sm:flex-col items-center justify-center gap-2 flex-shrink-0 px-1">
+                            <div className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs font-black shadow-md text-center leading-snug max-w-[12.5rem] ring-1 ring-white/30">
+                              {coverageUi.periodBadge}
+                            </div>
+                            {coverageUi.windowTripHint && (
+                              <p className="text-[10px] text-slate-600 text-center leading-snug max-w-[13rem] font-medium">
+                                {coverageUi.windowTripHint}
+                              </p>
+                            )}
+                            {coverageUi.periodSub && (
+                              <p className="text-[10px] text-teal-900/85 text-center leading-snug max-w-[13rem] mt-0.5 hidden sm:block font-medium">
+                                {coverageUi.periodSub}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex-1 bg-white rounded-xl p-3.5 border-2 border-orange-300/50 shadow-md">
+                            <p className="text-[10px] text-orange-800 font-bold uppercase tracking-wider">
+                              {t('checkout.window_label_end', checkoutLang)}
+                            </p>
+                            <p className="text-sm font-bold text-gray-900 mt-1">{formatDate(endDate)}</p>
+                          </div>
                         </div>
                         {coverageUi.periodSub && (
-                          <p className="text-[10px] text-teal-800/90 text-center leading-snug max-w-[12rem] mt-1 hidden sm:block">
+                          <p className="text-[10px] text-teal-900/85 text-center leading-snug mt-3 sm:hidden font-medium px-1">
                             {coverageUi.periodSub}
                           </p>
                         )}
-                      </div>
-                      <div className="flex-1 bg-white rounded-lg p-3 border border-orange-200 shadow-sm">
-                        <p className="text-[10px] text-gray-400 font-medium uppercase">End</p>
-                        <p className="text-sm font-bold text-gray-900 mt-0.5">{formatDate(endDate)}</p>
+
+                        {startDate === minStartDate && (
+                          <p className="text-xs text-teal-800 mt-4 flex items-center gap-2 rounded-lg bg-white/70 border border-teal-200/60 px-3 py-2.5 font-semibold">
+                            <Zap className="w-3.5 h-3.5 flex-shrink-0 text-amber-500" />
+                            Starting on the earliest available day — discounts activate right after purchase.
+                          </p>
+                        )}
+                        {startDate > minStartDate && (
+                          <p className="text-xs text-teal-800 mt-4 flex items-center gap-2 rounded-lg bg-white/70 border border-teal-200/60 px-3 py-2.5 font-semibold">
+                            <Calendar className="w-3.5 h-3.5 flex-shrink-0 text-teal-600" />
+                            Your discounts will activate on {formatDate(startDate)}.
+                          </p>
+                        )}
                       </div>
                     </div>
-                    {coverageUi.periodSub && (
-                      <p className="text-[10px] text-teal-800/90 text-center leading-snug mt-3 sm:hidden">
-                        {coverageUi.periodSub}
-                      </p>
-                    )}
-
-                    {startDate === minStartDate && (
-                      <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
-                        <Zap className="w-3.5 h-3.5 flex-shrink-0" />
-                        Starting on the earliest available day — discounts activate right after purchase.
-                      </p>
-                    )}
-                    {startDate > minStartDate && (
-                      <p className="text-xs text-teal-600 mt-3 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-                        Your discounts will activate on {formatDate(startDate)}.
-                      </p>
-                    )}
-                  </div>
                   </div>
                 </div>
 
@@ -1085,6 +1526,16 @@ const PaymentCheckout: React.FC = () => {
                   </div>
                 )}
 
+                {paypalSdkError && paypalHostedCardEnabled && (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
+                    <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900">PayPal card fields unavailable</p>
+                      <p className="text-sm text-amber-800 mt-0.5">{paypalSdkError}</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Card Form */}
                 <div className="bg-white rounded-xl p-6 border border-gray-200 space-y-5">
                   {/* Card Header */}
@@ -1095,7 +1546,11 @@ const PaymentCheckout: React.FC = () => {
                       </div>
                       <div>
                         <p className="font-bold text-gray-900 text-sm">Credit or Debit Card</p>
-                        <p className="text-xs text-gray-500">Pay securely on StikmNek — no redirect</p>
+                        <p className="text-xs text-gray-500">
+                          {paypalHostedCardEnabled
+                            ? 'Card details are entered in secure PayPal fields — you stay on StikmNek'
+                            : 'Pay securely on StikmNek — no redirect'}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -1105,6 +1560,186 @@ const PaymentCheckout: React.FC = () => {
                     </div>
                   </div>
 
+                  {paypalHostedCardEnabled && paypalCardEligible === false && !paypalSdkError && (
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                      PayPal Advanced Card payments are not available in this browser or for this account.
+                      Set <code className="text-xs bg-white px-1 rounded">VITE_PAYPAL_CLIENT_ID</code> to a merchant
+                      profile with Expanded Checkout enabled, refresh, and try again.
+                    </div>
+                  )}
+
+                  {paypalHostedCardEnabled && !paypalSdkError && paypalCardEligible !== false && (
+                    <div className="border-t border-gray-100 pt-5 space-y-4 relative">
+                      {paypalCardEligible === null && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl bg-white/85 backdrop-blur-[1px] text-gray-600">
+                          <Loader2 className="w-7 h-7 animate-spin text-teal-600" />
+                          <span className="text-sm font-medium">Loading secure card fields…</span>
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Name on card</label>
+                        <div
+                          ref={paypalNameFieldRef}
+                          className="min-h-[48px] px-3 py-2 rounded-xl border-2 border-gray-200 bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Card number</label>
+                        <div
+                          ref={paypalNumberFieldRef}
+                          className="min-h-[48px] px-3 py-2 rounded-xl border-2 border-gray-200 bg-white"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Expiry</label>
+                          <div
+                            ref={paypalExpiryFieldRef}
+                            className="min-h-[48px] px-3 py-2 rounded-xl border-2 border-gray-200 bg-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">CVV</label>
+                          <div
+                            ref={paypalCvvFieldRef}
+                            className="min-h-[48px] px-3 py-2 rounded-xl border-2 border-gray-200 bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      {paypalCardEligible === true && (
+                      <div className="pt-2 space-y-3">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Billing address</p>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Street address</label>
+                          <input
+                            type="text"
+                            value={billingLine1}
+                            onChange={(e) => {
+                              setBillingLine1(e.target.value);
+                              setBillingErrors((prev) => ({ ...prev, line1: '' }));
+                            }}
+                            autoComplete="street-address"
+                            className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
+                              billingErrors.line1 ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
+                            }`}
+                          />
+                          {billingErrors.line1 && (
+                            <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              {billingErrors.line1}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                            Apartment, suite, etc.{' '}
+                            <span className="text-gray-400 font-normal">(optional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={billingLine2}
+                            onChange={(e) => setBillingLine2(e.target.value)}
+                            autoComplete="address-line2"
+                            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">City / suburb</label>
+                            <input
+                              type="text"
+                              value={billingCity}
+                              onChange={(e) => {
+                                setBillingCity(e.target.value);
+                                setBillingErrors((prev) => ({ ...prev, city: '' }));
+                              }}
+                              autoComplete="address-level2"
+                              className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
+                                billingErrors.city ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
+                              }`}
+                            />
+                            {billingErrors.city && (
+                              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                {billingErrors.city}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">State / province</label>
+                            <input
+                              type="text"
+                              value={billingState}
+                              onChange={(e) => {
+                                setBillingState(e.target.value);
+                                setBillingErrors((prev) => ({ ...prev, state: '' }));
+                              }}
+                              autoComplete="address-level1"
+                              className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
+                                billingErrors.state ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
+                              }`}
+                            />
+                            {billingErrors.state && (
+                              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                {billingErrors.state}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Postal code</label>
+                            <input
+                              type="text"
+                              value={billingPostal}
+                              onChange={(e) => {
+                                setBillingPostal(e.target.value);
+                                setBillingErrors((prev) => ({ ...prev, postal: '' }));
+                              }}
+                              autoComplete="postal-code"
+                              className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
+                                billingErrors.postal ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
+                              }`}
+                            />
+                            {billingErrors.postal && (
+                              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                {billingErrors.postal}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Country</label>
+                            <input
+                              type="text"
+                              value={billingCountryCode}
+                              onChange={(e) => {
+                                setBillingCountryCode(e.target.value.toUpperCase().slice(0, 2));
+                                setBillingErrors((prev) => ({ ...prev, country: '' }));
+                              }}
+                              maxLength={2}
+                              autoComplete="country"
+                              placeholder="AU"
+                              className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-mono font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
+                                billingErrors.country ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
+                              }`}
+                            />
+                            {billingErrors.country && (
+                              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                {billingErrors.country}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      )}
+                    </div>
+                  )}
+
+                  {!paypalHostedCardEnabled && (
                   <div className="border-t border-gray-100 pt-5 space-y-4">
                     {/* Cardholder Name */}
                     <div>
@@ -1236,6 +1871,7 @@ const PaymentCheckout: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                  )}
 
                   {/* Security badges */}
                   <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 border border-gray-100">
@@ -1275,8 +1911,15 @@ const PaymentCheckout: React.FC = () => {
                 {/* Pay with Card Button */}
                 <button
                   type="button"
-                  onClick={handlePayWithCard}
-                  disabled={processing}
+                  onClick={
+                    paypalHostedCardEnabled && paypalCardEligible === true
+                      ? handlePayPalHostedPay
+                      : handlePayWithCard
+                  }
+                  disabled={
+                    processing ||
+                    (paypalHostedCardEnabled && paypalCardEligible !== true)
+                  }
                   className="w-full py-4 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-lg transition-all shadow-lg shadow-teal-200 hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                 >
                   {processing ? (
@@ -1293,7 +1936,9 @@ const PaymentCheckout: React.FC = () => {
                 </button>
 
                 <p className="text-xs text-center text-gray-400">
-                  Card is processed securely. You stay on StikmNek — no redirect.
+                  {paypalHostedCardEnabled
+                    ? 'PayPal processes your card on-page (Expanded Checkout). Funds are captured when you pay.'
+                    : 'Card is processed securely. You stay on StikmNek — no redirect.'}
                 </p>
               </div>
             )}
@@ -1330,7 +1975,9 @@ const PaymentCheckout: React.FC = () => {
                 </p>
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 border border-green-200 text-sm text-green-700 font-medium">
                   <CreditCard className="w-4 h-4" />
-                  Card ending in {paymentResult.cardLast4}
+                  {paymentResult.cardLast4
+                    ? `Card ending in ${paymentResult.cardLast4}`
+                    : 'Payment confirmed'}
                 </div>
                 <div className="mt-6 w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                   <div className="bg-green-500 h-full rounded-full animate-pulse" style={{ width: '100%' }} />

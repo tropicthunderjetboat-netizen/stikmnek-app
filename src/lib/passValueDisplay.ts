@@ -7,3 +7,9 @@ export function approximateVatuFromAud(aud: number): number {
   if (!Number.isFinite(aud) || aud <= 0) return 0;
   return Math.round(aud * APPROX_VTU_PER_AUD);
 }
+
+/** Inverse of {@link approximateVatuFromAud} — illustrative AUD from VT at the same fixed rate. */
+export function approximateAudFromVatu(vt: number): number {
+  if (!Number.isFinite(vt) || APPROX_VTU_PER_AUD <= 0) return 0;
+  return vt / APPROX_VTU_PER_AUD;
+}

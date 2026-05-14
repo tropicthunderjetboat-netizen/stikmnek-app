@@ -20,6 +20,7 @@ export const translations: Record<string, Record<Language, string>> = {
   },
   'hero.ctaTourist': { en: 'Sign Up & Get Deals', fr: 'Inscrivez-vous et profitez des offres', bi: 'Saen Ap & Karem Dils' },
   'hero.ctaBusiness': { en: 'List Your Business (Free)', fr: 'Inscrivez votre entreprise (gratuit)', bi: 'Listem Bisnis Blong Yu (Fri)' },
+  'hero.businessOwnersHint': { en: 'Own a business?', fr: 'Vous avez un commerce ?', bi: 'Yu gat bisnis?' },
   'hero.cta': { en: 'Get Your Pass', fr: 'Obtenez votre pass', bi: 'Karem Pas Blong Yu' },
   'hero.explore': { en: 'Explore Deals', fr: 'Explorer les offres', bi: 'Eksploarem Dils' },
   'hero.businesses': { en: 'Local Businesses', fr: 'Entreprises locales', bi: 'Lokal Bisnis' },
@@ -49,9 +50,9 @@ export const translations: Record<string, Record<Language, string>> = {
     bi: 'Kostomem yor travel long fleksibel pricing',
   },
   'pass.build_how_desc': {
-    en: 'On Passes, pricing starts at A$15 for the first guest plus A$5 per additional guest (ages 6+), up to 6 per pass. Pick a 24-hour or 7-day holiday plan and checkout — your total updates instantly.',
-    fr: 'Dans Passes, les prix commencent à 15 $ AUD pour la 1re personne + 5 $ par invité supplémentaire (6 ans et +), jusqu’à 6 par pass. Choisissez 24 h ou 7 jours, puis payez — le total se met à jour instantanément.',
-    bi: 'Long Pas, praes i stat long A$15 long fes man + A$5 long evri narafala (6+), kasem 6 long wan pas. Jusum 24 owa o 7 dei, mo pei — total i apdet stretwe.',
+    en: 'Sign up, add how many people are travelling, your travel dates, pay with a credit card, and start saving.',
+    fr: 'Inscrivez-vous, indiquez le nombre de participants, vos dates de voyage, payez par carte de crédit, et commencez à économiser.',
+    bi: 'Sign ap, putem hu mas i travelem, dat blong trip, pei wetem kredit kad, mo stat sevem.',
   },
 
   // Pass pricing card (package UI)
@@ -97,9 +98,9 @@ export const translations: Record<string, Record<Language, string>> = {
     bi: 'Holiday pas 7 dei',
   },
   'passPricing.simple_header': {
-    en: 'Simple pricing: A$__BASE__ for the first person, A$__GUEST__ per extra guest. Kids under 6 always FREE.',
-    fr: 'Tarifs simples : __BASE__ $ AUD pour la 1re personne, __GUEST__ $ par invité supplémentaire. Enfants de moins de 6 ans : toujours GRATUIT.',
-    bi: 'Prais we i simpol: A$__BASE__ long fes man, A$__GUEST__ long evri narafala man. Pikinini under 6: oltaim fri.',
+    en: 'A$__BASE__ first guest (6+), A$__GUEST__ each for guests 2–6, then A$10 for the 7th and A$__GUEST__ each up to __MAX__ per pass. Under 6 free.',
+    fr: '__BASE__ $ 1re pers. (6+), __GUEST__ $ (pers. 2–6), puis 10 $ pour la 7e puis __GUEST__ $ jusqu’à __MAX__ / pass. Moins de 6 ans gratuits.',
+    bi: 'A$__BASE__ fes (6+), A$__GUEST__ long 2–6, mo A$10 long 7fala mo A$__GUEST__ kasem __MAX__/pas. Under 6 fri.',
   },
   'passPricing.people_label': {
     en: 'People (ages 6+)',
@@ -148,9 +149,9 @@ export const translations: Record<string, Record<Language, string>> = {
   'passPricing.purchase': { en: 'Purchase pass', fr: 'Acheter le pass', bi: 'Baem pas' },
   'passPricing.purchase_locked': { en: 'Active pass', fr: 'Pass actif', bi: 'Pas i aktiv' },
   'passPricing.holiday_addon_micro': {
-    en: '+A$10 · 7-day unlock',
-    fr: '+10 $ AUD · déblocage 7 j.',
-    bi: '+A$10 · 7-dei anlok',
+    en: '+A$15 · 7-day unlock',
+    fr: '+15 $ AUD · déblocage 7 j.',
+    bi: '+A$15 · 7-dei anlok',
   },
   'passPricing.aria_decrease_party': {
     en: 'Decrease party size',
@@ -220,10 +221,20 @@ export const translations: Record<string, Record<Language, string>> = {
     fr: 'Invités supplémentaires (__COUNT__ × __FEE__ $ AUD)',
     bi: 'Narafala man (__COUNT__ × A$__FEE__)',
   },
+  'checkout.extra_guests_2_6_row': {
+    en: 'Guests 2–6 (__COUNT__ × A$__FEE__)',
+    fr: 'Personnes 2 à 6 (__COUNT__ × __FEE__ $ AUD)',
+    bi: 'Man 2–6 (__COUNT__ × A$__FEE__)',
+  },
+  'checkout.extra_guests_from_7_row': {
+    en: 'From 7th guest (__COUNT__ people, slots 7–__P__)',
+    fr: 'À partir de la 7e personne (__COUNT__ pers., places 7–__P__)',
+    bi: 'Long 7fala man (__COUNT__ man, slot 7–__P__)',
+  },
   'checkout.extension_row': {
-    en: 'Whole-trip option (+A$10)',
-    fr: 'Option « tout le séjour » (+10 $ AUD)',
-    bi: 'Opsen long ful trip (+A$10)',
+    en: 'Whole-trip option (+A$15)',
+    fr: 'Option « tout le séjour » (+15 $ AUD)',
+    bi: 'Opsen long ful trip (+A$15)',
   },
   'checkout.total_row': { en: 'Total', fr: 'Total', bi: 'Total' },
   'checkout.potential_savings': {
@@ -263,7 +274,7 @@ export const translations: Record<string, Record<Language, string>> = {
     fr: 'Courte visite — réductions sur un jour calendaire au choix.',
     bi: 'Sot visit — diskount long wan kalenda dei yu josem.',
   },
-  'checkout.option_extended_title': { en: 'Whole trip (+A$10)', fr: 'Tout le séjour (+10 $ AUD)', bi: 'Ful trip (+A$10)' },
+  'checkout.option_extended_title': { en: 'Whole trip (+A$15)', fr: 'Tout le séjour (+15 $ AUD)', bi: 'Ful trip (+A$15)' },
   'checkout.option_extended_desc': {
     en: 'Covers longer visits — __CAL__ calendar days of deal access from your start date.',
     fr: 'Pour les séjours plus longs — __CAL__ jours calendaires d’accès aux offres à partir de la date de début.',
@@ -297,9 +308,9 @@ export const translations: Record<string, Record<Language, string>> = {
   },
   'checkout.plan_holiday_title': { en: '7-Day Holiday Pass', fr: 'Pass vacances 7 jours', bi: 'Holiday Pas 7 Dei' },
   'checkout.plan_holiday_sub': {
-    en: 'Best for stayover visitors — 7 calendar days of deal access (+A$10). Share the app after purchase for 7 extra days free (14 days of deals total).',
-    fr: 'Idéal pour les séjours — 7 jours calendaires d’accès (+10 $ AUD). Partagez l’app après achat pour 7 jours supplémentaires gratuits (14 jours d’offres au total).',
-    bi: 'Bes blong taem yu stap — 7 kalenda dei akses (+A$10). Serem app afta bai blong 7 dei moa blong free (14 dei long total).',
+    en: 'Best for stayover visitors — 7 calendar days of deal access (+A$15). Share the app after purchase for 7 extra days free (14 days of deals total).',
+    fr: 'Idéal pour les séjours — 7 jours calendaires d’accès (+15 $ AUD). Partagez l’app après achat pour 7 jours supplémentaires gratuits (14 jours d’offres au total).',
+    bi: 'Bes blong taem yu stap — 7 kalenda dei akses (+A$15). Serem app afta bai blong 7 dei moa blong free (14 dei long total).',
   },
   'checkout.share_second_week_unlock': {
     en: 'Share this app and get 7 extra days FREE!!',
@@ -426,6 +437,28 @@ export const translations: Record<string, Record<Language, string>> = {
   },
   'checkout.section_pass_group': { en: 'Pass & group', fr: 'Pass et groupe', bi: 'Pas mo grup' },
   'checkout.section_dates': { en: 'When discounts apply', fr: 'Quand les réductions s’appliquent', bi: 'Taem diskount i ap' },
+  'checkout.section_dates_sub': {
+    en: 'Pick when deal discounts turn on — the end date is set automatically from your pass type.',
+    fr: 'Choisissez l’activation des réductions — la fin est calculée selon votre type de pass.',
+    bi: 'Jusum taem diskount i stat — det blong finis i kam otomatik long taem blong pas.',
+  },
+  'checkout.discount_window_card_title': {
+    en: 'Your discount window',
+    fr: 'Votre fenêtre de réductions',
+    bi: 'Windo blong diskount',
+  },
+  'checkout.period_badge_pass_window': {
+    en: '__CAL__-day deal access',
+    fr: '__CAL__ j. d’accès aux offres',
+    bi: '__CAL__ dei blong akses long dils',
+  },
+  'checkout.window_trip_hint': {
+    en: 'Your trip is __NIGHTS__ nights — align your start date with when you want to use deals.',
+    fr: 'Votre séjour : __NIGHTS__ nuits — alignez la date de début avec l’usage des offres.',
+    bi: 'Trip blong yu __NIGHTS__ naet — josem det blong stat wetem taem yu laik yusum dils.',
+  },
+  'checkout.window_label_start': { en: 'Start', fr: 'Début', bi: 'Stat' },
+  'checkout.window_label_end': { en: 'End', fr: 'Fin', bi: 'Finis' },
   'checkout.order_summary_deals_short': {
     en: 'Unlimited deal redemptions for your chosen coverage window.',
     fr: 'Offres illimitées pendant la période choisie.',
@@ -479,9 +512,9 @@ export const translations: Record<string, Record<Language, string>> = {
     bi: 'Long bigfala grup o lon taem, wan pas i no save stret — askem support o tingbaot moa pas.',
   },
   'passFlow.checkout_preview': {
-    en: 'Checkout will use {party} guests (ages 6+) · {duration} — starting at A$15 + A$5 per extra guest (edit before paying).',
-    fr: 'Le paiement utilisera {party} voyageurs (6 ans et +) · {duration} — à partir de 15 $ + 5 $ par invité supplémentaire (modifiable avant paiement).',
-    bi: 'Checkout bae yusum {party} man (6+) · {duration} — stat long A$15 + A$5 long narafala (yu ken senis bifo pem).',
+    en: 'Checkout will use {party} guests (ages 6+) · {duration} — A$15 first, A$5 each for 2–6, A$10 on the 7th then A$5 each up to 20; +A$15 for whole-trip (edit before paying).',
+    fr: 'Paiement : {party} voyageurs (6+) · {duration} — 15 $ 1re pers., 5 $ (2–6), 10 $ pour la 7e puis 5 $ jusqu’à 20 ; +15 $ séjour (modifiable avant paiement).',
+    bi: 'Checkout: {party} man (6+) · {duration} — A$15 fes, A$5 long 2–6, A$10 long 7fala mo A$5 kasem 20; +A$15 ful trip (yu ken senis bifo pem).',
   },
   'passFlow.duration_short': { en: '1-day', fr: '1 jour', bi: 'wan-dei' },
   'passFlow.duration_extended': { en: 'whole-trip', fr: 'tout le séjour', bi: 'ful-trip' },
@@ -526,6 +559,21 @@ export const translations: Record<string, Record<Language, string>> = {
   'dash.title': { en: 'My Dashboard', fr: 'Mon tableau de bord', bi: 'Dasbod Blong Mi' },
   'dash.passes': { en: 'My Passes', fr: 'Mes pass', bi: 'Pas Blong Mi' },
   'dash.favorites': { en: 'Favorites', fr: 'Favoris', bi: 'Favrit' },
+  'dash.favorites_list_heading': {
+    en: 'Your saved places',
+    fr: 'Vos adresses enregistrées',
+    bi: 'Ples we yu sevem',
+  },
+  'dash.favorites_list_empty': {
+    en: 'Browse deals and tap the heart on a listing to save it here.',
+    fr: 'Parcourez les offres et touchez le cœur sur une annonce pour l’enregistrer ici.',
+    bi: 'Lukluk long ol diskaon mo tap long hating blong sevem long hia.',
+  },
+  'dash.favorites_back_dashboard': {
+    en: 'Back to dashboard',
+    fr: 'Retour au tableau de bord',
+    bi: 'Go bak long dasbod',
+  },
   'dash.history': { en: 'Redemption History', fr: 'Historique d\'utilisation', bi: 'Histri blong Yusim' },
   'dash.nopass': { en: 'No active pass. Get one to start saving!', fr: 'Pas de pass actif. Obtenez-en un pour commencer à économiser!', bi: 'No gat aktiv pas. Karem wan blong stat sevem!' },
   'dash.pass_prefs_title': { en: 'Pass checkout defaults', fr: 'Préférences d’achat du pass', bi: 'Pas checkout difolt' },

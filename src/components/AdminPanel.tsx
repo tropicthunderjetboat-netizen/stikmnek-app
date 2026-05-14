@@ -994,7 +994,7 @@ const AdminPanel: React.FC = () => {
         }, 1000);
       }
 
-      // Owner decision emails are sent from the `manage-business` edge function (SendGrid + service role)
+      // Owner decision emails are sent from the `manage-business` edge function (Resend + service role)
       // so the browser never calls `send-email` here (avoids duplicate mail and JWT/RS256 invoke issues).
     } catch (err: unknown) {
       let msg = rpcErrorMsg || (err instanceof Error ? err.message : 'Unknown error');

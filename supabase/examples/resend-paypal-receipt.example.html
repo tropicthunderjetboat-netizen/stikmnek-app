@@ -1,0 +1,51 @@
+<!--
+  StikmNek — PayPal capture receipt (short) (Resend template body)
+
+  Secret: RESEND_TEMPLATE_PAYPAL_RECEIPT
+  PASS_LABEL is always "StikmNek Pass" (EN) from the API.
+
+  Subject is set by paypal-capture (e.g. StikmNek receipt — StikmNek Pass).
+-->
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body style="margin:0; padding:24px 12px; background:#f6f7f9; font-family:Arial, sans-serif; color:#111;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; margin:0 auto; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(15,23,42,0.08);">
+      <tr>
+        <td style="padding:24px 22px;">
+          <div style="font-weight:800; font-size:16px; color:#0d9488; margin-bottom:12px;">StikmNek</div>
+          <h2 style="margin:0 0 12px; font-size:18px;">Thanks for your purchase!</h2>
+          <p style="margin:0 0 16px; font-size:14px; line-height:1.5; color:#334155;">Your pass is now active.</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse; width:100%; max-width:520px;">
+            <tr>
+              <td style="padding:6px 0; color:#555; font-size:14px;">Receipt</td>
+              <td style="padding:6px 0; font-weight:700; font-size:14px; text-align:right;">{{{RECEIPT_NUMBER}}}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0; color:#555; font-size:14px;">Pass</td>
+              <td style="padding:6px 0; font-weight:700; font-size:14px; text-align:right;">{{{PASS_LABEL}}}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0; color:#555; font-size:14px;">Valid from</td>
+              <td style="padding:6px 0; font-size:14px; text-align:right;">{{{VALID_FROM}}}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0; color:#555; font-size:14px;">Valid until</td>
+              <td style="padding:6px 0; font-size:14px; text-align:right;">{{{VALID_UNTIL}}}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0; color:#555; font-size:14px;">Amount</td>
+              <td style="padding:6px 0; font-weight:700; font-size:14px; text-align:right;">{{{CURRENCY}}} {{{AMOUNT}}}</td>
+            </tr>
+          </table>
+          <p style="margin:20px 0 0; font-size:12px; color:#64748b;">
+            If you have any issues, reply to this email and we’ll help.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

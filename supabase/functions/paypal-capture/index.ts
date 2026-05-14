@@ -11,18 +11,16 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
-import { semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
+import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
 import {
   calculatePassPriceAud,
+  clampPartySize,
   dynamicPassInclusiveDays,
   parsePartySizeAndExtended,
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
-
-function passTypeToBrandDisplay(passType: string): string {
-  if (String(passType).toLowerCase() === 'dynamic') return 'StikmNek Pass';
-  return 'StikmNek Pass';
-}
+import { transactionalPassProductNameEn } from '../_shared/passDisplay.ts';
+import { getResendApiKey, sendResendEmail } from '../_shared/resend.ts';
 
 /** Gross amount from PayPal capture response (AUD). */
 function capturedAmountFromPayPalCapture(captureJson: Record<string, unknown>): number | null {
@@ -41,26 +39,79 @@ function capturedAmountFromPayPalCapture(captureJson: Record<string, unknown>): 
   }
 }
 
+/** Calendar span between valid_from and valid_until (matches process-card-payment / pass row semantics). */
+function calendarDaysBetweenValidRange(validFrom: string, validUntil: string): number {
+  const a = new Date(validFrom + 'T00:00:00.000Z');
+  const b = new Date(validUntil + 'T00:00:00.000Z');
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 1;
+  const diff = Math.round((b.getTime() - a.getTime()) / 86400000);
+  return Math.max(1, diff);
+}
+
+/** Same logic as `_shared/parsePassPartyWithProfileFallback.ts` — inlined so deploy bundlers always resolve deps. */
+type SupabaseProfileClient = {
+  from: (table: string) => {
+    select: (cols: string) => {
+      eq: (col: string, val: string) => { maybeSingle: () => Promise<{ data: unknown; error: { message?: string } | null }> };
+    };
+  };
+};
+
+async function parsePassPartyWithProfileFallback(
+  body: Record<string, unknown>,
+  supabase: SupabaseProfileClient,
+  userId: string,
+): Promise<{ partySize: number; isExtended: boolean } | null> {
+  const direct = parsePartySizeAndExtended(body);
+  if (direct) return direct;
+
+  const { data: prof, error } = await supabase
+    .from('user_profiles')
+    .select('num_adults, num_children, party_size')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('[paypal-capture] user_profiles read failed:', error.message);
+  }
+
+  const row = prof as Record<string, unknown> | null | undefined;
+  const adults = Math.max(0, Math.floor(Number(row?.num_adults ?? 0)));
+  const children = Math.max(0, Math.floor(Number(row?.num_children ?? 0)));
+  const combined = adults + children;
+
+  const merged: Record<string, unknown> = { ...body };
+
+  if (combined > 0) {
+    merged.partySize = clampPartySize(combined);
+    console.warn('[paypal-capture] filled partySize from num_adults+num_children', { userId, combined });
+    return parsePartySizeAndExtended(merged);
+  }
+
+  if (row != null && row.party_size != null && row.party_size !== '') {
+    merged.partySize = clampPartySize(Number(row.party_size));
+    console.warn('[paypal-capture] filled partySize from party_size column', { userId });
+    return parsePartySizeAndExtended(merged);
+  }
+
+  return null;
+}
+
 async function sendReceiptEmail(params: {
   toEmail: string;
   toName?: string | null;
   receiptNumber: string;
-  passType: string;
   amount: number;
   currency: string;
   validFrom: string;
   validUntil: string;
 }): Promise<{ sent: boolean; skipped?: boolean; error?: string }> {
-  const apiKey = Deno.env.get('SENDGRID_API_KEY');
-  if (!apiKey) {
-    console.warn('[paypal-capture] SENDGRID_API_KEY not set - skipping receipt email');
-    return { sent: false, skipped: true, error: 'SENDGRID_API_KEY not set' };
+  if (!getResendApiKey()) {
+    console.warn('[paypal-capture] RESEND_API_KEY not set - skipping receipt email');
+    return { sent: false, skipped: true, error: 'RESEND_API_KEY not set' };
   }
 
-  const fromEmail = Deno.env.get('SENDGRID_FROM_EMAIL') || 'no-reply@stikmnek.com';
-  const fromName = Deno.env.get('SENDGRID_FROM_NAME') || 'StikmNek';
-
-  const passLabel = passTypeToBrandDisplay(params.passType);
+  const passLabel = transactionalPassProductNameEn();
 
   const subject = `StikmNek receipt — ${passLabel}`;
   const html = `
@@ -95,28 +146,30 @@ async function sendReceiptEmail(params: {
     </div>
   `;
 
-  const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      personalizations: [
-        {
-          to: [{ email: params.toEmail, name: params.toName ?? undefined }],
-          subject,
+  const templateId = Deno.env.get('RESEND_TEMPLATE_PAYPAL_RECEIPT')?.trim();
+  const res = await sendResendEmail({
+    to: params.toEmail,
+    subject,
+    ...(templateId
+      ? {
+        template: {
+          id: templateId,
+          variables: {
+            PASS_LABEL: passLabel,
+            RECEIPT_NUMBER: params.receiptNumber,
+            VALID_FROM: params.validFrom,
+            VALID_UNTIL: params.validUntil,
+            AMOUNT: params.amount.toFixed(2),
+            CURRENCY: params.currency,
+          },
         },
-      ],
-      from: { email: fromEmail, name: fromName },
-      content: [{ type: 'text/html', value: html }],
-    }),
+      }
+      : { html }),
   });
 
   if (!res.ok) {
-    const errText = await res.text();
-    console.error('[paypal-capture] SendGrid receipt error:', res.status, errText);
-    return { sent: false, error: `SendGrid error: ${res.status}` };
+    console.error('[paypal-capture] Resend receipt error:', res.status, res.body);
+    return { sent: false, error: `Resend error: ${res.status}` };
   }
 
   return { sent: true };
@@ -194,19 +247,61 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const paypalOrderId = body?.paypalOrderId ?? body?.orderId;
     const startDate = body?.startDate ?? body?.start_date;
-    const parsed = parsePartySizeAndExtended(body as Record<string, unknown>);
+    const parsed = await parsePassPartyWithProfileFallback(
+      (body && typeof body === 'object' ? body : {}) as Record<string, unknown>,
+      supabase,
+      user.id,
+    );
 
     if (!paypalOrderId) {
       return errorResponse('Missing paypalOrderId', 400);
     }
     if (!parsed) {
-      return errorResponse('Missing or invalid partySize (1-6) or isExtended', 400);
+      return errorResponse('Missing or invalid partySize (1-20) or isExtended', 400);
     }
     const { partySize, isExtended } = parsed;
     if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
       return errorResponse('Missing or invalid startDate (YYYY-MM-DD)', 400);
     }
     const expectedAmount = calculatePassPriceAud(partySize, isExtended);
+
+    const orderIdStr = String(paypalOrderId);
+    const { data: existingPass, error: existingErr } = await supabase
+      .from('passes')
+      .select(
+        'id, purchased_at, pass_type, valid_from, valid_until, expires_at, amount_paid, currency, share_bonus_applied, max_people',
+      )
+      .eq('user_id', user.id)
+      .eq('payment_session_id', orderIdStr)
+      .maybeSingle();
+    if (existingErr) {
+      console.warn('[paypal-capture] idempotent pass lookup:', existingErr.message);
+    } else if (existingPass) {
+      const ep = existingPass as Record<string, unknown>;
+      const vf = String(ep.valid_from ?? '');
+      const vu = String(ep.valid_until ?? '');
+      const exAt = String(ep.expires_at ?? '');
+      const inclusiveDaysReplay = calendarDaysBetweenValidRange(vf, vu);
+      const rid = String(ep.id ?? '');
+      const amt = Number(ep.amount_paid) || expectedAmount;
+      return jsonResponse({
+        success: true,
+        idempotentReplay: true,
+        receiptNumber: `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`,
+        passType: semanticPassIdFromDb((normalizePassTypeToDb(String(ep.pass_type ?? '')) ?? 'dynamic') as DbPassType),
+        passLabel: transactionalPassProductNameEn(),
+        amount: amt,
+        currency: (ep.currency as string) || 'AUD',
+        expiresAt: exAt,
+        validFrom: vf,
+        validUntil: vu,
+        days: inclusiveDaysReplay,
+        shareBonusApplied: Boolean(ep.share_bonus_applied),
+        group: `Up to ${Number(ep.max_people ?? partySize)} people (ages 6+)`,
+        sessionId: rid,
+        receiptEmail: null,
+      });
+    }
 
     const mode = (Deno.env.get('PAYPAL_MODE') ?? Deno.env.get('PAYPAL_SANDBOX') ?? 'sandbox').toString().toLowerCase();
     const sandbox = mode !== 'live' && mode !== 'production' && mode !== 'false';
@@ -360,7 +455,6 @@ Deno.serve(async (req) => {
           toEmail: buyerEmail,
           toName: (user.user_metadata as any)?.full_name ?? (user.user_metadata as any)?.name ?? null,
           receiptNumber,
-          passType: passTypeDb,
           amount,
           currency: 'AUD',
           validFrom,
@@ -378,7 +472,7 @@ Deno.serve(async (req) => {
       success: true,
       receiptNumber,
       passType: semanticPassIdFromDb(passTypeDb),
-      passLabel: 'StikmNek Pass',
+      passLabel: transactionalPassProductNameEn(),
       amount,
       currency: 'AUD',
       expiresAt,

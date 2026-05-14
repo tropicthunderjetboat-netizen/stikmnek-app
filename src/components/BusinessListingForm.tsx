@@ -24,7 +24,7 @@ import {
   pricingTiersFromDb,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
-import { normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
+import { businessHoursFromProfileRow, normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
 import { syncEmbeddedEditGalleryPhotos } from '@/lib/syncEmbeddedListingPhotos';
 import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
 import { fetchApprovedPhotosForOffering, photoRowsToUploadedPhotos } from '@/lib/fetchApprovedPhotosForOffering';
@@ -261,6 +261,14 @@ type EditBaseline = {
   category: string;
 };
 
+/** Prefer `hours`, then DB `opening_hours` when the profile row split them across columns. */
+function hoursPrefillFromBusiness(b: Business): string {
+  return businessHoursFromProfileRow({
+    hours: b.hours ?? '',
+    opening_hours: (b as unknown as { opening_hours?: unknown }).opening_hours,
+  });
+}
+
 function buildEditBaseline(b: Business): EditBaseline {
   const rawTiers = b.pricingTiers ?? null;
   const tiered = categoryUsesTieredPricing(asCategoryKey(b.category));
@@ -273,7 +281,7 @@ function buildEditBaseline(b: Business): EditBaseline {
   const cat = asCategoryKey(String(b.category || 'dining'));
   return {
     description: b.description || '',
-    hours: b.hours || '',
+    hours: hoursPrefillFromBusiness(b),
     phone: b.phone || '',
     email: ((b.contactEmail as string) || '').trim(),
     discount: (b.discount || '').trim(),
@@ -533,7 +541,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       address: b.location || '',
       phone: b.phone || '',
       email: (b.contactEmail || '').trim() || user?.email || '',
-      hours: b.hours || '',
+      hours: hoursPrefillFromBusiness(b),
       whatsappNumber: (b.whatsappNumber || b.whatsapp_number || '').trim(),
       mapUrl: mapUrlPrefill,
       website: displayWebsiteForInput(b.website ?? null),
@@ -548,7 +556,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     embeddedResolved,
     embeddedEdit?.profileBusinessId,
     embeddedEdit?.offeringId,
-    embeddedEdit?.business.id,
+    /** Entire row: new object when `dbBusinesses` / merge refreshes, not only when `id` changes. */
+    embeddedEdit?.business,
     embeddedEdit?.listingTitle,
     embeddedEdit?.listingCategory,
     user?.email,
@@ -1279,7 +1288,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 value={form.name}
                 onChange={(e) => {
                   setFieldErrors((fe) => ({ ...fe, title: undefined }));
-                  setForm({ ...form, name: e.target.value });
+                  setForm((prev) => ({ ...prev, name: e.target.value }));
                 }}
                 aria-invalid={!!fieldErrors.title}
                 className={`w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 ${
@@ -1316,7 +1325,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 value={form.category}
                 onChange={(e) => {
                   setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
-                  setForm({ ...form, category: e.target.value });
+                  setForm((prev) => ({ ...prev, category: e.target.value }));
                 }}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
               >
@@ -1340,7 +1349,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 value={form.description}
                 onChange={(html) => {
                   setFieldErrors((fe) => ({ ...fe, description: undefined }));
-                  setForm({ ...form, description: html });
+                  setForm((prev) => ({ ...prev, description: html }));
                 }}
                 placeholder={
                   language === 'en'
@@ -1417,7 +1426,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                     value={form.originalPrice}
                     onChange={(e) => {
                       setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
-                      setForm({ ...form, originalPrice: e.target.value });
+                      setForm((prev) => ({ ...prev, originalPrice: e.target.value }));
                     }}
                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
                     placeholder="5000"
@@ -1444,7 +1453,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                     value={form.discountPercent}
                     onChange={(e) => {
                       setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
-                      setForm({ ...form, discountPercent: e.target.value });
+                      setForm((prev) => ({ ...prev, discountPercent: e.target.value }));
                     }}
                     className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
                     placeholder="20"
@@ -1600,7 +1609,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   type="date"
                   value={form.discountValidFrom}
                   min={todayStr()}
-                  onChange={(e) => setForm({ ...form, discountValidFrom: e.target.value })}
+                  onChange={(e) => setForm((prev) => ({ ...prev, discountValidFrom: e.target.value }))}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 />
               </div>
@@ -1610,7 +1619,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 </label>
                 <select
                   value={form.listingDuration}
-                  onChange={(e) => setForm({ ...form, listingDuration: e.target.value })}
+                  onChange={(e) => setForm((prev) => ({ ...prev, listingDuration: e.target.value }))}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 >
                   {DURATION_OPTIONS.map(opt => (
@@ -1667,7 +1676,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               <input
                 type="text"
                 value={form.hours}
-                onChange={(e) => setForm({ ...form, hours: e.target.value })}
+                onChange={(e) => setForm((prev) => ({ ...prev, hours: e.target.value }))}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 placeholder="e.g. 9:00 AM - 5:00 PM"
               />
@@ -1679,7 +1688,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               <input
                 type="text"
                 value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                onChange={(e) => setForm((prev) => ({ ...prev, address: e.target.value }))}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 placeholder="Port Vila, Vanuatu"
               />
@@ -1694,7 +1703,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               <input
                 type="tel"
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 placeholder="+678 12345"
               />
@@ -1704,7 +1713,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               <input
                 type="email"
                 value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
@@ -1734,7 +1743,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               <input
                 type="tel"
                 value={form.whatsappNumber}
-                onChange={(e) => setForm({ ...form, whatsappNumber: e.target.value })}
+                onChange={(e) => setForm((prev) => ({ ...prev, whatsappNumber: e.target.value }))}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-green-200 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 placeholder="+678 5551234"
               />
@@ -1768,12 +1777,12 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <LocationMapPicker
                 mapUrl={form.mapUrl}
-                onMapUrlChange={(v) => setForm({ ...form, mapUrl: v })}
+                onMapUrlChange={(v) => setForm((prev) => ({ ...prev, mapUrl: v }))}
                 language={language}
               />
               <WebsiteUrlInput
                 website={form.website}
-                onWebsiteChange={(v) => setForm({ ...form, website: v })}
+                onWebsiteChange={(v) => setForm((prev) => ({ ...prev, website: v }))}
                 language={language}
                 id="listing-website"
               />

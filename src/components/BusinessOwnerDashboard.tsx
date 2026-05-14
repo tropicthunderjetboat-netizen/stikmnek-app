@@ -293,7 +293,15 @@ function mergeListingBusinessForEdit(selected: UnifiedBusiness, fromDb: Business
     location: firstNonEmptyStr(uBiz.location, fromDb.location),
     lat: Number(uBiz.lat) || Number(fromDb.lat) || 0,
     lng: Number(uBiz.lng) || Number(fromDb.lng) || 0,
-    hours: firstNonEmptyStr(uBiz.hours, fromDb.hours),
+    hours: firstNonEmptyStr(
+      uBiz.hours,
+      fromDb
+        ? businessHoursFromProfileRow({
+            hours: fromDb.hours ?? '',
+            opening_hours: (fromDb as unknown as Record<string, unknown>).opening_hours,
+          })
+        : '',
+    ),
     phone: firstNonEmptyStr(uBiz.phone, fromDb.phone),
     contactEmail:
       firstNonEmptyStr(uBiz.contactEmail ?? undefined, fromDb.contactEmail ?? undefined) || null,
@@ -815,6 +823,20 @@ const BusinessOwnerDashboard: React.FC = () => {
     return effectiveProfileBusinessId(selectedBusiness);
   }, [selectedBusiness]);
 
+  /** Approved rows for the same company profile (each live deal / profile stub). Used on Edit for mobile listing switcher. */
+  const approvedListingsSameProfile = useMemo(() => {
+    if (!selectedProfileId) return [];
+    const rows = unifiedBusinesses.filter(
+      (b) => b._source === 'approved' && effectiveProfileBusinessId(b) === selectedProfileId,
+    );
+    return [...rows].sort((a, b) => {
+      const aIsProfile = a.id === selectedProfileId;
+      const bIsProfile = b.id === selectedProfileId;
+      if (aIsProfile !== bIsProfile) return aIsProfile ? -1 : 1;
+      return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+    });
+  }, [unifiedBusinesses, selectedProfileId]);
+
   useEffect(() => {
     if (unifiedBusinesses.length > 0 && !selectedBusinessIdRef.current) {
       const firstApproved = unifiedBusinesses.find(b => b._source === 'approved');
@@ -1015,9 +1037,17 @@ const BusinessOwnerDashboard: React.FC = () => {
     }
   };
 
-  const businessReviews = dbReviews.filter(
-    r => selectedProfileId && r.business_id === selectedProfileId,
-  );
+  const businessReviews = useMemo(() => {
+    if (!selectedProfileId) return [];
+    const forProfile = dbReviews.filter((r) => r.business_id === selectedProfileId);
+    const offeringFocus =
+      selectedBusiness &&
+      selectedIsApproved &&
+      String(selectedBusiness.id) !== String(selectedProfileId);
+    if (!offeringFocus) return forProfile;
+    const oid = String(selectedBusiness!.id);
+    return forProfile.filter((r) => String(r.offering_id || '') === oid);
+  }, [dbReviews, selectedProfileId, selectedBusiness, selectedIsApproved]);
 
   const weeklyRedemptions = [
     { day: 'Mon', count: 12, revenue: 180 }, { day: 'Tue', count: 8, revenue: 120 },
@@ -1488,6 +1518,81 @@ const BusinessOwnerDashboard: React.FC = () => {
     setMobileSidebarOpen(false);
   };
 
+  /** Mobile-first: pick which live deal row without opening the hamburger menu (Edit, Analytics, Reviews, Photos). */
+  function renderHubListingSwitcher(context: 'edit' | 'analytics' | 'reviews' | 'photos') {
+    if (approvedListingsSameProfile.length <= 1) return null;
+    const selectId = `hub-listing-select-${context}`;
+    const hint =
+      context === 'edit'
+        ? language === 'en'
+          ? 'You have more than one live deal under this business. Choose which listing to update — no need to open the side menu.'
+          : language === 'fr'
+            ? 'Plusieurs annonces sont actives. Choisissez celle à modifier — sans passer par le menu.'
+            : 'Yu gat plante live dil. Pikim wan blong apdeit — no nid openem said menu.'
+        : context === 'analytics'
+          ? language === 'en'
+            ? 'Analytics and charts below are for the listing you select here.'
+            : language === 'fr'
+              ? 'Les statistiques ci-dessous correspondent à l’annonce choisie ici.'
+              : 'Ol namba long daon i blong listing we yu pikim hia.'
+          : context === 'reviews'
+            ? language === 'en'
+              ? 'Reviews shown below are for this listing when reviews are linked to a specific deal.'
+              : language === 'fr'
+                ? 'Les avis affichés correspondent à cette annonce lorsqu’ils sont liés à une offre.'
+                : 'Ol riviu long daon i blong listing ia taem oli link long wan dil.'
+            : language === 'en'
+              ? 'Photos below are for this listing’s gallery (each deal can have its own photos).'
+              : language === 'fr'
+                ? 'Les photos ci-dessous sont celles de cette annonce (chaque offre peut avoir sa galerie).'
+                : 'Ol foto long daon i blong gallery blong listing ia (evri dil i save gat ol foto blong hem).';
+    return (
+      <div className="mb-4 rounded-2xl border border-teal-100 bg-white p-4 shadow-sm">
+        <label
+          htmlFor={selectId}
+          className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2"
+        >
+          {language === 'en' ? 'Which listing?' : language === 'fr' ? 'Quelle annonce ?' : 'Wan listing?'}
+        </label>
+        <div className="relative">
+          <select
+            id={selectId}
+            value={selectedBusinessId}
+            onChange={(e) => setSelectedBusinessId(e.target.value)}
+            className="w-full min-h-[48px] px-4 py-3.5 pr-11 rounded-xl border border-gray-200 text-base font-semibold text-gray-900 bg-white appearance-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-400"
+          >
+            {approvedListingsSameProfile.map((b) => {
+              const isProfileRow = b.id === selectedProfileId;
+              const suffix =
+                language === 'en'
+                  ? isProfileRow
+                    ? ' — company profile'
+                    : ''
+                  : language === 'fr'
+                    ? isProfileRow
+                      ? ' — profil entreprise'
+                      : ''
+                    : isProfileRow
+                      ? ' — profil bisnis'
+                      : '';
+              return (
+                <option key={b.id} value={b.id}>
+                  {(b.name || 'Listing').trim()}
+                  {suffix}
+                </option>
+              );
+            })}
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute right-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+            aria-hidden
+          />
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-gray-500">{hint}</p>
+      </div>
+    );
+  }
+
   // ═══ SIDEBAR RENDERER ═══
   function renderSidebar(isMobile: boolean) {
     return (
@@ -1591,11 +1696,21 @@ const BusinessOwnerDashboard: React.FC = () => {
     if (!selectedIsApproved) {
       return renderPendingOnlyNotice('Reviews are available once your listing is approved.');
     }
+    const avgFromFiltered =
+      businessReviews.length > 0
+        ? businessReviews.reduce((s, r) => s + r.rating, 0) / businessReviews.length
+        : null;
+    const avgRatingDisplay =
+      avgFromFiltered != null ? avgFromFiltered.toFixed(1) : String(selectedBusiness?.rating ?? '—');
+
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-gray-900">Customer Reviews ({businessReviews.length})</h3>
-          <div className="flex items-center gap-2 text-sm text-gray-500"><Star className="w-4 h-4 text-yellow-500 fill-yellow-500" /><span className="font-bold text-gray-900">{selectedBusiness?.rating}</span> average</div>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" aria-hidden />
+            <span className="font-bold text-gray-900">{avgRatingDisplay}</span> average
+          </div>
         </div>
         {businessReviews.length > 0 ? businessReviews.map(review => {
           const existingResponse = reviewResponses.find(r => r.review_id === review.id);
@@ -2133,34 +2248,50 @@ const BusinessOwnerDashboard: React.FC = () => {
 
 
             {activeTab === 'analytics' && selectedBusiness && selectedIsApproved && (
-              <Suspense
-                fallback={
-                  <div className="flex justify-center py-16">
-                    <Loader2 className="h-8 w-8 text-teal-500 animate-spin" aria-hidden />
-                  </div>
-                }
-              >
-                <DashboardAnalytics selectedBusiness={selectedBusiness as any} />
-              </Suspense>
+              <>
+                {renderHubListingSwitcher('analytics')}
+                <Suspense
+                  fallback={
+                    <div className="flex justify-center py-16">
+                      <Loader2 className="h-8 w-8 text-teal-500 animate-spin" aria-hidden />
+                    </div>
+                  }
+                >
+                  <DashboardAnalytics selectedBusiness={selectedBusiness as any} />
+                </Suspense>
+              </>
             )}
             {activeTab === 'analytics' && selectedBusiness && !selectedIsApproved && renderPendingOnlyNotice('Analytics are available once your listing is approved.')}
             {activeTab === 'edit' && selectedBusiness && selectedIsApproved && listingEmbeddedEdit && (
-              <Suspense
-                fallback={
-                  <div className="flex justify-center py-16">
-                    <Loader2 className="h-8 w-8 text-teal-500 animate-spin" aria-hidden />
-                  </div>
-                }
-              >
-                <BusinessListingForm
-                  key={`edit-${listingEmbeddedEdit.profileBusinessId}-${listingEmbeddedEdit.offeringId || listingEmbeddedEdit.business.id}`}
-                  embeddedEdit={listingEmbeddedEdit}
-                />
-              </Suspense>
+              <>
+                {renderHubListingSwitcher('edit')}
+                <Suspense
+                  fallback={
+                    <div className="flex justify-center py-16">
+                      <Loader2 className="h-8 w-8 text-teal-500 animate-spin" aria-hidden />
+                    </div>
+                  }
+                >
+                  <BusinessListingForm
+                    key={`edit-${listingEmbeddedEdit.profileBusinessId}-${listingEmbeddedEdit.offeringId || listingEmbeddedEdit.business.id}`}
+                    embeddedEdit={listingEmbeddedEdit}
+                  />
+                </Suspense>
+              </>
             )}
             {activeTab === 'edit' && selectedBusiness && !selectedIsApproved && renderPendingOnlyNotice('Editing is available once your listing is approved.')}
-            {activeTab === 'reviews' && selectedBusiness && renderReviewsTab()}
-            {activeTab === 'photos' && selectedBusiness && renderPhotosTab()}
+            {activeTab === 'reviews' && selectedBusiness && (
+              <>
+                {selectedIsApproved && renderHubListingSwitcher('reviews')}
+                {renderReviewsTab()}
+              </>
+            )}
+            {activeTab === 'photos' && selectedBusiness && (
+              <>
+                {selectedIsApproved && renderHubListingSwitcher('photos')}
+                {renderPhotosTab()}
+              </>
+            )}
             {activeTab === 'submit' && renderSubmitTab()}
             {activeTab === 'submissions' && (<MySubmissions onNewStatusChange={setUnseenSubmissionChanges} />)}
             {activeTab === 'emails' && (<EmailNotificationCenter mode={user?.type === 'admin' ? 'admin' : 'business'} />)}
