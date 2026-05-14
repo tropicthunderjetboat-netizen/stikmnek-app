@@ -437,6 +437,7 @@ supabase secrets set PAYPAL_MODE=live
 | `RESEND_API_KEY` | Resend | Transactional email API key (required for `send-email`, `manage-business`, `paypal-capture`) |
 | `RESEND_FROM_EMAIL` | Resend | Verified sender address (e.g. `no-reply@stikmnek.com`) |
 | `RESEND_FROM_NAME` | Resend | Display name for the From header (optional) |
+| `RESEND_TEMPLATE_*` | Resend | Optional published template ids — see `supabase/resend-templates.md` |
 | `SENTRY_DSN` | Sentry | Error tracking DSN |
 | `GA_MEASUREMENT_ID` | Google | Analytics measurement ID |
 | `GATEWAY_API_KEY` | Internal | API gateway key |

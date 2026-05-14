@@ -44,7 +44,7 @@ const defaultVars: ReceiptVars = {
   customer_email: 'Vanuatuwatersports@gmail.com',
   receipt_number: '',
   transaction_date: '',
-  item_description: 'StikmNek Extended Group Adventure Pass',
+  item_description: 'StikmNek Pass',
 
   payment_method: 'Credit Card',
   amount: '45',

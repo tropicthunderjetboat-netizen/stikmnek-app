@@ -18,12 +18,8 @@ import {
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
 import { parsePassPartyWithProfileFallback } from '../_shared/parsePassPartyWithProfileFallback.ts';
+import { transactionalPassProductNameEn } from '../_shared/passDisplay.ts';
 import { getResendApiKey, sendResendEmail } from '../_shared/resend.ts';
-
-function passTypeToBrandDisplay(passType: string): string {
-  if (String(passType).toLowerCase() === 'dynamic') return 'StikmNek Pass';
-  return 'StikmNek Pass';
-}
 
 /** Gross amount from PayPal capture response (AUD). */
 function capturedAmountFromPayPalCapture(captureJson: Record<string, unknown>): number | null {
@@ -46,7 +42,6 @@ async function sendReceiptEmail(params: {
   toEmail: string;
   toName?: string | null;
   receiptNumber: string;
-  passType: string;
   amount: number;
   currency: string;
   validFrom: string;
@@ -57,7 +52,7 @@ async function sendReceiptEmail(params: {
     return { sent: false, skipped: true, error: 'RESEND_API_KEY not set' };
   }
 
-  const passLabel = passTypeToBrandDisplay(params.passType);
+  const passLabel = transactionalPassProductNameEn();
 
   const subject = `StikmNek receipt — ${passLabel}`;
   const html = `
@@ -92,10 +87,25 @@ async function sendReceiptEmail(params: {
     </div>
   `;
 
+  const templateId = Deno.env.get('RESEND_TEMPLATE_PAYPAL_RECEIPT')?.trim();
   const res = await sendResendEmail({
     to: params.toEmail,
     subject,
-    html,
+    ...(templateId
+      ? {
+        template: {
+          id: templateId,
+          variables: {
+            PASS_LABEL: passLabel,
+            RECEIPT_NUMBER: params.receiptNumber,
+            VALID_FROM: params.validFrom,
+            VALID_UNTIL: params.validUntil,
+            AMOUNT: params.amount.toFixed(2),
+            CURRENCY: params.currency,
+          },
+        },
+      }
+      : { html }),
   });
 
   if (!res.ok) {
@@ -348,7 +358,6 @@ Deno.serve(async (req) => {
           toEmail: buyerEmail,
           toName: (user.user_metadata as any)?.full_name ?? (user.user_metadata as any)?.name ?? null,
           receiptNumber,
-          passType: passTypeDb,
           amount,
           currency: 'AUD',
           validFrom,
@@ -366,7 +375,7 @@ Deno.serve(async (req) => {
       success: true,
       receiptNumber,
       passType: semanticPassIdFromDb(passTypeDb),
-      passLabel: 'StikmNek Pass',
+      passLabel: transactionalPassProductNameEn(),
       amount,
       currency: 'AUD',
       expiresAt,

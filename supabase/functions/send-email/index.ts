@@ -2,6 +2,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { normalizePassTypeToDb } from '../_shared/passTypes.ts';
+import { transactionalPassProductNameEn } from '../_shared/passDisplay.ts';
 import {
   getResendApiKey,
   getTransactionalFromHeader,
@@ -95,17 +96,6 @@ function maskEmailForLog(email: string): string {
   return `${show}***@${domain}`;
 }
 
-/** StikmNek branded pass names (accepts legacy DB `pass_type` or semantic product id). */
-function passTypeToBrandDisplay(passType: unknown): string {
-  const db = normalizePassTypeToDb(String(passType ?? ''));
-  if (db === 'dynamic') return 'StikmNek Pass';
-  if (db === 'daily') return 'Family Explorer Pass';
-  if (db === 'weekly') return 'Extended Group Adventure Pass';
-  if (db === 'monthly') return 'Ultimate Crew Experience Pass';
-  if (db === 'mega_group') return 'Mega Group Experience Pass';
-  return 'StikmNek Pass';
-}
-
 function escapeHtml(v: unknown): string {
   return String(v ?? '')
     .replace(/&/g, '&amp;')
@@ -182,7 +172,7 @@ function shareBonusPromoText(passType: unknown): { headline: string; body: strin
   if (t === 'mega_group') {
     return {
       headline: 'Unlock more value (free upgrade)',
-      body: `${base} You’ll unlock +5 extra days on your Mega Group pass.`,
+      body: `${base} You’ll unlock +5 extra days on your pass.`,
     };
   }
   if (t === 'dynamic') {
@@ -296,10 +286,24 @@ Deno.serve(async (req) => {
         ? `<p>Congratulations! Your business listing "${safeBusinessName}" has been approved and is now live on StikmNek.</p>${notesBlock}`
         : `<p>Your business listing "${safeBusinessName}" was not approved at this time.</p>${notesBlock}<p>Please contact support if you have questions.</p>`;
 
+      const templateId = decision === 'approved'
+        ? Deno.env.get('RESEND_TEMPLATE_BUSINESS_APPROVED')?.trim()
+        : Deno.env.get('RESEND_TEMPLATE_BUSINESS_REJECTED')?.trim();
+
       const res = await sendResendEmail({
         to: emailStr,
         subject,
-        html,
+        ...(templateId
+          ? {
+            template: {
+              id: templateId,
+              variables: {
+                BUSINESS_NAME: String(business_name ?? '').replace(/[\r\n\x00]/g, ' ').trim(),
+                ADMIN_NOTES: String(admin_notes ?? '').replace(/[\r\n\x00]/g, ' ').trim(),
+              },
+            },
+          }
+          : { html }),
       });
 
       if (!res.ok) {
@@ -357,7 +361,7 @@ Deno.serve(async (req) => {
         return errorResponse(req, 'Missing user_email');
       }
 
-      const passLabel = passTypeToBrandDisplay(pass_type);
+      const passLabel = transactionalPassProductNameEn();
 
       /** Temporary: set PASS_CONFIRMATION_EMAIL_OVERRIDE in Supabase secrets to receive test receipts at a real inbox. Remove after verification. */
       const emailOverride = (Deno.env.get('PASS_CONFIRMATION_EMAIL_OVERRIDE') ?? '').trim();
@@ -503,10 +507,31 @@ Deno.serve(async (req) => {
 </html>
       `.trim();
 
+      const passTemplateId = Deno.env.get('RESEND_TEMPLATE_PASS_CONFIRMATION')?.trim();
       const res = await sendResendEmail({
         to: toEmail,
         subject,
-        html,
+        ...(passTemplateId
+          ? {
+            template: {
+              id: passTemplateId,
+              variables: {
+                USER_NAME: user_name || '',
+                PASS_LABEL: passLabel,
+                RECEIPT_NUMBER: receipt_number || '',
+                AMOUNT_FORMATTED: formatMoney(amount, currency),
+                PAYMENT_METHOD: payment_method || '',
+                VALID_FROM: displayFrom,
+                VALID_UNTIL: displayUntil,
+                DURATION_LABEL: durationLabel,
+                SHARE_BONUS_LABEL: shareApplied ? 'Applied ✓' : 'Not applied',
+                PROMO_HEADLINE: promo.headline,
+                PROMO_BODY: promo.body,
+                FOOTER_YEAR: new Date().getFullYear(),
+              },
+            },
+          }
+          : { html }),
       });
 
       console.log('[send-email] Resend response status:', res.status);
@@ -702,11 +727,33 @@ Deno.serve(async (req) => {
           }
           : undefined;
 
+      const bookingTemplateId = Deno.env.get('RESEND_TEMPLATE_BOOKING_INQUIRY')?.trim();
       console.log('[send-email] Calling Resend API (booking inquiry)...');
       const res = await sendResendEmail({
         to: ownerEmail,
         subject,
-        html,
+        ...(bookingTemplateId
+          ? {
+            template: {
+              id: bookingTemplateId,
+              variables: {
+                LISTING_NAME: String(bizName),
+                VISIT_DATE: String(visit_date ?? ''),
+                ADULTS_COUNT: a,
+                CHILDREN_COUNT: c,
+                INFANTS_COUNT: inf,
+                TOTAL_STANDARD_VT: String(total_standard_vt ?? ''),
+                TOTAL_DEAL_VT: String(total_deal_vt ?? ''),
+                SAVINGS_VT: String(savings_vt ?? ''),
+                GUEST_NAME: String(tourist_name ?? ''),
+                GUEST_MAIL: String(tourist_email ?? ''),
+                GUEST_WHATSAPP: tourist_whatsapp ? String(tourist_whatsapp) : '',
+                GUEST_PHONE: tourist_phone ? String(tourist_phone) : '',
+                GUEST_MESSAGE: message ? String(message) : '',
+              },
+            },
+          }
+          : { html }),
         bcc: bccList.length > 0 ? bccList : undefined,
         replyTo: reply,
       });

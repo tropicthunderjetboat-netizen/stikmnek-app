@@ -16,6 +16,7 @@ import {
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
 import { parsePassPartyWithProfileFallback } from '../_shared/parsePassPartyWithProfileFallback.ts';
+import { transactionalPassProductNameEn } from '../_shared/passDisplay.ts';
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
@@ -463,7 +464,7 @@ Deno.serve(async (req) => {
         success: true,
         receiptNumber,
         passType: semanticPassIdFromDb(passTypeDb),
-        passLabel: 'StikmNek Pass',
+        passLabel: transactionalPassProductNameEn(),
         amount,
         currency: 'AUD',
         expiresAt,

@@ -1,0 +1,112 @@
+<!--
+  StikmNek — Pass purchase receipt (Resend template body)
+
+  How to use:
+  1. Resend → Templates → New template → paste everything INSIDE the outer comments only,
+     or paste from <!doctype> through </html> as your HTML body.
+  2. Add each variable in the editor (Insert → Variable) with the exact KEY shown in
+     {{{ TRIPLE_BRACE }}} placeholders below — keys must match supabase/resend-templates.md
+     and what send-email sends (USER_NAME, PASS_LABEL = StikmNek Pass, …).
+
+  Resend uses {{{ KEY }}} for substitution in templates (see their variable docs).
+  Set secret: RESEND_TEMPLATE_PASS_CONFIRMATION = <published template id or alias>
+
+  Subject is still sent by the app; you can leave default subject empty in Resend or set a fallback.
+-->
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StikmNek receipt</title>
+  </head>
+  <body style="margin:0; padding:0; background:#f6f7f9;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7f9; padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+            <tr>
+              <td style="padding:0 4px 14px; font-family:Arial, sans-serif; color:#0f172a;">
+                <div style="font-weight:800; letter-spacing:0.2px; font-size:16px; color:#0d9488;">StikmNek</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(15, 23, 42, 0.08);">
+                <div style="padding:22px 22px 16px; background:linear-gradient(135deg, #0d9488 0%, #059669 100%); color:#ffffff; font-family:Arial, sans-serif;">
+                  <div style="font-size:12px; opacity:0.95; margin-bottom:6px;">Purchase receipt</div>
+                  <div style="font-size:22px; font-weight:800; line-height:1.2;">{{{PASS_LABEL}}}</div>
+                  <div style="margin-top:10px; font-size:13px; opacity:0.92;">
+                    Your pass is now active.
+                  </div>
+                  <div style="margin-top:8px; font-size:13px; opacity:0.88;">
+                    {{{USER_NAME}}}
+                  </div>
+                </div>
+                <div style="padding:18px 22px 8px; font-family:Arial, sans-serif; color:#0f172a;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate; border-spacing:0; width:100%;">
+                    <tr>
+                      <td style="padding:12px 0; border-bottom:1px solid #e5e7eb;">
+                        <div style="font-size:12px; color:#64748b;">Receipt</div>
+                        <div style="font-size:14px; font-weight:700; color:#0f172a;">{{{RECEIPT_NUMBER}}}</div>
+                      </td>
+                      <td style="padding:12px 0; border-bottom:1px solid #e5e7eb;" align="right">
+                        <div style="font-size:12px; color:#64748b;">Amount</div>
+                        <div style="font-size:14px; font-weight:800; color:#0f172a;">{{{AMOUNT_FORMATTED}}}</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
+                        <div style="font-size:12px; color:#64748b;">Valid from</div>
+                        <div style="font-size:14px; color:#0f172a;">{{{VALID_FROM}}}</div>
+                      </td>
+                      <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                        <div style="font-size:12px; color:#64748b;">Valid until</div>
+                        <div style="font-size:14px; color:#0f172a;">{{{VALID_UNTIL}}}</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
+                        <div style="font-size:12px; color:#64748b;">Pass duration</div>
+                        <div style="font-size:14px; font-weight:700; color:#0f172a;">{{{DURATION_LABEL}}}</div>
+                      </td>
+                      <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;" align="right">
+                        <div style="font-size:12px; color:#64748b;">Share bonus</div>
+                        <div style="font-size:14px; color:#0f172a;">{{{SHARE_BONUS_LABEL}}}</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:12px 0;" colspan="2">
+                        <div style="font-size:12px; color:#64748b;">Payment method</div>
+                        <div style="font-size:14px; color:#0f172a;">{{{PAYMENT_METHOD}}}</div>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+                <div style="padding:0 22px 20px; font-family:Arial, sans-serif;">
+                  <div style="background:#ecfeff; border:1px solid #99f6e4; border-radius:14px; padding:14px 14px;">
+                    <div style="display:block; font-weight:800; color:#115e59; font-size:14px; margin-bottom:6px;">
+                      🎁 {{{PROMO_HEADLINE}}}
+                    </div>
+                    <div style="color:#0f172a; font-size:13px; line-height:1.45;">
+                      {{{PROMO_BODY}}}
+                    </div>
+                    <div style="margin-top:12px;">
+                      <a href="https://www.stikmnek.com" style="display:inline-block; background:#0d9488; color:#ffffff; text-decoration:none; padding:10px 14px; border-radius:10px; font-size:13px; font-weight:700;">
+                        Open StikmNek
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:14px 8px 0; text-align:center; font-family:Arial, sans-serif; color:#94a3b8; font-size:12px;">
+                © {{{FOOTER_YEAR}}} StikmNek • Vanuatu travel deals
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

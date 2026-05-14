@@ -569,11 +569,23 @@ async function sendInitialListingLiveEmail(params: {
   const plain = plainLines.join('\n');
 
   try {
+    const listingTpl = Deno.env.get('RESEND_TEMPLATE_LISTING_LIVE')?.trim();
     const res = await sendResendEmail({
       to: params.toEmail,
       subject,
-      html,
-      text: plain,
+      ...(listingTpl
+        ? {
+          template: {
+            id: listingTpl,
+            variables: {
+              BUSINESS_NAME: params.businessName,
+              LISTING_URL: params.listingUrl,
+              BADGE_URL: LISTING_LIVE_BADGE_URL,
+              SOCIAL_HASHTAG_LINE: tagLine,
+            },
+          },
+        }
+        : { html, text: plain }),
     });
 
     if (!res.ok) {
@@ -621,11 +633,25 @@ async function sendAdminDecisionNotificationEmail(params: {
     ? `<p>Congratulations! Your business listing "${safeBusinessName}" has been approved and is now live on StikmNek.</p>${notesBlock}`
     : `<p>Your business listing "${safeBusinessName}" was not approved at this time.</p>${notesBlock}<p>Please contact support if you have questions.</p>`;
 
+  const decisionTpl = params.decision === 'approved'
+    ? Deno.env.get('RESEND_TEMPLATE_BUSINESS_APPROVED')?.trim()
+    : Deno.env.get('RESEND_TEMPLATE_BUSINESS_REJECTED')?.trim();
+
   try {
     const res = await sendResendEmail({
       to: emailStr,
       subject,
-      html,
+      ...(decisionTpl
+        ? {
+          template: {
+            id: decisionTpl,
+            variables: {
+              BUSINESS_NAME: String(params.businessName ?? '').replace(/[\r\n\x00]/g, ' ').trim(),
+              ADMIN_NOTES: String(params.adminNotes ?? '').replace(/[\r\n\x00]/g, ' ').trim(),
+            },
+          },
+        }
+        : { html }),
     });
     if (!res.ok) {
       console.error('[manage-business] Resend decision email FAILED:', res.status, res.body);

@@ -1,0 +1,62 @@
+<!--
+  StikmNek — Booking inquiry to business owner (Resend template body)
+
+  Secret: RESEND_TEMPLATE_BOOKING_INQUIRY
+  Variables: LISTING_NAME, VISIT_DATE, ADULTS_COUNT, CHILDREN_COUNT, INFANTS_COUNT,
+    TOTAL_STANDARD_VT, TOTAL_DEAL_VT, SAVINGS_VT, GUEST_NAME, GUEST_MAIL,
+    GUEST_WHATSAPP, GUEST_PHONE, GUEST_MESSAGE
+
+  Resend variable types: use Number (+ numeric fallback) only for ADULTS_COUNT,
+  CHILDREN_COUNT, INFANTS_COUNT. Use String for TOTAL_*_VT and SAVINGS_VT — the API
+  sends those as text (e.g. formatted VT), so Number type causes Resend warnings.
+
+  Subject + reply_to are set by the Edge Function. Set template defaults (from, subject,
+  preview, fallbacks) per supabase/resend-templates.md to clear Resend publish warnings.
+-->
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body style="margin:0; padding:24px 12px; background:#f6f7f9; font-family:Arial, sans-serif; color:#111;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; margin:0 auto; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 8px 24px rgba(15,23,42,0.08);">
+      <tr>
+        <td style="padding:24px 22px;">
+          <div style="font-weight:800; font-size:16px; color:#0d9488; margin-bottom:8px;">StikmNek</div>
+          <h1 style="margin:0 0 16px; font-size:20px; font-weight:800; color:#0f172a;">New booking inquiry</h1>
+          <p style="margin:0 0 8px; font-size:14px; line-height:1.5;"><strong>Listing:</strong> {{{LISTING_NAME}}}</p>
+          <p style="margin:0 0 8px; font-size:14px; line-height:1.5;"><strong>Preferred visit date:</strong> {{{VISIT_DATE}}}</p>
+          <p style="margin:0 0 16px; font-size:14px; line-height:1.5;">
+            <strong>Party:</strong>
+            {{{ADULTS_COUNT}}} adult(s), {{{CHILDREN_COUNT}}} child(ren), {{{INFANTS_COUNT}}} infant(s)
+          </p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin:12px 0 20px; max-width:480px; width:100%;">
+            <tr>
+              <td style="padding:6px 12px 6px 0; color:#555; font-size:14px;">Total standard (VT)</td>
+              <td style="padding:6px 0; font-weight:700; font-size:14px;">{{{TOTAL_STANDARD_VT}}}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 12px 6px 0; color:#555; font-size:14px;">Total StikmNek (VT)</td>
+              <td style="padding:6px 0; font-weight:700; font-size:14px;">{{{TOTAL_DEAL_VT}}}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 12px 6px 0; color:#555; font-size:14px;">Guest savings (VT)</td>
+              <td style="padding:6px 0; font-weight:700; font-size:14px; color:#0d9488;">{{{SAVINGS_VT}}}</td>
+            </tr>
+          </table>
+          <p style="margin:16px 0 6px; font-size:13px; font-weight:700; color:#0f172a;">From</p>
+          <p style="margin:0 0 4px; font-size:14px;">{{{GUEST_NAME}}}</p>
+          <p style="margin:0 0 4px; font-size:14px;">Guest mail: {{{GUEST_MAIL}}}</p>
+          <p style="margin:0 0 4px; font-size:14px;">WhatsApp: {{{GUEST_WHATSAPP}}}</p>
+          <p style="margin:0 0 12px; font-size:14px;">Phone: {{{GUEST_PHONE}}}</p>
+          <p style="margin:12px 0 4px; font-size:13px; font-weight:700; color:#0f172a;">Message</p>
+          <p style="margin:0; font-size:14px; line-height:1.5; white-space:pre-wrap;">{{{GUEST_MESSAGE}}}</p>
+          <p style="margin:20px 0 0; font-size:12px; color:#64748b; line-height:1.45;">
+            Sent via StikmNek. Reply directly to this email to reach the guest.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
