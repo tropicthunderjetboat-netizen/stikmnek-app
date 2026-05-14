@@ -171,8 +171,9 @@ function isPaymentInvokeTransportFailure(error: unknown): boolean {
   );
 }
 
+/** Shown when `functions.invoke` never completes (DNS, TLS, ad blocker, wrong Supabase URL, etc.). */
 const PAYMENT_TRANSPORT_FAILURE_HINT =
-  'We could not reach the payment service (the request never completed). This is usually not your card being declined. Try: refresh and pay again, switch networks, disable ad blockers or strict privacy extensions for this site, or use a private window. If it keeps happening, confirm the app is built with the correct Supabase project URL and that the process-card-payment Edge Function is deployed (Supabase Dashboard → Edge Functions → Logs).';
+  'We could not reach the payment service (the request never completed). This is usually not your card being declined. Try: refresh and pay again, switch networks, disable ad blockers or strict privacy extensions for this site, or use a private window. If it keeps happening, confirm the app is built with the correct Supabase project URL and that the payment Edge Functions you use are deployed (PayPal checkout: **create-checkout** and **paypal-capture**; legacy card form: **process-card-payment**) — see Supabase Dashboard → Edge Functions → Logs.';
 
 /** Load PayPal JS SDK with Smart Buttons (standard checkout — works where Expanded Card Fields do not). */
 function loadPayPalButtonsSdk(clientId: string): Promise<void> {
@@ -725,6 +726,12 @@ const PaymentCheckout: React.FC = () => {
             // #endregion
 
             if (error) {
+              if (isPaymentInvokeTransportFailure(error)) {
+                const detail = describeFunctionsFetchFailure(error);
+                throw new Error(
+                  detail ? `${PAYMENT_TRANSPORT_FAILURE_HINT} (${detail})` : PAYMENT_TRANSPORT_FAILURE_HINT,
+                );
+              }
               const body = await getInvokeErrorBody(error);
               const serverError =
                 (typeof body?.error === 'string' && body.error) ||
