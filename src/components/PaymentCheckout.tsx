@@ -149,32 +149,46 @@ function isPaymentInvokeTransportFailure(error: unknown): boolean {
 const PAYMENT_TRANSPORT_FAILURE_HINT =
   'We could not reach the payment service (the request never completed). This is usually not your card being declined. Try: refresh and pay again, switch networks, disable ad blockers or strict privacy extensions for this site, or use a private window. If it keeps happening, confirm the app is built with the correct Supabase project URL and that the process-card-payment Edge Function is deployed (Supabase Dashboard → Edge Functions → Logs).';
 
-/** PayPal Expanded Checkout: load JS SDK with Card Fields only (no redirect). */
-function loadPayPalCardSdk(clientId: string): Promise<void> {
-  const winPaypal = () => (window as unknown as { paypal?: { CardFields?: unknown } }).paypal;
-  if (winPaypal()?.CardFields) return Promise.resolve();
+/** Load PayPal JS SDK with Smart Buttons (standard checkout — works where Expanded Card Fields do not). */
+function loadPayPalButtonsSdk(clientId: string): Promise<void> {
+  const winButtons = () => (window as unknown as { paypal?: { Buttons?: unknown } }).paypal?.Buttons;
 
   return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-stikmnek-paypal-sdk]') as HTMLScriptElement | null;
+    if (existing && !existing.src.includes('components=buttons')) {
+      existing.remove();
+      try {
+        delete (window as unknown as { paypal?: unknown }).paypal;
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (winButtons()) {
+      resolve();
+      return;
+    }
+
     const markReady = () => {
-      if (winPaypal()?.CardFields) resolve();
-      else reject(new Error('PayPal SDK loaded but CardFields is not available'));
+      if (winButtons()) resolve();
+      else reject(new Error('PayPal SDK loaded but Buttons is not available'));
     };
 
-    const existing = document.querySelector('script[data-stikmnek-paypal-sdk]') as HTMLScriptElement | null;
-    if (existing) {
-      if (winPaypal()?.CardFields) {
+    const existingReload = document.querySelector('script[data-stikmnek-paypal-sdk]') as HTMLScriptElement | null;
+    if (existingReload) {
+      if (winButtons()) {
         resolve();
         return;
       }
-      existing.addEventListener('load', markReady);
-      existing.addEventListener('error', () => reject(new Error('PayPal SDK failed to load')));
+      existingReload.addEventListener('load', markReady);
+      existingReload.addEventListener('error', () => reject(new Error('PayPal SDK failed to load')));
       return;
     }
 
     const s = document.createElement('script');
     s.src =
       `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}` +
-      '&currency=AUD&intent=capture&components=card-fields';
+      '&currency=AUD&intent=capture&components=buttons';
     s.async = true;
     s.dataset.stikmnekPaypalSdk = '1';
     s.onload = () => markReady();
@@ -330,28 +344,12 @@ const PaymentCheckout: React.FC = () => {
   const cvvRef = useRef<HTMLInputElement>(null);
 
   const paypalClientId = String(import.meta.env.VITE_PAYPAL_CLIENT_ID ?? '').trim();
-  const paypalHostedCardEnabled = paypalClientId.length > 0;
+  /** Smart Buttons checkout when public client id is configured (Expanded Card Fields not required). */
+  const paypalSmartEnabled = paypalClientId.length > 0;
 
-  const paypalNameFieldRef = useRef<HTMLDivElement>(null);
-  const paypalNumberFieldRef = useRef<HTMLDivElement>(null);
-  const paypalExpiryFieldRef = useRef<HTMLDivElement>(null);
-  const paypalCvvFieldRef = useRef<HTMLDivElement>(null);
-  const paypalCardFieldsHandleRef = useRef<{
-    submit: (opts: {
-      billingAddress: Record<string, string | undefined>;
-      contingencies?: string[];
-    }) => Promise<void>;
-  } | null>(null);
-  const [paypalCardEligible, setPaypalCardEligible] = useState<boolean | null>(null);
-  const [paypalSdkError, setPaypalSdkError] = useState<string | null>(null);
-
-  const [billingLine1, setBillingLine1] = useState('');
-  const [billingLine2, setBillingLine2] = useState('');
-  const [billingCity, setBillingCity] = useState('');
-  const [billingState, setBillingState] = useState('');
-  const [billingPostal, setBillingPostal] = useState('');
-  const [billingCountryCode, setBillingCountryCode] = useState('AU');
-  const [billingErrors, setBillingErrors] = useState<Record<string, string>>({});
+  const paypalButtonContainerRef = useRef<HTMLDivElement>(null);
+  const [paypalButtonsSdkError, setPaypalButtonsSdkError] = useState<string | null>(null);
+  const [paypalButtonsReady, setPaypalButtonsReady] = useState(false);
 
   /** Previous `cart.partySize` for oversize → capped sync (keep warning visible after cap). */
   const prevCartPartySizeRef = useRef<number | null>(null);
@@ -607,67 +605,48 @@ const PaymentCheckout: React.FC = () => {
     return { payStartDate, partyForPay, isExtended: Boolean(ext) };
   }
 
-  const validatePayPalBilling = (): boolean => {
-    const err: Record<string, string> = {};
-    if (!billingLine1.trim()) err.line1 = 'Street address is required';
-    if (!billingCity.trim()) err.city = 'City is required';
-    if (!billingState.trim()) err.state = 'State / region is required';
-    if (!billingPostal.trim()) err.postal = 'Postal code is required';
-    if (!billingCountryCode.trim() || billingCountryCode.trim().length !== 2) {
-      err.country = 'Country code is required (e.g. AU)';
-    }
-    setBillingErrors(err);
-    return Object.keys(err).length === 0;
-  };
-
   useEffect(() => {
-    if (!paypalHostedCardEnabled || step !== 'payment') {
-      setPaypalCardEligible(null);
-      setPaypalSdkError(null);
-      paypalCardFieldsHandleRef.current = null;
+    if (!paypalSmartEnabled || step !== 'payment') {
+      setPaypalButtonsSdkError(null);
+      setPaypalButtonsReady(false);
+      if (paypalButtonContainerRef.current) paypalButtonContainerRef.current.innerHTML = '';
       return;
     }
 
     let cancelled = false;
 
-    const clearHostedFieldMounts = () => {
-      for (const r of [paypalNameFieldRef, paypalNumberFieldRef, paypalExpiryFieldRef, paypalCvvFieldRef]) {
-        if (r.current) r.current.innerHTML = '';
-      }
-    };
-
     (async () => {
-      setPaypalSdkError(null);
-      setPaypalCardEligible(null);
-      paypalCardFieldsHandleRef.current = null;
-      clearHostedFieldMounts();
+      setPaypalButtonsSdkError(null);
+      setPaypalButtonsReady(false);
+      if (paypalButtonContainerRef.current) paypalButtonContainerRef.current.innerHTML = '';
 
       try {
-        await loadPayPalCardSdk(paypalClientId);
+        await loadPayPalButtonsSdk(paypalClientId);
         if (cancelled) return;
 
-        type FieldRenderer = { render: (el: HTMLElement) => Promise<void> };
-        type CardFieldsHandle = {
+        type ButtonsInstance = {
           isEligible: () => boolean;
-          NameField: () => FieldRenderer;
-          NumberField: () => FieldRenderer;
-          ExpiryField: () => FieldRenderer;
-          CVVField: () => FieldRenderer;
-          submit: (opts: {
-            billingAddress: Record<string, string | undefined>;
-            contingencies?: string[];
-          }) => Promise<void>;
+          render: (selector: HTMLElement | string) => Promise<void>;
         };
 
-        const paypal = (window as unknown as { paypal?: { CardFields: (cfg: Record<string, unknown>) => CardFieldsHandle } })
-          .paypal;
-        if (!paypal?.CardFields) {
-          throw new Error('PayPal SDK did not expose CardFields');
+        const paypalNs = window as unknown as {
+          paypal?: { Buttons: (cfg: Record<string, unknown>) => ButtonsInstance };
+        };
+        const paypal = paypalNs.paypal;
+        if (!paypal?.Buttons) {
+          throw new Error('PayPal SDK did not expose Buttons');
         }
 
-        const cardField = paypal.CardFields({
+        const origin = window.location.origin;
+        const returnUrl = `${origin}/passes`;
+        const cancelUrl = `${origin}/passes`;
+
+        const buttonConfig: Record<string, unknown> = {
           style: {
-            input: { 'font-size': '16px', color: '#111827' },
+            layout: 'vertical',
+            shape: 'rect',
+            label: 'pay',
+            color: 'gold',
           },
           createOrder: async () => {
             const token = await ensureFreshSession();
@@ -683,6 +662,10 @@ const PaymentCheckout: React.FC = () => {
                 party_size: partyForPay,
                 isExtended: ext,
                 is_extended: ext,
+                returnUrl,
+                return_url: returnUrl,
+                cancelUrl,
+                cancel_url: cancelUrl,
               },
             });
 
@@ -695,7 +678,9 @@ const PaymentCheckout: React.FC = () => {
               console.error('[PaymentCheckout] create-checkout error', getInvokeStatus(error), body, error);
               throw new Error(serverError);
             }
-            const orderId = (data as Record<string, unknown> | null)?.orderId ?? (data as Record<string, unknown> | null)?.order_id;
+            const orderId =
+              (data as Record<string, unknown> | null)?.orderId ??
+              (data as Record<string, unknown> | null)?.order_id;
             if (!(data as Record<string, unknown> | null)?.success || !orderId) {
               const msg =
                 typeof (data as Record<string, unknown> | null)?.error === 'string'
@@ -709,182 +694,164 @@ const PaymentCheckout: React.FC = () => {
             const orderId = String(data?.orderID ?? '');
             if (!orderId) throw new Error('Missing PayPal order');
 
-            const token = await ensureFreshSession();
-            if (!token) throw new Error('SESSION_EXPIRED');
+            setProcessing(true);
+            setPaymentError(null);
+            setStep('processing');
 
-            const { payStartDate, partyForPay, isExtended: ext } = resolvePayContextFromRef();
-            let referralCode: string | null = null;
             try {
-              referralCode = localStorage.getItem('stikmnek-referral-code');
-            } catch {
-              referralCode = null;
-            }
+              const token = await ensureFreshSession();
+              if (!token) throw new Error('SESSION_EXPIRED');
 
-            const { data: capData, error: capErr } = await supabase.functions.invoke('paypal-capture', {
-              body: {
-                paypalOrderId: orderId,
-                startDate: payStartDate,
-                partySize: partyForPay,
-                party_size: partyForPay,
-                isExtended: ext,
-                is_extended: ext,
-                referralCode,
-                paymentTransactionId: getOrCreatePassPurchaseIdempotencyKey(),
-              },
-            });
-
-            if (capErr) {
-              const status = getInvokeStatus(capErr);
-              const body = await getInvokeErrorBody(capErr);
-              const fromBody = typeof body?.error === 'string' ? body.error : null;
-              let serverError =
-                fromBody ??
-                (typeof (capData as Record<string, unknown> | null)?.error === 'string'
-                  ? String((capData as Record<string, unknown>).error)
-                  : null) ??
-                (typeof (capData as Record<string, unknown> | null)?.message === 'string'
-                  ? String((capData as Record<string, unknown>).message)
-                  : null);
-              if (isPaymentInvokeTransportFailure(capErr)) {
-                const detail = describeFunctionsFetchFailure(capErr);
-                throw new Error(
-                  detail ? `${PAYMENT_TRANSPORT_FAILURE_HINT} (${detail})` : PAYMENT_TRANSPORT_FAILURE_HINT,
-                );
+              const { payStartDate, partyForPay, isExtended: ext } = resolvePayContextFromRef();
+              let referralCode: string | null = null;
+              try {
+                referralCode = localStorage.getItem('stikmnek-referral-code');
+              } catch {
+                referralCode = null;
               }
-              if (serverError) throw new Error(serverError);
-              throw new Error(capErr.message || 'Capture failed');
+
+              const { data: capData, error: capErr } = await supabase.functions.invoke('paypal-capture', {
+                body: {
+                  paypalOrderId: orderId,
+                  startDate: payStartDate,
+                  partySize: partyForPay,
+                  party_size: partyForPay,
+                  isExtended: ext,
+                  is_extended: ext,
+                  referralCode,
+                  paymentTransactionId: getOrCreatePassPurchaseIdempotencyKey(),
+                },
+              });
+
+              if (capErr) {
+                const status = getInvokeStatus(capErr);
+                const body = await getInvokeErrorBody(capErr);
+                const fromBody = typeof body?.error === 'string' ? body.error : null;
+                let serverError =
+                  fromBody ??
+                  (typeof (capData as Record<string, unknown> | null)?.error === 'string'
+                    ? String((capData as Record<string, unknown>).error)
+                    : null) ??
+                  (typeof (capData as Record<string, unknown> | null)?.message === 'string'
+                    ? String((capData as Record<string, unknown>).message)
+                    : null);
+                if (isPaymentInvokeTransportFailure(capErr)) {
+                  const detail = describeFunctionsFetchFailure(capErr);
+                  throw new Error(
+                    detail ? `${PAYMENT_TRANSPORT_FAILURE_HINT} (${detail})` : PAYMENT_TRANSPORT_FAILURE_HINT,
+                  );
+                }
+                if (serverError) throw new Error(serverError);
+                throw new Error(capErr.message || 'Capture failed');
+              }
+
+              const ok = capData as Record<string, unknown> | null;
+              if (!ok?.success) {
+                throw new Error(typeof ok?.error === 'string' ? String(ok.error) : 'Payment capture failed');
+              }
+
+              setPaymentResult(capData);
+              setStep('success');
+
+              const paymentResultData = {
+                receiptNumber: ok.receiptNumber,
+                passType: ok.passType,
+                passLabel: ok.passLabel || passLabel,
+                amount: ok.amount,
+                currency: ok.currency || 'AUD',
+                paymentMethod: ok.paymentMethod || 'paypal',
+                expiresAt: ok.expiresAt,
+                validFrom: ok.validFrom,
+                validUntil: ok.validUntil,
+                days: ok.days,
+                shareBonusApplied: Boolean(ok.shareBonusApplied),
+                group: ok.group || `Up to ${partyForPay} people (ages 6+)`,
+                partySize: partyForPay,
+                isExtended: ext,
+                sessionId: ok.sessionId,
+                completedAt: new Date().toISOString(),
+                cardLast4: ok.cardLast4,
+                paypalOrderId: orderId,
+              };
+              localStorage.setItem('lastPayment', JSON.stringify(paymentResultData));
+              try {
+                localStorage.removeItem('stikmnek-referral-code');
+              } catch {
+                /* ignore */
+              }
+              localStorage.removeItem('paypalPending');
+              localStorage.removeItem('pendingPayment');
+
+              toast.success('Payment successful! Your pass is now active.');
+              setTimeout(() => {
+                refreshUserPass();
+              }, 1000);
+              setTimeout(() => {
+                setCart(null);
+                setCurrentView('payment-confirmation');
+              }, 2500);
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : 'Payment failed';
+              if (msg === 'SESSION_EXPIRED') {
+                toast.error('Your session has expired. Please sign in again.');
+                setShowAuth(true);
+                setAuthMode('signin');
+              } else {
+                toast.error(msg);
+              }
+              setPaymentError(msg);
+              setStep('payment');
+            } finally {
+              setProcessing(false);
             }
-
-            const ok = capData as Record<string, unknown> | null;
-            if (!ok?.success) {
-              throw new Error(typeof ok?.error === 'string' ? String(ok.error) : 'Payment capture failed');
-            }
-
-            setPaymentResult(capData);
-            setStep('success');
-
-            const paymentResultData = {
-              receiptNumber: ok.receiptNumber,
-              passType: ok.passType,
-              passLabel: ok.passLabel || passLabel,
-              amount: ok.amount,
-              currency: ok.currency || 'AUD',
-              paymentMethod: ok.paymentMethod || 'paypal',
-              expiresAt: ok.expiresAt,
-              validFrom: ok.validFrom,
-              validUntil: ok.validUntil,
-              days: ok.days,
-              shareBonusApplied: Boolean(ok.shareBonusApplied),
-              group: ok.group || `Up to ${partyForPay} people (ages 6+)`,
-              partySize: partyForPay,
-              isExtended: ext,
-              sessionId: ok.sessionId,
-              completedAt: new Date().toISOString(),
-              cardLast4: ok.cardLast4,
-              paypalOrderId: orderId,
-            };
-            localStorage.setItem('lastPayment', JSON.stringify(paymentResultData));
-            try {
-              localStorage.removeItem('stikmnek-referral-code');
-            } catch {
-              /* ignore */
-            }
-            localStorage.removeItem('paypalPending');
-            localStorage.removeItem('pendingPayment');
-
-            toast.success('Payment successful! Your pass is now active.');
-            setTimeout(() => {
-              refreshUserPass();
-            }, 1000);
-            setTimeout(() => {
-              setCart(null);
-              setCurrentView('payment-confirmation');
-            }, 2500);
           },
           onError: (err: unknown) => {
-            console.error('[PaymentCheckout] PayPal CardFields onError', err);
+            console.error('[PaymentCheckout] PayPal Buttons onError', err);
+            const m = err && typeof err === 'object' && 'message' in err ? String((err as { message: string }).message) : 'PayPal error';
+            toast.error(m);
+            setPaymentError(m);
           },
-        });
+          onCancel: () => {
+            toast.info('Payment cancelled');
+          },
+        };
 
-        if (!cardField.isEligible()) {
-          if (!cancelled) setPaypalCardEligible(false);
-          return;
+        const buttons = paypal.Buttons(buttonConfig);
+        if (!buttons.isEligible()) {
+          throw new Error(
+            'PayPal Smart Buttons are not available for this account or region. Contact PayPal support or check your live app credentials.',
+          );
         }
 
-        const ne = paypalNameFieldRef.current;
-        const nu = paypalNumberFieldRef.current;
-        const ex = paypalExpiryFieldRef.current;
-        const cv = paypalCvvFieldRef.current;
-        if (!ne || !nu || !ex || !cv) {
-          throw new Error('Card field containers not ready');
-        }
+        const el = paypalButtonContainerRef.current;
+        if (!el) throw new Error('PayPal button container not ready');
 
-        await cardField.NameField().render(ne);
-        await cardField.NumberField().render(nu);
-        await cardField.ExpiryField().render(ex);
-        await cardField.CVVField().render(cv);
-        paypalCardFieldsHandleRef.current = cardField;
-
-        if (!cancelled) setPaypalCardEligible(true);
+        await buttons.render(el);
+        if (!cancelled) setPaypalButtonsReady(true);
       } catch (e: unknown) {
         if (cancelled) return;
         const msg = e instanceof Error ? e.message : 'PayPal failed to initialize';
-        setPaypalSdkError(msg);
-        setPaypalCardEligible(false);
-        console.error('[PaymentCheckout] PayPal SDK init', e);
+        setPaypalButtonsSdkError(msg);
+        setPaypalButtonsReady(false);
+        console.error('[PaymentCheckout] PayPal Buttons init', e);
       }
     })();
 
     return () => {
       cancelled = true;
-      paypalCardFieldsHandleRef.current = null;
-      clearHostedFieldMounts();
+      if (paypalButtonContainerRef.current) paypalButtonContainerRef.current.innerHTML = '';
     };
   }, [
-    paypalHostedCardEnabled,
+    paypalSmartEnabled,
     paypalClientId,
     step,
     passLabel,
     refreshUserPass,
     setCart,
     setCurrentView,
+    setShowAuth,
+    setAuthMode,
   ]);
-
-  const handlePayPalHostedPay = async () => {
-    if (!paypalCardFieldsHandleRef.current) return;
-    if (!validatePayPalBilling()) return;
-
-    setProcessing(true);
-    setPaymentError(null);
-    setStep('processing');
-    try {
-      await paypalCardFieldsHandleRef.current.submit({
-        contingencies: ['SCA_WHEN_REQUIRED'],
-        billingAddress: {
-          addressLine1: billingLine1.trim(),
-          addressLine2: billingLine2.trim() || '',
-          adminArea1: billingState.trim(),
-          adminArea2: billingCity.trim(),
-          postalCode: billingPostal.trim(),
-          countryCode: billingCountryCode.trim().toUpperCase(),
-        },
-      });
-    } catch (err: unknown) {
-      let errorMsg = err instanceof Error ? err.message : 'Failed to process payment. Please try again.';
-      if (errorMsg === 'SESSION_EXPIRED') {
-        toast.error('Your session has expired. Please sign in again.');
-        setShowAuth(true);
-        setAuthMode('signin');
-        errorMsg = 'Your session has expired. Please sign in again.';
-      } else {
-        toast.error(errorMsg);
-      }
-      setPaymentError(errorMsg);
-      setStep('payment');
-    } finally {
-      setProcessing(false);
-    }
-  };
 
   // ═══ CARD VALIDATION ═══
   const validateCard = (): boolean => {
@@ -1526,12 +1493,12 @@ const PaymentCheckout: React.FC = () => {
                   </div>
                 )}
 
-                {paypalSdkError && paypalHostedCardEnabled && (
+                {paypalButtonsSdkError && paypalSmartEnabled && (
                   <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
                     <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-semibold text-amber-900">PayPal card fields unavailable</p>
-                      <p className="text-sm text-amber-800 mt-0.5">{paypalSdkError}</p>
+                      <p className="text-sm font-semibold text-amber-900">PayPal checkout unavailable</p>
+                      <p className="text-sm text-amber-800 mt-0.5">{paypalButtonsSdkError}</p>
                     </div>
                   </div>
                 )}
@@ -1545,223 +1512,41 @@ const PaymentCheckout: React.FC = () => {
                         <CreditCard className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <p className="font-bold text-gray-900 text-sm">Credit or Debit Card</p>
+                        <p className="font-bold text-gray-900 text-sm">
+                          {paypalSmartEnabled ? 'Pay with PayPal' : 'Credit or Debit Card'}
+                        </p>
                         <p className="text-xs text-gray-500">
-                          {paypalHostedCardEnabled
-                            ? 'Card details are entered in secure PayPal fields — you stay on StikmNek'
+                          {paypalSmartEnabled
+                            ? 'Use your PayPal account or card in PayPal’s secure window — then you return to StikmNek.'
                             : 'Pay securely on StikmNek — no redirect'}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <CardBrandIcon brand="visa" className="w-8 h-5" />
-                      <CardBrandIcon brand="mastercard" className="w-8 h-5" />
-                      <CardBrandIcon brand="amex" className="w-8 h-5" />
-                    </div>
+                    {!paypalSmartEnabled && (
+                      <div className="flex items-center gap-1.5">
+                        <CardBrandIcon brand="visa" className="w-8 h-5" />
+                        <CardBrandIcon brand="mastercard" className="w-8 h-5" />
+                        <CardBrandIcon brand="amex" className="w-8 h-5" />
+                      </div>
+                    )}
                   </div>
 
-                  {paypalHostedCardEnabled && paypalCardEligible === false && !paypalSdkError && (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 space-y-2">
-                      <p className="font-semibold text-gray-800">PayPal is not offering hosted card fields for this session</p>
-                      <p>
-                        Your site already has a client ID (the PayPal SDK loaded). This message means PayPal returned
-                        “not eligible” for Advanced Card / Expanded Checkout — usually a merchant or app setting, not a
-                        missing <code className="text-xs bg-white px-1 rounded">VITE_PAYPAL_CLIENT_ID</code>.
-                      </p>
-                      <ul className="list-disc pl-5 space-y-1 text-gray-600">
-                        <li>
-                          In{' '}
-                          <a
-                            className="text-teal-700 underline font-medium"
-                            href="https://developer.paypal.com/dashboard/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            PayPal Developer
-                          </a>
-                          : same REST app as this client ID → enable **Advanced** / **Expanded** credit and debit card
-                          payments for your **business** account (complete any onboarding PayPal shows).
-                        </li>
-                        <li>
-                          Use a **sandbox** client ID while testing, and match Edge <code className="text-xs bg-white px-1 rounded">PAYPAL_MODE</code> (sandbox vs live).
-                        </li>
-                        <li>Try another browser, or turn off ad blockers / strict tracking protection that block PayPal scripts or iframes.</li>
-                      </ul>
-                    </div>
-                  )}
-
-                  {paypalHostedCardEnabled && !paypalSdkError && paypalCardEligible !== false && (
+                  {paypalSmartEnabled && !paypalButtonsSdkError && (
                     <div className="border-t border-gray-100 pt-5 space-y-4 relative">
-                      {paypalCardEligible === null && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl bg-white/85 backdrop-blur-[1px] text-gray-600">
+                      {!paypalButtonsReady && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl bg-white/85 backdrop-blur-[1px] text-gray-600 min-h-[52px]">
                           <Loader2 className="w-7 h-7 animate-spin text-teal-600" />
-                          <span className="text-sm font-medium">Loading secure card fields…</span>
+                          <span className="text-sm font-medium">Loading PayPal…</span>
                         </div>
                       )}
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Name on card</label>
-                        <div
-                          ref={paypalNameFieldRef}
-                          className="min-h-[48px] px-3 py-2 rounded-xl border-2 border-gray-200 bg-white"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Card number</label>
-                        <div
-                          ref={paypalNumberFieldRef}
-                          className="min-h-[48px] px-3 py-2 rounded-xl border-2 border-gray-200 bg-white"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Expiry</label>
-                          <div
-                            ref={paypalExpiryFieldRef}
-                            className="min-h-[48px] px-3 py-2 rounded-xl border-2 border-gray-200 bg-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">CVV</label>
-                          <div
-                            ref={paypalCvvFieldRef}
-                            className="min-h-[48px] px-3 py-2 rounded-xl border-2 border-gray-200 bg-white"
-                          />
-                        </div>
-                      </div>
-
-                      {paypalCardEligible === true && (
-                      <div className="pt-2 space-y-3">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Billing address</p>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Street address</label>
-                          <input
-                            type="text"
-                            value={billingLine1}
-                            onChange={(e) => {
-                              setBillingLine1(e.target.value);
-                              setBillingErrors((prev) => ({ ...prev, line1: '' }));
-                            }}
-                            autoComplete="street-address"
-                            className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
-                              billingErrors.line1 ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
-                            }`}
-                          />
-                          {billingErrors.line1 && (
-                            <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                              <AlertCircle className="w-3 h-3" />
-                              {billingErrors.line1}
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                            Apartment, suite, etc.{' '}
-                            <span className="text-gray-400 font-normal">(optional)</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={billingLine2}
-                            onChange={(e) => setBillingLine2(e.target.value)}
-                            autoComplete="address-line2"
-                            className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">City / suburb</label>
-                            <input
-                              type="text"
-                              value={billingCity}
-                              onChange={(e) => {
-                                setBillingCity(e.target.value);
-                                setBillingErrors((prev) => ({ ...prev, city: '' }));
-                              }}
-                              autoComplete="address-level2"
-                              className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
-                                billingErrors.city ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
-                              }`}
-                            />
-                            {billingErrors.city && (
-                              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" />
-                                {billingErrors.city}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">State / province</label>
-                            <input
-                              type="text"
-                              value={billingState}
-                              onChange={(e) => {
-                                setBillingState(e.target.value);
-                                setBillingErrors((prev) => ({ ...prev, state: '' }));
-                              }}
-                              autoComplete="address-level1"
-                              className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
-                                billingErrors.state ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
-                              }`}
-                            />
-                            {billingErrors.state && (
-                              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" />
-                                {billingErrors.state}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Postal code</label>
-                            <input
-                              type="text"
-                              value={billingPostal}
-                              onChange={(e) => {
-                                setBillingPostal(e.target.value);
-                                setBillingErrors((prev) => ({ ...prev, postal: '' }));
-                              }}
-                              autoComplete="postal-code"
-                              className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
-                                billingErrors.postal ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
-                              }`}
-                            />
-                            {billingErrors.postal && (
-                              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" />
-                                {billingErrors.postal}
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Country</label>
-                            <input
-                              type="text"
-                              value={billingCountryCode}
-                              onChange={(e) => {
-                                setBillingCountryCode(e.target.value.toUpperCase().slice(0, 2));
-                                setBillingErrors((prev) => ({ ...prev, country: '' }));
-                              }}
-                              maxLength={2}
-                              autoComplete="country"
-                              placeholder="AU"
-                              className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-mono font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 ${
-                                billingErrors.country ? 'border-red-300 bg-red-50/50' : 'border-gray-200'
-                              }`}
-                            />
-                            {billingErrors.country && (
-                              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" />
-                                {billingErrors.country}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      )}
+                      <div ref={paypalButtonContainerRef} className="min-h-[48px] max-w-md" />
+                      <p className="text-xs text-gray-500">
+                        Total due: <strong>A${priceAud.toFixed(2)} AUD</strong> — charged when you complete payment in PayPal.
+                      </p>
                     </div>
                   )}
 
-                  {!paypalHostedCardEnabled && (
+                  {!paypalSmartEnabled && (
                   <div className="border-t border-gray-100 pt-5 space-y-4">
                     {/* Cardholder Name */}
                     <div>
@@ -1930,18 +1715,11 @@ const PaymentCheckout: React.FC = () => {
                   </div>
                 )}
 
-                {/* Pay with Card Button */}
+                {!paypalSmartEnabled && (
                 <button
                   type="button"
-                  onClick={
-                    paypalHostedCardEnabled && paypalCardEligible === true
-                      ? handlePayPalHostedPay
-                      : handlePayWithCard
-                  }
-                  disabled={
-                    processing ||
-                    (paypalHostedCardEnabled && paypalCardEligible !== true)
-                  }
+                  onClick={handlePayWithCard}
+                  disabled={processing}
                   className="w-full py-4 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-lg transition-all shadow-lg shadow-teal-200 hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                 >
                   {processing ? (
@@ -1956,10 +1734,11 @@ const PaymentCheckout: React.FC = () => {
                     </>
                   )}
                 </button>
+                )}
 
                 <p className="text-xs text-center text-gray-400">
-                  {paypalHostedCardEnabled
-                    ? 'PayPal processes your card on-page (Expanded Checkout). Funds are captured when you pay.'
+                  {paypalSmartEnabled
+                    ? 'You may complete payment in a PayPal window. Your pass activates after payment succeeds.'
                     : 'Card is processed securely. You stay on StikmNek — no redirect.'}
                 </p>
               </div>

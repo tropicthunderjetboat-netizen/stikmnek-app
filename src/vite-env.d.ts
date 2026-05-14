@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** PayPal app client ID for in-page Card Fields (public). Must match Edge `PAYPAL_MODE` (sandbox vs live). */
+  /** PayPal public client ID for Smart Buttons checkout. Must match Edge `PAYPAL_MODE` (sandbox vs live). */
   readonly VITE_PAYPAL_CLIENT_ID?: string;
 }
 
