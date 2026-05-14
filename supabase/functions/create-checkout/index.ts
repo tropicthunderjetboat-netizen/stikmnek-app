@@ -141,10 +141,13 @@ Deno.serve(async (req) => {
     const orderData = await orderRes.json();
     const orderId = orderData.id;
     const approveLink = orderData.links?.find((l: any) => l.rel === 'approve');
-    const approvalUrl = approveLink?.href;
+    const approvalUrl = approveLink?.href ?? null;
 
-    if (!orderId || !approvalUrl) {
-      return errorResponse('PayPal did not return approval URL', 502, { reason: 'paypal_missing_approval_link' });
+    if (!orderId) {
+      return errorResponse('PayPal did not return an order id', 502, { reason: 'paypal_missing_order_id' });
+    }
+    if (!approvalUrl) {
+      console.warn('[create-checkout] PayPal returned no approve link (OK for Card Fields / wallet-less flows)');
     }
 
     return jsonResponse({

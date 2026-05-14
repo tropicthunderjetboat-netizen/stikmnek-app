@@ -72,7 +72,7 @@ StikmNek is a full-stack web application that connects tourists in Vanuatu with 
 ### Data Flow
 
 1. **Tourist browses deals** → React SPA fetches from Supabase DB (direct client)
-2. **Tourist purchases pass** → Edge function creates PayPal order → PayPal checkout → Capture webhook
+2. **Tourist purchases pass** → PayPal Card Fields on checkout (or legacy form) → `create-checkout` / `paypal-capture` Edge Functions (or `process-card-payment` when no public client id)
 3. **Business submits listing** → Edge function inserts into `pending_businesses` → Admin reviews → Approved to `businesses`
 4. **Business edits listing** → Edge function inserts into `pending_edits` → Admin reviews → Applied to `businesses`
 5. **Tourist redeems deal** → Edge function verifies pass validity → Records redemption → Updates savings tracker
@@ -308,19 +308,21 @@ Authentication is handled by Supabase Auth (GoTrue):
 
 ### PayPal
 
-- **Mode**: Configurable via `PAYPAL_MODE` env var (sandbox/live)
-- **Flow**: Create order → PayPal redirect → Capture on return
-- **Pass Types**: Daily ($15), Weekly ($45), Monthly ($99)
-- **SuperStar Reviews**: Additional purchase option
+- **Mode**: Configurable via `PAYPAL_MODE` env var (sandbox/live) on Edge Functions.
+- **In-page card (Expanded Checkout)**: When `VITE_PAYPAL_CLIENT_ID` is set on the frontend build, checkout loads the PayPal JS SDK (`card-fields`) and uses `create-checkout` + `paypal-capture` Edge Functions (no redirect to paypal.com). Enable **Expanded / Advanced card payments** on the PayPal business account and use a client ID from the same app as the Edge secrets.
+- **Legacy / dev**: If `VITE_PAYPAL_CLIENT_ID` is unset, checkout keeps the older raw card form, which calls `process-card-payment` (mock or disabled unless `CARD_MOCK_ENABLED=true` on that function).
 
 ### Environment Variables
 
 ```
+# Supabase Edge (create-checkout, paypal-capture)
 PAYPAL_CLIENT_ID     - PayPal app client ID
 PAYPAL_CLIENT_SECRET - PayPal app secret
 PAYPAL_MODE          - "sandbox" or "live"
-```
 
+# Vite frontend (public — use sandbox client ID for dev; live for production)
+VITE_PAYPAL_CLIENT_ID - Same PayPal app’s public client ID for Card Fields SDK
+```
 ---
 
 ## Analytics & Monitoring
@@ -441,6 +443,12 @@ supabase secrets set PAYPAL_MODE=live
 | `SENTRY_DSN` | Sentry | Error tracking DSN |
 | `GA_MEASUREMENT_ID` | Google | Analytics measurement ID |
 | `GATEWAY_API_KEY` | Internal | API gateway key |
+
+### Frontend (Vite / `.env`)
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_PAYPAL_CLIENT_ID` | Public PayPal client ID for in-page Card Fields checkout. Omit to use the legacy `process-card-payment` form (dev/mock). |
 
 ---
 
