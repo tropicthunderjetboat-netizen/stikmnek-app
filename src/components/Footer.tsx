@@ -2,9 +2,23 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { MapPin, Mail, Phone, Shield, Globe, HelpCircle, Book, FileText, Lock, Cookie, Database, RefreshCw } from 'lucide-react';
+import {
+  MapPin,
+  Mail,
+  Phone,
+  Shield,
+  Globe,
+  HelpCircle,
+  Book,
+  FileText,
+  Lock,
+  Cookie,
+  Database,
+  RefreshCw,
+  Heart,
+} from 'lucide-react';
 import { toast } from 'sonner';
-import { SUPPORT_EMAIL } from '@/data/contact';
+import { supportMailtoUrl } from '@/data/contact';
 
 // App version - bump this on every deploy so users can verify they have latest code
 const APP_VERSION = '3.0.0';
@@ -67,8 +81,9 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* About */}
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
+            <div className="mb-4">
+              <div className="flex items-center gap-2">
+              <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
                 <svg viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M12 2L2 7l10 5 10-5-10-5z" />
                   <path d="M2 17l10 5 10-5" />
@@ -76,6 +91,14 @@ const Footer: React.FC = () => {
                 </svg>
               </div>
               <span className="text-lg font-bold">StikmNek</span>
+            </div>
+            <p
+              className="mt-3 inline-flex max-w-sm items-start gap-1.5 rounded-lg border border-teal-500/35 bg-teal-500/10 px-3 py-2 text-[11px] font-medium leading-snug text-teal-100/95"
+              role="note"
+            >
+              <Heart className="mt-0.5 h-3.5 w-3.5 shrink-0 text-teal-400" aria-hidden />
+              {t('footer.local_badge', language)}
+            </p>
             </div>
             <p className="text-sm text-gray-400 leading-relaxed mb-4">
               {t('footer.abouttext', language)}
@@ -85,12 +108,6 @@ const Footer: React.FC = () => {
                 <MapPin className="w-4 h-4 text-teal-500" />
                 Vanuatu
 
-              </div>
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-teal-500" />
-                <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-teal-400 transition-colors">
-                  {SUPPORT_EMAIL}
-                </a>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-teal-500" />
@@ -167,7 +184,7 @@ const Footer: React.FC = () => {
               </li>
               <li>
                 <a
-                  href={`mailto:${SUPPORT_EMAIL}`}
+                  href={supportMailtoUrl('StikmNek support')}
                   className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
                 >
                   <span className="text-gray-500">

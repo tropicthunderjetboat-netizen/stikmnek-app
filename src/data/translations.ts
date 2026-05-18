@@ -615,6 +615,11 @@ export const translations: Record<string, Record<Language, string>> = {
   // Footer
   'footer.about': { en: 'About StikmNek', fr: 'À propos de StikmNek', bi: 'Abaotem StikmNek' },
   'footer.abouttext': { en: 'StikmNek connects tourists with the best local businesses across Vanuatu. Save money while experiencing authentic island culture.', fr: 'StikmNek connecte les touristes avec les meilleures entreprises locales à travers le Vanuatu. Économisez tout en vivant la culture insulaire authentique.', bi: 'StikmNek i konetim turis wetem beswan lokal bisnis long Vanuatu. Sevem mani taem yu eksperiens tru aelan kalsa.' },
+  'footer.local_badge': {
+    en: '100% locally owned · Supporting grassroots businesses',
+    fr: '100 % localement détenu · Soutien aux entreprises locales',
+    bi: '100% lokal · Sapotem smol bisnis blong Vanuatu',
+  },
   'footer.links': { en: 'Quick Links', fr: 'Liens rapides', bi: 'Kwik Link' },
   'footer.support': { en: 'Support', fr: 'Support', bi: 'Sapot' },
   'footer.legal': { en: 'Legal', fr: 'Légal', bi: 'Ligo' },
