@@ -8,6 +8,7 @@ import {
   MAX_PARTY_SIZE,
   SEVENTH_GUEST_HEAD_CHARGE_AUD,
 } from '@/data/pricing';
+import { SUPPORT_EMAIL, supportMailtoUrl } from '@/data/contact';
 import {
   HelpCircle, Book, Store, Shield, Users, ChevronDown, ChevronRight,
   Search, ArrowLeft, MapPin, CreditCard, QrCode, Star, Camera,
@@ -16,8 +17,6 @@ import {
 } from 'lucide-react';
 
 type HelpSection = 'overview' | 'tourist-faq' | 'business-guide' | 'admin-manual' | 'quick-start' | 'troubleshooting';
-
-const SUPPORT_EMAIL = 'stikmnek@gmail.com';
 
 interface FAQItem {
   question: string;
@@ -458,7 +457,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
                 </div>
               </div>
               <a
-                href={`mailto:${SUPPORT_EMAIL}?subject=StikmNek%20support`}
+                href={supportMailtoUrl('StikmNek support')}
                 className="block w-full mt-4 py-2.5 rounded-xl bg-teal-50 text-teal-700 text-sm font-semibold hover:bg-teal-100 transition-colors text-center"
               >
                 Email support

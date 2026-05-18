@@ -21,6 +21,7 @@ import PostPurchasePassPreferencesDialog from '@/components/PostPurchasePassPref
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 import { t, type Language } from '@/data/translations';
+import { SUPPORT_EMAIL, supportMailtoUrl } from '@/data/contact';
 
 function passPrefsPromptStorageKey(receiptNumber: string): string {
   return `pass_prefs_prompt_v1_${receiptNumber}`;
@@ -1427,7 +1428,10 @@ Enjoy your deals in Vanuatu!
         {/* Help Text */}
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-400">
-            Need help? Contact us at <a href="mailto:stikmnek@gmail.com" className="text-teal-600 hover:underline">stikmnek@gmail.com</a>
+            Need help? Contact us at{' '}
+            <a href={supportMailtoUrl()} className="text-teal-600 hover:underline">
+              {SUPPORT_EMAIL}
+            </a>
           </p>
         </div>
       </div>

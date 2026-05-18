@@ -531,7 +531,7 @@ Proprietary - All rights reserved.
 
 ## Support
 
-- **Email**: support@stikmnek.com
+- **Email**: stikmnek@gmail.com
 - **Website**: https://www.stikmnek.com
 - **Location**: Vanuatu
 

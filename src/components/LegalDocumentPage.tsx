@@ -3,6 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { PROSE_CLASSES } from '@/lib/prose';
+import { SUPPORT_EMAIL } from '@/data/contact';
 
 const VALID_SLUGS = new Set([
   'privacy',
@@ -52,7 +53,7 @@ function bodyFor(slug: string, lang: Lang): React.ReactNode {
   const p = (chunks: Record<Lang, string[]>) =>
     chunks[lang].map((para, i) => (
       <p key={i} className="text-gray-600 leading-relaxed mb-4">
-        {para}
+        {para.replace(/\{\{SUPPORT_EMAIL\}\}/g, SUPPORT_EMAIL)}
       </p>
     ));
 
@@ -63,19 +64,19 @@ function bodyFor(slug: string, lang: Lang): React.ReactNode {
           'StikmNek (“we”, “us”) respects your privacy. This policy describes how we collect, use, and protect personal information when you use our website and services in Vanuatu.',
           'We collect information you provide (such as account details, pass purchases, and support requests) and technical data needed to operate the platform securely. We use this data to provide deals, passes, redemptions, and customer support.',
           'We do not sell your personal data. We may share data with payment processors and hosting providers only as needed to run the service, subject to appropriate safeguards.',
-          'You may request access to or correction of your personal data by contacting us at stikmnek@gmail.com. We retain data only as long as needed for the purposes above or as required by law.',
+          'You may request access to or correction of your personal data by contacting us at {{SUPPORT_EMAIL}}. We retain data only as long as needed for the purposes above or as required by law.',
         ],
         fr: [
           'StikmNek (« nous ») respecte votre vie privée. Cette politique décrit comment nous collectons, utilisons et protégeons les données personnelles lorsque vous utilisez notre site et nos services au Vanuatu.',
           'Nous collectons les informations que vous fournissez (compte, achats de pass, demandes d’assistance) et des données techniques nécessaires au bon fonctionnement et à la sécurité de la plateforme.',
           'Nous ne vendons pas vos données personnelles. Nous pouvons les partager avec des prestataires de paiement ou d’hébergement uniquement dans la mesure nécessaire au service.',
-          'Vous pouvez demander l’accès ou la rectification de vos données en écrivant à stikmnek@gmail.com. Nous conservons les données le temps nécessaire à ces finalités ou selon la loi.',
+          'Vous pouvez demander l’accès ou la rectification de vos données en écrivant à {{SUPPORT_EMAIL}}. Nous conservons les données le temps nécessaire à ces finalités ou selon la loi.',
         ],
         bi: [
           'StikmNek i rispekem praevet blong yu. Polisi ia i eksplenem hao mifala kolektem, yusum mo protektem infomesen blong yu taem yu yusum websaet mo savis blong mifala long Vanuatu.',
           'Mifala kolektem infomesen yu givim (akaont, bae pas, help) mo teknoloji data we i nid blong sefti mo wok blong platform.',
           'Mifala i no salim data blong yu. Mifala save serem wetem pei pei mo hosting olsem we i nid blong runem savis.',
-          'Yu save askem long luk o stretem data blong yu long stikmnek@gmail.com.',
+          'Yu save askem long luk o stretem data blong yu long {{SUPPORT_EMAIL}}.',
         ],
       });
     case 'terms':
@@ -83,19 +84,19 @@ function bodyFor(slug: string, lang: Lang): React.ReactNode {
         en: [
           'By using StikmNek you agree to these Terms of Service. StikmNek provides a platform for discovering deals and purchasing tourist passes in Vanuatu; individual businesses are responsible for their offers and in-venue service.',
           'Passes and Super Star purchases are subject to the conditions shown at checkout. Misuse of the platform, fraud, or abusive behaviour may result in suspension of your account.',
-          'The platform is provided “as is”. To the extent permitted by law, we limit liability for indirect losses. Disputes should first be raised with our support team at stikmnek@gmail.com.',
+          'The platform is provided “as is”. To the extent permitted by law, we limit liability for indirect losses. Disputes should first be raised with our support team at {{SUPPORT_EMAIL}}.',
           'If you operate a business listing or deal on StikmNek, you must also comply with our Business partner & listing terms (including insurance, permits, and honoring pass discounts).',
         ],
       fr: [
           'En utilisant StikmNek, vous acceptez ces conditions d’utilisation. StikmNek propose une plateforme pour découvrir des offres et acheter des pass touristiques au Vanuatu ; chaque établissement reste responsable de ses offres et de son service sur place.',
           'Les pass et achats Super Star sont soumis aux conditions affichées au paiement. Fraude ou abus peut entraîner la suspension du compte.',
-          'La plateforme est fournie « en l’état ». Dans les limites légales, notre responsabilité pour les pertes indirectes est limitée. Contact : stikmnek@gmail.com.',
+          'La plateforme est fournie « en l’état ». Dans les limites légales, notre responsabilité pour les pertes indirectes est limitée. Contact : {{SUPPORT_EMAIL}}.',
           'Si vous exploitez une fiche ou une offre sur StikmNek, vous devez également respecter nos conditions Partenaires commerciaux et inscription (assurances, autorisations, honneur des remises pass).',
         ],
         bi: [
           'Taem yu yusum StikmNek yu agri long ol taem ia. StikmNek i givim platform blong faenem dils mo bae pas long Vanuatu. Evri bisinis i stap ansa blong ol ofa blong olgeta.',
           'Pas mo Super Star i aninit long kondisen long taem yu pei. Rong yus o abius i save lisim akaont blong yu.',
-          'Platform i kam «olsem hemi stap». Lus we i nid, mifala i limitim liability. Help: stikmnek@gmail.com.',
+          'Platform i kam «olsem hemi stap». Lus we i nid, mifala i limitim liability. Help: {{SUPPORT_EMAIL}}.',
           'Sapos yu ronem bisinis long StikmNek, yu mas folem tu Business partner & listing terms (insurance, pemit, mo diskon pas).',
         ],
       });
@@ -109,7 +110,7 @@ function bodyFor(slug: string, lang: Lang): React.ReactNode {
           'You will honour all valid StikmNek passes at the discounted rates and terms shown on your approved listing (or as otherwise agreed in writing with StikmNek). You will not refuse a valid redemption without a lawful reason, or charge extra to circumvent the published deal.',
           'StikmNek provides a platform to connect tourists with businesses. We aim to list reputable operators and review submissions, but we do not control safety, quality, conduct, or disputes that occur outside the platform (for example on your premises or during a tour). We are not liable for loss, injury, or damage arising from services you provide. User reviews are an important part of community accountability; we encourage truthful feedback to help keep standards high.',
           'If you breach these obligations, we may remove or suspend your listing, restrict your account, or take other steps permitted by law or our general Terms of Service.',
-          'Questions: stikmnek@gmail.com.',
+          'Questions: {{SUPPORT_EMAIL}}.',
         ],
         fr: [
           'Ces conditions s’appliquent lorsque vous soumettez ou maintenez une fiche entreprise sur StikmNek. En cochant la case sur le formulaire, vous confirmez les avoir lues et acceptées.',
@@ -118,7 +119,7 @@ function bodyFor(slug: string, lang: Lang): React.ReactNode {
           'Vous exercez votre activité de manière honnête et professionnelle, conformément à la loi. Vous ne trompez pas les touristes sur les prix, services ou contenu de l’offre StikmNek.',
           'Vous honorez les pass StikmNek valides aux tarifs réduits et conditions figurant sur votre fiche approuvée (ou convenues par écrit avec StikmNek). Vous ne refusez pas un passage valide sans motif légitime, ni ne facturez de suppléments pour contourner l’offre publiée.',
           'StikmNek met en relation touristes et entreprises. Nous cherchons à référencer des opérateurs sérieux et examinons les dossiers, mais nous ne contrôlons pas la sécurité, la qualité ou les litiges hors plateforme (sur place, pendant une visite, etc.). Nous déclinons toute responsabilité pour les préjudices liés à vos prestations. Les avis utilisateurs contribuent à la transparence ; nous encourageons des retours sincères.',
-          'En cas de manquement, nous pouvons retirer ou suspendre votre fiche, restreindre votre compte ou prendre d’autres mesures. Contact : stikmnek@gmail.com.',
+          'En cas de manquement, nous pouvons retirer ou suspendre votre fiche, restreindre votre compte ou prendre d’autres mesures. Contact : {{SUPPORT_EMAIL}}.',
         ],
         bi: [
           'Ol taem ia i aplae taem yu submit o hol listing long StikmNek. Taem yu teka boks long form, yu se hem i ridim mo agri long ol taem ia.',
@@ -127,37 +128,37 @@ function bodyFor(slug: string, lang: Lang): React.ReactNode {
           'Yu wok honest, professional, mo folem loa. Yu no lusim tourist long praes o sevis.',
           'Yu bae honor ol valid StikmNek pas long diskon mo taem long listing blong yu we i approve. Yu no refus valid redemption mo yu no faetem ekstra blong brekem deal.',
           'StikmNek i platform blong konnektem tourist mo bisinis. Mifala trae long listem gud bisinis tasol mifala no kontrolim sefti o sabis longwe long websaet. Riviu blong ol yusa i helpem long honesty. Mifala no stap ansa blong loss o injuri long sabis blong yu.',
-          'Sapos yu brekem ol taem ia, mifala save tekaot listing, lisim akaont, o oda. Help: stikmnek@gmail.com.',
+          'Sapos yu brekem ol taem ia, mifala save tekaot listing, lisim akaont, o oda. Help: {{SUPPORT_EMAIL}}.',
         ],
       });
     case 'gdpr':
       return p({
         en: [
           'Where EU data protection law applies, we process personal data on lawful bases such as contract performance and legitimate interests in operating a secure discount platform.',
-          'You may have rights to access, rectification, erasure, restriction, portability, and objection, and to lodge a complaint with a supervisory authority. Contact stikmnek@gmail.com to exercise these rights.',
+          'You may have rights to access, rectification, erasure, restriction, portability, and objection, and to lodge a complaint with a supervisory authority. Contact {{SUPPORT_EMAIL}} to exercise these rights.',
         ],
         fr: [
           'Lorsque le droit européen sur la protection des données s’applique, nous traitons les données sur des bases légales telles que l’exécution du contrat et l’intérêt légitime à exploiter une plateforme sécurisée.',
-          'Vous pouvez disposer de droits d’accès, de rectification, d’effacement, de limitation, de portabilité et d’opposition, et introduire une réclamation auprès d’une autorité de contrôle. Écrivez à stikmnek@gmail.com.',
+          'Vous pouvez disposer de droits d’accès, de rectification, d’effacement, de limitation, de portabilité et d’opposition, et introduire une réclamation auprès d’une autorité de contrôle. Écrivez à {{SUPPORT_EMAIL}}.',
         ],
         bi: [
           'Sapos EU law i aplae, mifala wok wetem data long legal basis olsem kontrak mo sefti blong platform.',
-          'Yu gat raet blong akses, stretim, dilet, limit, mo komplen. Kontak: stikmnek@gmail.com.',
+          'Yu gat raet blong akses, stretim, dilet, limit, mo komplen. Kontak: {{SUPPORT_EMAIL}}.',
         ],
       });
     case 'cookies':
       return p({
         en: [
           'We use cookies and similar technologies where necessary for authentication, preferences, analytics, and security. You can control cookies through your browser settings; disabling some cookies may limit certain features.',
-          'For questions about cookies, contact stikmnek@gmail.com.',
+          'For questions about cookies, contact {{SUPPORT_EMAIL}}.',
         ],
         fr: [
           'Nous utilisons des cookies et technologies similaires lorsque nécessaire pour l’authentification, les préférences, l’analyse et la sécurité. Vous pouvez les gérer dans les paramètres du navigateur.',
-          'Questions : stikmnek@gmail.com.',
+          'Questions : {{SUPPORT_EMAIL}}.',
         ],
         bi: [
           'Mifala yusum kuki blong login, seting, analytics, mo sefti. Yu save kontrol long browser.',
-          'Kuesten: stikmnek@gmail.com.',
+          'Kuesten: {{SUPPORT_EMAIL}}.',
         ],
       });
     case 'data-protection':
@@ -165,15 +166,15 @@ function bodyFor(slug: string, lang: Lang): React.ReactNode {
         en: [
           'We implement appropriate technical and organisational measures to protect personal data against unauthorised access, loss, or alteration. Staff and processors with access to data are bound to confidentiality where applicable.',
           'Data breaches will be handled in line with applicable law. Notifications to users or authorities will be made when required.',
-          'Contact stikmnek@gmail.com for data protection enquiries.',
+          'Contact {{SUPPORT_EMAIL}} for data protection enquiries.',
         ],
         fr: [
           'Nous mettons en œuvre des mesures techniques et organisationnelles appropriées pour protéger les données personnelles contre l’accès non autorisé, la perte ou l’altération.',
-          'Les violations de données seront traitées conformément à la loi. Contact : stikmnek@gmail.com.',
+          'Les violations de données seront traitées conformément à la loi. Contact : {{SUPPORT_EMAIL}}.',
         ],
         bi: [
           'Mifala yusum gud wok blong protektem data blong yu.',
-          'Sapos i gat brek, mifala bae folem loa. Kontak: stikmnek@gmail.com.',
+          'Sapos i gat brek, mifala bae folem loa. Kontak: {{SUPPORT_EMAIL}}.',
         ],
       });
     default:

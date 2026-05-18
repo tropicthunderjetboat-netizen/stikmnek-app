@@ -4,11 +4,10 @@ import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { MapPin, Mail, Phone, Shield, Globe, HelpCircle, Book, FileText, Lock, Cookie, Database, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { SUPPORT_EMAIL } from '@/data/contact';
 
 // App version - bump this on every deploy so users can verify they have latest code
 const APP_VERSION = '3.0.0';
-
-const CONTACT_EMAIL = 'stikmnek@gmail.com';
 
 const Footer: React.FC = () => {
   const { language } = useAppContext();
@@ -89,8 +88,8 @@ const Footer: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-teal-500" />
-                <a href={`mailto:${CONTACT_EMAIL}`} className="hover:text-teal-400 transition-colors">
-                  {CONTACT_EMAIL}
+                <a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-teal-400 transition-colors">
+                  {SUPPORT_EMAIL}
                 </a>
               </div>
               <div className="flex items-center gap-2">
@@ -168,7 +167,7 @@ const Footer: React.FC = () => {
               </li>
               <li>
                 <a
-                  href={`mailto:${CONTACT_EMAIL}`}
+                  href={`mailto:${SUPPORT_EMAIL}`}
                   className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
                 >
                   <span className="text-gray-500">
