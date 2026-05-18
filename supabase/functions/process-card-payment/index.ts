@@ -17,6 +17,7 @@ import {
 } from '../_shared/pricingDynamic.ts';
 import { parsePassPartyWithProfileFallback } from '../_shared/parsePassPartyWithProfileFallback.ts';
 import { transactionalPassProductNameEn } from '../_shared/passDisplay.ts';
+import { notifyAdminsOfPassPurchase } from '../_shared/purchaseNotify.ts';
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
@@ -458,6 +459,22 @@ Deno.serve(async (req) => {
           .update({ share_bonus_unlocked: false, updated_at: new Date().toISOString() })
           .eq('user_id', authUser.id);
         if (clrErr) console.error('process-card-payment: clear share_bonus_unlocked', clrErr);
+      }
+
+      try {
+        await notifyAdminsOfPassPurchase({
+          receiptNumber,
+          amount,
+          currency: 'AUD',
+          paymentMethod: 'Card',
+          buyerEmail: authUser.email ?? null,
+          validFrom,
+          validUntil,
+          partySize,
+          userId: authUser.id,
+        });
+      } catch (notifyErr: unknown) {
+        console.error('process-card-payment: admin purchase notify error:', notifyErr);
       }
 
       return jsonResponse(req, {

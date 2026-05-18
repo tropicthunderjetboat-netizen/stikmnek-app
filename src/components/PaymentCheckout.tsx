@@ -116,31 +116,6 @@ async function getInvokeErrorBody(error: any): Promise<Record<string, unknown> |
   return null;
 }
 
-// #region agent log
-/** PayPal gateway debug (session 16b279) — no tokens or PII. */
-function agentDebugLog(payload: {
-  location: string;
-  message: string;
-  hypothesisId: string;
-  runId?: string;
-  data: Record<string, unknown>;
-}): void {
-  void fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '16b279' },
-    body: JSON.stringify({
-      sessionId: '16b279',
-      location: payload.location,
-      message: payload.message,
-      hypothesisId: payload.hypothesisId,
-      runId: payload.runId ?? 'pre-fix',
-      data: payload.data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-}
-// #endregion
-
 /** `FunctionsFetchError`: fetch threw before HTTP — unwrap TypeError / cause for debugging. */
 function describeFunctionsFetchFailure(error: unknown): string | null {
   if (!error || typeof error !== 'object') return null;
@@ -171,8 +146,9 @@ function isPaymentInvokeTransportFailure(error: unknown): boolean {
   );
 }
 
+/** Shown when `functions.invoke` never completes (DNS, TLS, ad blocker, wrong Supabase URL, etc.). */
 const PAYMENT_TRANSPORT_FAILURE_HINT =
-  'We could not reach the payment service (the request never completed). This is usually not your card being declined. Try: refresh and pay again, switch networks, disable ad blockers or strict privacy extensions for this site, or use a private window. If it keeps happening, confirm the app is built with the correct Supabase project URL and that the process-card-payment Edge Function is deployed (Supabase Dashboard → Edge Functions → Logs).';
+  'We could not reach the payment service (the request never completed). This is usually not your card being declined. Try: refresh and pay again, switch networks, disable ad blockers or strict privacy extensions for this site, or use a private window. If it keeps happening, confirm the app is built with the correct Supabase project URL and that the payment Edge Functions you use are deployed (PayPal checkout: **create-checkout** and **paypal-capture**; legacy card form: **process-card-payment**) — see Supabase Dashboard → Edge Functions → Logs.';
 
 /** Load PayPal JS SDK with Smart Buttons (standard checkout — works where Expanded Card Fields do not). */
 function loadPayPalButtonsSdk(clientId: string): Promise<void> {
@@ -679,20 +655,6 @@ const PaymentCheckout: React.FC = () => {
 
             const { payStartDate, partyForPay, isExtended: ext } = resolvePayContextFromRef();
 
-            // #region agent log
-            agentDebugLog({
-              location: 'PaymentCheckout.tsx:createOrder',
-              message: 'createOrder after session + context',
-              hypothesisId: 'H2',
-              data: {
-                partyForPay,
-                payStartDate,
-                isExtended: ext,
-                paypalClientIdPrefix: String(paypalClientId ?? '').slice(0, 14),
-              },
-            });
-            // #endregion
-
             const { data, error } = await supabase.functions.invoke('create-checkout', {
               body: {
                 startDate: payStartDate,
@@ -708,23 +670,13 @@ const PaymentCheckout: React.FC = () => {
               },
             });
 
-            // #region agent log
-            const d0 = data as Record<string, unknown> | null;
-            agentDebugLog({
-              location: 'PaymentCheckout.tsx:createOrder:invoke',
-              message: 'create-checkout invoke returned',
-              hypothesisId: 'H1',
-              data: {
-                invokeHasError: Boolean(error),
-                invokeStatus: error ? getInvokeStatus(error) : null,
-                responseSuccess: Boolean(d0?.success),
-                hasOrderIdField: Boolean(d0?.orderId ?? d0?.order_id),
-                errorKey: typeof d0?.error === 'string' ? String(d0.error).slice(0, 160) : null,
-              },
-            });
-            // #endregion
-
             if (error) {
+              if (isPaymentInvokeTransportFailure(error)) {
+                const detail = describeFunctionsFetchFailure(error);
+                throw new Error(
+                  detail ? `${PAYMENT_TRANSPORT_FAILURE_HINT} (${detail})` : PAYMENT_TRANSPORT_FAILURE_HINT,
+                );
+              }
               const body = await getInvokeErrorBody(error);
               const serverError =
                 (typeof body?.error === 'string' && body.error) ||
@@ -743,33 +695,11 @@ const PaymentCheckout: React.FC = () => {
                   : 'Could not start payment';
               throw new Error(msg);
             }
-            // #region agent log
-            const oid = String(orderId);
-            agentDebugLog({
-              location: 'PaymentCheckout.tsx:createOrder:success',
-              message: 'PayPal order id returned to SDK',
-              hypothesisId: 'H1',
-              data: {
-                orderIdLen: oid.length,
-                orderIdSuffix: oid.slice(-8),
-                paypalClientIdPrefix: String(paypalClientId ?? '').slice(0, 14),
-              },
-            });
-            // #endregion
             return String(orderId);
           },
           onApprove: async (data: { orderID?: string }) => {
             const orderId = String(data?.orderID ?? '');
             if (!orderId) throw new Error('Missing PayPal order');
-
-            // #region agent log
-            agentDebugLog({
-              location: 'PaymentCheckout.tsx:onApprove',
-              message: 'onApprove fired',
-              hypothesisId: 'H4',
-              data: { orderIdLen: orderId.length, orderIdSuffix: orderId.slice(-8) },
-            });
-            // #endregion
 
             setProcessing(true);
             setPaymentError(null);
@@ -799,22 +729,6 @@ const PaymentCheckout: React.FC = () => {
                   paymentTransactionId: getOrCreatePassPurchaseIdempotencyKey(),
                 },
               });
-
-              // #region agent log
-              const cap = capData as Record<string, unknown> | null;
-              agentDebugLog({
-                location: 'PaymentCheckout.tsx:onApprove:capture',
-                message: 'paypal-capture invoke returned',
-                hypothesisId: 'H5',
-                data: {
-                  invokeHasError: Boolean(capErr),
-                  invokeStatus: capErr ? getInvokeStatus(capErr) : null,
-                  capSuccess: Boolean(cap?.success),
-                  capErrorKey:
-                    typeof cap?.error === 'string' ? String(cap.error).slice(0, 160) : null,
-                },
-              });
-              // #endregion
 
               if (capErr) {
                 const status = getInvokeStatus(capErr);
@@ -885,17 +799,6 @@ const PaymentCheckout: React.FC = () => {
               }, 2500);
             } catch (err: unknown) {
               const msg = err instanceof Error ? err.message : 'Payment failed';
-              // #region agent log
-              agentDebugLog({
-                location: 'PaymentCheckout.tsx:onApprove:catch',
-                message: 'onApprove path failed',
-                hypothesisId: 'H5',
-                data: {
-                  errMsg: msg.slice(0, 200),
-                  sessionExpired: msg === 'SESSION_EXPIRED',
-                },
-              });
-              // #endregion
               if (msg === 'SESSION_EXPIRED') {
                 toast.error('Your session has expired. Please sign in again.');
                 setShowAuth(true);
@@ -911,19 +814,10 @@ const PaymentCheckout: React.FC = () => {
           },
           onError: (err: unknown) => {
             console.error('[PaymentCheckout] PayPal Buttons onError', err);
-            // #region agent log
-            const m0 =
+            const m =
               err && typeof err === 'object' && 'message' in err
                 ? String((err as { message: string }).message)
                 : 'PayPal error';
-            agentDebugLog({
-              location: 'PaymentCheckout.tsx:buttons:onError',
-              message: 'PayPal Buttons onError',
-              hypothesisId: 'H2',
-              data: { errMsg: m0.slice(0, 200) },
-            });
-            // #endregion
-            const m = m0;
             toast.error(m);
             setPaymentError(m);
           },

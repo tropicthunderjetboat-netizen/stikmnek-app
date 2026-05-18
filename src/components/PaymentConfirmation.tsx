@@ -164,6 +164,22 @@ async function extractErrorBody(error: any): Promise<any> {
   return null;
 }
 
+/** User-facing line when `send-email` fails with SDK / network noise (pass is already paid). */
+function describePassConfirmationEmailInvokeFailure(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes('non-2xx') ||
+    lower.includes('edge function returned') ||
+    lower.includes('functionsfetcherror') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('failed to send') ||
+    lower.includes('networkerror')
+  ) {
+    return 'Confirmation email could not be sent yet (the email service may still be configured). Your pass is active — all details are on this page.';
+  }
+  return raw.length > 300 ? `${raw.slice(0, 297)}…` : raw;
+}
+
 // ─── Helper: Invoke extend-pass with retry logic ───
 async function invokeExtendPassWithRetry(
   userId: string,
@@ -822,9 +838,13 @@ const PaymentConfirmation: React.FC = () => {
     void refreshUserPass?.().catch?.(() => {});
   }, [refreshUserPass]);
 
-  const sendConfirmationEmail = async () => {
+  const sendConfirmationEmail = async (opts?: { fromAuto?: boolean }) => {
+    const fromAuto = opts?.fromAuto === true;
     const p = paymentRef.current;
-    if (!p || !user?.email) return;
+    if (!p || !user?.id) return;
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const receiptTo = (authUser?.email ?? user.email ?? '').trim();
+    if (!receiptTo) return;
     setSendingEmail(true);
     try {
       const durationDays =
@@ -835,7 +855,7 @@ const PaymentConfirmation: React.FC = () => {
           action: 'send_pass_confirmation',
           user_id: user.id,
           user_name: user.name,
-          user_email: user.email,
+          user_email: receiptTo,
           receipt_number: p.receiptNumber,
           pass_type: p.passType,
           amount: p.amount,
@@ -852,11 +872,27 @@ const PaymentConfirmation: React.FC = () => {
       if (data?.success) {
         setEmailSent(true);
       } else if (data?.error || error) {
-        const msg = typeof data?.error === 'string' ? data.error : (error as Error)?.message || 'Email could not be sent';
-        toast.error(msg);
+        const raw =
+          typeof data?.error === 'string'
+            ? data.error
+            : (error as Error)?.message || 'Email could not be sent';
+        const msg = describePassConfirmationEmailInvokeFailure(raw);
+        if (fromAuto) {
+          console.warn('[PaymentConfirmation] send-email (auto pass confirmation) failed:', raw);
+          toast.warning(msg, { duration: 8000 });
+        } else {
+          toast.error(msg);
+        }
       }
     } catch (err) {
-      toast.error((err as Error)?.message || 'Confirmation email could not be sent');
+      const raw = (err as Error)?.message || 'Confirmation email could not be sent';
+      const msg = describePassConfirmationEmailInvokeFailure(raw);
+      if (fromAuto) {
+        console.warn('[PaymentConfirmation] send-email (auto) threw:', err);
+        toast.warning(msg, { duration: 8000 });
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setSendingEmail(false);
     }
@@ -868,7 +904,7 @@ const PaymentConfirmation: React.FC = () => {
     const t = window.setTimeout(() => {
       if (emailSentRef.current) return;
       emailSentRef.current = true;
-      void sendConfirmationEmail();
+      void sendConfirmationEmail({ fromAuto: true });
     }, 1600);
     return () => window.clearTimeout(t);
   }, [payment?.receiptNumber, user?.email]);

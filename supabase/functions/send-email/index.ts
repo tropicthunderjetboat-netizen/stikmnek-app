@@ -21,8 +21,8 @@ import {
  *   Legacy migration: if RESEND_FROM_* unset, SENDGRID_FROM_EMAIL / SENDGRID_FROM_NAME are still read.
  *   SUPABASE_SERVICE_ROLE_KEY — required for send_booking_inquiry (pass check, business row, owner email)
  *   BOOKING_INQUIRY_BCC — comma-separated emails to BCC on every booking inquiry (e.g. ops inbox)
- *   PASS_CONFIRMATION_EMAIL_OVERRIDE — if set, send_pass_confirmation delivers to this address instead of the
- *     purchaser’s auth email (for one-off QA). Remove after testing.
+ *   PURCHASE_NOTIFY_EMAILS — comma-separated ops inboxes for new pass purchases (default: stikmnek@gmail.com);
+ *     sent from paypal-capture / process-card-payment, not from this function.
  * CORS: CORS_ALLOWED_ORIGINS (comma-separated). If unset, Allow-Origin is *.
  */
 
