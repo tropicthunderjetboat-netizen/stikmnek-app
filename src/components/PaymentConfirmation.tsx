@@ -841,7 +841,10 @@ const PaymentConfirmation: React.FC = () => {
   const sendConfirmationEmail = async (opts?: { fromAuto?: boolean }) => {
     const fromAuto = opts?.fromAuto === true;
     const p = paymentRef.current;
-    if (!p || !user?.email) return;
+    if (!p || !user?.id) return;
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const receiptTo = (authUser?.email ?? user.email ?? '').trim();
+    if (!receiptTo) return;
     setSendingEmail(true);
     try {
       const durationDays =
@@ -852,7 +855,7 @@ const PaymentConfirmation: React.FC = () => {
           action: 'send_pass_confirmation',
           user_id: user.id,
           user_name: user.name,
-          user_email: user.email,
+          user_email: receiptTo,
           receipt_number: p.receiptNumber,
           pass_type: p.passType,
           amount: p.amount,

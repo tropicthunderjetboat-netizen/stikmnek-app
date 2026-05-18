@@ -20,6 +20,7 @@ import {
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
 import { transactionalPassProductNameEn } from '../_shared/passDisplay.ts';
+import { notifyAdminsOfPassPurchase } from '../_shared/purchaseNotify.ts';
 import { getResendApiKey, sendResendEmail } from '../_shared/resend.ts';
 
 /** Gross amount from PayPal capture response (AUD). */
@@ -466,6 +467,22 @@ Deno.serve(async (req) => {
     } catch (emailErr: any) {
       console.error('[paypal-capture] receipt email error:', emailErr);
       receiptEmail = { sent: false, error: emailErr?.message ?? 'Receipt email failed' };
+    }
+
+    try {
+      await notifyAdminsOfPassPurchase({
+        receiptNumber,
+        amount,
+        currency: 'AUD',
+        paymentMethod: 'PayPal',
+        buyerEmail: user.email ?? null,
+        validFrom,
+        validUntil,
+        partySize,
+        userId: user.id,
+      });
+    } catch (notifyErr: unknown) {
+      console.error('[paypal-capture] admin purchase notify error:', notifyErr);
     }
 
     return jsonResponse({
