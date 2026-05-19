@@ -455,6 +455,16 @@ supabase secrets set PAYPAL_MODE=live
 
 ## Testing
 
+### Demo tourist pass (business presentations)
+
+For a non-expiring QR pass on a dedicated demo account (`tourist@gmail.com` / **Ima Tourist**):
+
+1. Create the user in **Supabase → Authentication → Users** (email `tourist@gmail.com`, password of your choice).
+2. Run `supabase/scripts/seed_demo_tourist_pass.sql` in the **SQL Editor**.
+3. Sign in as that user → **My Dashboard** → show the QR code to businesses for scanning.
+
+The script sets `valid_until` and `expires_at` to **2099-12-31** and marks the row with `payment_provider = demo`. Re-run the script anytime to refresh the pass.
+
 ### Manual Testing Checklist
 
 - [ ] Tourist signup → Profile creation → Pass purchase → Deal redemption

@@ -15,8 +15,8 @@ import {
   Cookie,
   Database,
   RefreshCw,
-  Heart,
 } from 'lucide-react';
+import LocalOwnedBadge from './LocalOwnedBadge';
 import { toast } from 'sonner';
 import { supportMailtoUrl } from '@/data/contact';
 
@@ -92,13 +92,7 @@ const Footer: React.FC = () => {
               </div>
               <span className="text-lg font-bold">StikmNek</span>
             </div>
-            <p
-              className="mt-3 inline-flex max-w-sm items-start gap-1.5 rounded-lg border border-teal-500/35 bg-teal-500/10 px-3 py-2 text-[11px] font-medium leading-snug text-teal-100/95"
-              role="note"
-            >
-              <Heart className="mt-0.5 h-3.5 w-3.5 shrink-0 text-teal-400" aria-hidden />
-              {t('footer.local_badge', language)}
-            </p>
+              <LocalOwnedBadge variant="footer" language={language} className="mt-3" />
             </div>
             <p className="text-sm text-gray-400 leading-relaxed mb-4">
               {t('footer.abouttext', language)}

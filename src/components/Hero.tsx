@@ -4,6 +4,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { touristFacingOfferings } from '@/data/businesses';
 import { MapPin, Sparkles } from 'lucide-react';
+import LocalOwnedBadge from './LocalOwnedBadge';
 
 const Hero: React.FC = () => {
   const navigate = useNavigate();
@@ -61,11 +62,12 @@ const Hero: React.FC = () => {
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 w-full flex flex-col justify-center">
         <div className="max-w-2xl">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 text-white/90 text-sm mb-6">
-            <MapPin className="w-4 h-4 text-emerald-400" />
-            Vanuatu
-
+          <div className="flex flex-col gap-2 sm:gap-3 mb-6">
+            <div className="inline-flex w-fit items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 text-white/90 text-sm">
+              <MapPin className="w-4 h-4 text-emerald-400" />
+              Vanuatu
+            </div>
+            <LocalOwnedBadge variant="hero" language={language} />
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-6">
