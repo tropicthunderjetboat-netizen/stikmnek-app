@@ -29,6 +29,7 @@ import {
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import PricingTiersEditor from './PricingTiersEditor';
 import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
+import { listingHoursFieldCopy } from '@/lib/listingHoursLabels';
 import {
   categoryUsesTieredPricing,
   pricingTiersFromDb,
@@ -124,6 +125,10 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
   const profileId = effectiveProfileBusinessId(
     selectedBusiness as Business & { _profileBusinessId?: string },
   );
+  const isPerListingOffering = String(selectedBusiness.id) !== String(profileId);
+  const hoursFieldCopy = listingHoursFieldCopy(selectedBusiness.category, language, {
+    isPerListing: isPerListingOffering,
+  });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [activeSection, setActiveSection] = useState<EditSection>(initialSection || 'basic');
@@ -1003,7 +1008,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-2">
                   <Clock className="w-3.5 h-3.5 text-gray-400" />
-                  Operating Hours
+                  {hoursFieldCopy.label}
                   {isFieldChanged('hours') && (
                     <span className="flex items-center gap-1 text-[10px] text-orange-500 font-semibold bg-orange-50 px-1.5 py-0.5 rounded">
                       <Edit3 className="w-2.5 h-2.5" /> Modified
@@ -1018,7 +1023,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                     className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors ${
                       isFieldChanged('hours') ? 'border-orange-300 bg-orange-50/30' : 'border-gray-200'
                     }`}
-                    placeholder="e.g. 9:00 AM - 5:00 PM"
+                    placeholder={hoursFieldCopy.placeholder}
                   />
                   {isFieldChanged('hours') && (
                     <button
@@ -1029,7 +1034,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                     </button>
                   )}
                 </div>
-                <p className="text-[11px] text-gray-400 mt-1">Use a clear format tourists can understand</p>
+                <p className="text-[11px] text-gray-400 mt-1">{hoursFieldCopy.hint}</p>
               </div>
 
               {/* Listing Status */}

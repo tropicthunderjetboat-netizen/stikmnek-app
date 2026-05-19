@@ -49,12 +49,14 @@ import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import OnboardingSteps, { type OnboardingStepNumber } from './OnboardingSteps';
 import {
   businessHoursFromProfileRow,
+  listingHoursFromRow,
   effectiveProfileBusinessId,
   OFFERING_LISTING_COLUMNS,
   BUSINESS_PROFILE_EMBED_COLS,
   listingCategoryFromOffering,
   listingDisplayTitleFromOfferingRow,
 } from '@/lib/businessOfferingMap';
+import { listingHoursFieldCopy } from '@/lib/listingHoursLabels';
 
 const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
 const DashboardAnalytics = React.lazy(() => import('./DashboardAnalytics'));
@@ -156,7 +158,7 @@ function mapOfferingRowToUnified(
     location: String(profile.location ?? ''),
     lat: Number(profile.lat) || 0,
     lng: Number(profile.lng) || 0,
-    hours: businessHoursFromProfileRow(profile as Record<string, unknown>),
+    hours: listingHoursFromRow(o, profile as Record<string, unknown>),
     phone: String(profile.phone ?? ''),
     tags: Array.isArray(o.tags) ? (o.tags as string[]) : Array.isArray(profile.tags) ? (profile.tags as string[]) : [],
     featured: Boolean(o.featured) || Boolean(profile.featured),
@@ -293,15 +295,7 @@ function mergeListingBusinessForEdit(selected: UnifiedBusiness, fromDb: Business
     location: firstNonEmptyStr(uBiz.location, fromDb.location),
     lat: Number(uBiz.lat) || Number(fromDb.lat) || 0,
     lng: Number(uBiz.lng) || Number(fromDb.lng) || 0,
-    hours: firstNonEmptyStr(
-      uBiz.hours,
-      fromDb
-        ? businessHoursFromProfileRow({
-            hours: fromDb.hours ?? '',
-            opening_hours: (fromDb as unknown as Record<string, unknown>).opening_hours,
-          })
-        : '',
-    ),
+    hours: uBiz.hours,
     phone: firstNonEmptyStr(uBiz.phone, fromDb.phone),
     contactEmail:
       firstNonEmptyStr(uBiz.contactEmail ?? undefined, fromDb.contactEmail ?? undefined) || null,
@@ -2012,8 +2006,22 @@ const BusinessOwnerDashboard: React.FC = () => {
                 <input type="text" value={submitForm.location} onChange={(e) => setSubmitForm({ ...submitForm, location: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Port Vila, Vanuatu" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Operating Hours</label>
-                <input type="text" value={submitForm.hours} onChange={(e) => setSubmitForm({ ...submitForm, hours: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="9:00 AM - 5:00 PM" />
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  {listingHoursFieldCopy(submitForm.category, language, {
+                    isPerListing: Boolean(selectedProfileId),
+                  }).label}
+                </label>
+                <input
+                  type="text"
+                  value={submitForm.hours}
+                  onChange={(e) => setSubmitForm({ ...submitForm, hours: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  placeholder={
+                    listingHoursFieldCopy(submitForm.category, language, {
+                      isPerListing: Boolean(selectedProfileId),
+                    }).placeholder
+                  }
+                />
               </div>
             </div>
             {/* Phone, Email & WhatsApp */}

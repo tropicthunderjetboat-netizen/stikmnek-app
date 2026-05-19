@@ -298,10 +298,21 @@ async function applyListingEditChangesToLive(
     changes.description = trimPendingDescription(changes.description);
   }
 
+  /** Listing schedule: per offering when scoped; otherwise business profile hours. */
+  let hoursForOfferingOnly: unknown = undefined;
+  let hoursForProfileOnly: unknown = undefined;
+  if (changes.hours !== undefined) {
+    if (targetOfferingId) {
+      hoursForOfferingOnly = changes.hours;
+    } else {
+      hoursForProfileOnly = changes.hours;
+    }
+    delete (changes as { hours?: unknown }).hours;
+  }
+
   const updates: Record<string, any> = {};
   const colMap: Record<string, string> = {
     description: 'description',
-    hours: 'hours',
     phone: 'phone',
     email: 'email',
     contact_email: 'contact_email',
@@ -323,6 +334,10 @@ async function applyListingEditChangesToLive(
     const col = colMap[k] || k;
     if (v !== undefined) updates[col] = v;
   }
+  if (hoursForProfileOnly !== undefined) {
+    updates.hours = hoursForProfileOnly;
+  }
+
   if (Object.keys(updates).length > 0) {
     const { error: bizUpdErr } = await supabase
       .from('businesses')
@@ -335,6 +350,9 @@ async function applyListingEditChangesToLive(
   }
 
   const offeringPatch: Record<string, unknown> = {};
+  if (hoursForOfferingOnly !== undefined) {
+    offeringPatch.hours = hoursForOfferingOnly;
+  }
   if (changes.description !== undefined) {
     offeringPatch.description = changes.description;
     offeringPatch.description_fr = changes.description;
@@ -1421,6 +1439,7 @@ Deno.serve(async (req) => {
         discount_valid_until: pending.discount_valid_until ?? null,
         whatsapp_number: pending.whatsapp_number ?? null,
         pricing_tiers: pending.pricing_tiers ?? null,
+        hours: pending.hours || '',
         tags: tagArray,
         active: true,
         updated_at: new Date().toISOString(),
@@ -1718,6 +1737,7 @@ Deno.serve(async (req) => {
         discount_valid_until: (pending as any).discount_valid_until ?? null,
         whatsapp_number: (pending as any).whatsapp_number ?? null,
         pricing_tiers: (pending as any).pricing_tiers ?? null,
+        hours: (pending as any).hours || '',
         tags: tagArray,
         active: true,
         featured: false,

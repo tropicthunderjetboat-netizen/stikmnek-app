@@ -428,8 +428,20 @@ const BusinessDetail: React.FC = () => {
   if (!selectedBusiness || !effectiveBiz) return null;
 
   const biz = effectiveBiz;
-  /** Profile hours (mapper merges `hours` + `opening_hours`). */
+  /** Listing schedule (per offering) with profile fallback — see `listingHoursFromRow`. */
   const operatingHoursText = String(biz.hours || '').trim();
+  const hoursSectionTitle =
+    biz.category === 'tours' || biz.category === 'activities'
+      ? language === 'en'
+        ? 'Schedule & departures'
+        : language === 'fr'
+          ? 'Horaires & départs'
+          : 'Taem & lego'
+      : language === 'en'
+        ? 'Operating hours'
+        : language === 'fr'
+          ? 'Heures d’ouverture'
+          : 'Taem wok';
   const dealPx = effectiveListingDealPrice(biz);
   const origPx = effectiveListingOriginalPrice(biz);
   const hasActiveDiscount = listingHasActiveDiscount(biz) || Boolean(tierDiscountBadge);
@@ -801,11 +813,7 @@ const BusinessDetail: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-bold text-gray-900 text-sm mb-1">
-                      {language === 'en'
-                        ? 'Operating hours'
-                        : language === 'fr'
-                          ? 'Heures d’ouverture'
-                          : 'Taem wok'}
+                      {hoursSectionTitle}
                     </h3>
                     <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
                       {operatingHoursText}
@@ -1182,11 +1190,7 @@ const BusinessDetail: React.FC = () => {
                 {operatingHoursText ? (
                   <div className="rounded-lg border border-gray-100 bg-gray-50/90 px-3 py-2.5">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                      {language === 'en'
-                        ? 'Operating hours'
-                        : language === 'fr'
-                          ? 'Heures d’ouverture'
-                          : 'Taem wok'}
+                      {hoursSectionTitle}
                     </p>
                     <div className="flex items-start gap-2 text-sm text-gray-700">
                       <Clock className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />

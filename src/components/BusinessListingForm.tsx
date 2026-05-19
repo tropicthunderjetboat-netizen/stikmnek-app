@@ -25,6 +25,7 @@ import {
   type PricingTierInput,
 } from '@/lib/pricingTiers';
 import { businessHoursFromProfileRow, normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
+import { listingHoursFieldCopy } from '@/lib/listingHoursLabels';
 import { syncEmbeddedEditGalleryPhotos } from '@/lib/syncEmbeddedListingPhotos';
 import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
 import { fetchApprovedPhotosForOffering, photoRowsToUploadedPhotos } from '@/lib/fetchApprovedPhotosForOffering';
@@ -401,6 +402,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
 
   /** When the owner has exactly one profile, link new pending rows to it (multi-offer workflow). */
   const [ownerProfileBusinessId, setOwnerProfileBusinessId] = useState<string | null>(null);
+
+  const hoursFieldCopy = listingHoursFieldCopy(form.category, language, {
+    isPerListing: Boolean(embeddedEdit?.offeringId) || Boolean(ownerProfileBusinessId),
+  });
 
   const editBaselineRef = useRef<EditBaseline | null>(null);
   /** Fresh `business_offerings` + gallery from DB (avoids stale `dbBusinesses` / unified row). */
@@ -1671,15 +1676,16 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                {language === 'en' ? 'Operating Hours' : 'Heures d\'ouverture'}
+                {hoursFieldCopy.label}
               </label>
               <input
                 type="text"
                 value={form.hours}
                 onChange={(e) => setForm((prev) => ({ ...prev, hours: e.target.value }))}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-                placeholder="e.g. 9:00 AM - 5:00 PM"
+                placeholder={hoursFieldCopy.placeholder}
               />
+              <p className="text-[11px] text-gray-400 mt-1">{hoursFieldCopy.hint}</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

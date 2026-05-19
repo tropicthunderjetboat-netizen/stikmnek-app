@@ -24,7 +24,7 @@ export function listingDisplayTitleFromOfferingRow(
 
 /** PostgREST column list for `business_offerings` rows (no embed). */
 export const OFFERING_LISTING_COLUMNS =
-  'id, business_id, title, description, description_fr, description_bi, discount, original_price, deal_price, image, map_url, website, discount_valid_from, discount_valid_until, whatsapp_number, pricing_tiers, tags, featured, active, created_at, updated_at';
+  'id, business_id, title, description, description_fr, description_bi, discount, original_price, deal_price, image, map_url, website, discount_valid_from, discount_valid_until, whatsapp_number, pricing_tiers, tags, featured, active, hours, opening_hours, created_at, updated_at';
 
 /** Parent `businesses` columns when embedded from `business_offerings` (left join — no `!inner`). */
 export const BUSINESS_PROFILE_EMBED_COLS =
@@ -70,6 +70,8 @@ export function splitBusinessListingsViewRow(
     tags: oTags.length > 0 ? oTags : tagsArray(row.tags),
     featured: row.offering_featured_raw ?? row.featured,
     active: row.active,
+    hours: row.offering_hours_raw ?? '',
+    opening_hours: row.offering_opening_hours_raw ?? '',
     created_at: row.offering_created_at,
     updated_at: row.offering_updated_at,
   };
@@ -84,8 +86,8 @@ export function splitBusinessListingsViewRow(
     location: row.location,
     lat: row.lat,
     lng: row.lng,
-    hours: row.hours,
-    opening_hours: row.opening_hours,
+    hours: row.business_hours_raw ?? row.hours,
+    opening_hours: row.business_opening_hours_raw ?? row.opening_hours,
     phone: row.phone,
     email: row.email,
     contact_email: row.contact_email,
@@ -115,6 +117,30 @@ export function businessHoursFromProfileRow(b: Record<string, unknown>): string 
   const primary = String(b.hours ?? '').trim();
   if (primary) return primary;
   return String(b.opening_hours ?? '').trim();
+}
+
+/** Per-listing schedule; falls back to business profile hours when offering fields are empty. */
+export function listingHoursFromRow(
+  o: Record<string, unknown>,
+  b: Record<string, unknown>,
+): string {
+  const fromOffering = businessHoursFromProfileRow(o);
+  if (fromOffering) return fromOffering;
+  return businessHoursFromProfileRow(b);
+}
+
+export function isTourOrActivityCategory(category: unknown): boolean {
+  const k = String(category ?? '').trim().toLowerCase();
+  return k === 'tours' || k === 'activities';
+}
+
+/** True when `id` is a business_offerings row (not the profile stub row). */
+export function isPerListingOfferingId(
+  offeringOrProfileId: string,
+  profileBusinessId?: string | null,
+): boolean {
+  const pid = String(profileBusinessId ?? offeringOrProfileId).trim();
+  return String(offeringOrProfileId).trim() !== pid;
 }
 
 function offeringPrimaryImage(o: Record<string, unknown>): string {
@@ -225,7 +251,7 @@ export function mapJoinedOfferingToBusiness(
     mapUrl: (o.map_url as string) || (b.map_url as string) || null,
     map_url: (o.map_url as string) || (b.map_url as string) || null,
     website: (o.website as string) || (b.website as string) || null,
-    hours: businessHoursFromProfileRow(b),
+    hours: listingHoursFromRow(o, b),
     phone: String(b.phone ?? ''),
     contactEmail:
       oContact ||
