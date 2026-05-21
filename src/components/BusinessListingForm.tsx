@@ -1803,8 +1803,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             </label>
             <p className="text-xs text-gray-500 mb-2">
               {language === 'en'
-                ? 'At least one photo is required. The first photo is used as the cover image.'
-                : 'Au moins une photo est requise. La première sert d’image de couverture.'}
+                ? 'At least one photo is required. Drag to reorder or use Set cover — the first photo is your listing cover.'
+                : 'Au moins une photo est requise. Glissez pour réordonner ou « Définir couverture » — la première est l’image principale.'}
             </p>
             <div className={fieldErrors.photos ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
               <PhotoUploader

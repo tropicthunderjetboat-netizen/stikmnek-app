@@ -1,6 +1,17 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { supabase, getEdgeAuthHeaders } from '@/lib/supabase';
-import { Upload, X, Image as ImageIcon, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import {
+  Upload,
+  X,
+  Image as ImageIcon,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  GripVertical,
+  ChevronLeft,
+  ChevronRight,
+  Star,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 export interface UploadedPhoto {
@@ -21,6 +32,8 @@ interface PhotoUploaderProps {
   label?: string;
   sublabel?: string;
   compact?: boolean;
+  /** When true (default if maxPhotos > 1), owners can drag to reorder and set cover image (first in list). */
+  allowReorder?: boolean;
 }
 
 interface UploadingFile {
@@ -231,10 +244,14 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   label = 'Upload Photos',
   sublabel = 'Drag & drop or click to browse. PNG, JPG up to 5MB each.',
   compact = false,
+  allowReorder: allowReorderProp,
 }) => {
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [dragPhotoIndex, setDragPhotoIndex] = useState<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const allowReorder = allowReorderProp ?? maxPhotos > 1;
 
 
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
@@ -588,6 +605,39 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
     }
   }, [photos, maxPhotos, uploadFile, onPhotosChange]);
 
+  const reorderPhotos = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+      if (fromIndex >= photos.length || toIndex >= photos.length) return;
+      const next = [...photos];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      onPhotosChange(next);
+    },
+    [photos, onPhotosChange],
+  );
+
+  const setPhotoAsMain = useCallback(
+    (index: number) => {
+      if (index <= 0 || index >= photos.length) return;
+      const next = [...photos];
+      const [moved] = next.splice(index, 1);
+      next.unshift(moved);
+      onPhotosChange(next);
+      toast.success('Cover photo updated');
+    },
+    [photos, onPhotosChange],
+  );
+
+  const movePhoto = useCallback(
+    (index: number, direction: -1 | 1) => {
+      const target = index + direction;
+      if (target < 0 || target >= photos.length) return;
+      reorderPhotos(index, target);
+    },
+    [photos.length, reorderPhotos],
+  );
+
   const handleRemovePhoto = useCallback(async (photo: UploadedPhoto) => {
     try {
       await supabase.storage.from('business-photos').remove([photo.filePath]);
@@ -745,27 +795,121 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
 
       {/* Photo Previews / Thumbnails */}
       {photos.length > 0 && (
-        <div className={`grid gap-3 ${compact ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
+        <div className="space-y-2">
+          {allowReorder && photos.length > 1 && (
+            <p className="text-xs text-gray-500">
+              Drag to reorder, or tap <span className="font-medium">Set cover</span>. The first photo is your listing cover.
+            </p>
+          )}
+          <div className={`grid gap-3 ${compact ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
           {photos.map((photo, index) => (
             <div
               key={photo.id}
-              className="group relative rounded-xl overflow-hidden bg-gray-100 aspect-square border border-gray-200 hover:border-teal-300 transition-all"
+              draggable={allowReorder && photos.length > 1}
+              onDragStart={(e) => {
+                if (!allowReorder || photos.length <= 1) return;
+                setDragPhotoIndex(index);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(index));
+              }}
+              onDragEnd={() => {
+                setDragPhotoIndex(null);
+                setDropTargetIndex(null);
+              }}
+              onDragOver={(e) => {
+                if (!allowReorder || dragPhotoIndex === null) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                setDropTargetIndex(index);
+              }}
+              onDragLeave={() => {
+                if (dropTargetIndex === index) setDropTargetIndex(null);
+              }}
+              onDrop={(e) => {
+                if (!allowReorder || dragPhotoIndex === null) return;
+                e.preventDefault();
+                reorderPhotos(dragPhotoIndex, index);
+                setDragPhotoIndex(null);
+                setDropTargetIndex(null);
+              }}
+              className={`group relative rounded-xl overflow-hidden bg-gray-100 aspect-square border transition-all ${
+                dropTargetIndex === index && dragPhotoIndex !== null && dragPhotoIndex !== index
+                  ? 'border-teal-500 ring-2 ring-teal-300 scale-[1.02]'
+                  : dragPhotoIndex === index
+                    ? 'border-teal-400 opacity-60'
+                    : 'border-gray-200 hover:border-teal-300'
+              } ${allowReorder && photos.length > 1 ? 'cursor-grab active:cursor-grabbing' : ''}`}
             >
               <img
                 src={photo.url || photo.preview}
                 alt={photo.name}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover pointer-events-none"
                 loading="lazy"
+                draggable={false}
               />
 
-              {/* Overlay on hover */}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
+              {allowReorder && photos.length > 1 && (
+                <div
+                  className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-black/50 text-white flex items-center justify-center opacity-70 group-hover:opacity-100"
+                  title="Drag to reorder"
+                >
+                  <GripVertical className="w-4 h-4" aria-hidden />
+                </div>
+              )}
+
+              {/* Overlay on hover / focus-within */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/45 group-focus-within:bg-black/45 transition-all flex flex-col items-center justify-center gap-1.5 p-2">
+                {allowReorder && index > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPhotoAsMain(index);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all px-2 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[10px] font-semibold flex items-center gap-1"
+                    title="Use as cover photo"
+                  >
+                    <Star className="w-3 h-3 fill-current" />
+                    Set cover
+                  </button>
+                )}
+                {allowReorder && photos.length > 1 && (
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all">
+                    <button
+                      type="button"
+                      disabled={index === 0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        movePhoto(index, -1);
+                      }}
+                      className="w-7 h-7 rounded-full bg-white/90 text-gray-800 flex items-center justify-center disabled:opacity-40 shadow"
+                      title="Move earlier"
+                      aria-label="Move photo earlier"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={index === photos.length - 1}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        movePhoto(index, 1);
+                      }}
+                      className="w-7 h-7 rounded-full bg-white/90 text-gray-800 flex items-center justify-center disabled:opacity-40 shadow"
+                      title="Move later"
+                      aria-label="Move photo later"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleRemovePhoto(photo);
                   }}
-                  className="opacity-0 group-hover:opacity-100 transition-all w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg transform scale-75 group-hover:scale-100"
+                  className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg"
                   title="Remove photo"
                 >
                   <X className="w-4 h-4" />
@@ -773,15 +917,15 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               </div>
 
               {/* File info badge */}
-              <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-all">
+              <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-all pointer-events-none">
                 <p className="text-[10px] text-white truncate font-medium">{photo.name}</p>
                 <p className="text-[9px] text-white/70">{formatSize(photo.size)}</p>
               </div>
 
-              {/* Main photo badge */}
+              {/* Cover photo badge */}
               {index === 0 && (
-                <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-teal-600 text-white text-[9px] font-bold uppercase tracking-wider">
-                  Main
+                <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-teal-600 text-white text-[9px] font-bold uppercase tracking-wider pointer-events-none">
+                  Cover
                 </div>
               )}
             </div>
@@ -797,6 +941,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               <span className="text-[10px] text-gray-400 font-medium">Add More</span>
             </div>
           )}
+          </div>
         </div>
       )}
 

@@ -1828,7 +1828,7 @@ const BusinessOwnerDashboard: React.FC = () => {
           )}
           <div className="border-t border-gray-100 pt-6">
             <p className="text-sm font-medium text-gray-700 mb-3">Upload New Photos</p>
-            <PhotoUploader photos={newGalleryPhotos} onPhotosChange={setNewGalleryPhotos} maxPhotos={10} maxSizeMB={5} userId={user.id} label="Upload New Promotional Images" sublabel="Drag & drop or click. PNG, JPG up to 5MB each." />
+            <PhotoUploader photos={newGalleryPhotos} onPhotosChange={setNewGalleryPhotos} maxPhotos={10} maxSizeMB={5} userId={user.id} label="Upload New Promotional Images" sublabel="Drag & drop or click. PNG, JPG up to 5MB each. Reorder before saving — first photo becomes cover when uploaded." />
             {newGalleryPhotos.length > 0 && (
               <button onClick={handleSaveNewGalleryPhotos} disabled={savingGallery} className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 shadow-lg shadow-teal-200 flex items-center justify-center gap-2 disabled:opacity-60">
                 {savingGallery ? <><Loader2 className="w-5 h-5 animate-spin" />Saving...</> : <><Save className="w-5 h-5" />Save {newGalleryPhotos.length} Photo{newGalleryPhotos.length > 1 ? 's' : ''}</>}
@@ -2083,7 +2083,7 @@ const BusinessOwnerDashboard: React.FC = () => {
                   maxSizeMB={5}
                   userId={user.id}
                   label="Upload photos of your business"
-                  sublabel="Drag & drop or click. PNG, JPG up to 5MB. First photo = main image."
+                  sublabel="Drag & drop or click. PNG, JPG up to 5MB. Drag to reorder or Set cover — first photo = main image."
                 />
               </div>
               {submitFieldErrors.photos && (
