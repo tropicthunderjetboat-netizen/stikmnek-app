@@ -459,6 +459,49 @@ async function applyListingEditChangesToLive(
   return { error: null };
 }
 
+/** Delete moderation photos (+ Storage objects) linked to a pending submission row. */
+async function deletePhotosLinkedToPendingSubmission(
+  supabase: SupabaseServiceClient,
+  pendingId: string,
+): Promise<{ error: string | null }> {
+  const pid = String(pendingId || '').trim();
+  if (!pid) return { error: null };
+
+  const match = `pending_id.eq.${pid},business_id.eq.${pid},submission_pending_id.eq.${pid}`;
+  const { data: photos, error: listErr } = await supabase
+    .from('business_photos')
+    .select('file_path')
+    .or(match);
+
+  if (listErr) {
+    console.error('[manage-business] deletePhotosLinkedToPendingSubmission list:', listErr);
+    return { error: listErr.message };
+  }
+
+  const paths = (photos || [])
+    .map((p: { file_path?: string | null }) => p.file_path)
+    .filter((p: string | null | undefined): p is string => typeof p === 'string' && p.trim().length > 0);
+
+  if (paths.length > 0) {
+    const { error: rmErr } = await supabase.storage.from('business-photos').remove(paths);
+    if (rmErr) {
+      console.warn('[manage-business] deletePhotosLinkedToPendingSubmission storage:', rmErr.message);
+    }
+  }
+
+  const { error: delErr } = await supabase.from('business_photos').delete().or(match);
+  if (delErr) {
+    const msg = String(delErr.message || '').toLowerCase();
+    if (msg.includes('pending_id')) {
+      await supabase.from('business_photos').delete().eq('business_id', pid);
+    } else {
+      console.error('[manage-business] deletePhotosLinkedToPendingSubmission delete:', delErr);
+      return { error: delErr.message };
+    }
+  }
+  return { error: null };
+}
+
 /**
  * Remove gallery rows + Storage objects for a business, then caller deletes `businesses` row.
  * `business_photos` may not have ON DELETE CASCADE in all deployments.
@@ -1049,6 +1092,44 @@ Deno.serve(async (req) => {
       }
 
       return jsonResponse(req, { success: true });
+    }
+
+    // ─── ADMIN_DELETE_PENDING_SUBMISSION ───
+    // Admin removes a row from the approvals queue (pending, approved stuck, or rejected).
+    // Does not delete live `businesses` / `business_offerings` already on the site.
+    if (action === 'admin_delete_pending_submission') {
+      const denied = await assertAdmin(supabase, authUser, req);
+      if (denied) return denied;
+
+      const pendingId = body.pendingId ?? body.pending_id ?? body.businessId;
+      if (!pendingId) return errorResponse(req, 'Missing pendingId', 400);
+
+      const { data: row, error: fetchErr } = await supabase
+        .from('pending_businesses')
+        .select('id, name, status')
+        .eq('id', String(pendingId))
+        .maybeSingle();
+
+      if (fetchErr || !row) {
+        return errorResponse(req, 'Submission not found', 404);
+      }
+
+      const photoRes = await deletePhotosLinkedToPendingSubmission(supabase, String(pendingId));
+      if (photoRes.error) {
+        return errorResponse(req, 'Could not remove submission photos: ' + photoRes.error, 500);
+      }
+
+      const { error: delErr } = await supabase
+        .from('pending_businesses')
+        .delete()
+        .eq('id', String(pendingId));
+
+      if (delErr) {
+        console.error('[manage-business] admin_delete_pending_submission:', delErr);
+        return errorResponse(req, delErr.message || 'Failed to delete submission', 500);
+      }
+
+      return jsonResponse(req, { success: true, deletedId: String(pendingId) });
     }
 
     // ─── RESUBMIT_PENDING_BUSINESS ───

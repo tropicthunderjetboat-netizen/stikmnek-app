@@ -149,6 +149,8 @@ const AdminPanel: React.FC = () => {
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [repairingId, setRepairingId] = useState<string | null>(null);
+  const [deletingPendingId, setDeletingPendingId] = useState<string | null>(null);
+  const [approvalListFilter, setApprovalListFilter] = useState<'all' | 'pending' | 'archived'>('all');
   const [processingPhotoId, setProcessingPhotoId] = useState<string | null>(null);
   const [loadingPending, setLoadingPending] = useState(false);
   const [loadingBusinesses, setLoadingBusinesses] = useState(false);
@@ -1031,6 +1033,52 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const handleDeletePendingSubmission = async (pendingId: string) => {
+    const biz = pendingBusinesses.find((b) => b.id === pendingId);
+    if (!biz) return;
+
+    const statusNote =
+      biz.status === 'pending'
+        ? 'This submission has not been approved yet.'
+        : biz.status === 'approved'
+          ? 'This only removes the stuck row from Approvals. Live listings on the site are not deleted.'
+          : 'This removes the rejected submission from the queue.';
+
+    const confirmed = window.confirm(
+      `Remove "${biz.name}" from the approvals list?\n\n${statusNote}\n\nThis cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingPendingId(pendingId);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: { action: 'admin_delete_pending_submission', userId: user?.id, pendingId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(String(data.error));
+      toast.success(`Removed "${biz.name}" from approvals.`);
+      setPendingBusinesses((prev) => prev.filter((b) => b.id !== pendingId));
+      setBusinessPhotos((prev) => {
+        const next = { ...prev };
+        delete next[pendingId];
+        if (biz.business_id) delete next[String(biz.business_id)];
+        return next;
+      });
+      setRpcPhotoMap((prev) => {
+        const next = { ...prev };
+        delete next[pendingId];
+        if (biz.business_id) delete next[String(biz.business_id)];
+        return next;
+      });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      toast.error('Could not remove submission: ' + msg);
+    } finally {
+      setDeletingPendingId(null);
+    }
+  };
+
   const handleRepairApprovedSubmission = async (pendingId: string) => {
     const biz = pendingBusinesses.find((b) => b.id === pendingId);
     if (!biz) return;
@@ -1118,7 +1166,24 @@ const AdminPanel: React.FC = () => {
   };
 
 
-  const pendingCount = pendingBusinesses.length;
+  const pendingOnlyCount = useMemo(
+    () => pendingBusinesses.filter((b) => b.status === 'pending').length,
+    [pendingBusinesses],
+  );
+  const archivedSubmissionCount = useMemo(
+    () => pendingBusinesses.filter((b) => b.status !== 'pending').length,
+    [pendingBusinesses],
+  );
+  const filteredApprovalSubmissions = useMemo(() => {
+    if (approvalListFilter === 'pending') {
+      return pendingBusinesses.filter((b) => b.status === 'pending');
+    }
+    if (approvalListFilter === 'archived') {
+      return pendingBusinesses.filter((b) => b.status !== 'pending');
+    }
+    return pendingBusinesses;
+  }, [pendingBusinesses, approvalListFilter]);
+  const pendingCount = pendingOnlyCount;
 
 
   // Merge hardcoded businesses with DB businesses (DB takes priority, deduplicate by id)
@@ -1525,7 +1590,13 @@ const AdminPanel: React.FC = () => {
               </span>
               <div className="h-4 w-px bg-gray-200" />
               <span className="text-xs text-gray-400">
-                {pendingBusinesses.length} total submission{pendingBusinesses.length !== 1 ? 's' : ''}
+                {pendingOnlyCount} awaiting review
+                {archivedSubmissionCount > 0 ? (
+                  <span className="text-gray-500">
+                    {' '}
+                    · {archivedSubmissionCount} in queue (approved/rejected — use Remove to clear)
+                  </span>
+                ) : null}
               </span>
             </div>
 
@@ -1535,6 +1606,28 @@ const AdminPanel: React.FC = () => {
                 Pending Business Approvals
               </h3>
               <div className="flex items-center gap-3 text-sm flex-wrap">
+                <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white">
+                  {(
+                    [
+                      ['all', 'All'],
+                      ['pending', 'Awaiting review'],
+                      ['archived', 'Stuck / done'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setApprovalListFilter(key)}
+                      className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        approvalListFilter === key
+                          ? 'bg-teal-600 text-white'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <button
                   onClick={() => loadPending(true)}
                   disabled={loadingPending}
@@ -1559,8 +1652,13 @@ const AdminPanel: React.FC = () => {
                 </button>
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-50 text-yellow-700 font-semibold">
                   <AlertCircle className="w-4 h-4" />
-                  {pendingCount} Pending Business{pendingCount !== 1 ? 'es' : ''}
+                  {pendingCount} awaiting review
                 </span>
+                {archivedSubmissionCount > 0 && (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 font-semibold">
+                    {archivedSubmissionCount} stuck / archived
+                  </span>
+                )}
                 {pendingEditCount > 0 && (
                   <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 font-semibold">
                     <Edit3 className="w-4 h-4" />
@@ -1581,9 +1679,9 @@ const AdminPanel: React.FC = () => {
             )}
 
 
-            {pendingBusinesses.length > 0 ? (
+            {filteredApprovalSubmissions.length > 0 ? (
               <div className="space-y-4">
-                {pendingBusinesses.map(biz => {
+                {filteredApprovalSubmissions.map(biz => {
                   const keyPending = String(biz.id);
                   const keyProfile = biz.business_id ? String(biz.business_id) : '';
                   const raw = unionPhotosForKeys([rpcPhotoMap, businessPhotos], [keyPending, keyProfile]);
@@ -1632,13 +1730,29 @@ const AdminPanel: React.FC = () => {
                               </div>
                             </div>
                           </div>
-                          <span className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize ${
-                            biz.status === 'pending' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
-                            biz.status === 'approved' ? 'bg-green-50 text-green-700 border border-green-200' :
-                            'bg-red-50 text-red-700 border border-red-200'
-                          }`}>
-                            {biz.status}
-                          </span>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className={`px-3 py-1.5 rounded-lg text-xs font-bold capitalize ${
+                              biz.status === 'pending' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                              biz.status === 'approved' ? 'bg-green-50 text-green-700 border border-green-200' :
+                              'bg-red-50 text-red-700 border border-red-200'
+                            }`}>
+                              {biz.status}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeletePendingSubmission(biz.id)}
+                              disabled={deletingPendingId === biz.id}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 text-xs font-bold hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition-colors disabled:opacity-50"
+                              title="Remove this submission from the approvals queue"
+                            >
+                              {deletingPendingId === biz.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                              Remove
+                            </button>
+                          </div>
                         </div>
 
                         <AdminPendingSubmissionReview
@@ -1946,23 +2060,27 @@ const AdminPanel: React.FC = () => {
                         )}
 
                         {biz.status === 'approved' && biz.business_id && (
-                          <div className="flex items-center justify-between gap-3 pt-4 border-t border-gray-100">
-                            <p className="text-xs text-gray-500">
-                              Approved but not visible on the public site? Use repair to create the missing live offer.
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-gray-100">
+                            <p className="text-xs text-gray-500 min-w-[12rem]">
+                              Approved but not on the site? Repair creates the live offer. Already live? Use Remove to
+                              clear this stuck row only.
                             </p>
-                            <button
-                              onClick={() => handleRepairApprovedSubmission(biz.id)}
-                              disabled={repairingId === biz.id}
-                              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                              title="Creates a new business_offerings row from this approved submission and removes the stuck pending row."
-                            >
-                              {repairingId === biz.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <ArrowRight className="w-4 h-4" />
-                              )}
-                              Repair Live Listing
-                            </button>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleRepairApprovedSubmission(biz.id)}
+                                disabled={repairingId === biz.id || deletingPendingId === biz.id}
+                                className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                title="Creates a new business_offerings row from this approved submission and removes the stuck pending row."
+                              >
+                                {repairingId === biz.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <ArrowRight className="w-4 h-4" />
+                                )}
+                                Repair Live Listing
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1970,11 +2088,17 @@ const AdminPanel: React.FC = () => {
                   );
                 })}
               </div>
+            ) : pendingBusinesses.length > 0 ? (
+              <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
+                <p className="text-sm text-gray-500">
+                  No submissions match this filter. Try &quot;All&quot; or &quot;Stuck / done&quot; to remove old rows.
+                </p>
+              </div>
             ) : (
               <div className="bg-white rounded-xl p-12 shadow-sm border border-gray-100 text-center">
                 <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-gray-900 mb-2">No Pending Approvals</h3>
-                <p className="text-gray-500">All business submissions have been reviewed.</p>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">No Submissions in Queue</h3>
+                <p className="text-gray-500">No business submissions are waiting in the approvals list.</p>
               </div>
             )}
 
