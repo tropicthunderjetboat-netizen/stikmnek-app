@@ -987,6 +987,16 @@ const AdminPanel: React.FC = () => {
       setPendingBusinesses(prev => prev.filter(b => b.id !== businessId));
       toast.success(`Business "${biz?.name}" ${decision === 'approved' ? 'approved' : 'rejected'} successfully!`);
 
+      if (decision === 'approved' && data?.listingEmail && !data.listingEmail.sent) {
+        const emailErr =
+          data.listingEmail.error ||
+          (data.listingEmail.skipped ? 'Resend not configured (RESEND_API_KEY)' : 'send failed');
+        toast.warning(
+          `Listing approved, but the "listing is live" email was not sent: ${emailErr}. Check Supabase secrets and owner email.`,
+          { duration: 12000 },
+        );
+      }
+
       if (decision === 'approved') {
         setTimeout(async () => {
           await refreshBusinesses();
@@ -1037,6 +1047,14 @@ const AdminPanel: React.FC = () => {
       if (error) throw error;
       if (data?.error) throw new Error(String(data.error));
       toast.success(`Repaired live offer for "${biz.name}".`);
+      if (data?.listingEmail && !data.listingEmail.sent) {
+        const emailErr =
+          data.listingEmail.error ||
+          (data.listingEmail.skipped ? 'Resend not configured' : 'send failed');
+        toast.warning(`Repair succeeded, but listing-live email was not sent: ${emailErr}.`, {
+          duration: 12000,
+        });
+      }
       setPendingBusinesses((prev) => prev.filter((b) => b.id !== pendingId));
       await refreshBusinesses();
       void loadPending();

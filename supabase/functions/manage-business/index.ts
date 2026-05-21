@@ -498,10 +498,14 @@ function businessNameForHashtag(name: string): string {
   return alnum || 'YourBusiness';
 }
 
-/** Owner inbox for listing-live email: `user_profiles.email` only (initial approval flow). */
+/**
+ * Owner inbox for listing-live / decision emails.
+ * Order: user_profiles.email → pending submission email → auth.users email.
+ */
 async function resolveOwnerNotificationEmail(
   supabase: ReturnType<typeof createClient>,
   ownerId: string,
+  options?: { pendingEmail?: string | null },
 ): Promise<string | null> {
   const { data: prof, error: profErr } = await supabase
     .from('user_profiles')
@@ -511,8 +515,24 @@ async function resolveOwnerNotificationEmail(
   if (profErr) {
     console.warn('[manage-business] resolveOwnerNotificationEmail user_profiles:', profErr.message);
   }
-  const em = prof?.email;
-  if (typeof em === 'string' && em.trim()) return em.trim();
+  const profileEm = typeof prof?.email === 'string' ? prof.email.trim() : '';
+  if (profileEm && DECISION_EMAIL_RE.test(profileEm)) return profileEm;
+
+  const pendingEm = String(options?.pendingEmail ?? '').trim();
+  if (pendingEm && DECISION_EMAIL_RE.test(pendingEm)) return pendingEm;
+
+  try {
+    const { data: authRow, error: authErr } = await supabase.auth.admin.getUserById(ownerId);
+    if (authErr) {
+      console.warn('[manage-business] resolveOwnerNotificationEmail auth:', authErr.message);
+    } else {
+      const authEm = authRow?.user?.email?.trim() ?? '';
+      if (authEm && DECISION_EMAIL_RE.test(authEm)) return authEm;
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn('[manage-business] resolveOwnerNotificationEmail auth exception:', msg);
+  }
   return null;
 }
 
@@ -524,6 +544,7 @@ async function sendInitialListingLiveEmail(params: {
   toEmail: string;
   businessName: string;
   listingUrl: string;
+  adminNotes?: string;
 }): Promise<{ sent: boolean; skipped?: boolean; error?: string }> {
   if (!getResendApiKey()) {
     console.warn('[manage-business] RESEND_API_KEY not set — skipping listing-live email');
@@ -537,6 +558,11 @@ async function sendInitialListingLiveEmail(params: {
   const hashtagName = businessNameForHashtag(params.businessName);
   const tagLine =
     `#StikmNek #VanuatuDeals #${hashtagName} #TravelVanuatu #SupportLocal`;
+  const notesTrim = String(params.adminNotes ?? '').trim();
+  const notesHtml = notesTrim
+    ? `<p><strong>Note from StikmNek:</strong> ${escapeHtmlEmail(notesTrim)}</p>`
+    : '';
+  const notesPlain = notesTrim ? `\n\nNote from StikmNek: ${notesTrim}` : '';
 
   const html = `
 <div style="font-family: Arial, sans-serif; line-height: 1.55; color: #111; max-width: 560px;">
@@ -552,6 +578,7 @@ async function sendInitialListingLiveEmail(params: {
   <p>${escapeHtmlEmail(tagLine)}</p>
   <hr>
   <p>Thank you for joining the StikmNek family. We&#39;re thrilled to have you!</p>
+  ${notesHtml}
   <p>Best regards,<br>The StikmNek Team</p>
 </div>
 `.trim();
@@ -580,6 +607,7 @@ async function sendInitialListingLiveEmail(params: {
     '---',
     '',
     "Thank you for joining the StikmNek family. We're thrilled to have you!",
+    notesPlain,
     '',
     'Best regards,',
     'The StikmNek Team',
@@ -588,6 +616,7 @@ async function sendInitialListingLiveEmail(params: {
 
   try {
     const listingTpl = Deno.env.get('RESEND_TEMPLATE_LISTING_LIVE')?.trim();
+    const inlinePayload = { html, text: plain };
     const res = await sendResendEmail({
       to: params.toEmail,
       subject,
@@ -600,11 +629,28 @@ async function sendInitialListingLiveEmail(params: {
               LISTING_URL: params.listingUrl,
               BADGE_URL: LISTING_LIVE_BADGE_URL,
               SOCIAL_HASHTAG_LINE: tagLine,
+              ADMIN_NOTES: notesTrim,
             },
           },
         }
-        : { html, text: plain }),
+        : inlinePayload),
     });
+
+    if (!res.ok && listingTpl) {
+      console.warn(
+        '[manage-business] Listing-live template send failed; retrying inline HTML:',
+        res.status,
+        res.body?.slice(0, 200),
+      );
+      const retry = await sendResendEmail({
+        to: params.toEmail,
+        subject,
+        ...inlinePayload,
+      });
+      if (retry.ok) return { sent: true };
+      console.error('[manage-business] Resend listing-live inline retry FAILED:', retry.status, retry.body);
+      return { sent: false, error: `Resend error: ${retry.status}` };
+    }
 
     if (!res.ok) {
       console.error('[manage-business] Resend listing-live email FAILED:', res.status, res.body);
@@ -1396,10 +1442,12 @@ Deno.serve(async (req) => {
 
         const rejectListingName =
           (pending.name != null && String(pending.name).trim()) || 'Your listing';
-        const rejectEmailRaw = (pending.email && String(pending.email).trim()) || '';
-        if (rejectEmailRaw && DECISION_EMAIL_RE.test(rejectEmailRaw)) {
+        const rejectTo = await resolveOwnerNotificationEmail(supabase, String(pending.owner_id), {
+          pendingEmail: pending.email,
+        });
+        if (rejectTo) {
           const sg = await sendAdminDecisionNotificationEmail({
-            toEmail: rejectEmailRaw,
+            toEmail: rejectTo,
             businessName: rejectListingName,
             decision: 'rejected',
             adminNotes: String(adminNotes || '').trim() || 'No additional notes.',
@@ -1407,6 +1455,11 @@ Deno.serve(async (req) => {
           if (!sg.sent) {
             console.warn('[manage-business] Rejection notice email:', sg.skipped ? 'skipped' : sg.error ?? 'failed');
           }
+        } else {
+          console.warn(
+            '[manage-business] Rejection notice skipped: no owner email (profile, pending, or auth)',
+            String(pending.owner_id),
+          );
         }
 
         return jsonResponse(req, { success: true });
@@ -1418,7 +1471,6 @@ Deno.serve(async (req) => {
         pendingRow.business_id != null && String(pendingRow.business_id).trim() !== ''
           ? String(pendingRow.business_id)
           : null;
-      const isInitialNewBusinessApproval = existingProfileId == null;
       let newOfferingId: string | null = null;
 
       const vDesc = String(pending.description ?? '');
@@ -1606,60 +1658,48 @@ Deno.serve(async (req) => {
         );
       }
 
-      if (!isInitialNewBusinessApproval) {
-        const listingTitle =
-          (pending.name != null && String(pending.name).trim()) || 'Your listing';
-        const toExtra =
-          vEmail && DECISION_EMAIL_RE.test(vEmail)
-            ? vEmail
-            : await resolveOwnerNotificationEmail(supabase, String(pending.owner_id));
-        if (toExtra) {
-          const sgExtra = await sendAdminDecisionNotificationEmail({
-            toEmail: toExtra,
-            businessName: listingTitle,
-            decision: 'approved',
-            adminNotes: String(adminNotes || '').trim() || 'No additional notes.',
-          });
-          if (!sgExtra.sent) {
-            console.warn(
-              '[manage-business] Additional-listing approval email:',
-              sgExtra.skipped ? 'skipped' : sgExtra.error ?? 'failed',
-            );
-          }
-        }
-      }
+      const listingPublicId = newOfferingId ?? liveBusinessId;
+      const listingUrl = `${getAppBaseUrl()}/?business=${listingPublicId}`;
+      const { data: liveNameRow } = await supabase
+        .from('businesses')
+        .select('name')
+        .eq('id', liveBusinessId)
+        .maybeSingle();
+      const listingTitle =
+        (pending.name != null && String(pending.name).trim()) ||
+        (liveNameRow?.name && String(liveNameRow.name).trim()) ||
+        'Your listing';
 
-      if (isInitialNewBusinessApproval) {
-        const ownerEmail = await resolveOwnerNotificationEmail(supabase, String(pending.owner_id));
-        const listingUrl = `${getAppBaseUrl()}/business/${liveBusinessId}`;
-        const { data: liveNameRow } = await supabase
-          .from('businesses')
-          .select('name')
-          .eq('id', liveBusinessId)
-          .maybeSingle();
-        const displayName =
-          (liveNameRow?.name && String(liveNameRow.name).trim()) ||
-          (pending.name != null && String(pending.name).trim()) ||
-          'there';
-
-        if (ownerEmail) {
-          const sgResult = await sendInitialListingLiveEmail({
-            toEmail: ownerEmail,
-            businessName: displayName,
-            listingUrl,
-          });
-          if (!sgResult.sent) {
-            console.warn(
-              '[manage-business] Initial listing-live email:',
-              sgResult.skipped ? 'skipped (no API key)' : sgResult.error ?? 'unknown',
-            );
-          }
-        } else {
+      const ownerEmail = await resolveOwnerNotificationEmail(supabase, String(pending.owner_id), {
+        pendingEmail: vEmail,
+      });
+      let listingEmail: { sent: boolean; skipped?: boolean; error?: string } = {
+        sent: false,
+        skipped: true,
+        error: 'No recipient email',
+      };
+      if (ownerEmail) {
+        listingEmail = await sendInitialListingLiveEmail({
+          toEmail: ownerEmail,
+          businessName: listingTitle,
+          listingUrl,
+          adminNotes: String(adminNotes || '').trim(),
+        });
+        if (!listingEmail.sent) {
           console.warn(
-            '[manage-business] Initial listing-live email skipped: user_profiles.email empty for owner',
-            String(pending.owner_id),
+            '[manage-business] Listing-live email:',
+            listingEmail.skipped ? 'skipped (no API key)' : listingEmail.error ?? 'unknown',
+            'to=',
+            ownerEmail.replace(/(.{2}).*@/, '$1***@'),
           );
+        } else {
+          console.log('[manage-business] Listing-live email sent to', ownerEmail.replace(/(.{2}).*@/, '$1***@'));
         }
+      } else {
+        console.warn(
+          '[manage-business] Listing-live email skipped: no owner email (user_profiles, pending.email, auth.users) for',
+          String(pending.owner_id),
+        );
       }
 
       const { error: delPendingErr } = await supabase
@@ -1676,7 +1716,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      return jsonResponse(req, { success: true });
+      return jsonResponse(req, { success: true, listingEmail });
     }
 
     // ─── REPAIR_APPROVED_SUBMISSION ───
@@ -1779,7 +1819,33 @@ Deno.serve(async (req) => {
         return errorResponse(req, 'Repaired offering but could not delete pending row: ' + delErr.message, 500);
       }
 
-      return jsonResponse(req, { success: true, offeringId: inserted?.id ?? null });
+      const repairOfferingId = inserted?.id ? String(inserted.id) : null;
+      const listingUrl = repairOfferingId
+        ? `${getAppBaseUrl()}/?business=${repairOfferingId}`
+        : `${getAppBaseUrl()}/?business=${existingProfileId}`;
+      const repairTitle =
+        ((pending as any).name && String((pending as any).name).trim()) || 'Your listing';
+      const repairTo = await resolveOwnerNotificationEmail(supabase, String((pending as any).owner_id), {
+        pendingEmail: (pending as any).email,
+      });
+      let listingEmail: { sent: boolean; skipped?: boolean; error?: string } = {
+        sent: false,
+        skipped: true,
+      };
+      if (repairTo) {
+        listingEmail = await sendInitialListingLiveEmail({
+          toEmail: repairTo,
+          businessName: repairTitle,
+          listingUrl,
+          adminNotes: 'Your listing has been published on StikmNek.',
+        });
+      }
+
+      return jsonResponse(req, {
+        success: true,
+        offeringId: repairOfferingId,
+        listingEmail,
+      });
     }
 
     // ─── DELETE_OWN_BUSINESS (owner only; photos + storage + row) ───
