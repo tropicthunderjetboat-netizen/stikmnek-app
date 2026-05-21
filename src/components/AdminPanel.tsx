@@ -738,7 +738,6 @@ const AdminPanel: React.FC = () => {
     try {
       const changes: Record<string, any> = {
         title: editForm.name,
-        category: editForm.category,
         description: editForm.description,
         discount: editForm.discount,
         original_price: Number(editForm.originalPrice) || 0,
@@ -749,6 +748,12 @@ const AdminPanel: React.FC = () => {
         map_url: editForm.mapUrl,
         website: normalizeWebsiteForStorage(editForm.website) ?? '',
       };
+      // Per-listing rows: category lives on `business_offerings.tags` (tours vs activities tabs).
+      if (editOfferingId) {
+        changes.tags = [editForm.category];
+      } else {
+        changes.category = editForm.category;
+      }
       if (editForm.image) changes.image = editForm.image;
 
       const { data, error } = await supabase.functions.invoke('manage-business', {

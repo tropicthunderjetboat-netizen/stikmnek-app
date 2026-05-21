@@ -21,6 +21,22 @@ import { purgePublicDataForAuthUser } from './purge-user.ts';
 
 const CATEGORIES = ['dining', 'accommodation', 'tours', 'activities', 'shopping', 'transport', 'services', 'other'];
 
+/** Canonical tab keys (must match `src/data/businesses.ts` + admin listing editor). */
+const LISTING_TAB_CATEGORY_KEYS = new Set([
+  'dining',
+  'activities',
+  'tours',
+  'shopping',
+  'spa',
+  'accommodation',
+]);
+
+function normalizeListingTabCategory(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const k = raw.trim().toLowerCase();
+  return LISTING_TAB_CATEGORY_KEYS.has(k) ? k : null;
+}
+
 function jsonResponse(req: Request, data: object, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -287,11 +303,21 @@ async function applyListingEditChangesToLive(
     changes.title !== undefined ? String(changes.title ?? '').trim() || 'Offer' : undefined;
   delete (changes as { title?: unknown }).title;
 
-  /** When editing a specific deal, listing category tabs read `business_offerings.tags` first. */
+  /**
+   * Per-listing category: public UI reads `business_offerings.tags` first (`listingCategoryFromOffering`).
+   * Admin/owner `category` on a scoped edit must update offering tags — not only `businesses.category`.
+   */
   let tagsForOfferingOnly: unknown = undefined;
   if (targetOfferingId && changes.tags !== undefined) {
     tagsForOfferingOnly = changes.tags;
     delete (changes as { tags?: unknown }).tags;
+  }
+  if (targetOfferingId && changes.category !== undefined) {
+    const catKey = normalizeListingTabCategory(changes.category);
+    if (catKey) {
+      tagsForOfferingOnly = [catKey];
+    }
+    delete (changes as { category?: unknown }).category;
   }
 
   if (changes.description !== undefined) {
