@@ -9,7 +9,7 @@ import {
   BarChart3, Users, TrendingUp, DollarSign, Store, Eye, Download,
   Plus, Search, Filter, ChevronDown, ArrowUpRight, ArrowDownRight,
   CheckCircle, XCircle, AlertCircle, Clock, FileText, MessageSquare,
-  Image as ImageIcon, Calendar, Loader2, RefreshCw, Edit3, ArrowRight, Layers,
+  Image as ImageIcon, Calendar, Loader2, RefreshCw, Edit3, ArrowRight,
   Wifi, WifiOff, Mail, Trash2, AlertTriangle, X, MapPin, Phone, Tag, Save,
   Globe, Percent, CreditCard
 } from 'lucide-react';
@@ -27,6 +27,7 @@ import {
 import { PROSE_CLASSES } from '@/lib/prose';
 import PricingDiscountFields from './PricingDiscountFields';
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
+import AdminPendingSubmissionReview, { type AdminPendingBusiness } from './AdminPendingSubmissionReview';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 
 const AdminPurchaseOverview = React.lazy(() => import('./AdminPurchaseOverview'));
@@ -91,6 +92,10 @@ interface PendingBusiness {
   discount_valid_from?: string;
   discount_valid_until?: string;
   pricing_tiers?: unknown;
+  map_url?: string | null;
+  website?: string | null;
+  whatsapp_number?: string | null;
+  updated_at?: string;
   /** When set, approval creates a `business_offerings` row on this profile only */
   business_id?: string | null;
 }
@@ -1636,48 +1641,15 @@ const AdminPanel: React.FC = () => {
                           </span>
                         </div>
 
-                        <p className="text-sm text-gray-600 mb-4 line-clamp-4">{plainTextFromHtml(biz.description || '')}</p>
-
-                        {pricingTiersFromDb(biz.pricing_tiers).length > 0 && (
-                          <div className="mb-4 p-4 rounded-xl border border-violet-200 bg-violet-50/60">
-                            <div className="flex items-center gap-2 mb-3">
-                              <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
-                                <Layers className="w-4 h-4 text-violet-700" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-bold text-violet-900">Tiered pricing (VT)</p>
-                                <p className="text-[11px] text-violet-700/85">
-                                  Per-person bands submitted with this listing — review before approve.
-                                </p>
-                              </div>
-                            </div>
-                            <div className="overflow-x-auto rounded-lg border border-violet-100 bg-white">
-                              <table className="min-w-full text-sm">
-                                <thead>
-                                  <tr className="border-b border-violet-100 text-left text-[10px] uppercase tracking-wide text-gray-500">
-                                    <th className="px-3 py-2 font-semibold">Label</th>
-                                    <th className="px-3 py-2 font-semibold">Pax</th>
-                                    <th className="px-3 py-2 font-semibold">Standard VT</th>
-                                    <th className="px-3 py-2 font-semibold">StikmNek VT</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {pricingTiersFromDb(biz.pricing_tiers).map((row, i) => (
-                                    <tr key={i} className="border-b border-gray-50 last:border-0">
-                                      <td className="px-3 py-2 font-medium text-gray-900">{row.label || '—'}</td>
-                                      <td className="px-3 py-2 text-gray-700">
-                                        {row.min_pax}
-                                        {row.max_pax != null ? `–${row.max_pax}` : '+'}
-                                      </td>
-                                      <td className="px-3 py-2 text-gray-800">{row.original_price_vt}</td>
-                                      <td className="px-3 py-2 font-semibold text-teal-700">{row.deal_price_vt}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
+                        <AdminPendingSubmissionReview
+                          biz={biz as AdminPendingBusiness}
+                          language={language}
+                          onSaved={(updated) => {
+                            setPendingBusinesses((prev) =>
+                              prev.map((row) => (row.id === updated.id ? { ...row, ...updated } : row)),
+                            );
+                          }}
+                        />
 
                         {/* ═══ Uploaded Photos (RPC-driven, individual moderation) ═══ */}
                         <div className="mb-4 p-3 rounded-lg border border-gray-200 bg-gray-50">
@@ -1877,14 +1849,14 @@ const AdminPanel: React.FC = () => {
                             <div className="p-2.5 rounded-lg bg-teal-50 border border-teal-100">
                               <p className="text-[10px] text-gray-400 font-medium uppercase">Pricing</p>
                               <div className="flex items-baseline gap-1.5 mt-0.5">
-                                <span className="text-sm font-bold text-teal-700">${biz.deal_price || 0}</span>
+                                <span className="text-sm font-bold text-teal-700">{formatVT(biz.deal_price || 0)}</span>
                                 {biz.original_price > 0 && (
-                                  <span className="text-xs text-gray-400 line-through">${biz.original_price}</span>
+                                  <span className="text-xs text-gray-400 line-through">{formatVT(biz.original_price)}</span>
                                 )}
                               </div>
                               {biz.original_price > 0 && biz.deal_price > 0 && biz.deal_price < biz.original_price && (
                                 <p className="text-[9px] text-emerald-600 font-semibold mt-0.5">
-                                  Save ${(biz.original_price - biz.deal_price).toFixed(0)}
+                                  Save {formatVT(biz.original_price - biz.deal_price)}
                                 </p>
                               )}
                             </div>
@@ -2086,28 +2058,108 @@ const AdminPanel: React.FC = () => {
 
                           {/* Changes Diff */}
                           <div className="space-y-3 mb-4">
-                            {Object.entries(changes).map(([key, newValue]) => {
-                              const currentValue = business ? (business as any)[key === 'original_price' ? 'originalPrice' : key === 'deal_price' ? 'dealPrice' : key] : undefined;
+                            {Object.entries(changes)
+                              .filter(([k]) => !k.startsWith('_'))
+                              .map(([key, newValue]) => {
+                              const currentValue = business
+                                ? (business as Record<string, unknown>)[
+                                    key === 'original_price'
+                                      ? 'originalPrice'
+                                      : key === 'deal_price'
+                                        ? 'dealPrice'
+                                        : key
+                                  ]
+                                : undefined;
+                              const renderValue = (val: unknown, side: 'current' | 'proposed') => {
+                                if (key === 'pricing_tiers') {
+                                  const rows = pricingTiersFromDb(val);
+                                  return (
+                                    <div className={`rounded-lg border p-2 ${side === 'proposed' ? 'border-blue-200 bg-blue-50/50' : 'border-gray-200 bg-white'}`}>
+                                      {rows.length === 0 ? (
+                                        <span className="text-sm text-gray-500 italic">No tiers</span>
+                                      ) : (
+                                        <table className="min-w-full text-xs">
+                                          <thead>
+                                            <tr className="text-[10px] uppercase text-gray-500">
+                                              <th className="text-left pr-2 py-1">Label</th>
+                                              <th className="text-left pr-2 py-1">Pax</th>
+                                              <th className="text-left pr-2 py-1">Std VT</th>
+                                              <th className="text-left py-1">Deal VT</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {rows.map((row, i) => (
+                                              <tr key={i}>
+                                                <td className="py-0.5 pr-2 font-medium">{row.label || '—'}</td>
+                                                <td className="py-0.5 pr-2">
+                                                  {row.min_pax}
+                                                  {row.max_pax != null ? `–${row.max_pax}` : '+'}
+                                                </td>
+                                                <td className="py-0.5 pr-2">{formatVT(row.original_price_vt)}</td>
+                                                <td className="py-0.5 font-semibold text-teal-700">
+                                                  {formatVT(row.deal_price_vt)}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      )}
+                                    </div>
+                                  );
+                                }
+                                if (key === 'description') {
+                                  const html = String(val ?? '');
+                                  if (!hasMeaningfulDescriptionContent(html)) {
+                                    return <span className="text-sm text-gray-500 italic">—</span>;
+                                  }
+                                  const boxClass = `max-h-64 overflow-y-auto text-sm rounded-lg px-3 py-2 border ${
+                                    side === 'proposed'
+                                      ? 'border-blue-200 bg-blue-50 text-blue-900'
+                                      : 'border-gray-200 bg-white text-gray-800'
+                                  }`;
+                                  if (looksLikeRichDescriptionHtml(html)) {
+                                    return (
+                                      <div
+                                        className={`${boxClass} ${PROSE_CLASSES}`}
+                                        dangerouslySetInnerHTML={{
+                                          __html: sanitizeBusinessDescriptionHtml(html),
+                                        }}
+                                      />
+                                    );
+                                  }
+                                  return (
+                                    <div className={`${boxClass} whitespace-pre-wrap`}>
+                                      {plainTextFromHtml(html)}
+                                    </div>
+                                  );
+                                }
+                                if (typeof val === 'number') {
+                                  return (
+                                    <span className="text-sm font-medium">
+                                      {key.includes('price') ? formatVT(val) : String(val)}
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span className="text-sm break-words whitespace-pre-wrap">
+                                    {String(val ?? '—')}
+                                  </span>
+                                );
+                              };
                               return (
                                 <div key={key} className="p-3 rounded-lg bg-gray-50 border border-gray-100">
                                   <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
                                     {key.replace(/_/g, ' ')}
                                   </p>
-                                  <div className="flex items-start gap-3">
-                                    <div className="flex-1">
+                                  <div className="flex flex-col sm:flex-row items-stretch gap-3">
+                                    <div className="flex-1 min-w-0">
                                       <p className="text-[10px] text-gray-400 mb-0.5">Current</p>
-                                      <p className="text-sm text-gray-600 bg-white rounded-lg px-3 py-1.5 border border-gray-200">
-                                        {currentValue !== undefined ? (
-                                          typeof currentValue === 'number' ? `$${currentValue}` : String(currentValue || '—')
-                                        ) : '—'}
-                                      </p>
+                                      {renderValue(currentValue, 'current')}
                                     </div>
-                                    <ArrowRight className="w-4 h-4 text-gray-300 mt-5 flex-shrink-0" />
-                                    <div className="flex-1">
+                                    <ArrowRight className="w-4 h-4 text-gray-300 shrink-0 hidden sm:block self-center" />
+                                    <div className="flex-1 min-w-0">
                                       <p className="text-[10px] text-blue-500 mb-0.5 font-semibold">Proposed</p>
-                                      <p className="text-sm text-blue-700 font-semibold bg-blue-50 rounded-lg px-3 py-1.5 border border-blue-200">
-                                        {typeof newValue === 'number' ? `$${newValue}` : String(newValue || '—')}
-                                      </p>
+                                      {renderValue(newValue, 'proposed')}
                                     </div>
                                   </div>
                                 </div>
