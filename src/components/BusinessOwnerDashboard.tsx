@@ -12,12 +12,13 @@ import {
   ArrowDownRight, Calendar, MapPin, Phone, Mail, Tag, Trash2,
   RefreshCw, ShieldCheck, History, ArrowRight, Info, ClipboardList,
   BellRing, ChevronDown, LayoutDashboard, Menu, ArrowLeft,
-  Sparkles, Settings, LogOut, Zap, Wifi, ScanLine
+  Sparkles, Settings, LogOut, Zap, Wifi, ScanLine, Building2
 } from 'lucide-react';
 import EmailNotificationCenter from './EmailNotificationCenter';
 import PhotoUploader, { UploadedPhoto } from './PhotoUploader';
 import MySubmissions from './MySubmissions';
 import DashboardOverview from './DashboardOverview';
+import BusinessProfileSettings from './BusinessProfileSettings';
 import PricingDiscountFields, { DURATION_OPTIONS, addDays, todayStr } from './PricingDiscountFields';
 import QRScanner from './QRScanner';
 import BusinessHomeScreen from './BusinessHomeScreen';
@@ -335,7 +336,7 @@ async function buildApprovedUnifiedFromProfiles(
   return out;
 }
 
-type DashboardTab = 'overview' | 'submissions' | 'edit' | 'analytics' | 'reviews' | 'photos' | 'submit' | 'emails';
+type DashboardTab = 'overview' | 'profile' | 'submissions' | 'edit' | 'analytics' | 'reviews' | 'photos' | 'submit' | 'emails';
 
 const BusinessOwnerDashboard: React.FC = () => {
   const {
@@ -382,7 +383,7 @@ const BusinessOwnerDashboard: React.FC = () => {
     const handler = (e: Event) => {
       const payload = (e as CustomEvent).detail;
       const tab = typeof payload === 'string' ? payload : payload?.tab ?? payload;
-      if (['submit', 'submissions', 'overview', 'edit', 'analytics', 'reviews', 'photos', 'emails'].includes(tab)) {
+      if (['submit', 'submissions', 'overview', 'profile', 'edit', 'analytics', 'reviews', 'photos', 'emails'].includes(tab)) {
         setActiveTab(tab);
         if (tab === 'submit' && payload?.submission) {
           setResubmitSubmission(payload.submission);
@@ -830,6 +831,14 @@ const BusinessOwnerDashboard: React.FC = () => {
       return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
     });
   }, [unifiedBusinesses, selectedProfileId]);
+
+  /** Profile row id for business-wide settings (not tied to which listing is selected). */
+  const ownerProfileBusinessId = useMemo(() => {
+    if (selectedProfileId) return selectedProfileId;
+    const row = approvedOnlyBusinesses[0];
+    if (!row) return '';
+    return effectiveProfileBusinessId(row);
+  }, [selectedProfileId, approvedOnlyBusinesses]);
 
   useEffect(() => {
     if (unifiedBusinesses.length > 0 && !selectedBusinessIdRef.current) {
@@ -1498,6 +1507,15 @@ const BusinessOwnerDashboard: React.FC = () => {
   // ═══ SIDEBAR NAV ITEMS ═══
   const navItems: { key: DashboardTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { key: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-5 h-5" /> },
+    ...(ownerProfileBusinessId
+      ? [
+          {
+            key: 'profile' as const,
+            label: language === 'en' ? 'Business Profile' : language === 'fr' ? 'Profil entreprise' : 'Bisnis profail',
+            icon: <Building2 className="w-5 h-5" />,
+          },
+        ]
+      : []),
     { key: 'submissions', label: 'My Submissions', icon: <ClipboardList className="w-5 h-5" />, badge: unseenSubmissionChanges > 0 ? String(unseenSubmissionChanges) : (allSubmissions.length > 0 ? String(allSubmissions.length) : undefined) },
     { key: 'edit', label: 'Edit Listing', icon: <Edit3 className="w-5 h-5" />, badge: currentPendingEdit ? '!' : undefined },
     { key: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" /> },
@@ -2240,7 +2258,25 @@ const BusinessOwnerDashboard: React.FC = () => {
             {/* Tab Content */}
             {/* Overview tab — approved business: show full DashboardOverview */}
             {activeTab === 'overview' && selectedBusiness && selectedIsApproved && (
-              <DashboardOverview selectedBusiness={selectedBusiness as any} totalRedemptions={totalRedemptions} totalRevenue={totalRevenue} businessReviews={businessReviews} pendingBusinesses={pendingBusinesses} currentPendingEdit={currentPendingEdit} onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)} onToggleActive={handleToggleActive} onOpenScanner={() => setShowScanner(true)} />
+              <DashboardOverview selectedBusiness={selectedBusiness as any} totalRedemptions={totalRedemptions} totalRevenue={totalRevenue} businessReviews={businessReviews} pendingBusinesses={pendingBusinesses} currentPendingEdit={currentPendingEdit} onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)} onToggleActive={handleToggleActive} onOpenScanner={() => setShowScanner(true)} hasBusinessProfile={Boolean(ownerProfileBusinessId)} />
+            )}
+            {activeTab === 'profile' && ownerProfileBusinessId && (
+              <BusinessProfileSettings
+                profileBusinessId={ownerProfileBusinessId}
+                profileDisplayName={
+                  approvedListingsSameProfile.find((b) => String(b.id) === String(selectedProfileId))?.name ||
+                  selectedBusiness?.name
+                }
+              />
+            )}
+            {activeTab === 'profile' && !ownerProfileBusinessId && !ownerDataLoading && (
+              renderPendingOnlyNotice(
+                language === 'en'
+                  ? 'Save your business profile first (complete setup), then you can update phone and contact details here.'
+                  : language === 'fr'
+                    ? 'Complétez d’abord votre profil entreprise.'
+                    : 'Save profail bisnis first.',
+              )
             )}
             {/* Overview tab — pending business OR no businesses at all: show BusinessHomeScreen with 6 action buttons */}
             {activeTab === 'overview' && !ownerDataLoading && (!selectedBusiness || !selectedIsApproved) && (

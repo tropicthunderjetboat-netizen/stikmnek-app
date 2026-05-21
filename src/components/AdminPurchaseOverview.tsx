@@ -14,7 +14,8 @@ import {
 import { getPassDisplayTitle } from '@/data/pricing';
 import type { DbPassType } from '@/data/passCatalog';
 
-const DB_PASS_ORDER: DbPassType[] = ['dynamic', 'daily', 'weekly', 'monthly', 'mega_group'];
+const PRIMARY_PASS_TYPE: DbPassType = 'dynamic';
+const LEGACY_PASS_TYPES: DbPassType[] = ['daily', 'weekly', 'monthly', 'mega_group'];
 
 interface PassPurchase {
   id: string;
@@ -73,30 +74,31 @@ interface AdminPurchaseOverviewProps {
   dbBusinessCount: number;
 }
 
-const PASS_COLORS: Record<DbPassType, string> = {
+const PASS_COLORS: Record<string, string> = {
   dynamic: '#0d9488',
-  daily: '#0EA5E9',
-  weekly: '#8B5CF6',
-  monthly: '#F59E0B',
-  mega_group: '#C026D3',
+  legacy: '#64748b',
 };
 
-const PASS_LABELS: Record<DbPassType, string> = {
+const PASS_LABELS: Record<string, string> = {
   dynamic: getPassDisplayTitle('dynamic', 'en'),
-  daily: 'Archived pass (db: daily)',
-  weekly: 'Archived pass (db: weekly)',
-  monthly: 'Archived pass (db: monthly)',
-  mega_group: 'Archived pass (db: mega_group)',
+  legacy: 'Legacy passes (archived products)',
 };
 
-/** Reference “from” prices for admin copy; dynamic passes use variable pricing at checkout. */
-const PASS_PRICES: Record<DbPassType, number> = {
-  dynamic: 15,
-  daily: 15,
-  weekly: 45,
-  monthly: 99,
-  mega_group: 199,
-};
+function isLegacyPassType(passType: string): boolean {
+  return LEGACY_PASS_TYPES.includes(passType as DbPassType);
+}
+
+function passTypeAdminLabel(passType: string): string {
+  if (passType === PRIMARY_PASS_TYPE) return PASS_LABELS.dynamic;
+  if (isLegacyPassType(passType)) return PASS_LABELS.legacy;
+  return passType;
+}
+
+function passTypeAdminColor(passType: string): string {
+  if (passType === PRIMARY_PASS_TYPE) return PASS_COLORS.dynamic;
+  if (isLegacyPassType(passType)) return PASS_COLORS.legacy;
+  return '#6B7280';
+}
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
@@ -179,10 +181,10 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
         (payload) => {
           const newPurchase = mapPassRowToPurchase(payload.new as PassRow, null);
           setPurchases((prev) => [newPurchase, ...prev]);
-          toast.info(
-            `New pass purchase: ${PASS_LABELS[newPurchase.pass_type as DbPassType] || newPurchase.pass_type} - $${newPurchase.amount_paid}`,
-            { duration: 5000 },
-          );
+          const passLabel = isLegacyPassType(newPurchase.pass_type)
+            ? PASS_LABELS.legacy
+            : PASS_LABELS.dynamic;
+          toast.info(`New pass purchase: ${passLabel} - $${newPurchase.amount_paid}`, { duration: 5000 });
         },
       )
       .subscribe();
@@ -210,25 +212,41 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
   const totalPurchases = completedPurchases.length;
   const avgOrderValue = totalPurchases > 0 ? totalRevenue / totalPurchases : 0;
 
-  // Revenue by pass type
-  const revenueByType = DB_PASS_ORDER.map((type) => {
-    const typePurchases = completedPurchases.filter(p => p.pass_type === type);
-    return {
-      name: PASS_LABELS[type] || type,
-      shortName: type.charAt(0).toUpperCase() + type.slice(1),
-      value: typePurchases.reduce((sum, p) => sum + Number(p.amount_paid), 0),
-      count: typePurchases.length,
-      active: typePurchases.filter(
+  const dynamicPurchases = completedPurchases.filter((p) => p.pass_type === PRIMARY_PASS_TYPE);
+  const legacyPurchases = completedPurchases.filter((p) => isLegacyPassType(p.pass_type));
+
+  const revenueByType = [
+    {
+      name: PASS_LABELS.dynamic,
+      shortName: 'dynamic',
+      value: dynamicPurchases.reduce((sum, p) => sum + Number(p.amount_paid), 0),
+      count: dynamicPurchases.length,
+      active: dynamicPurchases.filter(
         (p) => new Date(p.expiry_date) > now && p.pass_is_active !== false,
       ).length,
-      color: PASS_COLORS[type],
-      price: PASS_PRICES[type],
-    };
-  });
+      color: PASS_COLORS.dynamic,
+      priceLabel: 'From $15 (variable)',
+    },
+    ...(legacyPurchases.length > 0
+      ? [
+          {
+            name: PASS_LABELS.legacy,
+            shortName: 'legacy',
+            value: legacyPurchases.reduce((sum, p) => sum + Number(p.amount_paid), 0),
+            count: legacyPurchases.length,
+            active: legacyPurchases.filter(
+              (p) => new Date(p.expiry_date) > now && p.pass_is_active !== false,
+            ).length,
+            color: PASS_COLORS.legacy,
+            priceLabel: 'Historical only',
+          },
+        ]
+      : []),
+  ];
 
   // Purchase trends over time (group by day)
   const trendData = (() => {
-    const dayMap: Record<string, { date: string; revenue: number; count: number; dynamic: number; daily: number; weekly: number; monthly: number; mega_group: number }> = {};
+    const dayMap: Record<string, { date: string; revenue: number; count: number; dynamic: number; legacy: number }> = {};
     
     // Determine how many days to show
     const daysToShow = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 180;
@@ -238,7 +256,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
       const d = new Date();
       d.setDate(d.getDate() - i);
       const key = d.toISOString().split('T')[0];
-      dayMap[key] = { date: key, revenue: 0, count: 0, dynamic: 0, daily: 0, weekly: 0, monthly: 0, mega_group: 0 };
+      dayMap[key] = { date: key, revenue: 0, count: 0, dynamic: 0, legacy: 0 };
     }
 
     completedPurchases.forEach(p => {
@@ -246,11 +264,8 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
       if (dayMap[day]) {
         dayMap[day].revenue += Number(p.amount_paid);
         dayMap[day].count += 1;
-        if (p.pass_type === 'dynamic') dayMap[day].dynamic += 1;
-        if (p.pass_type === 'daily') dayMap[day].daily += 1;
-        if (p.pass_type === 'weekly') dayMap[day].weekly += 1;
-        if (p.pass_type === 'monthly') dayMap[day].monthly += 1;
-        if (p.pass_type === 'mega_group') dayMap[day].mega_group += 1;
+        if (p.pass_type === PRIMARY_PASS_TYPE) dayMap[day].dynamic += 1;
+        else if (isLegacyPassType(p.pass_type)) dayMap[day].legacy += 1;
       }
     });
 
@@ -490,8 +505,8 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
         </div>
       </div>
 
-      {/* Revenue by Pass Type Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Revenue by pass product */}
+      <div className={`grid grid-cols-1 gap-4 ${revenueByType.length > 1 ? 'sm:grid-cols-2' : 'sm:max-w-md'}`}>
         {revenueByType.map(type => (
           <div key={type.shortName} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-3">
@@ -502,7 +517,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
                 />
                 <div>
                   <p className="text-sm font-bold text-gray-900">{type.name}</p>
-                  <p className="text-[11px] text-gray-400">${type.price}/pass</p>
+                  <p className="text-[11px] text-gray-400">{type.priceLabel}</p>
                 </div>
               </div>
               <span className="px-2.5 py-1 rounded-lg bg-teal-50 text-teal-700 text-xs font-bold">
@@ -638,19 +653,22 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
                     contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '12px' }}
                   />
                   <Bar dataKey="dynamic" name={PASS_LABELS.dynamic} fill={PASS_COLORS.dynamic} radius={[4, 4, 0, 0]} stackId="stack" />
-                  <Bar dataKey="daily" name={PASS_LABELS.daily} fill={PASS_COLORS.daily} radius={[4, 4, 0, 0]} stackId="stack" />
-                  <Bar dataKey="weekly" name={PASS_LABELS.weekly} fill={PASS_COLORS.weekly} radius={[0, 0, 0, 0]} stackId="stack" />
-                  <Bar dataKey="monthly" name={PASS_LABELS.monthly} fill={PASS_COLORS.monthly} radius={[4, 4, 0, 0]} stackId="stack" />
-                  <Bar dataKey="mega_group" name={PASS_LABELS.mega_group} fill={PASS_COLORS.mega_group} radius={[4, 4, 0, 0]} stackId="stack" />
+                  {legacyPurchases.length > 0 && (
+                    <Bar dataKey="legacy" name={PASS_LABELS.legacy} fill={PASS_COLORS.legacy} radius={[4, 4, 0, 0]} stackId="stack" />
+                  )}
                 </BarChart>
               </ResponsiveContainer>
-              <div className="flex items-center gap-4 mt-3">
-                {Object.entries(PASS_COLORS).map(([type, color]) => (
-                  <div key={type} className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded" style={{ backgroundColor: color }} />
-                    <span className="text-[11px] text-gray-600 leading-tight">{PASS_LABELS[type] ?? type}</span>
+              <div className="flex flex-wrap items-center gap-4 mt-3">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded" style={{ backgroundColor: PASS_COLORS.dynamic }} />
+                  <span className="text-[11px] text-gray-600 leading-tight">{PASS_LABELS.dynamic}</span>
+                </div>
+                {legacyPurchases.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded" style={{ backgroundColor: PASS_COLORS.legacy }} />
+                    <span className="text-[11px] text-gray-600 leading-tight">{PASS_LABELS.legacy}</span>
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -720,19 +738,10 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
             All revenue, trends, and analytics will be tracked in real-time.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
-            {(
-              [
-                { db: 'daily' as const, box: 'bg-blue-50 text-blue-700' },
-                { db: 'weekly' as const, box: 'bg-purple-50 text-purple-700' },
-                { db: 'monthly' as const, box: 'bg-amber-50 text-amber-700' },
-                { db: 'mega_group' as const, box: 'bg-fuchsia-50 text-fuchsia-700' },
-              ] as const
-            ).map(({ db, box }) => (
-              <div key={db} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold ${box}`}>
-                <CreditCard className="w-3.5 h-3.5" />
-                {PASS_LABELS[db]}: ${PASS_PRICES[db]}
-              </div>
-            ))}
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-teal-50 text-teal-700">
+              <CreditCard className="w-3.5 h-3.5" />
+              {PASS_LABELS.dynamic} — variable pricing from $15
+            </div>
           </div>
         </div>
       )}
@@ -776,10 +785,10 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
                         <div className="flex items-center gap-2">
                           <div
                             className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: PASS_COLORS[purchase.pass_type] || '#6B7280' }}
+                            style={{ backgroundColor: passTypeAdminColor(purchase.pass_type) }}
                           />
-                          <span className="text-xs font-semibold text-gray-700 capitalize">
-                            {PASS_LABELS[purchase.pass_type] || purchase.pass_type}
+                          <span className="text-xs font-semibold text-gray-700">
+                            {passTypeAdminLabel(purchase.pass_type)}
                           </span>
                         </div>
                       </td>

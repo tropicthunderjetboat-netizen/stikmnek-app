@@ -33,6 +33,8 @@ interface DashboardOverviewProps {
   onSwitchTab: (tab: string) => void;
   onToggleActive: (active: boolean) => void;
   onOpenScanner?: () => void;
+  /** When true, show quick link to business-wide profile settings. */
+  hasBusinessProfile?: boolean;
 }
 
 const DashboardOverview: React.FC<DashboardOverviewProps> = ({
@@ -45,6 +47,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onSwitchTab,
   onToggleActive,
   onOpenScanner,
+  hasBusinessProfile = false,
 }) => {
 
   const { language, setCurrentView } = useAppContext();
@@ -120,6 +123,24 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       bgHover: 'hover:shadow-blue-300/70',
       onClick: () => onSwitchTab('edit'),
     },
+    ...(hasBusinessProfile
+      ? [
+          {
+            label: language === 'en' ? 'Business Profile' : language === 'fr' ? 'Profil entreprise' : 'Bisnis profail',
+            description:
+              language === 'en'
+                ? 'Phone, email, address'
+                : language === 'fr'
+                  ? 'Téléphone, e-mail, adresse'
+                  : 'Fon, email, adres',
+            icon: <Phone className="w-7 h-7" />,
+            gradient: 'from-cyan-500 to-teal-600',
+            shadowColor: 'shadow-cyan-200/60',
+            bgHover: 'hover:shadow-cyan-300/70',
+            onClick: () => onSwitchTab('profile'),
+          },
+        ]
+      : []),
     {
       label: 'Reviews',
       description: 'See customer feedback',
