@@ -47,7 +47,6 @@ import BusinessCredentialsTile from '@/components/BusinessCredentialsTile';
 import {
   CREDENTIALS_VIEW_COLUMNS,
   credentialsFromBusinessListing,
-  hasAnyPublicCredential,
   mapCredentialsFromListingRow,
   type BusinessCredentialsPublic,
 } from '@/lib/businessCredentials';
@@ -839,11 +838,9 @@ const BusinessDetail: React.FC = () => {
               </div>
             )}
 
-            {hasAnyPublicCredential(profileCredentials) && (
-              <div className="order-4 lg:order-none">
-                <BusinessCredentialsTile credentials={profileCredentials} language={language} />
-              </div>
-            )}
+            <div className="order-4 lg:order-none">
+              <BusinessCredentialsTile credentials={profileCredentials} language={language} />
+            </div>
 
             <div className="order-3 lg:order-none">
               <PhotoGallery
