@@ -11,6 +11,7 @@ import { Award, Loader2, Save, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { edgeFunctionErrorMessage } from '@/lib/credentialUpload';
 import { toast } from 'sonner';
 
 type BusinessCredentialsSettingsProps = {
@@ -124,16 +125,73 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
         patch.first_aid_completed_at = firstAidDate || null;
       }
 
-      const { data, error } = await supabase.functions.invoke('manage-business', {
-        headers: await getEdgeAuthHeaders(),
-        body: {
-          action: 'upsert_business_credentials',
-          businessId: profileBusinessId,
-          credentials: patch,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(String(data.error));
+      let saveOk = false;
+      if (Object.keys(patch).length > 0) {
+        const row: Record<string, unknown> = {
+          business_id: profileBusinessId,
+          updated_at: new Date().toISOString(),
+          ...patch,
+        };
+        const resetVerified = (pathKey: string, flagKey: string, atKey: string, byKey: string) => {
+          if (patch[pathKey]) {
+            row[flagKey] = false;
+            row[atKey] = null;
+            row[byKey] = null;
+          }
+        };
+        resetVerified(
+          'tourism_permit_path',
+          'verified_tourism_permit',
+          'verified_tourism_permit_at',
+          'verified_tourism_permit_by',
+        );
+        resetVerified(
+          'liability_insurance_path',
+          'verified_liability_insurance',
+          'verified_liability_insurance_at',
+          'verified_liability_insurance_by',
+        );
+        resetVerified(
+          'association_credentials_path',
+          'verified_association_credentials',
+          'verified_association_credentials_at',
+          'verified_association_credentials_by',
+        );
+        if (patch.first_aid_certificate_path) {
+          row.verified_first_aid = false;
+          row.verified_first_aid_at = null;
+          row.verified_first_aid_by = null;
+        }
+
+        const { error: directErr } = await supabase
+          .from('business_credentials')
+          .upsert(row, { onConflict: 'business_id' });
+
+        if (!directErr) {
+          saveOk = true;
+        } else {
+          console.warn('[BusinessCredentialsSettings] direct upsert failed, trying edge:', directErr.message);
+          const { data, error } = await supabase.functions.invoke('manage-business', {
+            headers: await getEdgeAuthHeaders(),
+            body: {
+              action: 'upsert_business_credentials',
+              businessId: profileBusinessId,
+              credentials: patch,
+            },
+          });
+          if (error) {
+            throw new Error(await edgeFunctionErrorMessage(data, error));
+          }
+          if (data?.error) throw new Error(String(data.error));
+          if (data?.success === false) {
+            throw new Error(String(data.error || 'Save failed'));
+          }
+          saveOk = true;
+        }
+      } else {
+        saveOk = true;
+      }
+      if (!saveOk) throw new Error('Save failed');
 
       await refreshBusinesses?.();
       await loadCredentials();

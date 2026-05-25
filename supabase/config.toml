@@ -14,6 +14,9 @@ verify_jwt = false
 [functions.upload-photo]
 verify_jwt = false
 
+[functions.upload-credential]
+verify_jwt = false
+
 [functions.process-card-payment]
 verify_jwt = false
 

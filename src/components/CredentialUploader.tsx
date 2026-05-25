@@ -1,6 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { FileText, Loader2, Upload, X, CheckCircle } from 'lucide-react';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
+import {
+  credentialStoragePath,
+  edgeFunctionErrorMessage,
+  mimeTypeForCredentialFile,
+} from '@/lib/credentialUpload';
 import { toast } from 'sonner';
 
 export type CredentialUpload = {
@@ -17,19 +22,6 @@ type CredentialUploaderProps = {
   hint?: string;
   language: 'en' | 'fr' | 'bi';
 };
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === 'string' && result.length > 0) resolve(result);
-      else reject(new Error('Empty file'));
-    };
-    reader.onerror = () => reject(reader.error ?? new Error('Read failed'));
-    reader.readAsDataURL(file);
-  });
-}
 
 const CredentialUploader: React.FC<CredentialUploaderProps> = ({
   businessId,
@@ -54,33 +46,75 @@ const CredentialUploader: React.FC<CredentialUploaderProps> = ({
       );
       return;
     }
+
+    let effectiveUserId = userId?.trim() || '';
+    if (!effectiveUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error(language === 'en' ? 'Please sign in first.' : 'Connectez-vous.');
+        return;
+      }
+      effectiveUserId = user.id;
+    }
+
+    const contentType = mimeTypeForCredentialFile(file);
+    const filePath = credentialStoragePath(effectiveUserId, businessId, file.name);
+
     setUploading(true);
     try {
-      const dataUrl = await readFileAsDataUrl(file);
-      const { data, error } = await supabase.functions.invoke('upload-credential', {
-        headers: await getEdgeAuthHeaders(),
-        body: {
-          fileBase64: dataUrl,
-          fileName: file.name,
-          contentType: file.type || 'application/pdf',
-          userId,
-          businessId,
-        },
-      });
-      if (error) throw error;
-      if (!data?.success || !data?.filePath) {
-        throw new Error(data?.error || 'Upload failed');
+      // Prefer direct storage (same pattern as listing photos — no Edge Function required)
+      const { error: storageErr } = await supabase.storage
+        .from('business-credentials')
+        .upload(filePath, file, { contentType, upsert: false });
+
+      if (storageErr) {
+        console.warn('[CredentialUploader] direct storage failed:', storageErr.message);
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => {
+            const r = reader.result;
+            if (typeof r === 'string' && r.length > 0) resolve(r);
+            else reject(new Error('Could not read file'));
+          };
+          reader.onerror = () => reject(reader.error ?? new Error('Read failed'));
+          reader.readAsDataURL(file);
+        });
+
+        const { data, error } = await supabase.functions.invoke('upload-credential', {
+          headers: await getEdgeAuthHeaders(),
+          body: {
+            fileBase64: dataUrl,
+            fileName: file.name,
+            contentType,
+            userId: effectiveUserId,
+            businessId,
+          },
+        });
+        if (error) {
+          throw new Error(await edgeFunctionErrorMessage(data, error));
+        }
+        if (!data?.success || !data?.filePath) {
+          throw new Error(
+            (typeof data?.error === 'string' && data.error) ||
+              storageErr.message ||
+              'Upload failed',
+          );
+        }
+        onChange({ filePath: data.filePath, fileName: file.name });
+      } else {
+        onChange({ filePath, fileName: file.name });
       }
-      onChange({ filePath: data.filePath, fileName: file.name });
+
       toast.success(
         language === 'en'
-          ? 'Document uploaded — pending admin review'
+          ? 'Document uploaded — click Save credentials below'
           : language === 'fr'
-            ? 'Document téléchargé — en attente de validation'
-            : 'Dokumen i upload — wetem admin',
+            ? 'Document téléchargé — cliquez Enregistrer ci-dessous'
+            : 'Dokumen i upload — klikim Save',
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Upload failed';
+      console.error('[CredentialUploader]', err);
       toast.error(msg);
     } finally {
       setUploading(false);
@@ -131,7 +165,7 @@ const CredentialUploader: React.FC<CredentialUploaderProps> = ({
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,image/jpeg,image/png,image/webp"
+        accept=".pdf,image/jpeg,image/png,image/webp,application/pdf"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
