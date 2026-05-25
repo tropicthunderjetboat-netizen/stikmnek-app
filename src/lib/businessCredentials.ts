@@ -139,8 +139,46 @@ export function credentialsLeaderboardScore(creds: BusinessCredentialsPublic): n
 }
 
 export function hasAnyPublicCredential(creds: BusinessCredentialsPublic): boolean {
-  return creds.verifiedCount > 0;
+  return (
+    creds.verifiedCount > 0 ||
+    creds.verifiedTourismPermit ||
+    creds.verifiedLiabilityInsurance ||
+    creds.verifiedAssociationCredentials ||
+    creds.verifiedFirstAid
+  );
 }
+
+const EMPTY_PUBLIC_CREDENTIALS: BusinessCredentialsPublic = {
+  verifiedTourismPermit: false,
+  verifiedLiabilityInsurance: false,
+  verifiedAssociationCredentials: false,
+  verifiedFirstAid: false,
+  verifiedCount: 0,
+};
+
+/** Build public credential flags from a `Business` listing row (from `business_listings_view`). */
+export function credentialsFromBusinessListing(
+  b: Pick<
+    Business,
+    | 'credVerifiedTourismPermit'
+    | 'credVerifiedLiabilityInsurance'
+    | 'credVerifiedAssociationCredentials'
+    | 'credVerifiedFirstAid'
+    | 'credVerifiedCount'
+  > | null | undefined,
+): BusinessCredentialsPublic {
+  if (!b) return { ...EMPTY_PUBLIC_CREDENTIALS };
+  return {
+    verifiedTourismPermit: Boolean(b.credVerifiedTourismPermit),
+    verifiedLiabilityInsurance: Boolean(b.credVerifiedLiabilityInsurance),
+    verifiedAssociationCredentials: Boolean(b.credVerifiedAssociationCredentials),
+    verifiedFirstAid: Boolean(b.credVerifiedFirstAid),
+    verifiedCount: Number(b.credVerifiedCount) || 0,
+  };
+}
+
+export const CREDENTIALS_VIEW_COLUMNS =
+  'cred_verified_tourism_permit, cred_verified_liability_insurance, cred_verified_association_credentials, cred_verified_first_aid, cred_verified_count';
 
 /**
  * Credentials live on the master `businesses` row (one per company).

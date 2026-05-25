@@ -44,7 +44,13 @@ import {
 } from '@/lib/offeringPhotoPartition';
 import { isListingFavorited } from '@/lib/favoritesUi';
 import BusinessCredentialsTile from '@/components/BusinessCredentialsTile';
-import { mapCredentialsFromListingRow } from '@/lib/businessCredentials';
+import {
+  CREDENTIALS_VIEW_COLUMNS,
+  credentialsFromBusinessListing,
+  hasAnyPublicCredential,
+  mapCredentialsFromListingRow,
+  type BusinessCredentialsPublic,
+} from '@/lib/businessCredentials';
 import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
@@ -117,8 +123,39 @@ const BusinessDetail: React.FC = () => {
   const [profileOfferings, setProfileOfferings] = useState<Business[]>([]);
   const [offeringsFetchError, setOfferingsFetchError] = useState<string | null>(null);
   const [offeringsLoaded, setOfferingsLoaded] = useState(false);
+  const [profileCredentials, setProfileCredentials] = useState<BusinessCredentialsPublic>(() =>
+    credentialsFromBusinessListing(selectedBusiness ?? undefined),
+  );
 
   const profileId = selectedBusiness ? profileBusinessIdFor(selectedBusiness) : '';
+
+  /** Credentials are per company profile; reload from view so they persist after offering remap. */
+  useEffect(() => {
+    if (!profileId) {
+      setProfileCredentials(credentialsFromBusinessListing(undefined));
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from('business_listings_view')
+        .select(CREDENTIALS_VIEW_COLUMNS)
+        .eq('profile_business_id', profileId)
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      if (!error && data) {
+        setProfileCredentials(mapCredentialsFromListingRow(data as Record<string, unknown>));
+        return;
+      }
+      if (selectedBusiness && profileBusinessIdFor(selectedBusiness) === profileId) {
+        setProfileCredentials(credentialsFromBusinessListing(selectedBusiness));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId, selectedBusiness?.id]);
 
   /** Load master profile stub + all active offerings; listing copy comes from `business_offerings`. */
   useEffect(() => {
@@ -802,16 +839,11 @@ const BusinessDetail: React.FC = () => {
               </div>
             )}
 
-            <BusinessCredentialsTile
-              credentials={mapCredentialsFromListingRow({
-                cred_verified_tourism_permit: biz.credVerifiedTourismPermit,
-                cred_verified_liability_insurance: biz.credVerifiedLiabilityInsurance,
-                cred_verified_association_credentials: biz.credVerifiedAssociationCredentials,
-                cred_verified_first_aid: biz.credVerifiedFirstAid,
-                cred_verified_count: biz.credVerifiedCount,
-              })}
-              language={language}
-            />
+            {hasAnyPublicCredential(profileCredentials) && (
+              <div className="order-4 lg:order-none">
+                <BusinessCredentialsTile credentials={profileCredentials} language={language} />
+              </div>
+            )}
 
             <div className="order-3 lg:order-none">
               <PhotoGallery

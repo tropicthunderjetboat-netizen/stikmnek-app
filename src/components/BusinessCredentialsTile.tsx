@@ -41,7 +41,7 @@ const BusinessCredentialsTile: React.FC<BusinessCredentialsTileProps> = ({
         : 'StikmNek i verify';
 
   return (
-    <div className="order-4 bg-white rounded-xl p-5 sm:p-6 shadow-sm border-2 border-amber-200/80 bg-gradient-to-br from-amber-50/40 via-white to-teal-50/30 lg:order-none">
+    <div className="bg-white rounded-xl p-5 sm:p-6 shadow-sm border-2 border-amber-200/80 bg-gradient-to-br from-amber-50/40 via-white to-teal-50/30">
       <div className="flex items-center gap-2 mb-4">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-sm">
           <Award className="w-5 h-5 text-white" />
