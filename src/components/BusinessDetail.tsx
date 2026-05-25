@@ -693,64 +693,9 @@ const BusinessDetail: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="order-2 min-w-0 space-y-6 lg:order-1 lg:col-span-2">
-            {showTieredTable && (
-              <div className="bg-white rounded-xl p-5 shadow-sm border border-violet-100">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-violet-100 flex items-center justify-center">
-                    <Layers className="w-4 h-4 text-violet-700" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-violet-900 text-sm">
-                      {language === 'en' ? 'Per-person pricing (VT)' : language === 'fr' ? 'Tarifs par personne (VT)' : 'Praes long wanwan man (VT)'}
-                    </h3>
-                    <p className="text-xs text-violet-700/85">
-                      {language === 'en'
-                        ? 'Rates by guest type. Use Request booking to estimate totals for your party.'
-                        : language === 'fr'
-                          ? 'Tarifs selon le type de visiteur. Utilisez « Demander une réservation » pour le total.'
-                          : 'Praes blong wanwan kaen man. Yusum Askem bukin blong lukim totel.'}
-                    </p>
-                  </div>
-                </div>
-                <div className="overflow-x-auto rounded-lg border border-violet-100">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-violet-100 text-left text-[10px] uppercase tracking-wide text-gray-500">
-                        <th className="px-3 py-2 font-semibold">
-                          {language === 'en' ? 'Tier' : language === 'fr' ? 'Palier' : 'Ta'}
-                        </th>
-                        <th className="px-3 py-2 font-semibold">
-                          {language === 'en' ? 'Pax' : language === 'fr' ? 'Pers.' : 'Man'}
-                        </th>
-                        <th className="px-3 py-2 font-semibold">
-                          {language === 'en' ? 'Standard' : language === 'fr' ? 'Standard' : 'Stanad'}
-                        </th>
-                        <th className="px-3 py-2 font-semibold text-teal-800">
-                          StikmNek
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pricingTiers.map((row, i) => (
-                        <tr key={i} className="border-b border-gray-50 last:border-0">
-                          <td className="px-3 py-2 font-medium text-gray-900">{row.label || '—'}</td>
-                          <td className="px-3 py-2 text-gray-700">
-                            {row.min_pax}
-                            {row.max_pax != null ? `–${row.max_pax}` : '+'}
-                          </td>
-                          <td className="px-3 py-2 text-gray-800">{formatVT(row.original_price_vt)}</td>
-                          <td className="px-3 py-2 font-semibold text-teal-700">{formatVT(row.deal_price_vt)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            <div className="relative bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-gray-100">
+        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-3">
+          <div className="contents min-w-0 lg:col-span-2 lg:block lg:space-y-6">
+            <div className="order-1 relative bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-gray-100 lg:order-none">
               <div
                 className={
                   descriptionCollapsible && !descExpanded
@@ -798,15 +743,74 @@ const BusinessDetail: React.FC = () => {
               </div>
             </div>
 
-            <PhotoGallery
-              businessId={profileId}
-              offeringId={biz.id}
-              coverImage={displayCoverImage || biz.image}
-              businessName={biz.name}
-            />
+            {showTieredTable && (
+              <div className="order-2 bg-white rounded-xl p-5 shadow-sm border-2 border-teal-200/80 lg:order-none">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-sm">
+                    <Layers className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-teal-900 text-sm">
+                      {language === 'en' ? 'Per-person pricing (VT)' : language === 'fr' ? 'Tarifs par personne (VT)' : 'Praes long wanwan man (VT)'}
+                    </h3>
+                    <p className="text-xs text-teal-800/80">
+                      {language === 'en'
+                        ? 'Rates by guest type. Use Request booking to estimate totals for your party.'
+                        : language === 'fr'
+                          ? 'Tarifs selon le type de visiteur. Utilisez « Demander une réservation » pour le total.'
+                          : 'Praes blong wanwan kaen man. Yusum Askem bukin blong lukim totel.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-teal-100">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-teal-100 text-left text-[10px] uppercase tracking-wide text-gray-500">
+                        <th className="px-3 py-2 font-semibold">
+                          {language === 'en' ? 'Tier' : language === 'fr' ? 'Palier' : 'Ta'}
+                        </th>
+                        <th className="px-3 py-2 font-semibold">
+                          {language === 'en' ? 'Pax' : language === 'fr' ? 'Pers.' : 'Man'}
+                        </th>
+                        <th className="px-3 py-2 font-semibold">
+                          {language === 'en' ? 'Standard' : language === 'fr' ? 'Standard' : 'Stanad'}
+                        </th>
+                        <th className="px-3 py-2.5 font-bold text-white bg-gradient-to-r from-teal-600 to-emerald-600 rounded-tl-md">
+                          StikmNek
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pricingTiers.map((row, i) => (
+                        <tr key={i} className="border-b border-gray-50 last:border-0">
+                          <td className="px-3 py-2 font-medium text-gray-900">{row.label || '—'}</td>
+                          <td className="px-3 py-2 text-gray-700">
+                            {row.min_pax}
+                            {row.max_pax != null ? `–${row.max_pax}` : '+'}
+                          </td>
+                          <td className="px-3 py-2 text-gray-600">{formatVT(row.original_price_vt)}</td>
+                          <td className="px-3 py-2.5 font-bold text-teal-900 bg-gradient-to-r from-teal-50 to-emerald-50/90 text-base tabular-nums">
+                            {formatVT(row.deal_price_vt)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="order-3 lg:order-none">
+              <PhotoGallery
+                businessId={profileId}
+                offeringId={biz.id}
+                coverImage={displayCoverImage || biz.image}
+                businessName={biz.name}
+              />
+            </div>
 
             {operatingHoursText && (
-              <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+              <div className="order-6 bg-white rounded-xl p-5 shadow-sm border border-gray-100 lg:order-none">
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
                     <Clock className="w-5 h-5 text-teal-600" />
@@ -825,7 +829,7 @@ const BusinessDetail: React.FC = () => {
 
             {/* WhatsApp Contact Card — number shown only to pass holders */}
             {hasWhatsApp && (
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-5 shadow-sm border border-green-200">
+              <div className="order-7 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-5 shadow-sm border border-green-200 lg:order-none">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-lg shadow-green-200/50">
                     <WhatsAppIcon className="w-6 h-6 text-white" />
@@ -893,7 +897,7 @@ const BusinessDetail: React.FC = () => {
 
             {/* Super Star Summary Card - only show if business has super stars */}
             {superStarCount > 0 && (
-              <div className="bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-5 shadow-sm border border-purple-100">
+              <div className="order-8 bg-gradient-to-r from-purple-50 to-violet-50 rounded-xl p-5 shadow-sm border border-purple-100 lg:order-none">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-200/50">
                     <Sparkles className="w-5 h-5 text-white" />
@@ -920,7 +924,7 @@ const BusinessDetail: React.FC = () => {
             )}
 
             {/* Reviews Section */}
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="order-9 bg-white rounded-xl p-6 shadow-sm border border-gray-100 lg:order-none">
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">
@@ -1065,30 +1069,65 @@ const BusinessDetail: React.FC = () => {
             </div>
           </div>
 
-          <div className="order-1 min-w-0 space-y-4 lg:order-2 lg:col-span-1">
-            <div className="bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-gray-100 lg:sticky lg:top-20">
-              {showTieredTable ? (
-                <div className="mb-4">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                    {language === 'en' ? 'Pricing' : language === 'fr' ? 'Tarifs' : 'Praes'}
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    {language === 'en'
-                      ? 'Tiered per-person rates — see the pricing table on this page for Adult / Child / Infant VT.'
-                      : language === 'fr'
-                        ? 'Tarifs par palier — voir le tableau des prix sur cette page.'
-                        : 'Praes long wanwan man — lukim tebol long pej ia.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="flex items-baseline gap-2 mb-4 flex-wrap">
-                  <span className="text-3xl font-extrabold text-teal-700">{formatVT(displayListPx)}</span>
-                  {hasActiveDiscount && (
-                    <span className="text-lg text-gray-400 line-through">{formatVT(origPx)}</span>
-                  )}
-                </div>
-              )}
+          <div className="contents min-w-0 lg:col-span-1 lg:block lg:space-y-4">
+            <div className="contents lg:block lg:sticky lg:top-20">
+              {/* Pricing — mobile order 2 (after description); desktop sidebar top */}
+              <div
+                className={`order-2 bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-gray-100 lg:rounded-b-none lg:border-b-0 lg:order-none ${
+                  showTieredTable ? 'hidden lg:block' : ''
+                }`}
+              >
+                {showTieredTable ? (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                      {language === 'en' ? 'Pricing' : language === 'fr' ? 'Tarifs' : 'Praes'}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      {language === 'en'
+                        ? 'Tiered per-person rates — see the pricing table for Adult / Child / Infant VT.'
+                        : language === 'fr'
+                          ? 'Tarifs par palier — voir le tableau des prix.'
+                          : 'Praes long wanwan man — lukim tebol long pej ia.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border-2 border-teal-300/70 bg-gradient-to-br from-teal-50 via-emerald-50/90 to-white p-4 sm:p-5 shadow-md shadow-teal-100/60">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-[10px] font-bold uppercase tracking-wider shadow-sm">
+                        StikmNek
+                      </span>
+                      {detailDiscountBadge && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-amber-900 text-[10px] font-bold">
+                          {detailDiscountBadge}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-end gap-3 flex-wrap">
+                      <span className="text-4xl sm:text-[2.75rem] font-extrabold text-teal-800 tabular-nums leading-none tracking-tight">
+                        {formatVT(displayListPx)}
+                      </span>
+                      {hasActiveDiscount && (
+                        <div className="pb-0.5">
+                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+                            {language === 'en' ? 'Standard' : language === 'fr' ? 'Standard' : 'Stanad'}
+                          </p>
+                          <p className="text-xl text-gray-400 line-through tabular-nums">{formatVT(origPx)}</p>
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-teal-800/75 font-medium">
+                      {language === 'en'
+                        ? 'Your StikmNek member price'
+                        : language === 'fr'
+                          ? 'Votre tarif membre StikmNek'
+                          : 'Praes blong memba StikmNek'}
+                    </p>
+                  </div>
+                )}
+              </div>
 
+              {/* Actions — booking, WhatsApp, save/share */}
+              <div className="order-5 bg-white rounded-xl px-5 pb-5 pt-4 sm:px-6 sm:pb-6 shadow-sm border border-gray-100 border-t-0 lg:order-none lg:rounded-none lg:shadow-none lg:border-t lg:border-gray-100 lg:pt-5">
               <div className="flex items-center gap-1 mb-2">
                 <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
                 <span className="font-bold text-gray-900">{biz.rating}</span>
@@ -1143,7 +1182,11 @@ const BusinessDetail: React.FC = () => {
                   Share
                 </button>
               </div>
-              <div className="mt-5 space-y-3 pt-5 border-t border-gray-100">
+              </div>
+
+              {/* Contact & map */}
+              <div className="order-8 bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-gray-100 border-t-0 lg:order-none lg:rounded-t-none lg:pt-0 lg:border-t-0">
+              <div className="space-y-3 lg:pt-5 lg:border-t lg:border-gray-100">
                 <div className="flex items-center gap-3 text-sm text-gray-600"><MapPin className="w-4 h-4 text-teal-600 shrink-0" />{biz.location}</div>
                 {mapCoords && (
                   <Suspense
@@ -1210,6 +1253,7 @@ const BusinessDetail: React.FC = () => {
                     <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </button>
                 )}
+              </div>
               </div>
             </div>
           </div>
