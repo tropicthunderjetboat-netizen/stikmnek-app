@@ -11,6 +11,7 @@
     "functions:deploy:api": "supabase functions deploy --use-api -j 4",
     "functions:list": "supabase functions list",
     "functions:deploy:manage-business": "supabase functions deploy manage-business",
+    "functions:deploy:upload-credential": "supabase functions deploy upload-credential",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",

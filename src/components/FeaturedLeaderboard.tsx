@@ -13,28 +13,13 @@ import { Star, TrendingUp, Award, Crown, Sparkles, ArrowRight, ChevronDown, Chev
 import { formatVT } from '@/lib/utils';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
 import { toast } from 'sonner';
-
-// ─── Leaderboard Scoring Algorithm ───
-// Weights for each factor (total = 1.0)
-const WEIGHTS = {
-  rating: 0.30,        // Overall rating (including super stars)
-  reviewCount: 0.20,   // Number of reviews (engagement)
-  superStars: 0.20,    // Super Star count (premium signal)
-  dealValue: 0.15,     // Discount percentage (deal attractiveness)
-  engagement: 0.15,    // Redemption/review activity signal
-};
+import { computeLeaderboardScore } from '@/lib/leaderboardScore';
 
 interface ScoredBusiness {
   business: Business;
   score: number;
   rank: number;
-  breakdown: {
-    ratingScore: number;
-    reviewScore: number;
-    superStarScore: number;
-    dealScore: number;
-    engagementScore: number;
-  };
+  breakdown: ReturnType<typeof computeLeaderboardScore>['breakdown'];
 }
 
 const FeaturedLeaderboard: React.FC = () => {
@@ -44,74 +29,15 @@ const FeaturedLeaderboard: React.FC = () => {
 
   const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
-  // Calculate leaderboard scores
   const leaderboard: ScoredBusiness[] = useMemo(() => {
-    // Get max values for normalization
-    const maxReviews = Math.max(...allBusinesses.map(b => b.reviewCount), 1);
-    const maxSuperStars = Math.max(...allBusinesses.map(b => {
-      const pid = profileBusinessIdFor(b);
-      const reviewCount = dbReviews.filter((r: any) =>
-        r.business_id === pid &&
-        r.has_super_star &&
-        (r.offering_id ? String(r.offering_id) === String(b.id) : false)
-      ).length;
-      return reviewCount;
-    }), 1);
-
-    const scored = allBusinesses.map(business => {
-      const profileId = profileBusinessIdFor(business);
-      // 1. Rating score (0-1): normalized from 0-5 scale
-      const ratingScore = Math.min(business.rating / 5, 1);
-
-      // 2. Review count score (0-1): logarithmic scale for fairness
-      const reviewScore = Math.min(Math.log(business.reviewCount + 1) / Math.log(maxReviews + 1), 1);
-
-      // 3. Super Star score (0-1): premium engagement signal
-      const superStarCount = dbReviews.filter((r: any) =>
-        r.business_id === profileId &&
-        r.has_super_star &&
-        (r.offering_id ? String(r.offering_id) === String(business.id) : false)
-      ).length;
-      const superStarScore = maxSuperStars > 0 ? Math.min(superStarCount / maxSuperStars, 1) : 0;
-
-      // 4. Deal value score (0-1): discount percentage (ignore missing/zero deal_price)
-      const oOrig = effectiveListingOriginalPrice(business);
-      const oDeal = effectiveListingDealPrice(business);
-      const discountPct =
-        oOrig > 0 && oDeal > 0 && oDeal < oOrig ? (oOrig - oDeal) / oOrig : 0;
-      const dealScore = Math.min(discountPct * 2, 1); // 50% discount = max score
-
-      // 5. Engagement score (0-1): recent reviews + redemptions
-      const recentReviews = dbReviews.filter(r => {
-        if (r.business_id !== profileId) return false;
-        const daysSince = (Date.now() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24);
-        return daysSince <= 30;
-      }).length;
-      const bizRedemptions = redemptions.filter(r => r.businessId === profileId).length;
-      const engagementRaw = (recentReviews * 2) + bizRedemptions;
-      const engagementScore = Math.min(engagementRaw / 20, 1);
-
-      // Composite score
-      const score = (
-        ratingScore * WEIGHTS.rating +
-        reviewScore * WEIGHTS.reviewCount +
-        superStarScore * WEIGHTS.superStars +
-        dealScore * WEIGHTS.dealValue +
-        engagementScore * WEIGHTS.engagement
-      );
-
-      return {
+    const scored = allBusinesses.map((business) => {
+      const { score, breakdown } = computeLeaderboardScore(
         business,
-        score,
-        rank: 0,
-        breakdown: {
-          ratingScore,
-          reviewScore,
-          superStarScore,
-          dealScore,
-          engagementScore,
-        },
-      };
+        allBusinesses,
+        dbReviews,
+        redemptions,
+      );
+      return { business, score, rank: 0, breakdown };
     });
 
     // Sort by score descending
@@ -168,7 +94,7 @@ const FeaturedLeaderboard: React.FC = () => {
           </h2>
           <p className="text-gray-500 max-w-lg mx-auto mb-4">
             {language === 'en'
-              ? 'Top deals ranked by rating, reviews, Super Stars, and value. Updated in real-time.'
+              ? 'Top deals ranked by rating, reviews, Super Stars, value, and verified credentials. Updated in real-time.'
               : language === 'fr'
               ? 'Meilleures offres classées par note, avis, Super Stars et valeur.'
               : 'Beswan dils i rank bae reting, riviu, Super Stars, mo valu.'}
@@ -193,11 +119,12 @@ const FeaturedLeaderboard: React.FC = () => {
               </h4>
               <div className="space-y-2">
                 {[
-                  { label: 'Overall Rating', weight: '30%', desc: 'Star rating out of 5', color: 'bg-amber-500' },
-                  { label: 'Review Count', weight: '20%', desc: 'Number of customer reviews (log scale)', color: 'bg-blue-500' },
-                  { label: 'Super Stars', weight: '20%', desc: 'Premium Super Star reviews received', color: 'bg-purple-500' },
-                  { label: 'Deal Value', weight: '15%', desc: 'Discount percentage offered', color: 'bg-emerald-500' },
-                  { label: 'Engagement', weight: '15%', desc: 'Recent reviews and redemptions (30 days)', color: 'bg-orange-500' },
+                  { label: 'Overall Rating', weight: '27%', desc: 'Star rating out of 5', color: 'bg-amber-500' },
+                  { label: 'Review Count', weight: '18%', desc: 'Number of customer reviews (log scale)', color: 'bg-blue-500' },
+                  { label: 'Super Stars', weight: '18%', desc: 'Premium Super Star reviews received', color: 'bg-purple-500' },
+                  { label: 'Deal Value', weight: '14%', desc: 'Discount percentage offered', color: 'bg-emerald-500' },
+                  { label: 'Engagement', weight: '13%', desc: 'Recent reviews and redemptions (30 days)', color: 'bg-orange-500' },
+                  { label: 'Verified credentials', weight: '10%', desc: 'Admin-checked permits, insurance, first aid', color: 'bg-teal-500' },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <div className={`w-2 h-2 rounded-full ${item.color} flex-shrink-0`} />
@@ -351,6 +278,7 @@ const FeaturedLeaderboard: React.FC = () => {
                               { value: breakdown.superStarScore, color: 'bg-purple-400', label: 'Super Stars' },
                               { value: breakdown.dealScore, color: 'bg-emerald-400', label: 'Deal' },
                               { value: breakdown.engagementScore, color: 'bg-orange-400', label: 'Engagement' },
+                              { value: breakdown.credentialsScore, color: 'bg-teal-400', label: 'Credentials' },
                             ].map((seg, i) => (
                               <div
                                 key={i}

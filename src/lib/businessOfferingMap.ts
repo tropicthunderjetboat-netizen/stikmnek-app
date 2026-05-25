@@ -104,6 +104,11 @@ export function splitBusinessListingsViewRow(
     tags: bTags.length > 0 ? bTags : tagsArray(row.tags),
     featured: row.business_featured_raw ?? row.featured,
     whatsapp_number: row.business_whatsapp_number_raw,
+    cred_verified_tourism_permit: row.cred_verified_tourism_permit,
+    cred_verified_liability_insurance: row.cred_verified_liability_insurance,
+    cred_verified_association_credentials: row.cred_verified_association_credentials,
+    cred_verified_first_aid: row.cred_verified_first_aid,
+    cred_verified_count: row.cred_verified_count,
   };
 
   return { o, b };
@@ -271,6 +276,11 @@ export function mapJoinedOfferingToBusiness(
     profileName: String(b.name ?? '').trim() || undefined,
     discountValidFrom: isoDateOnly(o.discount_valid_from),
     discountValidUntil: isoDateOnly(o.discount_valid_until),
+    credVerifiedTourismPermit: Boolean(b.cred_verified_tourism_permit),
+    credVerifiedLiabilityInsurance: Boolean(b.cred_verified_liability_insurance),
+    credVerifiedAssociationCredentials: Boolean(b.cred_verified_association_credentials),
+    credVerifiedFirstAid: Boolean(b.cred_verified_first_aid),
+    credVerifiedCount: Number(b.cred_verified_count) || 0,
   };
 }
 

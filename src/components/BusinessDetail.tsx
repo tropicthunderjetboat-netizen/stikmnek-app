@@ -43,6 +43,8 @@ import {
   supplementUntaggedPhotosForRecentNewestOffering,
 } from '@/lib/offeringPhotoPartition';
 import { isListingFavorited } from '@/lib/favoritesUi';
+import BusinessCredentialsTile from '@/components/BusinessCredentialsTile';
+import { mapCredentialsFromListingRow } from '@/lib/businessCredentials';
 import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
 
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
@@ -799,6 +801,17 @@ const BusinessDetail: React.FC = () => {
                 </div>
               </div>
             )}
+
+            <BusinessCredentialsTile
+              credentials={mapCredentialsFromListingRow({
+                cred_verified_tourism_permit: biz.credVerifiedTourismPermit,
+                cred_verified_liability_insurance: biz.credVerifiedLiabilityInsurance,
+                cred_verified_association_credentials: biz.credVerifiedAssociationCredentials,
+                cred_verified_first_aid: biz.credVerifiedFirstAid,
+                cred_verified_count: biz.credVerifiedCount,
+              })}
+              language={language}
+            />
 
             <div className="order-3 lg:order-none">
               <PhotoGallery

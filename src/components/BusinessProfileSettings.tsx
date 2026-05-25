@@ -7,6 +7,7 @@ import { validateBusinessProfileOnboarding } from '@/lib/businessOnboardingValid
 import LocationMapPicker from '@/components/LocationMapPicker';
 import WebsiteUrlInput from '@/components/WebsiteUrlInput';
 import PhotoUploader, { type UploadedPhoto } from '@/components/PhotoUploader';
+import BusinessCredentialsSettings from '@/components/BusinessCredentialsSettings';
 import { parseLatLngFromMapUrl, normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 import { toast } from 'sonner';
 import { Building2, Clock, Loader2, Mail, MapPin, Phone, Save, User } from 'lucide-react';
@@ -410,7 +411,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
             <Label className="mb-2 block">
               {language === 'en' ? 'Logo (optional)' : language === 'fr' ? 'Logo (optionnel)' : 'Logo'}
             </Label>
-            <PhotoUploader photos={logoPhotos} onPhotosChange={setLogoPhotos} maxPhotos={1} language={language} />
+            <PhotoUploader photos={logoPhotos} onPhotosChange={setLogoPhotos} maxPhotos={1} userId={user!.id} />
           </div>
 
           <div className="flex flex-wrap gap-3 pt-2">
@@ -424,6 +425,10 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
           </div>
         </form>
       </div>
+
+      {user?.id && (
+        <BusinessCredentialsSettings profileBusinessId={profileBusinessId} />
+      )}
     </div>
   );
 };

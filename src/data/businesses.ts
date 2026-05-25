@@ -80,6 +80,12 @@ export interface Business {
   discountValidFrom?: string | null;
   /** From `business_offerings.discount_valid_until` (YYYY-MM-DD). */
   discountValidUntil?: string | null;
+  /** Admin-verified credentials (from `business_listings_view`, public flags only). */
+  credVerifiedTourismPermit?: boolean;
+  credVerifiedLiabilityInsurance?: boolean;
+  credVerifiedAssociationCredentials?: boolean;
+  credVerifiedFirstAid?: boolean;
+  credVerifiedCount?: number;
 }
 
 /** First active (or first) embedded offering — safe vs missing `business_offerings`. */

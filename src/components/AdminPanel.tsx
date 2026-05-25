@@ -29,6 +29,7 @@ import PricingDiscountFields from './PricingDiscountFields';
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import AdminPendingSubmissionReview, { type AdminPendingBusiness } from './AdminPendingSubmissionReview';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import AdminBusinessCredentials from '@/components/AdminBusinessCredentials';
 
 const AdminPurchaseOverview = React.lazy(() => import('./AdminPurchaseOverview'));
 const PassEditor = React.lazy(() => import('./PassEditor'));
@@ -196,6 +197,8 @@ const AdminPanel: React.FC = () => {
 
   // ─── Preview Business modal state ───
   const [previewBusinessId, setPreviewBusinessId] = useState<string | null>(null);
+  const [credentialsBusinessId, setCredentialsBusinessId] = useState<string | null>(null);
+  const [credentialsBusinessName, setCredentialsBusinessName] = useState('');
 
 
   const retryCountRef = useRef(0);
@@ -1522,6 +1525,18 @@ const AdminPanel: React.FC = () => {
                                 {isFromDb ? (
                                   <button
                                     onClick={() => {
+                                      setCredentialsBusinessId(profileBusinessIdFor(biz));
+                                      setCredentialsBusinessName(biz.profileName || biz.name);
+                                    }}
+                                    className="px-3 py-1 rounded-lg bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100 transition-colors flex items-center gap-1"
+                                  >
+                                    <FileText className="w-3 h-3" />
+                                    Credentials
+                                  </button>
+                                ) : null}
+                                {isFromDb ? (
+                                  <button
+                                    onClick={() => {
                                       setDeleteEntireBusinessProfile(false);
                                       setConfirmDeleteId(biz.id);
                                     }}
@@ -2733,6 +2748,32 @@ const AdminPanel: React.FC = () => {
         )}
 
 
+        {/* ═══ CREDENTIALS REVIEW MODAL ═══ */}
+        {credentialsBusinessId && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => setCredentialsBusinessId(null)}
+            />
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6">
+              <button
+                type="button"
+                onClick={() => setCredentialsBusinessId(null)}
+                className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Verify credentials</h3>
+              <p className="text-sm text-gray-500 mb-4">{credentialsBusinessName}</p>
+              <AdminBusinessCredentials
+                businessId={credentialsBusinessId}
+                businessName={credentialsBusinessName}
+                onVerified={() => void refreshBusinesses?.()}
+              />
+            </div>
+          </div>
+        )}
+
         {/* ═══ PREVIEW BUSINESS MODAL ═══ */}
         {previewBusinessId && (() => {
           const biz = allBusinesses.find(b => b.id === previewBusinessId);
@@ -2781,6 +2822,16 @@ const AdminPanel: React.FC = () => {
                   )}
                   {biz.tags && biz.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mb-4">{biz.tags.map((tag, i) => <span key={i} className="px-2 py-0.5 rounded-md bg-gray-100 text-gray-600 text-xs font-medium">{tag}</span>)}</div>
+                  )}
+                  {isFromDb && (
+                    <div className="mb-4 pt-4 border-t border-gray-100">
+                      <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Credentials</p>
+                      <AdminBusinessCredentials
+                        businessId={profileBusinessIdFor(biz)}
+                        businessName={biz.profileName || biz.name}
+                        onVerified={() => void refreshBusinesses?.()}
+                      />
+                    </div>
                   )}
                   <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
                     <button onClick={() => { setPreviewBusinessId(null); openEditModal(biz.id); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-colors"><Edit3 className="w-4 h-4" />Edit Listing</button>

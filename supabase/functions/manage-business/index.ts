@@ -2527,6 +2527,182 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── UPSERT_BUSINESS_CREDENTIALS ─── (owner or admin)
+    if (action === 'upsert_business_credentials') {
+      const businessId = String(body.businessId ?? '').trim();
+      if (!businessId) return errorResponse(req, 'Missing businessId');
+
+      const denied = await assertAdminOrOwner(supabase, businessId, authUser, req);
+      if (denied) return denied;
+
+      const patch = (body.credentials ?? body.patch ?? {}) as Record<string, unknown>;
+      const row: Record<string, unknown> = {
+        business_id: businessId,
+        updated_at: new Date().toISOString(),
+      };
+
+      const setDoc = (
+        prefix: string,
+        urlKey: string,
+        pathKey: string,
+        uploadedAtKey: string,
+        verifiedKey: string,
+      ) => {
+        if (patch[urlKey] !== undefined) row[urlKey] = patch[urlKey] || null;
+        if (patch[pathKey] !== undefined) {
+          row[pathKey] = patch[pathKey] || null;
+          if (patch[pathKey]) {
+            row[uploadedAtKey] = new Date().toISOString();
+            row[verifiedKey] = false;
+            row[`verified_${prefix}_at`] = null;
+            row[`verified_${prefix}_by`] = null;
+          }
+        }
+      };
+
+      setDoc(
+        'liability_insurance',
+        'liability_insurance_url',
+        'liability_insurance_path',
+        'liability_insurance_uploaded_at',
+        'verified_liability_insurance',
+      );
+      setDoc(
+        'tourism_permit',
+        'tourism_permit_url',
+        'tourism_permit_path',
+        'tourism_permit_uploaded_at',
+        'verified_tourism_permit',
+      );
+      setDoc(
+        'association_credentials',
+        'association_credentials_url',
+        'association_credentials_path',
+        'association_credentials_uploaded_at',
+        'verified_association_credentials',
+      );
+
+      if (patch.first_aid_certificate_path !== undefined) {
+        row.first_aid_certificate_path = patch.first_aid_certificate_path || null;
+        row.first_aid_certificate_url = patch.first_aid_certificate_url || null;
+        if (patch.first_aid_certificate_path) {
+          row.first_aid_uploaded_at = new Date().toISOString();
+          row.verified_first_aid = false;
+          row.verified_first_aid_at = null;
+          row.verified_first_aid_by = null;
+        }
+      }
+      if (patch.first_aid_completed_at !== undefined) {
+        row.first_aid_completed_at = patch.first_aid_completed_at || null;
+        if (patch.first_aid_completed_at) {
+          row.verified_first_aid = false;
+          row.verified_first_aid_at = null;
+          row.verified_first_aid_by = null;
+        }
+      }
+      if (patch.admin_notes !== undefined) {
+        const adminProf = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('user_id', authUser.id)
+          .maybeSingle();
+        if (adminProf.data?.role === 'admin') {
+          row.admin_notes = patch.admin_notes;
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('business_credentials')
+        .upsert(row, { onConflict: 'business_id' })
+        .select('*')
+        .maybeSingle();
+
+      if (error) {
+        console.error('[manage-business] upsert_business_credentials:', error);
+        return errorResponse(req, error.message, 500);
+      }
+      return jsonResponse(req, { success: true, credentials: data });
+    }
+
+    // ─── ADMIN_VERIFY_CREDENTIAL ───
+    if (action === 'admin_verify_credential') {
+      const denied = await assertAdmin(supabase, authUser, req);
+      if (denied) return denied;
+
+      const businessId = String(body.businessId ?? '').trim();
+      const credentialKey = String(body.credentialKey ?? body.key ?? '').trim();
+      const verified = Boolean(body.verified);
+
+      const keyToColumn: Record<string, string> = {
+        tourism_permit: 'verified_tourism_permit',
+        liability_insurance: 'verified_liability_insurance',
+        association_credentials: 'verified_association_credentials',
+        first_aid: 'verified_first_aid',
+      };
+      const col = keyToColumn[credentialKey];
+      if (!businessId || !col) {
+        return errorResponse(req, 'Missing businessId or invalid credentialKey');
+      }
+
+      const atCol = `${col}_at`;
+      const byCol = `${col}_by`;
+      const updates: Record<string, unknown> = {
+        [col]: verified,
+        [atCol]: verified ? new Date().toISOString() : null,
+        [byCol]: verified ? authUser.id : null,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('business_credentials')
+        .upsert({ business_id: businessId, ...updates }, { onConflict: 'business_id' });
+
+      if (error) {
+        console.error('[manage-business] admin_verify_credential:', error);
+        return errorResponse(req, error.message, 500);
+      }
+      return jsonResponse(req, { success: true });
+    }
+
+    // ─── GET_CREDENTIAL_SIGNED_URL ─── (admin or owner)
+    if (action === 'get_credential_signed_url') {
+      const businessId = String(body.businessId ?? '').trim();
+      const filePath = String(body.filePath ?? '').trim();
+      if (!businessId || !filePath) {
+        return errorResponse(req, 'Missing businessId or filePath');
+      }
+
+      const denied = await assertAdminOrOwner(supabase, businessId, authUser, req);
+      if (denied) return denied;
+
+      const { data, error } = await supabase.storage
+        .from('business-credentials')
+        .createSignedUrl(filePath, 3600);
+
+      if (error || !data?.signedUrl) {
+        return errorResponse(req, error?.message || 'Could not create signed URL', 500);
+      }
+      return jsonResponse(req, { success: true, signedUrl: data.signedUrl });
+    }
+
+    // ─── GET_BUSINESS_CREDENTIALS ─── (admin or owner; full row)
+    if (action === 'get_business_credentials') {
+      const businessId = String(body.businessId ?? '').trim();
+      if (!businessId) return errorResponse(req, 'Missing businessId');
+
+      const denied = await assertAdminOrOwner(supabase, businessId, authUser, req);
+      if (denied) return denied;
+
+      const { data, error } = await supabase
+        .from('business_credentials')
+        .select('*')
+        .eq('business_id', businessId)
+        .maybeSingle();
+
+      if (error) return errorResponse(req, error.message, 500);
+      return jsonResponse(req, { success: true, credentials: data ?? null });
+    }
+
     // ─── ADMIN_DELETE_USER ───
     if (action === 'admin_delete_user') {
       const targetUserId = body.targetUserId || body.userId;
