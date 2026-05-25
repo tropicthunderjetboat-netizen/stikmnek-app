@@ -3,6 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import {
   CREDENTIAL_DEFINITIONS,
+  resolveCredentialsBusinessId,
   type BusinessCredentialsRow,
   type CredentialKey,
 } from '@/lib/businessCredentials';
@@ -57,15 +58,27 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
     if (!profileBusinessId || !user?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('manage-business', {
-        headers: await getEdgeAuthHeaders(),
-        body: {
-          action: 'get_business_credentials',
-          businessId: profileBusinessId,
-        },
-      });
-      if (error) throw error;
-      const row = (data?.credentials ?? null) as BusinessCredentialsRow | null;
+      const pid = await resolveCredentialsBusinessId(supabase, profileBusinessId);
+      const { data: directRow, error: directErr } = await supabase
+        .from('business_credentials')
+        .select('*')
+        .eq('business_id', pid)
+        .maybeSingle();
+
+      let row: BusinessCredentialsRow | null = directErr
+        ? null
+        : ((directRow ?? null) as BusinessCredentialsRow | null);
+      if (directErr) {
+        const { data, error } = await supabase.functions.invoke('manage-business', {
+          headers: await getEdgeAuthHeaders(),
+          body: {
+            action: 'get_business_credentials',
+            businessId: pid,
+          },
+        });
+        if (error) throw new Error(await edgeFunctionErrorMessage(data, error));
+        row = (data?.credentials ?? null) as BusinessCredentialsRow | null;
+      }
       const next: Record<CredentialKey, DocState> = {
         tourism_permit: { upload: null, verified: false },
         liability_insurance: { upload: null, verified: false },
@@ -125,10 +138,11 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
         patch.first_aid_completed_at = firstAidDate || null;
       }
 
+      const pid = await resolveCredentialsBusinessId(supabase, profileBusinessId);
       let saveOk = false;
       if (Object.keys(patch).length > 0) {
         const row: Record<string, unknown> = {
-          business_id: profileBusinessId,
+          business_id: pid,
           updated_at: new Date().toISOString(),
           ...patch,
         };
@@ -175,7 +189,7 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
             headers: await getEdgeAuthHeaders(),
             body: {
               action: 'upsert_business_credentials',
-              businessId: profileBusinessId,
+              businessId: pid,
               credentials: patch,
             },
           });
@@ -240,6 +254,13 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
         <div>
           <h3 className="text-lg font-extrabold text-gray-900">{title}</h3>
           <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+          <p className="text-xs text-teal-800/90 mt-2 font-medium">
+            {language === 'en'
+              ? 'Applies to your whole business — all your listings share these credentials.'
+              : language === 'fr'
+                ? 'Valable pour toute votre entreprise — toutes vos annonces partagent ces documents.'
+                : 'Blong olgeta bisnis — evri listing i yusum semak kredensel.'}
+          </p>
         </div>
       </div>
 

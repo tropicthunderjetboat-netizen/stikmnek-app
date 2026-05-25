@@ -2629,7 +2629,20 @@ Deno.serve(async (req) => {
       const denied = await assertAdmin(supabase, authUser, req);
       if (denied) return denied;
 
-      const businessId = String(body.businessId ?? '').trim();
+      let businessId = String(body.businessId ?? '').trim();
+      const { data: asProfile } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('id', businessId)
+        .maybeSingle();
+      if (!asProfile?.id) {
+        const { data: offering } = await supabase
+          .from('business_offerings')
+          .select('business_id')
+          .eq('id', businessId)
+          .maybeSingle();
+        if (offering?.business_id) businessId = String(offering.business_id);
+      }
       const credentialKey = String(body.credentialKey ?? body.key ?? '').trim();
       const verified = Boolean(body.verified);
 
@@ -2687,8 +2700,22 @@ Deno.serve(async (req) => {
 
     // ─── GET_BUSINESS_CREDENTIALS ─── (admin or owner; full row)
     if (action === 'get_business_credentials') {
-      const businessId = String(body.businessId ?? '').trim();
+      let businessId = String(body.businessId ?? '').trim();
       if (!businessId) return errorResponse(req, 'Missing businessId');
+
+      const { data: asProfile } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('id', businessId)
+        .maybeSingle();
+      if (!asProfile?.id) {
+        const { data: offering } = await supabase
+          .from('business_offerings')
+          .select('business_id')
+          .eq('id', businessId)
+          .maybeSingle();
+        if (offering?.business_id) businessId = String(offering.business_id);
+      }
 
       const denied = await assertAdminOrOwner(supabase, businessId, authUser, req);
       if (denied) return denied;

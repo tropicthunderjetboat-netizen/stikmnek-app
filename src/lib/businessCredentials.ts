@@ -1,3 +1,7 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Business } from '@/data/businesses';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
+
 /** Credential types stored on `business_credentials` (per business profile). */
 export type CredentialKey =
   | 'tourism_permit'
@@ -137,3 +141,62 @@ export function credentialsLeaderboardScore(creds: BusinessCredentialsPublic): n
 export function hasAnyPublicCredential(creds: BusinessCredentialsPublic): boolean {
   return creds.verifiedCount > 0;
 }
+
+/**
+ * Credentials live on the master `businesses` row (one per company).
+ * Multi-listing apps pass `profileBusinessId` on each offering; fall back to lookup by offering id.
+ */
+export function profileIdForCredentialsFromBusiness(b: Pick<Business, 'id' | 'profileBusinessId'>): string {
+  return profileBusinessIdFor(b as Business);
+}
+
+/** Resolve profile `businesses.id` from either profile id or `business_offerings.id`. */
+export async function resolveCredentialsBusinessId(
+  supabase: SupabaseClient,
+  businessIdOrOfferingId: string,
+): Promise<string> {
+  const id = String(businessIdOrOfferingId ?? '').trim();
+  if (!id) return '';
+
+  const { data: profileRow } = await supabase
+    .from('businesses')
+    .select('id')
+    .eq('id', id)
+    .maybeSingle();
+  if (profileRow?.id) return String(profileRow.id);
+
+  const { data: offering } = await supabase
+    .from('business_offerings')
+    .select('business_id')
+    .eq('id', id)
+    .maybeSingle();
+  if (offering?.business_id) return String(offering.business_id);
+
+  return id;
+}
+
+export const CREDENTIAL_VERIFY_COLUMNS: Record<
+  CredentialKey,
+  { flag: keyof BusinessCredentialsRow; at: string; by: string }
+> = {
+  tourism_permit: {
+    flag: 'verified_tourism_permit',
+    at: 'verified_tourism_permit_at',
+    by: 'verified_tourism_permit_by',
+  },
+  liability_insurance: {
+    flag: 'verified_liability_insurance',
+    at: 'verified_liability_insurance_at',
+    by: 'verified_liability_insurance_by',
+  },
+  association_credentials: {
+    flag: 'verified_association_credentials',
+    at: 'verified_association_credentials_at',
+    by: 'verified_association_credentials_by',
+  },
+  first_aid: {
+    flag: 'verified_first_aid',
+    at: 'verified_first_aid_at',
+    by: 'verified_first_aid_by',
+  },
+};
