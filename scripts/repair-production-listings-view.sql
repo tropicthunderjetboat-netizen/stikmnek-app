@@ -12,3 +12,4 @@ WHERE active = true;
 -- 3) Confirm anon can read (required for public site)
 GRANT SELECT ON public.business_listings_view TO anon;
 GRANT SELECT ON public.business_listings_view TO authenticated;
+a

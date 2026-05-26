@@ -1113,26 +1113,9 @@ const BusinessDetail: React.FC = () => {
 
           <div className="contents min-w-0 lg:col-span-1 lg:block lg:space-y-4">
             <div className="contents lg:block lg:sticky lg:top-20">
-              {/* Pricing — mobile order 2 (after description); desktop sidebar top */}
-              <div
-                className={`order-2 bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-gray-100 lg:rounded-b-none lg:border-b-0 lg:order-none ${
-                  showTieredTable ? 'hidden lg:block' : ''
-                }`}
-              >
-                {showTieredTable ? (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                      {language === 'en' ? 'Pricing' : language === 'fr' ? 'Tarifs' : 'Praes'}
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      {language === 'en'
-                        ? 'Tiered per-person rates — see the pricing table for Adult / Child / Infant VT.'
-                        : language === 'fr'
-                          ? 'Tarifs par palier — voir le tableau des prix.'
-                          : 'Praes long wanwan man — lukim tebol long pej ia.'}
-                    </p>
-                  </div>
-                ) : (
+              {/* Flat pricing card — tiered listings use the main-column table only */}
+              {!showTieredTable && (
+              <div className="order-2 bg-white rounded-xl p-5 sm:p-6 shadow-sm border border-gray-100 lg:rounded-b-none lg:border-b-0 lg:order-none">
                   <div className="rounded-xl border-2 border-teal-300/70 bg-gradient-to-br from-teal-50 via-emerald-50/90 to-white p-4 sm:p-5 shadow-md shadow-teal-100/60">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-[10px] font-bold uppercase tracking-wider shadow-sm">
@@ -1165,11 +1148,17 @@ const BusinessDetail: React.FC = () => {
                           : 'Praes blong memba StikmNek'}
                     </p>
                   </div>
-                )}
               </div>
+              )}
 
               {/* Actions — booking, WhatsApp, save/share */}
-              <div className="order-5 bg-white rounded-xl px-5 pb-5 pt-4 sm:px-6 sm:pb-6 shadow-sm border border-gray-100 border-t-0 lg:order-none lg:rounded-none lg:shadow-none lg:border-t lg:border-gray-100 lg:pt-5">
+              <div
+                className={`order-5 bg-white rounded-xl px-5 pb-5 pt-4 sm:px-6 sm:pb-6 shadow-sm border border-gray-100 lg:order-none lg:pt-5 ${
+                  showTieredTable
+                    ? ''
+                    : 'border-t-0 lg:rounded-none lg:shadow-none lg:border-t lg:border-gray-100'
+                }`}
+              >
               <div className="flex items-center gap-1 mb-2">
                 <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
                 <span className="font-bold text-gray-900">{biz.rating}</span>
