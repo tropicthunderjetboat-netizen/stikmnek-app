@@ -1,7 +1,6 @@
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { t } from '@/data/translations';
 import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
 import { Menu, X, User, MapPin, Tag, LayoutDashboard, Shield, Ticket, Store, Plane, Briefcase, HelpCircle } from 'lucide-react';
 import {
