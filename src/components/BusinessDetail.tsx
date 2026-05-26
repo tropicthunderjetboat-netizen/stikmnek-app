@@ -838,10 +838,6 @@ const BusinessDetail: React.FC = () => {
               </div>
             )}
 
-            <div className="order-4 lg:order-none">
-              <BusinessCredentialsTile credentials={profileCredentials} language={language} />
-            </div>
-
             <div className="order-3 lg:order-none">
               <PhotoGallery
                 businessId={profileId}
@@ -1108,6 +1104,10 @@ const BusinessDetail: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="order-10 lg:order-none">
+              <BusinessCredentialsTile credentials={profileCredentials} language={language} />
             </div>
           </div>
 
