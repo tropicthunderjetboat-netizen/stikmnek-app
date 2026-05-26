@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
+import { t } from '@/data/translations';
 import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
 import { Menu, X, User, MapPin, Tag, LayoutDashboard, Shield, Ticket, Store, Plane, Briefcase, HelpCircle } from 'lucide-react';
 import {
@@ -11,7 +12,7 @@ import {
   prefetchChunk,
 } from '@/lib/heavyChunks';
 
-const APP_ICON = 'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg';
+const APP_ICON = '/logo-icon.png';
 
 const Navbar: React.FC = () => {
   const {
@@ -105,24 +106,36 @@ const Navbar: React.FC = () => {
           {/* Logo */}
           <button
             onClick={() => setCurrentView('home')}
-            className="flex items-center gap-2 group"
+            className="flex items-center gap-2.5 group text-left"
           >
-            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-teal-200 group-hover:shadow-teal-300 transition-shadow">
-              <img 
-                src={APP_ICON} 
-                alt="StikmNek" 
+            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-teal-200 group-hover:shadow-teal-300 transition-shadow shrink-0">
+              <img
+                src={APP_ICON}
+                alt=""
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
-                  target.parentElement!.classList.add('bg-gradient-to-br', 'from-teal-500', 'to-emerald-600', 'flex', 'items-center', 'justify-center');
+                  target.parentElement!.classList.add(
+                    'bg-gradient-to-br',
+                    'from-teal-500',
+                    'to-emerald-600',
+                    'flex',
+                    'items-center',
+                    'justify-center',
+                  );
                   target.parentElement!.innerHTML = '<span class="text-white text-sm font-bold">S</span>';
                 }}
               />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-teal-700 to-emerald-600 bg-clip-text text-transparent">
-              StikmNek
-            </span>
+            <div className="min-w-0">
+              <span className="block text-xl font-bold bg-gradient-to-r from-teal-700 to-emerald-600 bg-clip-text text-transparent leading-tight">
+                StikmNek
+              </span>
+              <span className="hidden xl:block text-[10px] font-medium text-teal-800/75 leading-snug max-w-[240px] truncate">
+                {t('footer.local_badge', language)}
+              </span>
+            </div>
           </button>
 
           {/* Desktop Nav */}

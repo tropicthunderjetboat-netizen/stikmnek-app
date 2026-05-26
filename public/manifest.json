@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "StikmNek - Vanuatu Tourist Deals",
+  "name": "StikmNek - Discover Vanuatu's Best Deals",
   "short_name": "StikmNek",
-  "description": "Discover the best deals on dining, tours, activities, spa & accommodation in Vanuatu. Save up to 35% with your StikmNek pass.",
+  "description": "100% locally owned · Supporting grassroots businesses. Save on dining, tours, activities, spa & accommodation in Vanuatu with your StikmNek pass.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -14,28 +14,22 @@
   "categories": ["travel", "lifestyle", "shopping"],
   "icons": [
     {
-      "src": "https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg",
-      "sizes": "192x192",
-      "type": "image/jpeg",
+      "src": "/logo-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg",
+      "src": "/logo-icon.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/logo-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
-    },
-    {
-      "src": "https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg",
-      "sizes": "192x192",
-      "type": "image/jpeg",
-      "purpose": "maskable"
-    },
-    {
-      "src": "https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg",
-      "sizes": "512x512",
-      "type": "image/jpeg",
-      "purpose": "maskable"
     }
   ],
   "screenshots": [],

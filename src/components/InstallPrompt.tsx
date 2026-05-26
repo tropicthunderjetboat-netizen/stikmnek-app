@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Download, X, Share2, Plus, ChevronRight, Smartphone } from 'lucide-react';
 
-const APP_ICON = 'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg';
+const APP_ICON = '/logo-icon.png';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
