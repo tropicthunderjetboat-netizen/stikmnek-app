@@ -443,8 +443,10 @@ const CompleteBusinessProfile: React.FC = () => {
                   label={language === 'en' ? 'Business logo' : language === 'fr' ? 'Logo' : 'Logo'}
                   sublabel={
                     language === 'en'
-                      ? 'Optional — square PNG or JPG, up to 5MB.'
-                      : 'Optionnel — carré, PNG ou JPG.'
+                      ? 'Optional — one logo only. Pick one file at a time; choosing another replaces it. You can save without a logo.'
+                      : language === 'fr'
+                        ? 'Optionnel — un seul logo. Un fichier à la fois ; un nouveau remplace l’ancien.'
+                        : 'Optional — wan logo. Save i go wetem logo.'
                   }
                 />
                 <LocationMapPicker mapUrl={mapUrl} onMapUrlChange={setMapUrl} language={language} />

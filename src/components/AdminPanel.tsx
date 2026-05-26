@@ -30,6 +30,9 @@ import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import AdminPendingSubmissionReview, { type AdminPendingBusiness } from './AdminPendingSubmissionReview';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import AdminBusinessCredentials from '@/components/AdminBusinessCredentials';
+import AdminIncompleteProfiles, {
+  type IncompleteBusinessProfile,
+} from '@/components/AdminIncompleteProfiles';
 
 const AdminPurchaseOverview = React.lazy(() => import('./AdminPurchaseOverview'));
 const PassEditor = React.lazy(() => import('./PassEditor'));
@@ -154,6 +157,8 @@ const AdminPanel: React.FC = () => {
   const [approvalListFilter, setApprovalListFilter] = useState<'all' | 'pending' | 'archived'>('all');
   const [processingPhotoId, setProcessingPhotoId] = useState<string | null>(null);
   const [loadingPending, setLoadingPending] = useState(false);
+  const [incompleteProfiles, setIncompleteProfiles] = useState<IncompleteBusinessProfile[]>([]);
+  const [loadingIncompleteProfiles, setLoadingIncompleteProfiles] = useState(false);
   const [loadingBusinesses, setLoadingBusinesses] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
@@ -318,6 +323,23 @@ const AdminPanel: React.FC = () => {
       await loadPendingDirect(showToast);
     } finally {
       setLoadingPending(false);
+    }
+  }, [user]);
+
+  const loadIncompleteProfiles = useCallback(async () => {
+    if (!user) return;
+    setLoadingIncompleteProfiles(true);
+    try {
+      const { data, error } = await supabase.rpc('get_incomplete_business_profiles_for_admin');
+      if (error) {
+        console.warn('[Admin] get_incomplete_business_profiles_for_admin:', error.message);
+        return;
+      }
+      setIncompleteProfiles((data || []) as IncompleteBusinessProfile[]);
+    } catch (err) {
+      console.warn('[Admin] incomplete profiles load failed:', err);
+    } finally {
+      setLoadingIncompleteProfiles(false);
     }
   }, [user]);
 
@@ -504,8 +526,9 @@ const AdminPanel: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     loadPending();
+    void loadIncompleteProfiles();
     if (!editsLoadedRef.current) { editsLoadedRef.current = true; loadPendingEdits(); }
-  }, [user]);
+  }, [user, loadIncompleteProfiles]);
 
   const loadPendingEdits = async (showToast = false) => {
     if (!user) return;
@@ -1580,6 +1603,12 @@ const AdminPanel: React.FC = () => {
         {/* ═══ APPROVALS TAB ═══ */}
         {activeTab === 'approvals' && (
           <div className="space-y-6">
+            <AdminIncompleteProfiles
+              profiles={incompleteProfiles}
+              loading={loadingIncompleteProfiles}
+              onRefresh={() => void loadIncompleteProfiles()}
+            />
+
             {/* Status bar with realtime indicator and last refreshed */}
             <div className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 shadow-sm">
               <div className="flex items-center gap-2">
@@ -1644,7 +1673,10 @@ const AdminPanel: React.FC = () => {
                   ))}
                 </div>
                 <button
-                  onClick={() => loadPending(true)}
+                  onClick={() => {
+                    void loadPending(true);
+                    void loadIncompleteProfiles();
+                  }}
                   disabled={loadingPending}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >

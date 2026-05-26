@@ -252,7 +252,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const allowReorder = allowReorderProp ?? maxPhotos > 1;
-
+  const isSingleSlot = maxPhotos === 1;
 
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
 
@@ -559,12 +559,6 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
    */
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
-    const remaining = maxPhotos - photos.length;
-
-    if (remaining <= 0) {
-      toast.error(`Maximum ${maxPhotos} photos allowed`);
-      return;
-    }
 
     // Filter valid image files
     const validFiles = fileArray.filter(f => f && f.type.startsWith('image/'));
@@ -573,15 +567,44 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       return;
     }
 
+    let basePhotos = [...photos];
+    let remaining = maxPhotos - basePhotos.length - uploading.filter((u) => u.status !== 'error').length;
+
+    // Logo / single-slot: picking a new file replaces the current image instead of blocking.
+    if (remaining <= 0 && isSingleSlot && validFiles.length > 0) {
+      if (basePhotos.length > 0) {
+        const old = basePhotos[0];
+        try {
+          await supabase.storage.from('business-photos').remove([old.filePath]);
+        } catch (err) {
+          console.warn('Failed to remove previous image (non-critical):', err);
+        }
+        basePhotos = [];
+        onPhotosChange([]);
+      }
+      remaining = 1;
+    }
+
+    if (remaining <= 0) {
+      toast.error(
+        isSingleSlot
+          ? 'Only one image allowed. Remove the current image first, or choose a new file to replace it.'
+          : `Maximum ${maxPhotos} photos allowed`,
+      );
+      return;
+    }
+
     const filesToUpload = validFiles.slice(0, remaining);
-    if (fileArray.length > remaining) {
+    if (!isSingleSlot && fileArray.length > remaining) {
       toast.info(`Only uploading ${remaining} of ${fileArray.length} files (max ${maxPhotos})`);
+    } else if (isSingleSlot && validFiles.length > 1) {
+      toast.info('Only one logo at a time — using the first image you selected.');
     }
 
     console.log(`[PhotoUploader] Serial queue: ${filesToUpload.length} file(s)`);
 
     const successful: UploadedPhoto[] = [];
-    let accumulated = [...photos];
+    let accumulated = [...basePhotos];
 
     for (const file of filesToUpload) {
       let preReadDataUrl = '';
@@ -603,7 +626,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
     if (successful.length > 0) {
       toast.success(`${successful.length} photo${successful.length > 1 ? 's' : ''} uploaded!`);
     }
-  }, [photos, maxPhotos, uploadFile, onPhotosChange]);
+  }, [photos, maxPhotos, isSingleSlot, uploadFile, onPhotosChange, uploading]);
 
   const reorderPhotos = useCallback(
     (fromIndex: number, toIndex: number) => {
@@ -694,7 +717,9 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   };
 
   const isUploading = uploading.some(u => u.status === 'uploading' || u.status === 'compressing' || u.status === 'reading');
-  const canUploadMore = photos.length < maxPhotos;
+  const inFlightCount = uploading.filter((u) => u.status !== 'error').length;
+  const slotsUsed = photos.length + inFlightCount;
+  const canUploadMore = slotsUsed < maxPhotos;
 
   return (
     <div className="space-y-3">
@@ -703,7 +728,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        multiple
+        multiple={maxPhotos > 1}
         onChange={handleFileInput}
         className="hidden"
         capture={undefined}
@@ -737,7 +762,11 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               {sublabel}
             </p>
             <p className={`text-gray-300 mt-1 ${compact ? 'text-[10px]' : 'text-xs'}`}>
-              {photos.length}/{maxPhotos} photos
+              {isSingleSlot
+                ? photos.length > 0
+                  ? '1 logo uploaded — choose another file to replace'
+                  : 'One image'
+                : `${photos.length}/${maxPhotos} photos`}
             </p>
           </div>
         </div>
@@ -946,9 +975,11 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       )}
 
       {/* Max photos reached */}
-      {!canUploadMore && photos.length > 0 && (
+      {!canUploadMore && photos.length > 0 && inFlightCount === 0 && (
         <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 text-center">
-          Maximum of {maxPhotos} photos reached. Remove a photo to upload a new one.
+          {isSingleSlot
+            ? 'Logo uploaded. Remove it or pick a new file to replace it.'
+            : `Maximum of ${maxPhotos} photos reached. Remove a photo to upload a new one.`}
         </p>
       )}
     </div>
