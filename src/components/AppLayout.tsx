@@ -19,6 +19,7 @@ import ListYourBusinessCta from './ListYourBusinessCta';
 import Footer from './Footer';
 import AuthModal from './AuthModal';
 import CookieConsent from './CookieConsent';
+import ListingsLoadBanner from './ListingsLoadBanner';
 import PaymentConfirmation from './PaymentConfirmation';
 import FloatingPassButton from './FloatingPassButton';
 import LoadingSkeleton from './LoadingSkeleton';
@@ -339,6 +340,8 @@ const AppLayout: React.FC = () => {
       </a>
 
       {!hideMainNav && <Navbar />}
+
+      <ListingsLoadBanner />
 
       {user && userProfileLoadError && (
         <div

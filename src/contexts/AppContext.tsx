@@ -3,12 +3,8 @@ import { toast } from 'sonner';
 import { Language } from '@/data/translations';
 import { Business } from '@/data/businesses';
 import { supabase, directProfileInsert, SUPABASE_URL, ENDPOINTS } from '@/lib/supabase';
-import {
-  mapJoinedOfferingToBusiness,
-  profileBusinessIdFor,
-  splitBusinessListingsViewRow,
-  BUSINESS_LISTINGS_VIEW_COLUMNS,
-} from '@/lib/businessOfferingMap';
+import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import { fetchActiveListings } from '@/lib/loadListings';
 import {
   favoriteKeysFromDbRows,
   favoriteKeyForOffering,
@@ -326,6 +322,9 @@ interface AppContextType {
   ) => Promise<{ allowed: boolean; message?: string }>;
   refreshUserProfile: () => Promise<void>;
   dataLoaded: boolean;
+  /** Set when the latest listings fetch failed or returned zero rows. */
+  listingsLoadError: string | null;
+  listingsLoadSource: 'business_listings_view' | 'business_offerings_join' | 'none' | null;
   refreshBusinesses: () => Promise<void>;
   refreshUserPass: () => Promise<void>;
   /** Reload pass redemptions from DB (e.g. after QR redemption). */
@@ -381,6 +380,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [dbBusinesses, setDbBusinesses] = useState<Business[]>([]);
   const [dbReviews, setDbReviews] = useState<DBReview[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [listingsLoadError, setListingsLoadError] = useState<string | null>(null);
+  const [listingsLoadSource, setListingsLoadSource] = useState<
+    'business_listings_view' | 'business_offerings_join' | 'none' | null
+  >(null);
   const [businessOwnerHasBusinessRow, setBusinessOwnerHasBusinessRow] = useState<boolean | null>(null);
   const [businessOwnerHasPendingSubmission, setBusinessOwnerHasPendingSubmission] = useState(false);
   /** Bumps to cancel in-flight owner-row lookups when user/session changes (see `refreshBusinessOwnerRowStatus`). */
@@ -476,62 +479,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loadBusinesses = useCallback(async () => {
     const DBG = '[loadBusinesses]';
     const gen = ++businessesLoadGenRef.current;
-    const listAbort = typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal ? AbortSignal.timeout(45_000) : undefined;
+    const listAbort =
+      typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+        ? AbortSignal.timeout(45_000)
+        : undefined;
     try {
-      // Every active offering → one `Business` in `dbBusinesses` (no Map/Object keyed by business_id).
-      // Load from `business_listings_view` (merged businesses + business_offerings; offering-first).
-      // Stub profiles (`businesses.active = false`) still surface live offers via `active` on the view.
-      let q = supabase
-        .from('business_listings_view')
-        .select(BUSINESS_LISTINGS_VIEW_COLUMNS)
-        .eq('active', true)
-        .order('featured', { ascending: false })
-        .order('title', { ascending: true });
-      if (listAbort) q = q.abortSignal(listAbort);
-      const { data: offeringRows, error: loadErr } = await q;
+      const result = await fetchActiveListings(supabase, SUPABASE_URL, { signal: listAbort });
 
       if (gen !== businessesLoadGenRef.current) return;
 
-      if (loadErr) {
-        console.warn(`${DBG} fetch error:`, loadErr.message || loadErr, loadErr);
-        // Do not wipe existing listings on transient errors (concurrent loads / flaky mobile).
-        setDataLoaded(true);
-        return;
-      }
+      setListingsLoadSource(result.source);
+      setListingsLoadError(result.error);
 
-      if (offeringRows && offeringRows.length > 0) {
-        const mapped: Business[] = [];
-        for (const row of offeringRows as Record<string, unknown>[]) {
-          const { o: offering, b: profile } = splitBusinessListingsViewRow(row);
-          if (!profile?.id) {
-            console.warn(`${DBG} Skipping row (missing profile_business_id):`, row?.id);
-            continue;
-          }
-          const profileName = String(profile.name ?? '(no name)');
-          const profileId = String(profile.id ?? '');
-          try {
-            const b = mapJoinedOfferingToBusiness(offering, profile, SUPABASE_URL);
-            mapped.push(b);
-          } catch (mapErr) {
-            console.warn(
-              `${DBG} Skipping offering:`,
-              profileName,
-              `profile=${profileId}`,
-              'Reason:',
-              mapErr,
-            );
-          }
+      if (result.businesses.length > 0) {
+        setDbBusinesses(result.businesses);
+        if (result.source === 'business_offerings_join') {
+          console.warn(
+            `${DBG} Loaded ${result.businesses.length} listings via offerings join fallback`,
+          );
+        } else {
+          console.log(`${DBG} Loaded ${result.businesses.length} listings from view`);
         }
-        if (gen !== businessesLoadGenRef.current) return;
-        setDbBusinesses(mapped);
+      } else if (result.error) {
+        console.warn(`${DBG} No listings:`, result.error);
+        // Keep prior listings on transient errors if we had data (e.g. tab refocus).
+        setDbBusinesses((prev) => (prev.length > 0 ? prev : []));
       } else {
-        if (gen !== businessesLoadGenRef.current) return;
         setDbBusinesses([]);
       }
       setDataLoaded(true);
     } catch (err) {
       if (gen !== businessesLoadGenRef.current) return;
+      const msg = err instanceof Error ? err.message : 'Could not load listings';
       console.error('[loadBusinesses] Failed to load businesses:', err);
+      setListingsLoadError(msg);
+      setListingsLoadSource('none');
+      setDbBusinesses((prev) => (prev.length > 0 ? prev : []));
       setDataLoaded(true);
     }
   }, []);
@@ -2033,6 +2016,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         redemptions,
         dbBusinesses, dbReviews, submitReview, validateSuperStarPaymentPrerequisites,
         checkReviewSubmissionAllowed, dataLoaded,
+        listingsLoadError,
+        listingsLoadSource,
         refreshBusinesses,
         refreshUserPass,
         refreshRedemptions,
