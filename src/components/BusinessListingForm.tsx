@@ -42,6 +42,7 @@ import {
   localizedListingSubmitValidationFeedback,
 } from '@/lib/businessOnboardingValidation';
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
+import BusinessCredentialsSettings from './BusinessCredentialsSettings';
 
 
 /** Whole submit (RPC + edge + attach) — allow RPC + edge cold starts without false “slow connection” */
@@ -1141,23 +1142,52 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           <h2 className="text-2xl font-bold text-gray-900 mb-3">
             {language === 'en' ? 'Listing Submitted!' : 'Inscription soumise!'}
           </h2>
-          <p className="text-gray-500 mb-6">
+          <p className="text-gray-500 mb-4">
             {language === 'en'
               ? 'Thank you for listing your business on StikmNek. Our team will review your submission and get back to you within 24 hours. You will receive an email notification once your listing is approved.'
               : 'Merci d\'avoir inscrit votre entreprise sur StikmNek. Notre équipe examinera votre soumission et vous répondra dans les 24 heures. Vous recevrez une notification par email une fois votre inscription approuvée.'}
           </p>
-          <button
-            onClick={() => setSubmitted(false)}
-            className="px-6 py-2.5 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors"
-          >
-            {language === 'en' ? 'Submit Another' : 'Soumettre un autre'}
-          </button>
+          {ownerProfileBusinessId && (
+            <p className="text-sm text-teal-800 bg-teal-50 border border-teal-100 rounded-xl px-4 py-3 mb-6 text-left">
+              {language === 'en'
+                ? 'Optional: upload insurance, permits, or training certificates in Business Profile → My credentials. Verified documents help you rank higher on the leaderboard.'
+                : language === 'fr'
+                  ? 'Facultatif : téléchargez assurance, permis ou certificats dans Profil entreprise → Mes accréditations.'
+                  : 'Optional: upload insurance o permit long Business Profile → My credentials.'}
+            </p>
+          )}
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            {ownerProfileBusinessId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentView('business-dashboard');
+                  window.setTimeout(() => {
+                    window.dispatchEvent(
+                      new CustomEvent('switch-dashboard-tab', { detail: { tab: 'profile' } }),
+                    );
+                  }, 150);
+                }}
+                className="px-6 py-2.5 rounded-xl border border-teal-200 text-teal-800 font-semibold hover:bg-teal-50 transition-colors"
+              >
+                {language === 'en' ? 'Upload credentials' : language === 'fr' ? 'Télécharger des documents' : 'Upload kredensel'}
+              </button>
+            )}
+            <button
+              onClick={() => setSubmitted(false)}
+              className="px-6 py-2.5 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors"
+            >
+              {language === 'en' ? 'Submit Another' : 'Soumettre un autre'}
+            </button>
+          </div>
         </div>
       </section>
     );
   }
 
   const isEmbeddedEdit = Boolean(embeddedEdit);
+  const credentialsProfileId =
+    embeddedEdit?.profileBusinessId?.trim() || ownerProfileBusinessId || null;
 
   return (
     <section
@@ -1212,10 +1242,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             </p>
             <p className="text-gray-600 leading-relaxed">
               {language === 'en'
-                ? 'First complete your business profile (Dashboard) with phone, WhatsApp, and address. Here you add each deal separately — we copy those saved details into this form so you do not have to retype them. Use a clear title for this deal (not only your company name).'
+                ? 'First complete your business profile (Dashboard → Business Profile) with phone, WhatsApp, and address. Here you add each deal separately — we copy those saved details into this form. Scroll down to optionally upload credentials (insurance, permits). Use a clear title for this deal (not only your company name).'
                 : language === 'fr'
-                  ? 'Complétez dabord votre profil entreprise (tableau de bord) avec téléphone, WhatsApp et adresse. Ici vous ajoutez chaque offre — nous copions ces informations (vous pouvez les modifier). Donnez un titre clair pour cette offre.'
-                  : 'Fes komplitim profil bisnis long dashboard wetem fon, WhatsApp, mo adres. Hia yu adem evri dil — ol detaels i save kopi automatik (yu save senis). Yusum klia titel blong dil ia.'}
+                  ? 'Complétez dabord votre profil entreprise (tableau de bord → Profil entreprise). Ici vous ajoutez chaque offre. Faites défiler pour télécharger des accréditations (facultatif). Donnez un titre clair pour cette offre.'
+                  : 'Fes komplitim profil bisnis long dashboard. Hia yu adem evri dil. Scroll daon blong upload kredensel (optional). Yusum klia titel blong dil ia.'}
             </p>
           </div>
         )}
@@ -1824,6 +1854,29 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </p>
             )}
           </div>
+
+          {credentialsProfileId && user?.id && (
+            <div className="space-y-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                {language === 'en'
+                  ? 'Optional — company credentials'
+                  : language === 'fr'
+                    ? 'Facultatif — accréditations'
+                    : 'Optional — kredensel'}
+              </p>
+              <BusinessCredentialsSettings profileBusinessId={credentialsProfileId} />
+            </div>
+          )}
+
+          {!credentialsProfileId && user?.type === 'business' && !isEmbeddedEdit && (
+            <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-4 text-sm text-amber-900">
+              {language === 'en'
+                ? 'Save your business profile in the dashboard first (phone, address, logo). Then you can upload optional credentials (insurance, permits) on this form or under Business Profile.'
+                : language === 'fr'
+                  ? 'Enregistrez dabord votre profil entreprise dans le tableau de bord, puis vous pourrez télécharger des accréditations ici.'
+                  : 'Save profail bisnis long dashboard first, bae yu save upload kredensel.'}
+            </div>
+          )}
 
           {!isEmbeddedEdit && (
             <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">

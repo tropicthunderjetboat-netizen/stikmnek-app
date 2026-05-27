@@ -840,6 +840,37 @@ const BusinessOwnerDashboard: React.FC = () => {
     return effectiveProfileBusinessId(row);
   }, [selectedProfileId, approvedOnlyBusinesses]);
 
+  /** Profile id when owner has a `businesses` row but no approved offering yet (pending-first onboarding). */
+  const [fallbackProfileBusinessId, setFallbackProfileBusinessId] = useState('');
+  useEffect(() => {
+    if (!user?.id) {
+      setFallbackProfileBusinessId('');
+      return;
+    }
+    if (ownerProfileBusinessId) {
+      setFallbackProfileBusinessId('');
+      return;
+    }
+    if (businessOwnerHasBusinessRow !== true) return;
+    let cancelled = false;
+    void (async () => {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled || error) return;
+      setFallbackProfileBusinessId(data?.id ? String(data.id) : '');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, ownerProfileBusinessId, businessOwnerHasBusinessRow]);
+
+  const effectiveProfileBusinessId = ownerProfileBusinessId || fallbackProfileBusinessId;
+
   useEffect(() => {
     if (unifiedBusinesses.length > 0 && !selectedBusinessIdRef.current) {
       const firstApproved = unifiedBusinesses.find(b => b._source === 'approved');
@@ -1507,7 +1538,7 @@ const BusinessOwnerDashboard: React.FC = () => {
   // ═══ SIDEBAR NAV ITEMS ═══
   const navItems: { key: DashboardTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { key: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-5 h-5" /> },
-    ...(ownerProfileBusinessId
+    ...(effectiveProfileBusinessId
       ? [
           {
             key: 'profile' as const,
@@ -2258,18 +2289,18 @@ const BusinessOwnerDashboard: React.FC = () => {
             {/* Tab Content */}
             {/* Overview tab — approved business: show full DashboardOverview */}
             {activeTab === 'overview' && selectedBusiness && selectedIsApproved && (
-              <DashboardOverview selectedBusiness={selectedBusiness as any} totalRedemptions={totalRedemptions} totalRevenue={totalRevenue} businessReviews={businessReviews} pendingBusinesses={pendingBusinesses} currentPendingEdit={currentPendingEdit} onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)} onToggleActive={handleToggleActive} onOpenScanner={() => setShowScanner(true)} hasBusinessProfile={Boolean(ownerProfileBusinessId)} />
+              <DashboardOverview selectedBusiness={selectedBusiness as any} totalRedemptions={totalRedemptions} totalRevenue={totalRevenue} businessReviews={businessReviews} pendingBusinesses={pendingBusinesses} currentPendingEdit={currentPendingEdit} onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)} onToggleActive={handleToggleActive} onOpenScanner={() => setShowScanner(true)} hasBusinessProfile={Boolean(effectiveProfileBusinessId)} />
             )}
-            {activeTab === 'profile' && ownerProfileBusinessId && (
+            {activeTab === 'profile' && effectiveProfileBusinessId && (
               <BusinessProfileSettings
-                profileBusinessId={ownerProfileBusinessId}
+                profileBusinessId={effectiveProfileBusinessId}
                 profileDisplayName={
                   approvedListingsSameProfile.find((b) => String(b.id) === String(selectedProfileId))?.name ||
                   selectedBusiness?.name
                 }
               />
             )}
-            {activeTab === 'profile' && !ownerProfileBusinessId && !ownerDataLoading && (
+            {activeTab === 'profile' && !effectiveProfileBusinessId && !ownerDataLoading && (
               renderPendingOnlyNotice(
                 language === 'en'
                   ? 'Save your business profile first (complete setup), then you can update phone and contact details here.'
