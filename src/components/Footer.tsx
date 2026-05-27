@@ -17,6 +17,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import LocalOwnedBadge from './LocalOwnedBadge';
+import { APP_ICON } from '@/lib/brand';
 import { toast } from 'sonner';
 import { supportMailtoUrl } from '@/data/contact';
 
@@ -82,14 +83,16 @@ const Footer: React.FC = () => {
           {/* About */}
           <div>
             <div className="mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                    <path d="M2 12l10 5 10-5" />
-                  </svg>
-                </div>
+              <div className="flex items-center gap-3">
+                <img
+                  src={APP_ICON}
+                  alt="StikmNek"
+                  className="h-11 w-11 rounded-xl shadow-sm"
+                  width={44}
+                  height={44}
+                  loading="lazy"
+                  decoding="async"
+                />
                 <span className="text-lg font-bold">StikmNek</span>
               </div>
               <LocalOwnedBadge variant="footer" language={language} className="mt-3" />

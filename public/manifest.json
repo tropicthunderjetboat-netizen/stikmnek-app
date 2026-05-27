@@ -14,15 +14,15 @@
   "categories": ["travel", "lifestyle", "shopping"],
   "icons": [
     {
-      "src": "https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg",
-      "sizes": "192x192",
-      "type": "image/jpeg",
+      "src": "/app-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg",
+      "src": "/app-icon.png",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ],
