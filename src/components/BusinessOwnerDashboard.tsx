@@ -28,6 +28,8 @@ import {
   categoryUsesTieredPricing,
   validatePricingTiersForSubmit,
   pricingTiersFromDb,
+  pricingTiersForEditor,
+  defaultPricingTiersForNewListing,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
 import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
@@ -484,7 +486,11 @@ const BusinessOwnerDashboard: React.FC = () => {
   }, [resubmitSubmission, activeTab]);
 
   useEffect(() => {
-    if (!categoryUsesTieredPricing(submitForm.category)) setPricingTiers([]);
+    if (!categoryUsesTieredPricing(submitForm.category)) {
+      setPricingTiers([]);
+    } else if (pricingTiers.length === 0) {
+      setPricingTiers(defaultPricingTiersForNewListing());
+    }
   }, [submitForm.category]);
 
   const tierDiscountPercent = useMemo(() => {

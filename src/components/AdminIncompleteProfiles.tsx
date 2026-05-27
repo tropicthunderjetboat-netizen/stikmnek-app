@@ -1,5 +1,7 @@
-import React from 'react';
-import { Building2, Mail, MapPin, Phone, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Building2, Mail, MapPin, Phone, RefreshCw, Trash2 } from 'lucide-react';
+import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 export type IncompleteBusinessProfile = {
   id: string;
@@ -19,6 +21,7 @@ type AdminIncompleteProfilesProps = {
   profiles: IncompleteBusinessProfile[];
   loading: boolean;
   onRefresh: () => void;
+  adminUserId?: string;
 };
 
 /**
@@ -29,7 +32,46 @@ const AdminIncompleteProfiles: React.FC<AdminIncompleteProfilesProps> = ({
   profiles,
   loading,
   onRefresh,
+  adminUserId,
 }) => {
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const handleRemove = async (profile: IncompleteBusinessProfile) => {
+    const label = profile.name || 'this profile';
+    if (
+      !window.confirm(
+        `Remove "${label}" from StikmNek?\n\nThis deletes the unfinished business profile (no live listing). The owner account is not deleted.`,
+      )
+    ) {
+      return;
+    }
+    if (!adminUserId) {
+      toast.error('Sign in as admin to remove profiles.');
+      return;
+    }
+    setRemovingId(profile.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: {
+          action: 'admin_delete_business',
+          userId: adminUserId,
+          businessId: profile.id,
+          confirmDeleteEntireProfile: true,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(String(data.error));
+      toast.success(`Removed "${label}".`);
+      onRefresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not remove profile';
+      toast.error(msg);
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   if (!loading && profiles.length === 0) return null;
 
   return (
@@ -42,7 +84,7 @@ const AdminIncompleteProfiles: React.FC<AdminIncompleteProfilesProps> = ({
           </h3>
           <p className="text-xs text-violet-800 mt-0.5 max-w-2xl">
             These partners saved their business profile but have not submitted a deal for review. Ask them to open
-            Business Hub → Submit a listing. Logo upload issues here do not block saving the profile.
+            Business Hub → Submit a listing. Remove test or duplicate profiles here.
           </p>
         </div>
         <button
@@ -102,6 +144,15 @@ const AdminIncompleteProfiles: React.FC<AdminIncompleteProfilesProps> = ({
                   <p className="text-xs text-gray-500 mt-1">Contact: {p.owner_name}</p>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => void handleRemove(p)}
+                disabled={removingId === p.id}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs font-semibold hover:bg-red-100 disabled:opacity-50 shrink-0"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                {removingId === p.id ? 'Removing…' : 'Remove'}
+              </button>
             </li>
           ))}
         </ul>

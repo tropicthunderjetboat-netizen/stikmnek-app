@@ -12,14 +12,95 @@ export type PricingTierInput = {
   deal_price_vt: number;
 };
 
-export function emptyPricingTier(): PricingTierInput {
-  return {
-    label: '',
+/** Default slot order for tours / activities — shown as “Adults” and “Children”, not “Tier 1”. */
+export const TIER_PRESET_SLOTS = [
+  {
+    key: 'adult',
+    labelEn: 'Adults',
+    labelFr: 'Adultes',
+    labelBi: 'Adult',
     min_pax: 1,
-    max_pax: null,
+    max_pax: null as number | null,
+  },
+  {
+    key: 'child',
+    labelEn: 'Children',
+    labelFr: 'Enfants',
+    labelBi: 'Pikinini',
+    min_pax: 0,
+    max_pax: null as number | null,
+  },
+  {
+    key: 'infant',
+    labelEn: 'Infants',
+    labelFr: 'Bébés',
+    labelBi: 'Bebi',
+    min_pax: 0,
+    max_pax: null as number | null,
+  },
+] as const;
+
+export function tierPresetLabel(slotIndex: number, language: 'en' | 'fr' | 'bi' = 'en'): string {
+  const slot = TIER_PRESET_SLOTS[slotIndex];
+  if (!slot) return language === 'fr' ? 'Autre' : language === 'bi' ? 'Narawan' : 'Other';
+  if (language === 'fr') return slot.labelFr;
+  if (language === 'bi') return slot.labelBi;
+  return slot.labelEn;
+}
+
+export function emptyPricingTier(slotIndex = 0): PricingTierInput {
+  const slot = TIER_PRESET_SLOTS[slotIndex] ?? TIER_PRESET_SLOTS[0];
+  return {
+    label: slot.labelEn,
+    min_pax: slot.min_pax,
+    max_pax: slot.max_pax,
     original_price_vt: 0,
     deal_price_vt: 0,
   };
+}
+
+/** New tiered listings start with Adult + Children rows (not empty / “Tier 1”). */
+export function defaultPricingTiersForNewListing(): PricingTierInput[] {
+  return [emptyPricingTier(0), emptyPricingTier(1)];
+}
+
+function normalizeTierLabelForSlot(label: string, slotIndex: number): string {
+  const trimmed = (label || '').trim();
+  if (!trimmed) return TIER_PRESET_SLOTS[slotIndex]?.labelEn ?? trimmed;
+  if (/^tier\s*\d+$/i.test(trimmed)) {
+    return TIER_PRESET_SLOTS[slotIndex]?.labelEn ?? trimmed;
+  }
+  return trimmed;
+}
+
+/** Load DB tiers and ensure Adult / Child slots exist for the editor UI. */
+export function pricingTiersForEditor(value: unknown): PricingTierInput[] {
+  const parsed = pricingTiersFromDb(value);
+  if (parsed.length === 0) return defaultPricingTiersForNewListing();
+
+  const out = parsed.map((row, index) => ({
+    ...row,
+    label: normalizeTierLabelForSlot(row.label, index),
+    min_pax:
+      index === 0
+        ? Math.max(1, row.min_pax || 1)
+        : index === 1
+          ? Math.max(0, row.min_pax)
+          : row.min_pax,
+  }));
+
+  while (out.length < 2) {
+    out.push(emptyPricingTier(out.length));
+  }
+  return out;
+}
+
+/** Public listing: normalize “Tier 1” → Adults / Children without adding empty rows. */
+export function pricingTiersForDisplay(value: unknown): PricingTierInput[] {
+  return pricingTiersFromDb(value).map((row, index) => ({
+    ...row,
+    label: normalizeTierLabelForSlot(row.label, index),
+  }));
 }
 
 /** Parse DB jsonb (array or null) into editable rows. */

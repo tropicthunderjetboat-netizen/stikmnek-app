@@ -10,7 +10,7 @@ import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { trackInteractionEvent } from '@/lib/interactionEvents';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import BookingInquiryModal from '@/components/BookingInquiryModal';
-import { categoryUsesTieredPricing, pricingTiersFromDb } from '@/lib/pricingTiers';
+import { categoryUsesTieredPricing, pricingTiersForDisplay } from '@/lib/pricingTiers';
 const BusinessDetailMap = React.lazy(() => import('@/components/BusinessDetailMap'));
 import {
   displayWebsiteForInput,
@@ -304,7 +304,7 @@ const BusinessDetail: React.FC = () => {
       (effectiveBiz as { pricing_tiers?: unknown })?.pricing_tiers ??
       o?.pricing_tiers ??
       o?.tier_pricing;
-    return pricingTiersFromDb(tiers);
+    return pricingTiersForDisplay(tiers);
   }, [effectiveBiz?.id, effectiveBiz?.pricingTiers, selectedBusiness]);
   const showTieredTable =
     effectiveBiz != null &&
@@ -805,7 +805,7 @@ const BusinessDetail: React.FC = () => {
                     <thead>
                       <tr className="border-b border-teal-100 text-left text-[10px] uppercase tracking-wide text-gray-500">
                         <th className="px-3 py-2 font-semibold">
-                          {language === 'en' ? 'Tier' : language === 'fr' ? 'Palier' : 'Ta'}
+                          {language === 'en' ? 'Guest type' : language === 'fr' ? 'Type' : 'Kaen man'}
                         </th>
                         <th className="px-3 py-2 font-semibold">
                           {language === 'en' ? 'Pax' : language === 'fr' ? 'Pers.' : 'Man'}

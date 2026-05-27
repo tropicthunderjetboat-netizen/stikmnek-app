@@ -33,6 +33,10 @@ import AdminBusinessCredentials from '@/components/AdminBusinessCredentials';
 import AdminIncompleteProfiles, {
   type IncompleteBusinessProfile,
 } from '@/components/AdminIncompleteProfiles';
+import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
+import type { EmbeddedListingEdit } from '@/components/BusinessListingForm';
+
+const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
 
 const AdminPurchaseOverview = React.lazy(() => import('./AdminPurchaseOverview'));
 const PassEditor = React.lazy(() => import('./PassEditor'));
@@ -187,9 +191,11 @@ const AdminPanel: React.FC = () => {
     listingDuration: '1_month',
   });
 
-  // ─── Edit Business modal state ───
+  // ─── Edit Business modal state (legacy quick edit — prefer adminFullEdit) ───
   const [editBusinessId, setEditBusinessId] = useState<string | null>(null);
   const [editOfferingId, setEditOfferingId] = useState<string | null>(null);
+  const [adminFullEdit, setAdminFullEdit] = useState<EmbeddedListingEdit | null>(null);
+  const [adminFullEditLoading, setAdminFullEditLoading] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '', category: '', description: '', discount: '',
@@ -729,6 +735,59 @@ const AdminPanel: React.FC = () => {
       await refreshBusinesses();
     } catch (err: any) { toast.error('Failed to add business: ' + (err.message || 'Unknown error')); }
     finally { setAddingBusiness(false); }
+  };
+
+  const openAdminFullEdit = async (bizId: string) => {
+    const biz = allBusinesses.find((b) => b.id === bizId);
+    if (!biz) return;
+    const isFromDb = dbBusinesses.some((db) => db.id === bizId);
+    if (!isFromDb) {
+      toast.error('Sample businesses cannot be edited.');
+      return;
+    }
+    const profileId = profileBusinessIdFor(biz);
+    setAdminFullEditLoading(true);
+    try {
+      let offeringId = '';
+      if (biz.profileBusinessId && String(biz.id) !== String(biz.profileBusinessId)) {
+        offeringId = String(biz.id);
+      } else {
+        const { data: pick } = await supabase
+          .from('business_offerings')
+          .select('id')
+          .eq('business_id', profileId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        offeringId = pick?.id ? String(pick.id) : '';
+      }
+      if (!offeringId) {
+        toast.error('No live listing found for this business. Approve a listing first or use Business Profile cleanup.');
+        return;
+      }
+      const business = await fetchListingEditorBusiness(supabase, profileId, offeringId, SUPABASE_URL);
+      if (!business) {
+        toast.error('Could not load listing for editing.');
+        return;
+      }
+      setAdminFullEdit({
+        profileBusinessId: profileId,
+        offeringId,
+        listingTitle: biz.name || business.name,
+        listingCategory: biz.category || business.category,
+        business,
+        onEditSubmitted: async () => {
+          setAdminFullEdit(null);
+          await refreshBusinesses();
+          toast.success('Listing updated.');
+        },
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Could not open editor');
+    } finally {
+      setAdminFullEditLoading(false);
+    }
   };
 
   // ─── Open Edit modal ───
@@ -1422,9 +1481,42 @@ const AdminPanel: React.FC = () => {
           </div>
         )}
 
+        {adminFullEdit && (
+          <div className="mb-8 rounded-2xl border-2 border-teal-200 bg-white shadow-sm overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-teal-100 bg-teal-50">
+              <div>
+                <h3 className="text-sm font-bold text-teal-900">Full listing editor (admin)</h3>
+                <p className="text-xs text-teal-800 mt-0.5">
+                  Same form as business owners — Adults/Children pricing, photos, description, and map. Saves live
+                  immediately.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminFullEdit(null)}
+                className="px-3 py-1.5 rounded-lg border border-teal-200 text-teal-800 text-xs font-semibold hover:bg-teal-100"
+              >
+                Close editor
+              </button>
+            </div>
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-8 w-8 text-teal-500 animate-spin" aria-hidden />
+                </div>
+              }
+            >
+              <BusinessListingForm embeddedEdit={adminFullEdit} />
+            </Suspense>
+          </div>
+        )}
 
-
-
+        {adminFullEditLoading && (
+          <div className="mb-6 flex items-center justify-center gap-2 py-8 text-sm text-teal-700">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            Opening full listing editor…
+          </div>
+        )}
 
         {activeTab === 'overview' && (
           <Suspense fallback={<AdminTabFallback />}>
@@ -1537,9 +1629,13 @@ const AdminPanel: React.FC = () => {
                             </td>
                             <td className="px-5 py-3">
                               <div className="flex items-center gap-2">
-                                <button onClick={() => openEditModal(biz.id)} className="px-3 py-1 rounded-lg bg-teal-50 text-teal-700 text-xs font-semibold hover:bg-teal-100 transition-colors flex items-center gap-1">
+                                <button
+                                  onClick={() => void openAdminFullEdit(biz.id)}
+                                  disabled={adminFullEditLoading}
+                                  className="px-3 py-1 rounded-lg bg-teal-50 text-teal-700 text-xs font-semibold hover:bg-teal-100 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                >
                                   <Edit3 className="w-3 h-3" />
-                                  Edit
+                                  Edit listing
                                 </button>
                                 <button onClick={() => setPreviewBusinessId(biz.id)} className="px-3 py-1 rounded-lg bg-gray-50 text-gray-600 text-xs font-semibold hover:bg-gray-100 transition-colors flex items-center gap-1" title="Preview business details">
                                   <Eye className="w-3.5 h-3.5" />
@@ -1607,6 +1703,7 @@ const AdminPanel: React.FC = () => {
               profiles={incompleteProfiles}
               loading={loadingIncompleteProfiles}
               onRefresh={() => void loadIncompleteProfiles()}
+              adminUserId={user?.id}
             />
 
             {/* Status bar with realtime indicator and last refreshed */}
@@ -2866,7 +2963,7 @@ const AdminPanel: React.FC = () => {
                     </div>
                   )}
                   <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
-                    <button onClick={() => { setPreviewBusinessId(null); openEditModal(biz.id); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-colors"><Edit3 className="w-4 h-4" />Edit Listing</button>
+                    <button onClick={() => { setPreviewBusinessId(null); void openAdminFullEdit(biz.id); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-colors"><Edit3 className="w-4 h-4" />Edit Listing</button>
                     <button onClick={() => setPreviewBusinessId(null)} className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200 transition-colors">Close</button>
                   </div>
                 </div>

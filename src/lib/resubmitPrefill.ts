@@ -4,7 +4,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { pricingTiersFromDb, type PricingTierInput } from '@/lib/pricingTiers';
+import { pricingTiersFromDb, pricingTiersForEditor, type PricingTierInput } from '@/lib/pricingTiers';
 import { listingCategoryFromOffering } from '@/lib/businessOfferingMap';
 
 const PROFILE_RESUBMIT_COLS =
@@ -151,7 +151,8 @@ export function mergeResubmitListingPrefill(args: {
   const tiersFromPending = pricingTiersFromDb(pending.pricing_tiers);
   const tiersFromOffering =
     tiersFromPending.length === 0 ? pricingTiersFromDb(offering?.pricing_tiers) : [];
-  const pricingTiers = tiersFromPending.length > 0 ? tiersFromPending : tiersFromOffering;
+  const rawTiers = tiersFromPending.length > 0 ? tiersFromPending : tiersFromOffering;
+  const pricingTiers = pricingTiersForEditor(rawTiers);
 
   return {
     form: {
