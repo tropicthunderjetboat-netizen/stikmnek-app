@@ -87,8 +87,9 @@ CREATE POLICY business_credentials_admin_all
   );
 
 -- Document URLs are not exposed publicly; tourists see flags via business_listings_view only.
-
+-- Data API: explicit GRANTs required (Supabase May/Oct 2026 — see supabase/migrations/README.md).
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.business_credentials TO authenticated;
+GRANT ALL ON public.business_credentials TO service_role;
 
 -- ─── Storage bucket: business-credentials (private documents) ───
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
