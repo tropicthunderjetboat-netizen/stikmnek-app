@@ -3,12 +3,13 @@ import { useAppContext } from '@/contexts/AppContext';
 import {
   ScanLine, Edit3, Plus, MessageSquare, Home, BarChart3,
   Store, Sparkles, ArrowRight, Wifi, Clock, CheckCircle,
-  Star, Users, TrendingUp, Zap
+  Star, Users, TrendingUp, Zap, ShieldCheck
 } from 'lucide-react';
 
 interface BusinessHomeScreenProps {
   selectedBusiness: any | null;
   hasApprovedBusinesses: boolean;
+  hasBusinessProfile?: boolean;
   pendingCount: number;
   reviewCount: number;
   onSwitchTab: (tab: string) => void;
@@ -19,12 +20,19 @@ interface BusinessHomeScreenProps {
 const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
   selectedBusiness,
   hasApprovedBusinesses,
+  hasBusinessProfile = false,
   pendingCount,
   reviewCount,
   onSwitchTab,
   onOpenScanner,
 }) => {
   const { user, setCurrentView, language } = useAppContext();
+
+  const openCredentials = () => {
+    window.dispatchEvent(
+      new CustomEvent('switch-dashboard-tab', { detail: { tab: 'profile', focus: 'credentials' } }),
+    );
+  };
 
   const mainActions = [
     {
@@ -53,6 +61,28 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
       disabled: !hasApprovedBusinesses,
       disabledMsg: 'Available after listing approval',
     },
+    ...(hasBusinessProfile
+      ? [
+          {
+            key: 'credentials',
+            label: language === 'en' ? 'Credentials' : language === 'fr' ? 'Accréditations' : 'Kredensel',
+            description:
+              language === 'en'
+                ? 'Upload licence, insurance, and permits'
+                : language === 'fr'
+                  ? 'Téléversez licence, assurance et permis'
+                  : 'Uploadem permit mo insurance',
+            icon: <ShieldCheck className="w-7 h-7" />,
+            gradient: 'from-violet-500 to-indigo-600',
+            shadow: 'shadow-violet-200/60',
+            bgHover: 'hover:shadow-violet-300/60',
+            onClick: openCredentials,
+            badge: null,
+            disabled: false,
+            disabledMsg: '',
+          },
+        ]
+      : []),
     {
       key: 'create',
       label: language === 'en' ? 'Create a New Listing' : language === 'fr' ? 'Créer une annonce' : 'Mekem Niufala Listing',

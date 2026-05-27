@@ -392,6 +392,14 @@ const BusinessOwnerDashboard: React.FC = () => {
         } else {
           setResubmitSubmission(null);
         }
+        if (tab === 'profile' && payload?.focus === 'credentials') {
+          window.setTimeout(() => {
+            document.getElementById('business-credentials-section')?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start',
+            });
+          }, 250);
+        }
       }
     };
     window.addEventListener('switch-dashboard-tab', handler);
@@ -2321,6 +2329,7 @@ const BusinessOwnerDashboard: React.FC = () => {
               <BusinessHomeScreen
                 selectedBusiness={selectedBusiness}
                 hasApprovedBusinesses={hasApprovedBusinesses}
+                hasBusinessProfile={Boolean(resolvedProfileBusinessId)}
                 pendingCount={pendingOnlyBusinesses.length}
                 reviewCount={businessReviews.length}
                 onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)}

@@ -7,7 +7,7 @@ import {
   AlertCircle, CheckCircle, XCircle, FileText, ArrowRight,
   Zap, Share2, BarChart3, MessageSquare, Calendar, Heart,
   Globe, Target, Award, Sparkles, Activity, ShoppingBag, ScanLine,
-  Plus, Home
+  Plus, Home, ShieldCheck
 } from 'lucide-react';
 import {
   looksLikeRichDescriptionHtml,
@@ -103,7 +103,13 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     });
   };
 
-  // ═══ 6 QUICK ACTION BUTTONS ═══
+  const openCredentials = () => {
+    window.dispatchEvent(
+      new CustomEvent('switch-dashboard-tab', { detail: { tab: 'profile', focus: 'credentials' } }),
+    );
+  };
+
+  // ═══ QUICK ACTION BUTTONS ═══
   const quickActions = [
     {
       label: 'Scan QR Code',
@@ -138,6 +144,20 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             shadowColor: 'shadow-cyan-200/60',
             bgHover: 'hover:shadow-cyan-300/70',
             onClick: () => onSwitchTab('profile'),
+          },
+          {
+            label: language === 'en' ? 'Credentials' : language === 'fr' ? 'Accréditations' : 'Kredensel',
+            description:
+              language === 'en'
+                ? 'Licence, insurance, permits'
+                : language === 'fr'
+                  ? 'Licence, assurance, permis'
+                  : 'Permit, insurance, sertifikat',
+            icon: <ShieldCheck className="w-7 h-7" />,
+            gradient: 'from-violet-500 to-indigo-600',
+            shadowColor: 'shadow-violet-200/60',
+            bgHover: 'hover:shadow-violet-300/70',
+            onClick: openCredentials,
           },
         ]
       : []),

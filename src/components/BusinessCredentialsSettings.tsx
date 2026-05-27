@@ -246,7 +246,10 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
         : 'Optional — upload insurance, permit o sertifikat. Sapos admin i verify, yu save rank moa high.';
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+    <div
+      id="business-credentials-section"
+      className="scroll-mt-24 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5"
+    >
       <div className="flex items-start gap-3">
         <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
           <Award className="w-5 h-5 text-amber-600" />
