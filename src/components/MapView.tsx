@@ -457,29 +457,6 @@ const MapView: React.FC = () => {
 
         {/* Leaflet Map */}
         <div className="relative rounded-2xl overflow-hidden shadow-xl border border-gray-200">
-          {/* Legend Overlay */}
-          <div className="absolute top-4 left-4 z-[1000] bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-lg border border-gray-100">
-            <p className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider">
-              {language === 'en' ? 'Legend' : 'Légende'}
-            </p>
-            <div className="space-y-1.5">
-              {Object.entries(categoryColors).map(([cat, color]) => (
-                <div key={cat} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="text-xs text-gray-600 capitalize">{cat}</span>
-                </div>
-              ))}
-              {userLocation && (
-                <div className="flex items-center gap-2 pt-1 border-t border-gray-100 mt-1">
-                  <div className="w-3 h-3 rounded-full bg-blue-500 ring-2 ring-blue-200" />
-                  <span className="text-xs text-blue-600 font-medium">
-                    {language === 'en' ? 'You' : 'Vous'}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Layer Switcher */}
           <div className="absolute top-4 right-4 z-[1000]">
             <button
@@ -582,104 +559,16 @@ const MapView: React.FC = () => {
               zoomToBoundsOnClick={true}
               disableClusteringAtZoom={16}
             >
-              {businessesWithMapCoords.map(({ biz, c }) => {
-                const dist = getDistanceTo(c.lat, c.lng);
-                const isFav = isListingFavorited(favorites, biz);
-                return (
-                  <Marker
-                    key={biz.id}
-                    position={[c.lat, c.lng]}
-                    icon={createCategoryIcon(biz.category, biz.featured)}
-                    eventHandlers={{
-                      click: () => setSelectedMapBiz(biz),
-                    }}
-                  >
-                    <Popup maxWidth={280} minWidth={220} className="business-popup">
-                      <div className="p-0">
-                        <div className="relative">
-                          <img
-                            src={biz.image}
-                            alt={biz.name}
-                            className="w-full h-28 object-cover rounded-t-lg"
-                            loading="lazy"
-                          />
-                          {/* Favorite heart button on popup image */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void toggleFavorite(biz);
-                            }}
-                            className={`absolute top-1.5 right-1.5 w-7 h-7 rounded-full flex items-center justify-center transition-all shadow-md ${
-                              isFav
-                                ? 'bg-red-500 text-white hover:bg-red-600'
-                                : 'bg-white/90 text-gray-500 hover:bg-white hover:text-red-500'
-                            }`}
-                            title={isFav
-                              ? (language === 'en' ? 'Remove from favorites' : 'Retirer des favoris')
-                              : (language === 'en' ? 'Save to favorites' : 'Ajouter aux favoris')
-                            }
-                          >
-                            <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-current' : ''}`} />
-                          </button>
-                          <div className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-md bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold">
-                            {biz.discount}
-                          </div>
-                          {dist !== null && (
-                            <div className="absolute bottom-1.5 right-1.5 px-2 py-0.5 rounded-md bg-blue-600/90 text-white text-xs font-bold">
-                              {formatDistance(dist)}
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-3">
-                          <div className="flex items-start justify-between mb-1.5">
-                            <h3 className="font-bold text-gray-900 text-sm leading-tight pr-2">{biz.name}</h3>
-                            <div className="flex items-center gap-0.5 shrink-0">
-                              <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                              <span className="text-xs font-semibold">{biz.rating}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-                            <MapPin className="w-3 h-3 shrink-0" />
-                            <span className="truncate">{biz.location}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-base font-bold text-teal-700">${biz.dealPrice}</span>
-                              <span className="text-xs text-gray-400 line-through">${biz.originalPrice}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  void toggleFavorite(biz);
-                                }}
-                                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
-                                  isFav
-                                    ? 'bg-red-50 text-red-500 hover:bg-red-100'
-                                    : 'bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500'
-                                }`}
-                                title={isFav
-                                  ? (language === 'en' ? 'Remove from favorites' : 'Retirer des favoris')
-                                  : (language === 'en' ? 'Save to favorites' : 'Ajouter aux favoris')
-                                }
-                              >
-                                <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-current' : ''}`} />
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleViewDeal(biz); }}
-                                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 transition-colors"
-                              >
-                                {t('biz.viewdeal', language)}
-                                <ExternalLink className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </Popup>
-                  </Marker>
-                );
-              })}
+              {businessesWithMapCoords.map(({ biz, c }) => (
+                <Marker
+                  key={biz.id}
+                  position={[c.lat, c.lng]}
+                  icon={createCategoryIcon(biz.category, biz.featured)}
+                  eventHandlers={{
+                    click: () => setSelectedMapBiz(biz),
+                  }}
+                />
+              ))}
 
             </MarkerClusterGroup>
           </MapContainer>
@@ -688,9 +577,9 @@ const MapView: React.FC = () => {
           {selectedMapBiz && (() => {
             const isSelectedFav = isListingFavorited(favorites, selectedMapBiz);
             return (
-            <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-[1000]">
+            <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-auto sm:right-4 sm:w-96 max-h-[55vh] sm:max-h-none overflow-y-auto bg-white rounded-xl shadow-2xl border border-gray-100 overflow-x-hidden z-[1000]">
               <div className="relative">
-                <img src={selectedMapBiz.image} alt={selectedMapBiz.name} className="w-full h-36 object-cover" />
+                <img src={selectedMapBiz.image} alt={selectedMapBiz.name} className="w-full h-28 sm:h-36 object-cover" />
                 {/* Close button */}
                 <button
                   onClick={() => setSelectedMapBiz(null)}
