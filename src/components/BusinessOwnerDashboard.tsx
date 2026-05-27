@@ -19,6 +19,7 @@ import PhotoUploader, { UploadedPhoto } from './PhotoUploader';
 import MySubmissions from './MySubmissions';
 import DashboardOverview from './DashboardOverview';
 import BusinessProfileSettings from './BusinessProfileSettings';
+import BusinessCredentialsSettings from './BusinessCredentialsSettings';
 import PricingDiscountFields, { DURATION_OPTIONS, addDays, todayStr } from './PricingDiscountFields';
 import QRScanner from './QRScanner';
 import BusinessHomeScreen from './BusinessHomeScreen';
@@ -338,7 +339,17 @@ async function buildApprovedUnifiedFromProfiles(
   return out;
 }
 
-type DashboardTab = 'overview' | 'profile' | 'submissions' | 'edit' | 'analytics' | 'reviews' | 'photos' | 'submit' | 'emails';
+type DashboardTab =
+  | 'overview'
+  | 'profile'
+  | 'credentials'
+  | 'submissions'
+  | 'edit'
+  | 'analytics'
+  | 'reviews'
+  | 'photos'
+  | 'submit'
+  | 'emails';
 
 const BusinessOwnerDashboard: React.FC = () => {
   const {
@@ -385,20 +396,28 @@ const BusinessOwnerDashboard: React.FC = () => {
     const handler = (e: Event) => {
       const payload = (e as CustomEvent).detail;
       const tab = typeof payload === 'string' ? payload : payload?.tab ?? payload;
-      if (['submit', 'submissions', 'overview', 'profile', 'edit', 'analytics', 'reviews', 'photos', 'emails'].includes(tab)) {
+      if (tab === 'profile' && payload?.focus === 'credentials') {
+        setActiveTab('credentials');
+        setResubmitSubmission(null);
+      } else if (
+        [
+          'submit',
+          'submissions',
+          'overview',
+          'profile',
+          'credentials',
+          'edit',
+          'analytics',
+          'reviews',
+          'photos',
+          'emails',
+        ].includes(tab)
+      ) {
         setActiveTab(tab);
         if (tab === 'submit' && payload?.submission) {
           setResubmitSubmission(payload.submission);
         } else {
           setResubmitSubmission(null);
-        }
-        if (tab === 'profile' && payload?.focus === 'credentials') {
-          window.setTimeout(() => {
-            document.getElementById('business-credentials-section')?.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start',
-            });
-          }, 250);
         }
       }
     };
@@ -1560,6 +1579,11 @@ const BusinessOwnerDashboard: React.FC = () => {
             label: language === 'en' ? 'Business Profile' : language === 'fr' ? 'Profil entreprise' : 'Bisnis profail',
             icon: <Building2 className="w-5 h-5" />,
           },
+          {
+            key: 'credentials' as const,
+            label: language === 'en' ? 'My credentials' : language === 'fr' ? 'Mes accréditations' : 'Kredensel blong mi',
+            icon: <ShieldCheck className="w-5 h-5" />,
+          },
         ]
       : []),
     { key: 'submissions', label: 'My Submissions', icon: <ClipboardList className="w-5 h-5" />, badge: unseenSubmissionChanges > 0 ? String(unseenSubmissionChanges) : (allSubmissions.length > 0 ? String(allSubmissions.length) : undefined) },
@@ -2314,6 +2338,31 @@ const BusinessOwnerDashboard: React.FC = () => {
                   selectedBusiness?.name
                 }
               />
+            )}
+            {activeTab === 'credentials' && resolvedProfileBusinessId && (
+              <div className="max-w-3xl mx-auto space-y-4">
+                <BusinessCredentialsSettings profileBusinessId={resolvedProfileBusinessId} />
+                <p className="text-center text-sm text-gray-500">
+                  {language === 'en' ? 'Need to change phone, email, or address?' : language === 'fr' ? 'Modifier téléphone, e-mail ou adresse ?' : 'Wan senisim fon o email?'}
+                  {' '}
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('profile')}
+                    className="font-semibold text-teal-700 hover:text-teal-800 underline-offset-2 hover:underline"
+                  >
+                    {language === 'en' ? 'Open Business Profile' : language === 'fr' ? 'Ouvrir le profil entreprise' : 'Openem Bisnis profail'}
+                  </button>
+                </p>
+              </div>
+            )}
+            {activeTab === 'credentials' && !resolvedProfileBusinessId && !ownerDataLoading && (
+              renderPendingOnlyNotice(
+                language === 'en'
+                  ? 'Save your business profile first, then you can upload credentials here.'
+                  : language === 'fr'
+                    ? 'Enregistrez d’abord votre profil entreprise.'
+                    : 'Save profail bisnis first.',
+              )
             )}
             {activeTab === 'profile' && !resolvedProfileBusinessId && !ownerDataLoading && (
               renderPendingOnlyNotice(

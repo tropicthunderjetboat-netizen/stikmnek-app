@@ -104,9 +104,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   };
 
   const openCredentials = () => {
-    window.dispatchEvent(
-      new CustomEvent('switch-dashboard-tab', { detail: { tab: 'profile', focus: 'credentials' } }),
-    );
+    window.dispatchEvent(new CustomEvent('switch-dashboard-tab', { detail: { tab: 'credentials' } }));
   };
 
   // ═══ QUICK ACTION BUTTONS ═══

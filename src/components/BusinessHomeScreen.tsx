@@ -29,9 +29,7 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
   const { user, setCurrentView, language } = useAppContext();
 
   const openCredentials = () => {
-    window.dispatchEvent(
-      new CustomEvent('switch-dashboard-tab', { detail: { tab: 'profile', focus: 'credentials' } }),
-    );
+    window.dispatchEvent(new CustomEvent('switch-dashboard-tab', { detail: { tab: 'credentials' } }));
   };
 
   const mainActions = [
