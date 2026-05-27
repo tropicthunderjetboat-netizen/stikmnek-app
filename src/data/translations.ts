@@ -23,6 +23,8 @@ export const translations: Record<string, Record<Language, string>> = {
   'hero.businessOwnersHint': { en: 'Own a business?', fr: 'Vous avez un commerce ?', bi: 'Yu gat bisnis?' },
   'hero.cta': { en: 'Get Your Pass', fr: 'Obtenez votre pass', bi: 'Karem Pas Blong Yu' },
   'hero.explore': { en: 'Explore Deals', fr: 'Explorer les offres', bi: 'Eksploarem Dils' },
+  'hero.browseDeals': { en: 'Browse deals', fr: 'Voir les offres', bi: 'Lukim ol dils' },
+  'hero.welcomeBack': { en: 'Welcome back — find your next deal', fr: 'Bon retour — trouvez votre prochaine offre', bi: 'Welkam bak — faenem nix dils' },
   'hero.businesses': { en: 'Local Businesses', fr: 'Entreprises locales', bi: 'Lokal Bisnis' },
   'hero.savings': { en: 'Average Savings', fr: 'Économies moyennes', bi: 'Averej Sevin' },
   'hero.tourists': { en: 'Happy Tourists', fr: 'Touristes satisfaits', bi: 'Hapi Turis' },

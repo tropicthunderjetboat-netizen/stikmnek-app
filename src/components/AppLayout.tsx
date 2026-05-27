@@ -102,6 +102,36 @@ function BusinessListingFormInLayout({ padded }: { padded: boolean }) {
   return form;
 }
 
+/** Signed-in tourists get a shorter home — deals first, less marketing scroll on mobile. */
+function HomePage() {
+  const { user } = useAppContext();
+  const signedInTourist = user?.type === 'tourist';
+
+  if (signedInTourist) {
+    return (
+      <>
+        <Hero />
+        <FeaturedLeaderboard />
+        <CategoryShowcase />
+        <PassCards embeddedOnHome />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Hero />
+      <HowItWorks />
+      <CategoryShowcase />
+      <FeaturedLeaderboard />
+      <PassCards embeddedOnHome />
+      <MapView />
+      <ReviewsSection />
+      <ListYourBusinessCta />
+    </>
+  );
+}
+
 const AppLayout: React.FC = () => {
   const location = useLocation();
   const {
@@ -295,18 +325,7 @@ const AppLayout: React.FC = () => {
         return <BusinessListingFormInLayout padded />;
       case 'home':
       default:
-        return (
-          <>
-            <Hero />
-            <HowItWorks />
-            <CategoryShowcase />
-            <FeaturedLeaderboard />
-            <PassCards embeddedOnHome />
-            <MapView />
-            <ReviewsSection />
-            <ListYourBusinessCta />
-          </>
-        );
+        return <HomePage />;
     }
   };
 

@@ -8,7 +8,13 @@ import LocalOwnedBadge from './LocalOwnedBadge';
 
 const Hero: React.FC = () => {
   const navigate = useNavigate();
-  const { language, user, setShowAuth, setAuthMode, dbBusinesses } = useAppContext();
+  const { language, user, setShowAuth, setAuthMode, setCurrentView, dbBusinesses } = useAppContext();
+  const signedInTourist = user?.type === 'tourist';
+
+  const goToDeals = () => {
+    setCurrentView('deals');
+    navigate('/deals');
+  };
 
   const scrollToListBusiness = () => {
     if (!user) {
@@ -43,7 +49,11 @@ const Hero: React.FC = () => {
   );
 
   return (
-    <section className="relative min-h-[80vh] flex items-center overflow-hidden pt-16">
+    <section
+      className={`relative flex items-center overflow-hidden pt-16 ${
+        signedInTourist ? 'min-h-0 max-lg:py-8 lg:min-h-[80vh]' : 'min-h-[80vh]'
+      }`}
+    >
       {/* Background Image */}
       <div className="absolute inset-0">
         <img
@@ -60,47 +70,90 @@ const Hero: React.FC = () => {
       <div className="absolute top-20 right-10 w-72 h-72 bg-emerald-400/10 rounded-full blur-3xl" />
       <div className="absolute bottom-10 left-10 w-96 h-96 bg-teal-400/10 rounded-full blur-3xl" />
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 w-full flex flex-col justify-center">
+      <div
+        className={`relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex flex-col justify-center ${
+          signedInTourist ? 'py-6 sm:py-10 lg:py-20' : 'py-12 sm:py-16 lg:py-20'
+        }`}
+      >
         <div className="max-w-2xl">
-          <div className="flex flex-col gap-2 sm:gap-3 mb-6">
+          <div className={`flex flex-col gap-2 sm:gap-3 ${signedInTourist ? 'mb-4' : 'mb-6'}`}>
             <div className="inline-flex w-fit items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-sm border border-white/20 text-white/90 text-sm">
               <MapPin className="w-4 h-4 text-emerald-400" />
               Vanuatu
             </div>
-            <LocalOwnedBadge variant="hero" language={language} />
+            {!signedInTourist && <LocalOwnedBadge variant="hero" language={language} />}
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-6">
-            {t('hero.title', language)}
+          <h1
+            className={`font-extrabold text-white leading-tight ${
+              signedInTourist
+                ? 'text-3xl sm:text-4xl lg:text-6xl mb-3'
+                : 'text-4xl sm:text-5xl lg:text-6xl mb-6'
+            }`}
+          >
+            {signedInTourist ? t('hero.browseDeals', language) : t('hero.title', language)}
           </h1>
 
-          <p className="text-lg sm:text-xl text-white/80 mb-8 leading-relaxed max-w-xl">
-            {t('hero.subtitle', language)}
+          <p
+            className={`text-white/80 leading-relaxed max-w-xl ${
+              signedInTourist ? 'text-base sm:text-lg mb-5' : 'text-lg sm:text-xl mb-8'
+            }`}
+          >
+            {signedInTourist ? t('hero.welcomeBack', language) : t('hero.subtitle', language)}
           </p>
 
-          <div className="flex flex-col gap-3 mb-12 w-full max-w-md">
-            <button
-              type="button"
-              onClick={openTouristSignup}
-              className="group flex w-full items-center justify-center gap-2 px-8 py-4 sm:py-5 rounded-xl bg-orange-500 text-white font-bold text-lg hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/35 hover:shadow-orange-500/50 hover:-translate-y-0.5 min-h-[3.25rem]"
-            >
-              <Sparkles className="w-5 h-5 shrink-0 text-amber-100 opacity-95 group-hover:scale-110 transition-transform" aria-hidden />
-              {t('hero.ctaTourist', language)}
-            </button>
-            <p className="text-center text-xs text-white/55 sm:text-left sm:pl-1">
-              {t('hero.businessOwnersHint', language)}
-            </p>
-            <button
-              type="button"
-              onClick={scrollToListBusiness}
-              className="flex w-full items-center justify-center gap-2 px-8 py-3.5 sm:py-4 rounded-xl border-2 border-white/90 bg-white/5 text-white font-semibold text-base hover:bg-white/15 transition-all min-h-[3rem] backdrop-blur-[2px]"
-            >
-              {t('hero.ctaBusiness', language)}
-            </button>
+          <div className={`flex flex-col gap-3 w-full max-w-md ${signedInTourist ? 'mb-6' : 'mb-12'}`}>
+            {signedInTourist ? (
+              <>
+                <button
+                  type="button"
+                  onClick={goToDeals}
+                  className="group flex w-full items-center justify-center gap-2 px-8 py-4 rounded-xl bg-orange-500 text-white font-bold text-lg hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/35 hover:shadow-orange-500/50 hover:-translate-y-0.5 min-h-[3.25rem]"
+                >
+                  <Sparkles className="w-5 h-5 shrink-0 text-amber-100 opacity-95 group-hover:scale-110 transition-transform" aria-hidden />
+                  {t('hero.explore', language)}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentView('map');
+                    navigate('/map');
+                  }}
+                  className="flex w-full items-center justify-center gap-2 px-8 py-3.5 rounded-xl border-2 border-white/90 bg-white/5 text-white font-semibold text-base hover:bg-white/15 transition-all min-h-[3rem] backdrop-blur-[2px]"
+                >
+                  {language === 'en' ? 'View on map' : language === 'fr' ? 'Voir sur la carte' : 'Lukim long map'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={openTouristSignup}
+                  className="group flex w-full items-center justify-center gap-2 px-8 py-4 sm:py-5 rounded-xl bg-orange-500 text-white font-bold text-lg hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/35 hover:shadow-orange-500/50 hover:-translate-y-0.5 min-h-[3.25rem]"
+                >
+                  <Sparkles className="w-5 h-5 shrink-0 text-amber-100 opacity-95 group-hover:scale-110 transition-transform" aria-hidden />
+                  {t('hero.ctaTourist', language)}
+                </button>
+                <p className="text-center text-xs text-white/55 sm:text-left sm:pl-1">
+                  {t('hero.businessOwnersHint', language)}
+                </p>
+                <button
+                  type="button"
+                  onClick={scrollToListBusiness}
+                  className="flex w-full items-center justify-center gap-2 px-8 py-3.5 sm:py-4 rounded-xl border-2 border-white/90 bg-white/5 text-white font-semibold text-base hover:bg-white/15 transition-all min-h-[3rem] backdrop-blur-[2px]"
+                >
+                  {t('hero.ctaBusiness', language)}
+                </button>
+              </>
+            )}
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-6 max-w-lg">
+          {/* Stats — hidden on mobile for signed-in tourists to save scroll */}
+          <div
+            className={`grid grid-cols-3 gap-6 max-w-lg ${
+              signedInTourist ? 'hidden sm:grid' : ''
+            }`}
+          >
             <div className="text-center">
               <div className="text-3xl font-extrabold text-white">{businessCount}+</div>
               <div className="text-sm text-white/60 mt-1">{t('hero.businesses', language)}</div>
