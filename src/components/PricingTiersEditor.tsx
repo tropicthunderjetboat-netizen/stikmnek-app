@@ -71,10 +71,16 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
       language === 'en' ? 'Charter name' : language === 'fr' ? 'Nom du charter' : 'Nem blong charter',
     charterNamePlaceholder:
       language === 'en' ? 'e.g. Private Charter (up to 5)' : language === 'fr' ? 'ex. Charter privé (jusqu\'à 5)' : 'ex. Private Charter (5 pipol)',
+    minPax:
+      language === 'en' ? 'Min pax' : language === 'fr' ? 'Min pers.' : 'Min man',
     maxPax:
-      language === 'en' ? 'Max people included' : language === 'fr' ? 'Personnes max incluses' : 'Mak man long praes',
-    maxPaxHint:
-      language === 'en' ? 'Max group size covered by this flat price' : language === 'fr' ? 'Taille max du groupe couverte par ce tarif' : 'Mak saes grup blong flat praes ia',
+      language === 'en' ? 'Max pax (optional)' : language === 'fr' ? 'Max pers. (optionnel)' : 'Mak man (opsional)',
+    paxHint:
+      language === 'en'
+        ? 'Leave max blank for open-ended (e.g. 5+).'
+        : language === 'fr'
+          ? 'Laissez max vide pour illimité (ex. 5+).'
+          : 'Livi mak i stap nating blong 5+.',
     addInfant:
       language === 'en' ? 'Add infant pricing' : language === 'fr' ? 'Ajouter tarif bébé' : 'Addem bebi praes',
     addCharter:
@@ -255,28 +261,47 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
                 </div>
               </div>
 
-              {/* Charter max-pax field */}
-              {charter && (
-                <div className="max-w-[12rem]">
-                  <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
-                    {t.maxPax}
-                  </label>
+              {/* Pax range (optional max) */}
+              <div className="grid grid-cols-2 gap-2 max-w-[18rem]">
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">{t.minPax}</label>
                   <input
                     type="number"
-                    min={1}
+                    min={0}
+                    max={200}
+                    step={1}
+                    value={Number.isFinite(tier.min_pax) ? tier.min_pax : 0}
+                    onChange={(e) => {
+                      const v = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                      updateTier(index, { min_pax: v });
+                    }}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm"
+                    placeholder={charter ? '1' : index === 0 ? '1' : '0'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">{t.maxPax}</label>
+                  <input
+                    type="number"
+                    min={0}
                     max={200}
                     step={1}
                     value={tier.max_pax ?? ''}
                     onChange={(e) => {
-                      const v = Math.max(1, Number(e.target.value) || 1);
+                      const raw = e.target.value;
+                      if (raw === '') {
+                        updateTier(index, { max_pax: null });
+                        return;
+                      }
+                      const v = Math.max(0, Math.floor(Number(raw) || 0));
                       updateTier(index, { max_pax: v });
                     }}
                     className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm"
-                    placeholder="5"
+                    placeholder={charter ? '5' : ''}
                   />
-                  <p className="text-[10px] text-gray-500 mt-0.5">{t.maxPaxHint}</p>
                 </div>
-              )}
+              </div>
+              <p className="text-[10px] text-gray-500 -mt-1">{t.paxHint}</p>
             </div>
           );
         })}
