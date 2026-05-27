@@ -412,6 +412,13 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
               {language === 'en' ? 'Logo (optional)' : language === 'fr' ? 'Logo (optionnel)' : 'Logo'}
             </Label>
             <PhotoUploader photos={logoPhotos} onPhotosChange={setLogoPhotos} maxPhotos={1} userId={user!.id} />
+            <p className="text-xs text-gray-500 mt-2">
+              {language === 'en'
+                ? 'Tip: wide (landscape) logos display best on listing pages. PNG with a transparent background works well.'
+                : language === 'fr'
+                  ? 'Astuce : les logos horizontaux s’affichent mieux sur les annonces. PNG fond transparent recommandé.'
+                  : 'Tip: landscape logo i luk gud long listing. PNG transparent i gud.'}
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-3 pt-2">

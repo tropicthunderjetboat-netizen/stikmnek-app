@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { isListingFavorited } from '@/lib/favoritesUi';
+import BusinessProfileLogo from '@/components/BusinessProfileLogo';
 
 interface BusinessCardProps {
   business: Business;
@@ -209,28 +210,39 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
           <div className="flex-1 min-w-0 p-5">
             <div className="flex items-start justify-between gap-3 mb-2">
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-bold text-gray-900 text-lg">
-                    <button
-                      type="button"
-                      onClick={handleViewDeal}
-                      className="text-left hover:text-teal-700 transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
-                    >
-                      {business.name}
-                    </button>
-                  </h3>
-                  <SuperStarBadge count={superStarCount} />
-                  {hasWhatsApp && (
-                    <button
-                      type="button"
-                      onClick={handleWhatsApp}
-                      className="inline-flex min-h-11 items-center gap-1 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-green-600 text-xs font-bold hover:bg-green-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
-                      aria-label={whatsappLabel}
-                    >
-                      <WhatsAppIcon className="w-3.5 h-3.5 shrink-0" />
-                      <span>WhatsApp</span>
-                    </button>
-                  )}
+                <div className="flex items-start gap-2.5">
+                  {business.profileLogoUrl ? (
+                    <BusinessProfileLogo
+                      src={business.profileLogoUrl}
+                      alt={String(business.profileName || business.name || '')}
+                      variant="inline"
+                    />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-gray-900 text-lg">
+                        <button
+                          type="button"
+                          onClick={handleViewDeal}
+                          className="text-left hover:text-teal-700 transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                        >
+                          {business.name}
+                        </button>
+                      </h3>
+                      <SuperStarBadge count={superStarCount} />
+                      {hasWhatsApp && (
+                        <button
+                          type="button"
+                          onClick={handleWhatsApp}
+                          className="inline-flex min-h-11 items-center gap-1 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-green-600 text-xs font-bold hover:bg-green-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                          aria-label={whatsappLabel}
+                        >
+                          <WhatsAppIcon className="w-3.5 h-3.5 shrink-0" />
+                          <span>WhatsApp</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
                   <span className="flex items-center gap-1"><MapPin className="w-3 h-3 shrink-0" />{business.location}</span>
@@ -384,17 +396,28 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-bold text-gray-900 text-base leading-tight">
-                <button
-                  type="button"
-                  onClick={handleViewDeal}
-                  className="text-left hover:text-teal-700 transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
-                >
-                  {business.name}
-                </button>
-              </h3>
-              <SuperStarBadge count={superStarCount} />
+            <div className="flex items-start gap-2.5">
+              {business.profileLogoUrl ? (
+                <BusinessProfileLogo
+                  src={business.profileLogoUrl}
+                  alt={String(business.profileName || business.name || '')}
+                  variant="inline"
+                />
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-bold text-gray-900 text-base leading-tight">
+                    <button
+                      type="button"
+                      onClick={handleViewDeal}
+                      className="text-left hover:text-teal-700 transition-colors rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+                    >
+                      {business.name}
+                    </button>
+                  </h3>
+                  <SuperStarBadge count={superStarCount} />
+                </div>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">

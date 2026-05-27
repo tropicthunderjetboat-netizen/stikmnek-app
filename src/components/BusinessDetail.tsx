@@ -44,6 +44,7 @@ import {
 } from '@/lib/offeringPhotoPartition';
 import { isListingFavorited } from '@/lib/favoritesUi';
 import BusinessCredentialsTile from '@/components/BusinessCredentialsTile';
+import BusinessProfileLogo from '@/components/BusinessProfileLogo';
 import {
   CREDENTIALS_VIEW_COLUMNS,
   credentialsFromBusinessListing,
@@ -708,25 +709,34 @@ const BusinessDetail: React.FC = () => {
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              {biz.profileLogoUrl && (
-                <div className="h-10 w-10 rounded-xl bg-white/90 p-1 shadow-lg ring-1 ring-white/60">
-                  <img
-                    src={biz.profileLogoUrl}
-                    alt=""
-                    className="h-full w-full rounded-lg object-contain"
-                    loading="lazy"
-                    decoding="async"
-                  />
+            <div className="flex items-start gap-3 sm:gap-4">
+              {biz.profileLogoUrl ? (
+                <BusinessProfileLogo
+                  src={biz.profileLogoUrl}
+                  alt={String(biz.profileName || biz.name || 'Business logo')}
+                  variant="hero"
+                />
+              ) : null}
+              <div className="min-w-0 flex-1 space-y-1">
+                {(() => {
+                  const venue = String(biz.profileName || '').trim();
+                  const showVenue = venue.length > 0 && venue.toLowerCase() !== biz.name.trim().toLowerCase();
+                  return showVenue ? (
+                    <p className="text-xs sm:text-sm font-semibold text-white/90 tracking-wide">{venue}</p>
+                  ) : null;
+                })()}
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight">{biz.name}</h1>
+                  {superStarCount > 0 && (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500 to-violet-600 text-white text-xs font-bold shadow-lg shadow-purple-500/30">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>
+                        {superStarCount} Super Star{superStarCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white">{biz.name}</h1>
-              {superStarCount > 0 && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500 to-violet-600 text-white text-xs font-bold shadow-lg shadow-purple-500/30">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{superStarCount} Super Star{superStarCount !== 1 ? 's' : ''}</span>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>

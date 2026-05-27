@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Building2, Mail, MapPin, Phone, RefreshCw, Trash2 } from 'lucide-react';
+import BusinessProfileLogo from '@/components/BusinessProfileLogo';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -105,11 +106,7 @@ const AdminIncompleteProfiles: React.FC<AdminIncompleteProfilesProps> = ({
           {profiles.map((p) => (
             <li key={p.id} className="px-4 py-3 flex flex-wrap items-start gap-4 bg-white/40">
               {p.logo_url ? (
-                <img
-                  src={p.logo_url}
-                  alt=""
-                  className="w-12 h-12 rounded-lg object-cover border border-violet-100 shrink-0"
-                />
+                <BusinessProfileLogo src={p.logo_url} alt={p.name} variant="chip" className="shrink-0" />
               ) : (
                 <div className="w-12 h-12 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
                   <Building2 className="w-6 h-6 text-violet-400" aria-hidden />
