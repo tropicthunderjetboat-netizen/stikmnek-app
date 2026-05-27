@@ -38,10 +38,10 @@ const VARIANT: Record<
     img: 'max-h-full max-w-full w-auto h-auto object-contain object-center',
     fallbackIcon: 'w-4 h-4',
   },
-  /** Listing detail sidebar — full-width tile, landscape-friendly */
+  /** Listing detail sidebar — fills the tile width (landscape wordmarks) */
   sidebar: {
-    wrap: 'w-full flex items-center justify-center',
-    img: 'max-h-[5.5rem] sm:max-h-24 w-auto max-w-full object-contain object-center',
+    wrap: 'w-full h-full min-h-[4.25rem] flex items-center justify-center p-2 sm:p-3',
+    img: 'w-full h-full max-h-[7.5rem] object-contain object-center',
     fallbackIcon: 'w-8 h-8',
   },
 };
@@ -72,9 +72,16 @@ const BusinessProfileLogo: React.FC<BusinessProfileLogoProps> = ({
     );
   }
 
+  const isSidebar = variant === 'sidebar';
+
   return (
     <div
-      className={cn('flex shrink-0 items-center justify-center', styles.wrap, className)}
+      className={cn(
+        'flex items-center justify-center',
+        isSidebar ? 'w-full h-full shrink' : 'shrink-0',
+        styles.wrap,
+        className,
+      )}
       title={alt || undefined}
     >
       <img

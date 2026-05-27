@@ -1158,19 +1158,25 @@ const BusinessDetail: React.FC = () => {
                     showTieredTable ? '' : 'border-t-0 lg:rounded-none lg:shadow-none'
                   }`}
                 >
-                  <div className="rounded-xl border border-gray-100 bg-gradient-to-b from-slate-50/90 via-white to-white px-4 py-5 text-center">
-                    <BusinessProfileLogo
-                      src={biz.profileLogoUrl}
-                      alt={String(biz.profileName || biz.name || 'Business logo')}
-                      variant="sidebar"
-                      className="mx-auto"
-                    />
+                  <div className="text-center">
+                    <div
+                      className="w-full aspect-[5/2] sm:aspect-[2.8/1] max-h-[7.5rem] min-h-[4.25rem] rounded-xl border border-gray-100 bg-slate-50/80 overflow-hidden flex items-center justify-center"
+                      role="img"
+                      aria-label={String(biz.profileName || biz.name || 'Business logo')}
+                    >
+                      <BusinessProfileLogo
+                        src={biz.profileLogoUrl}
+                        alt=""
+                        variant="sidebar"
+                        className="h-full w-full"
+                      />
+                    </div>
                     {(() => {
                       const venue = String(biz.profileName || '').trim();
                       const showVenue =
                         venue.length > 0 && venue.toLowerCase() !== biz.name.trim().toLowerCase();
                       return showVenue ? (
-                        <p className="mt-3 text-sm font-semibold text-gray-800">{venue}</p>
+                        <p className="mt-2.5 text-sm font-semibold text-gray-800 leading-snug">{venue}</p>
                       ) : null;
                     })()}
                   </div>
