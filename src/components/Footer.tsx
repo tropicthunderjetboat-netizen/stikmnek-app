@@ -83,7 +83,7 @@ const Footer: React.FC = () => {
           <div>
             <div className="mb-4">
               <img
-                src="/logo.svg"
+                src="/logo-footer.svg"
                 alt="StikmNek — 100% locally owned · Supporting grassroots businesses"
                 className="h-14 w-auto max-w-[280px] opacity-95"
                 width={280}
