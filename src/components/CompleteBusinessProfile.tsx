@@ -13,6 +13,7 @@ import WebsiteUrlInput from '@/components/WebsiteUrlInput';
 import { parseLatLngFromMapUrl, normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 import { validateBusinessProfileOnboarding } from '@/lib/businessOnboardingValidation';
 import OnboardingSteps from '@/components/OnboardingSteps';
+import BusinessCredentialsSettings from '@/components/BusinessCredentialsSettings';
 
 /** Maps `validateBusinessProfileOnboarding` error keys → local `errors` state keys used by this form. */
 const PROFILE_VALIDATION_KEY_TO_FORM: Record<string, string> = {
@@ -50,6 +51,35 @@ const CompleteBusinessProfile: React.FC = () => {
   const [logoPhotos, setLogoPhotos] = useState<UploadedPhoto[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  /** Set after first successful save — unlocks credentials upload + “Continue to hub”. */
+  const [savedProfileBusinessId, setSavedProfileBusinessId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (!cancelled && data?.id) {
+        setSavedProfileBusinessId(String(data.id));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const continueToBusinessHub = () => {
+    setCurrentView('business-dashboard');
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('switch-dashboard-tab', { detail: { tab: 'submit' } }));
+    }, 150);
+  };
 
   useEffect(() => {
     if (!userProfile && user) {
@@ -109,16 +139,16 @@ const CompleteBusinessProfile: React.FC = () => {
     }
 
     setSubmitting(true);
+    const wasUpdate = Boolean(savedProfileBusinessId);
     try {
       const parsed = mapUrl.trim() ? parseLatLngFromMapUrl(mapUrl.trim()) : null;
       const logoUrl = logoPhotos[0]?.url?.trim() || '';
-      const insertRow: Record<string, unknown> = {
+      const rowPayload: Record<string, unknown> = {
         name: businessName.trim(),
         category,
         description: '',
         description_fr: '',
         description_bi: '',
-        // `image` is deprecated for listings, but kept as fallback for older reads.
         image: logoUrl,
         logo_url: logoUrl,
         discount: '',
@@ -129,24 +159,36 @@ const CompleteBusinessProfile: React.FC = () => {
         phone: businessPhone.trim(),
         email: businessEmail.trim(),
         whatsapp_number: whatsappNumber.trim(),
-        owner_id: user.id,
         tags: [category],
         active: false,
         map_url: mapUrl.trim() || null,
         website: normalizeWebsiteForStorage(website) ?? null,
       };
       if (parsed) {
-        insertRow.lat = parsed.lat;
-        insertRow.lng = parsed.lng;
+        rowPayload.lat = parsed.lat;
+        rowPayload.lng = parsed.lng;
       }
 
-      const { data: inserted, error: insertErr } = await supabase
-        .from('businesses')
-        .insert(insertRow as never)
-        .select('id')
-        .single();
+      let businessId = savedProfileBusinessId || '';
+      if (wasUpdate && savedProfileBusinessId) {
+        const { error: updateErr } = await supabase
+          .from('businesses')
+          .update(rowPayload as never)
+          .eq('id', savedProfileBusinessId)
+          .eq('owner_id', user.id);
+        if (updateErr) throw updateErr;
+        businessId = savedProfileBusinessId;
+      } else {
+        const { data: inserted, error: insertErr } = await supabase
+          .from('businesses')
+          .insert({ ...rowPayload, owner_id: user.id } as never)
+          .select('id')
+          .single();
+        if (insertErr) throw insertErr;
+        businessId = inserted?.id ? String(inserted.id) : '';
+      }
 
-      if (insertErr) throw insertErr;
+      if (businessId) setSavedProfileBusinessId(businessId);
 
       const { error: profileErr } = await supabase
         .from('user_profiles')
@@ -183,16 +225,15 @@ const CompleteBusinessProfile: React.FC = () => {
 
       toast.success(
         language === 'en'
-          ? 'Business profile saved! Opening your dashboard to add listings.'
+          ? wasUpdate
+            ? 'Profile updated.'
+            : 'Business profile saved! Add your credentials below, then continue to submit your first listing.'
           : language === 'fr'
-            ? 'Profil enregistré ! Ouverture du tableau de bord.'
-            : 'Bisnis profail i sevem!',
+            ? wasUpdate
+              ? 'Profil mis à jour.'
+              : 'Profil enregistré ! Ajoutez vos justificatifs ci-dessous, puis continuez.'
+            : 'Bisnis profail i sevem! Putem ol credential bihain mo go long hub.',
       );
-
-      setCurrentView('business-dashboard');
-      window.setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('switch-dashboard-tab', { detail: { tab: 'submit' } }));
-      }, 150);
     } catch (err: any) {
       console.error('[CompleteBusinessProfile]', err);
       toast.error(err?.message || 'Failed to save business profile');
@@ -488,23 +529,58 @@ const CompleteBusinessProfile: React.FC = () => {
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     {language === 'en' ? 'Saving…' : language === 'fr' ? 'Enregistrement…' : 'Sevem…'}
                   </>
+                ) : savedProfileBusinessId ? (
+                  language === 'en' ? 'Update profile' : language === 'fr' ? 'Mettre à jour' : 'Update profail'
                 ) : language === 'en' ? (
-                  'Save & continue'
+                  'Save profile'
                 ) : language === 'fr' ? (
-                  'Enregistrer et continuer'
+                  'Enregistrer le profil'
                 ) : (
-                  'Sevem mo go'
+                  'Sevem profail'
                 )}
               </Button>
             </div>
             <p className="text-center text-xs text-gray-500">
               {language === 'en'
-                ? 'You can return anytime — open My dashboard and we will prompt you to finish setup.'
+                ? 'You can return anytime — open My Business and we will prompt you to finish setup.'
                 : language === 'fr'
-                  ? 'Revenez quand vous voulez : ouvrez Mon tableau de bord pour reprendre la configuration.'
-                  : 'Yu ken kam bak eni taem — openem dashboard bae i askem yu blong finisim setapem.'}
+                  ? 'Revenez quand vous voulez : ouvrez Mon Entreprise pour reprendre la configuration.'
+                  : 'Yu ken kam bak eni taem — openem Bisnis Blong Mi bae i askem yu blong finisim setapem.'}
             </p>
           </form>
+
+          {savedProfileBusinessId && user?.id && (
+            <div className="px-6 sm:px-8 pb-6 sm:pb-8 border-t border-emerald-100 space-y-4">
+              <div>
+                <h2 className="text-sm font-bold text-gray-900">
+                  {language === 'en'
+                    ? 'Business credentials (recommended)'
+                    : language === 'fr'
+                      ? 'Justificatifs (recommandé)'
+                      : 'Ol credential blong bisnis'}
+                </h2>
+                <p className="text-xs text-gray-600 mt-1">
+                  {language === 'en'
+                    ? 'Upload your business licence, tourism permit, or other proof. You can add these later in Business Hub → Business Profile, but uploading now speeds up approval.'
+                    : language === 'fr'
+                      ? 'Téléversez votre licence ou permis. Vous pourrez les modifier plus tard dans le tableau de bord.'
+                      : 'Uploadem ol paper blong bisnis. Yu save putum bihain long Business Profile tu.'}
+                </p>
+              </div>
+              <BusinessCredentialsSettings profileBusinessId={savedProfileBusinessId} />
+              <Button
+                type="button"
+                onClick={continueToBusinessHub}
+                className="w-full bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-95"
+              >
+                {language === 'en'
+                  ? 'Continue to Business Hub — submit a listing'
+                  : language === 'fr'
+                    ? 'Continuer — soumettre une annonce'
+                    : 'Go long Business Hub — submit listing'}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

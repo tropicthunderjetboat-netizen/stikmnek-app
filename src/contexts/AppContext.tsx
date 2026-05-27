@@ -873,10 +873,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toast.success('Welcome back, Admin!');
       setCurrentView('admin');
     } else if (role === 'business') {
-      toast.success('Welcome! Redirecting to your dashboard...');
-      setCurrentView('business-dashboard');
+      toast.success('Welcome! Set up your business profile to continue.');
+      setCurrentView('complete-business-profile');
     } else {
       toast.success('Welcome to StikmNek!');
+    }
+  }, [setCurrentView]);
+
+  /** After sign-in: hub if a `businesses` row exists, otherwise profile setup (step 2). */
+  const redirectBusinessUserAfterAuth = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_id', userId)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      const hasRow = Boolean(data?.id);
+      setBusinessOwnerHasBusinessRow(hasRow);
+      if (hasRow) {
+        toast.success('Welcome back!');
+        setCurrentView('business-dashboard');
+      } else {
+        toast.success('Welcome! Set up your business profile to continue.');
+        setCurrentView('complete-business-profile');
+      }
+    } catch (err) {
+      console.warn('[redirectBusinessUserAfterAuth]', err);
+      setBusinessOwnerHasBusinessRow(null);
+      toast.success('Welcome! Set up your business profile to continue.');
+      setCurrentView('complete-business-profile');
     }
   }, [setCurrentView]);
 
@@ -986,7 +1014,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (shouldRedirect) {
         signInCooldownRef.current = Date.now();
-        redirectForRole(role);
+        if (role === 'business') {
+          await redirectBusinessUserAfterAuth(authUser.id);
+        } else {
+          redirectForRole(role);
+        }
       }
     } catch (err) {
       console.error('[handleAuthenticatedUser] CRITICAL ERROR:', err);
@@ -1024,13 +1056,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       setShowAuth(false);
       if (shouldRedirect) {
-        redirectForRole(fallbackRole);
+        signInCooldownRef.current = Date.now();
+        if (fallbackRole === 'business') {
+          await redirectBusinessUserAfterAuth(authUser.id);
+        } else {
+          redirectForRole(fallbackRole);
+        }
       }
     } finally {
       authProcessingRef.current = false;
       setAuthLoading(false);
     }
-  }, [resolveRole, buildUser, loadUserData, redirectForRole]);
+  }, [resolveRole, buildUser, loadUserData, redirectForRole, redirectBusinessUserAfterAuth]);
 
 
   // ═══════════════════════════════════════════════════════════

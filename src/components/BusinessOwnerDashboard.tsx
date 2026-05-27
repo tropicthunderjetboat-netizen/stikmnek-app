@@ -875,7 +875,8 @@ const BusinessOwnerDashboard: React.FC = () => {
     };
   }, [user?.id, ownerProfileBusinessId, businessOwnerHasBusinessRow]);
 
-  const effectiveProfileBusinessId = ownerProfileBusinessId || fallbackProfileBusinessId;
+  /** Resolved profile `businesses.id` for settings/credentials (do not shadow `effectiveProfileBusinessId()` from businessOfferingMap). */
+  const resolvedProfileBusinessId = ownerProfileBusinessId || fallbackProfileBusinessId;
 
   useEffect(() => {
     if (unifiedBusinesses.length > 0 && !selectedBusinessIdRef.current) {
@@ -1544,7 +1545,7 @@ const BusinessOwnerDashboard: React.FC = () => {
   // ═══ SIDEBAR NAV ITEMS ═══
   const navItems: { key: DashboardTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { key: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-5 h-5" /> },
-    ...(effectiveProfileBusinessId
+    ...(resolvedProfileBusinessId
       ? [
           {
             key: 'profile' as const,
@@ -2295,18 +2296,18 @@ const BusinessOwnerDashboard: React.FC = () => {
             {/* Tab Content */}
             {/* Overview tab — approved business: show full DashboardOverview */}
             {activeTab === 'overview' && selectedBusiness && selectedIsApproved && (
-              <DashboardOverview selectedBusiness={selectedBusiness as any} totalRedemptions={totalRedemptions} totalRevenue={totalRevenue} businessReviews={businessReviews} pendingBusinesses={pendingBusinesses} currentPendingEdit={currentPendingEdit} onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)} onToggleActive={handleToggleActive} onOpenScanner={() => setShowScanner(true)} hasBusinessProfile={Boolean(effectiveProfileBusinessId)} />
+              <DashboardOverview selectedBusiness={selectedBusiness as any} totalRedemptions={totalRedemptions} totalRevenue={totalRevenue} businessReviews={businessReviews} pendingBusinesses={pendingBusinesses} currentPendingEdit={currentPendingEdit} onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)} onToggleActive={handleToggleActive} onOpenScanner={() => setShowScanner(true)} hasBusinessProfile={Boolean(resolvedProfileBusinessId)} />
             )}
-            {activeTab === 'profile' && effectiveProfileBusinessId && (
+            {activeTab === 'profile' && resolvedProfileBusinessId && (
               <BusinessProfileSettings
-                profileBusinessId={effectiveProfileBusinessId}
+                profileBusinessId={resolvedProfileBusinessId}
                 profileDisplayName={
                   approvedListingsSameProfile.find((b) => String(b.id) === String(selectedProfileId))?.name ||
                   selectedBusiness?.name
                 }
               />
             )}
-            {activeTab === 'profile' && !effectiveProfileBusinessId && !ownerDataLoading && (
+            {activeTab === 'profile' && !resolvedProfileBusinessId && !ownerDataLoading && (
               renderPendingOnlyNotice(
                 language === 'en'
                   ? 'Save your business profile first (complete setup), then you can update phone and contact details here.'
