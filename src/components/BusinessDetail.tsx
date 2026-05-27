@@ -709,33 +709,24 @@ const BusinessDetail: React.FC = () => {
                 </button>
               )}
             </div>
-            <div className="flex items-start gap-3 sm:gap-4">
-              {biz.profileLogoUrl ? (
-                <BusinessProfileLogo
-                  src={biz.profileLogoUrl}
-                  alt={String(biz.profileName || biz.name || 'Business logo')}
-                  variant="hero"
-                />
-              ) : null}
-              <div className="min-w-0 flex-1 space-y-1">
-                {(() => {
-                  const venue = String(biz.profileName || '').trim();
-                  const showVenue = venue.length > 0 && venue.toLowerCase() !== biz.name.trim().toLowerCase();
-                  return showVenue ? (
-                    <p className="text-xs sm:text-sm font-semibold text-white/90 tracking-wide">{venue}</p>
-                  ) : null;
-                })()}
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight">{biz.name}</h1>
-                  {superStarCount > 0 && (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500 to-violet-600 text-white text-xs font-bold shadow-lg shadow-purple-500/30">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>
-                        {superStarCount} Super Star{superStarCount !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  )}
-                </div>
+            <div className="space-y-1">
+              {(() => {
+                const venue = String(biz.profileName || '').trim();
+                const showVenue = venue.length > 0 && venue.toLowerCase() !== biz.name.trim().toLowerCase();
+                return showVenue ? (
+                  <p className="text-xs sm:text-sm font-semibold text-white/90 tracking-wide">{venue}</p>
+                ) : null;
+              })()}
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight">{biz.name}</h1>
+                {superStarCount > 0 && (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-500 to-violet-600 text-white text-xs font-bold shadow-lg shadow-purple-500/30">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>
+                      {superStarCount} Super Star{superStarCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1161,12 +1152,39 @@ const BusinessDetail: React.FC = () => {
               </div>
               )}
 
+              {biz.profileLogoUrl ? (
+                <div
+                  className={`order-4 bg-white rounded-xl px-5 pt-5 pb-4 sm:px-6 shadow-sm border border-gray-100 lg:order-none ${
+                    showTieredTable ? '' : 'border-t-0 lg:rounded-none lg:shadow-none'
+                  }`}
+                >
+                  <div className="rounded-xl border border-gray-100 bg-gradient-to-b from-slate-50/90 via-white to-white px-4 py-5 text-center">
+                    <BusinessProfileLogo
+                      src={biz.profileLogoUrl}
+                      alt={String(biz.profileName || biz.name || 'Business logo')}
+                      variant="sidebar"
+                      className="mx-auto"
+                    />
+                    {(() => {
+                      const venue = String(biz.profileName || '').trim();
+                      const showVenue =
+                        venue.length > 0 && venue.toLowerCase() !== biz.name.trim().toLowerCase();
+                      return showVenue ? (
+                        <p className="mt-3 text-sm font-semibold text-gray-800">{venue}</p>
+                      ) : null;
+                    })()}
+                  </div>
+                </div>
+              ) : null}
+
               {/* Actions — booking, WhatsApp, save/share */}
               <div
                 className={`order-5 bg-white rounded-xl px-5 pb-5 pt-4 sm:px-6 sm:pb-6 shadow-sm border border-gray-100 lg:order-none lg:pt-5 ${
-                  showTieredTable
-                    ? ''
-                    : 'border-t-0 lg:rounded-none lg:shadow-none lg:border-t lg:border-gray-100'
+                  biz.profileLogoUrl
+                    ? 'border-t-0 lg:rounded-t-none lg:shadow-none'
+                    : showTieredTable
+                      ? ''
+                      : 'border-t-0 lg:rounded-none lg:shadow-none lg:border-t lg:border-gray-100'
                 }`}
               >
               <div className="flex items-center gap-1 mb-2">

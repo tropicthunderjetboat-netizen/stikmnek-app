@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type BusinessProfileLogoVariant = 'hero' | 'inline' | 'chip';
+export type BusinessProfileLogoVariant = 'hero' | 'inline' | 'chip' | 'sidebar';
 
 type BusinessProfileLogoProps = {
   src: string | null | undefined;
@@ -38,6 +38,12 @@ const VARIANT: Record<
     img: 'max-h-full max-w-full w-auto h-auto object-contain object-center',
     fallbackIcon: 'w-4 h-4',
   },
+  /** Listing detail sidebar — full-width tile, landscape-friendly */
+  sidebar: {
+    wrap: 'w-full flex items-center justify-center',
+    img: 'max-h-[5.5rem] sm:max-h-24 w-auto max-w-full object-contain object-center',
+    fallbackIcon: 'w-8 h-8',
+  },
 };
 
 /**
@@ -55,7 +61,7 @@ const BusinessProfileLogo: React.FC<BusinessProfileLogoProps> = ({
   const styles = VARIANT[variant];
 
   if (!trimmed || failed) {
-    if (variant === 'hero') return null;
+    if (variant === 'hero' || variant === 'sidebar') return null;
     return (
       <div
         className={cn('flex shrink-0 items-center justify-center text-gray-300', styles.wrap, className)}
