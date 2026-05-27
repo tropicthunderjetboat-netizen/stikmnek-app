@@ -481,13 +481,14 @@ const CompleteBusinessProfile: React.FC = () => {
                   onPhotosChange={setLogoPhotos}
                   maxPhotos={1}
                   userId={user.id}
+                  logoCrop
                   label={language === 'en' ? 'Business logo' : language === 'fr' ? 'Logo' : 'Logo'}
                   sublabel={
                     language === 'en'
-                      ? 'Optional — one logo only. Pick one file at a time; choosing another replaces it. You can save without a logo.'
+                      ? 'Optional — upload, then drag and zoom to fit the square (like a profile photo).'
                       : language === 'fr'
-                        ? 'Optionnel — un seul logo. Un fichier à la fois ; un nouveau remplace l’ancien.'
-                        : 'Optional — wan logo. Save i go wetem logo.'
+                        ? 'Optionnel — téléversez puis ajustez zoom et position.'
+                        : 'Optional — upload mo adjustem long square.'
                   }
                 />
                 <LocationMapPicker mapUrl={mapUrl} onMapUrlChange={setMapUrl} language={language} />

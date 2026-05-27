@@ -38,10 +38,11 @@ const VARIANT: Record<
     img: 'max-h-full max-w-full w-auto h-auto object-contain object-center',
     fallbackIcon: 'w-4 h-4',
   },
-  /** Listing detail sidebar — fills the tile width (landscape wordmarks) */
+  /** Listing detail sidebar — square tile, fills frame (matches logo crop) */
   sidebar: {
-    wrap: 'w-full h-full min-h-[4.25rem] flex items-center justify-center p-2 sm:p-3',
-    img: 'w-full h-full max-h-[7.5rem] object-contain object-center',
+    wrap:
+      'w-full max-w-[220px] mx-auto aspect-square overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm',
+    img: 'w-full h-full object-cover object-center',
     fallbackIcon: 'w-8 h-8',
   },
 };

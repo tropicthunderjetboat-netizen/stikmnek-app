@@ -13,6 +13,8 @@ import {
   Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import LogoCropDialog from '@/components/LogoCropDialog';
+import { useAppContext } from '@/contexts/AppContext';
 
 export interface UploadedPhoto {
   id: string;
@@ -34,6 +36,8 @@ interface PhotoUploaderProps {
   compact?: boolean;
   /** When true (default if maxPhotos > 1), owners can drag to reorder and set cover image (first in list). */
   allowReorder?: boolean;
+  /** Square crop + zoom before upload (business logo). */
+  logoCrop?: boolean;
 }
 
 interface UploadingFile {
@@ -245,11 +249,14 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   sublabel = 'Drag & drop or click to browse. PNG, JPG up to 5MB each.',
   compact = false,
   allowReorder: allowReorderProp,
+  logoCrop = false,
 }) => {
+  const { language } = useAppContext();
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [dragPhotoIndex, setDragPhotoIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [cropDialog, setCropDialog] = useState<{ src: string; fileName: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const allowReorder = allowReorderProp ?? maxPhotos > 1;
   const isSingleSlot = maxPhotos === 1;
@@ -557,6 +564,37 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
    * Handle selected files — strictly serial (read → compress+upload per file).
    * Avoids overlapping storage / session token work that can stall when many files start at once.
    */
+  const uploadFilesAfterCrop = useCallback(
+    async (filesToUpload: File[], preReadByIndex: string[]) => {
+      let basePhotos = [...photos];
+      const successful: UploadedPhoto[] = [];
+      let accumulated = [...basePhotos];
+
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        const result = await uploadFile(file, preReadByIndex[i] || undefined);
+        if (result) {
+          successful.push(result);
+          accumulated = [...accumulated, result];
+          onPhotosChange(accumulated);
+        }
+      }
+
+      if (successful.length > 0) {
+        toast.success(
+          logoCrop
+            ? language === 'en'
+              ? 'Logo saved!'
+              : language === 'fr'
+                ? 'Logo enregistré !'
+                : 'Logo i sevem!'
+            : `${successful.length} photo${successful.length > 1 ? 's' : ''} uploaded!`,
+        );
+      }
+    },
+    [photos, uploadFile, onPhotosChange, logoCrop, language],
+  );
+
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
 
@@ -564,6 +602,17 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
     const validFiles = fileArray.filter(f => f && f.type.startsWith('image/'));
     if (validFiles.length === 0) {
       toast.error('No valid image files selected');
+      return;
+    }
+
+    if (logoCrop && isSingleSlot) {
+      const file = validFiles[0];
+      try {
+        const src = await readFileAsDataUrl(file);
+        setCropDialog({ src, fileName: file.name });
+      } catch {
+        toast.error('Could not read image — try another file.');
+      }
       return;
     }
 
@@ -603,9 +652,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
 
     console.log(`[PhotoUploader] Serial queue: ${filesToUpload.length} file(s)`);
 
-    const successful: UploadedPhoto[] = [];
-    let accumulated = [...basePhotos];
-
+    const preReads: string[] = [];
     for (const file of filesToUpload) {
       let preReadDataUrl = '';
       try {
@@ -614,19 +661,33 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(`[PhotoUploader] Initial read failed for ${file.name}:`, msg);
       }
+      preReads.push(preReadDataUrl);
+    }
 
-      const result = await uploadFile(file, preReadDataUrl || undefined);
-      if (result) {
-        successful.push(result);
-        accumulated = [...accumulated, result];
-        onPhotosChange(accumulated);
+    await uploadFilesAfterCrop(filesToUpload, preReads);
+  }, [photos, maxPhotos, isSingleSlot, uploading, logoCrop, uploadFilesAfterCrop]);
+
+  const handleLogoCropped = useCallback(
+    async (file: File, previewDataUrl: string) => {
+      if (photos.length > 0) {
+        const old = photos[0];
+        try {
+          await supabase.storage.from('business-photos').remove([old.filePath]);
+        } catch (err) {
+          console.warn('Failed to remove previous logo (non-critical):', err);
+        }
+        onPhotosChange([]);
       }
-    }
-
-    if (successful.length > 0) {
-      toast.success(`${successful.length} photo${successful.length > 1 ? 's' : ''} uploaded!`);
-    }
-  }, [photos, maxPhotos, isSingleSlot, uploadFile, onPhotosChange, uploading]);
+      const result = await uploadFile(file, previewDataUrl);
+      if (result) {
+        onPhotosChange([result]);
+        toast.success(
+          language === 'en' ? 'Logo saved!' : language === 'fr' ? 'Logo enregistré !' : 'Logo i sevem!',
+        );
+      }
+    },
+    [photos, uploadFile, onPhotosChange, language],
+  );
 
   const reorderPhotos = useCallback(
     (fromIndex: number, toIndex: number) => {
@@ -981,6 +1042,34 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
             ? 'Logo uploaded. Remove it or pick a new file to replace it.'
             : `Maximum of ${maxPhotos} photos reached. Remove a photo to upload a new one.`}
         </p>
+      )}
+
+      {logoCrop && photos.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setCropDialog({ src: photos[0].url, fileName: photos[0].name })}
+          className="w-full text-center text-sm font-semibold text-teal-700 hover:text-teal-800 underline-offset-2 hover:underline"
+        >
+          {language === 'en'
+            ? 'Adjust how it looks on your listing'
+            : language === 'fr'
+              ? 'Ajuster l’affichage sur l’annonce'
+              : 'Adjustem olsem long listing'}
+        </button>
+      )}
+
+      {cropDialog && (
+        <LogoCropDialog
+          open
+          imageSrc={cropDialog.src}
+          fileName={cropDialog.fileName}
+          language={language}
+          onClose={() => setCropDialog(null)}
+          onCropped={(file, preview) => {
+            setCropDialog(null);
+            void handleLogoCropped(file, preview);
+          }}
+        />
       )}
     </div>
   );

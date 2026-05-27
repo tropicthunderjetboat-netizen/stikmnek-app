@@ -1159,16 +1159,11 @@ const BusinessDetail: React.FC = () => {
                   }`}
                 >
                   <div className="text-center">
-                    <div
-                      className="w-full aspect-[5/2] sm:aspect-[2.8/1] max-h-[7.5rem] min-h-[4.25rem] rounded-xl border border-gray-100 bg-slate-50/80 overflow-hidden flex items-center justify-center"
-                      role="img"
-                      aria-label={String(biz.profileName || biz.name || 'Business logo')}
-                    >
+                    <div role="img" aria-label={String(biz.profileName || biz.name || 'Business logo')}>
                       <BusinessProfileLogo
                         src={biz.profileLogoUrl}
                         alt=""
                         variant="sidebar"
-                        className="h-full w-full"
                       />
                     </div>
                     {(() => {
