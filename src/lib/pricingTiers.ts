@@ -158,6 +158,7 @@ export function validatePricingTiersForSubmit(tiers: PricingTierInput[]): {
 
   for (const t of active) {
     const label = (t.label || '').trim();
+    const isCharter = /^charter/i.test(label);
     const min_pax = Math.max(0, Math.floor(Number(t.min_pax) || 0));
     const maxRaw = t.max_pax;
     const max_pax =
@@ -176,7 +177,7 @@ export function validatePricingTiersForSubmit(tiers: PricingTierInput[]): {
     if (deal_price_vt >= original_price_vt) {
       return { data: null, error: 'StikmNek price must be less than the standard price for each tier.' };
     }
-    if (max_pax !== null && max_pax < min_pax) {
+    if (!isCharter && max_pax !== null && max_pax < min_pax) {
       return { data: null, error: 'Max pax must be greater than or equal to min pax for each tier.' };
     }
 

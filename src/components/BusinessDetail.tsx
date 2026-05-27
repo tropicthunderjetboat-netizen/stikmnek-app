@@ -820,19 +820,35 @@ const BusinessDetail: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {pricingTiers.map((row, i) => (
-                        <tr key={i} className="border-b border-gray-50 last:border-0">
-                          <td className="px-3 py-2 font-medium text-gray-900">{row.label || '—'}</td>
-                          <td className="px-3 py-2 text-gray-700">
-                            {row.min_pax}
-                            {row.max_pax != null ? `–${row.max_pax}` : '+'}
-                          </td>
-                          <td className="px-3 py-2 text-gray-600">{formatVT(row.original_price_vt)}</td>
-                          <td className="px-3 py-2.5 font-bold text-teal-900 bg-gradient-to-r from-teal-50 to-emerald-50/90 text-base tabular-nums">
-                            {formatVT(row.deal_price_vt)}
-                          </td>
-                        </tr>
-                      ))}
+                      {pricingTiers.map((row, i) => {
+                        const isCharter = /^charter/i.test((row.label || '').trim());
+                        const paxCell = isCharter
+                          ? row.max_pax != null
+                            ? language === 'en'
+                              ? `up to ${row.max_pax}`
+                              : language === 'fr'
+                                ? `jusqu'à ${row.max_pax}`
+                                : `kasem ${row.max_pax}`
+                            : language === 'en' ? 'group' : 'groupe'
+                          : `${row.min_pax}${row.max_pax != null ? `–${row.max_pax}` : '+'}`;
+                        return (
+                          <tr key={i} className="border-b border-gray-50 last:border-0">
+                            <td className="px-3 py-2 font-medium text-gray-900">
+                              <div>{row.label || '—'}</div>
+                              {isCharter && (
+                                <div className="text-[10px] text-amber-700 font-semibold uppercase tracking-wide mt-0.5">
+                                  {language === 'en' ? 'Flat rate' : language === 'fr' ? 'Tarif fixe' : 'Flat praes'}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-gray-700 text-xs">{paxCell}</td>
+                            <td className="px-3 py-2 text-gray-600">{formatVT(row.original_price_vt)}</td>
+                            <td className="px-3 py-2.5 font-bold text-teal-900 bg-gradient-to-r from-teal-50 to-emerald-50/90 text-base tabular-nums">
+                              {formatVT(row.deal_price_vt)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

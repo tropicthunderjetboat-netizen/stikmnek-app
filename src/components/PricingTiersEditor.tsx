@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Plus, Trash2, Users } from 'lucide-react';
+import { Plus, Trash2, Users, Anchor } from 'lucide-react';
 import type { Language } from '@/data/translations';
 import type { PricingTierInput } from '@/lib/pricingTiers';
 import {
@@ -14,8 +14,13 @@ export interface PricingTiersEditorProps {
   language: Language;
   /** When set (0–100), StikmNek VT per tier follows standard VT × (1 − pct/100). */
   discountPercent?: number | null;
-  /** Use fixed Adults / Children cards instead of generic “Tier 1” labels. */
+  /** Use fixed Adults / Children cards instead of generic "Tier 1" labels. */
   usePresetSlots?: boolean;
+}
+
+/** Charter rows carry the whole-boat flat price; identified by label prefix. */
+function isCharterTier(tier: PricingTierInput): boolean {
+  return /^charter/i.test((tier.label || '').trim());
 }
 
 function dealFromOriginal(original: number, pct: number): number {
@@ -40,10 +45,14 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
           : 'Praes long wanwan man (VT)',
     hint:
       language === 'en'
-        ? 'Set the standard price and StikmNek price for adults and children. The headline discount % above applies to both rows when you change standard VT.'
+        ? 'Set the standard price and StikmNek price for each guest type. You can rename the labels (e.g. Adults 13+, Children 3–12). The headline discount % above applies automatically when you enter a standard VT.'
         : language === 'fr'
-          ? 'Indiquez le prix standard et le prix StikmNek pour adultes et enfants.'
-          : 'Putum stanad mo StikmNek praes blong adult mo pikinini.',
+          ? 'Indiquez le prix standard et le prix StikmNek pour chaque type de visiteur. Renommez les libellés si besoin.'
+          : 'Putum stanad mo StikmNek praes. Yu save senisim nem blong evri rol.',
+    labelField:
+      language === 'en' ? 'Guest label' : language === 'fr' ? 'Libellé' : 'Nem',
+    labelPlaceholder:
+      language === 'en' ? 'e.g. Adults (13+)' : language === 'fr' ? 'ex. Adultes (13+)' : 'ex. Adult (13+)',
     adults:
       language === 'en' ? 'Adults' : language === 'fr' ? 'Adultes' : 'Adult',
     children:
@@ -54,8 +63,22 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
       language === 'en' ? 'Standard VT (per person)' : language === 'fr' ? 'Prix standard VT' : 'Stanad VT',
     deal:
       language === 'en' ? 'StikmNek VT (per person)' : language === 'fr' ? 'Prix StikmNek VT' : 'StikmNek VT',
+    origFlat:
+      language === 'en' ? 'Standard VT (whole group)' : language === 'fr' ? 'Prix standard (groupe entier)' : 'Stanad VT (olgeta grup)',
+    dealFlat:
+      language === 'en' ? 'StikmNek VT (whole group)' : language === 'fr' ? 'Prix StikmNek (groupe entier)' : 'StikmNek VT (olgeta grup)',
+    charterName:
+      language === 'en' ? 'Charter name' : language === 'fr' ? 'Nom du charter' : 'Nem blong charter',
+    charterNamePlaceholder:
+      language === 'en' ? 'e.g. Private Charter (up to 5)' : language === 'fr' ? 'ex. Charter privé (jusqu\'à 5)' : 'ex. Private Charter (5 pipol)',
+    maxPax:
+      language === 'en' ? 'Max people included' : language === 'fr' ? 'Personnes max incluses' : 'Mak man long praes',
+    maxPaxHint:
+      language === 'en' ? 'Max group size covered by this flat price' : language === 'fr' ? 'Taille max du groupe couverte par ce tarif' : 'Mak saes grup blong flat praes ia',
     addInfant:
       language === 'en' ? 'Add infant pricing' : language === 'fr' ? 'Ajouter tarif bébé' : 'Addem bebi praes',
+    addCharter:
+      language === 'en' ? 'Add private charter' : language === 'fr' ? 'Ajouter charter privé' : 'Addem praevet charter',
     remove:
       language === 'en' ? 'Remove' : language === 'fr' ? 'Supprimer' : 'Kivim',
     autoHint:
@@ -66,6 +89,8 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
           : 'StikmNek VT i folem diskaon % mo stanad VT.',
     freeformAdd:
       language === 'en' ? 'Add price row' : language === 'fr' ? 'Ajouter une ligne' : 'Addem wan lain',
+    charterTag:
+      language === 'en' ? 'Flat rate — whole group' : language === 'fr' ? 'Tarif fixe — groupe entier' : 'Flat praes — olgeta grup',
   };
 
   useEffect(() => {
@@ -84,23 +109,17 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
   const updateTier = (index: number, patch: Partial<PricingTierInput>) => {
     const row = tiers[index];
     if (!row) return;
-    let merged: PricingTierInput = { ...row, ...patch };
-    if (usePresetSlots && !Object.prototype.hasOwnProperty.call(patch, 'label')) {
-      merged = { ...merged, label: tierPresetLabel(index, lang) };
-    }
+    const merged: PricingTierInput = { ...row, ...patch };
+    // Auto-calculate deal price when standard price changes and discount is set
     if (
       discountPercent != null &&
       Number.isFinite(discountPercent) &&
       discountPercent >= 0 &&
       Object.prototype.hasOwnProperty.call(patch, 'original_price_vt')
     ) {
-      merged = {
-        ...merged,
-        deal_price_vt: dealFromOriginal(merged.original_price_vt, discountPercent),
-      };
+      merged.deal_price_vt = dealFromOriginal(merged.original_price_vt, discountPercent);
     }
-    const next = tiers.map((r, i) => (i === index ? merged : r));
-    onChange(next);
+    onChange(tiers.map((r, i) => (i === index ? merged : r)));
   };
 
   const removeTier = (index: number) => {
@@ -109,20 +128,30 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
   };
 
   const addInfantTier = () => {
-    if (tiers.length >= TIER_PRESET_SLOTS.length) return;
+    if (tiers.some((t) => /^infant|^b[eé]b[eé]/i.test(t.label))) return;
     onChange([...tiers, emptyPricingTier(2)]);
+  };
+
+  const addCharterTier = () => {
+    const charterRow: PricingTierInput = {
+      label: language === 'en' ? 'Private Charter' : language === 'fr' ? 'Charter privé' : 'Private Charter',
+      min_pax: 1,
+      max_pax: 5,
+      original_price_vt: 0,
+      deal_price_vt: 0,
+    };
+    onChange([...tiers, charterRow]);
   };
 
   const addFreeformTier = () => {
     onChange([...tiers, emptyPricingTier(tiers.length)]);
   };
 
-  const slotTitle = (index: number) => {
-    if (!usePresetSlots) return `${language === 'en' ? 'Price row' : 'Ligne'} ${index + 1}`;
-    if (index === 0) return t.adults;
-    if (index === 1) return t.children;
-    return t.infants;
-  };
+  const defaultLabelForSlot = (index: number) =>
+    index === 0 ? t.adults : index === 1 ? t.children : t.infants;
+
+  const hasCharter = tiers.some(isCharterTier);
+  const hasInfants = tiers.some((t) => /^infant|^b[eé]b[eé]|^bebi/i.test(t.label));
 
   return (
     <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50/90 to-white p-4 space-y-3">
@@ -140,91 +169,154 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
       </div>
 
       <div className="space-y-3">
-        {tiers.map((tier, index) => (
-          <div
-            key={`${index}-${tier.label}`}
-            className="rounded-lg border border-violet-100 bg-white p-3 space-y-2 shadow-sm"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-bold text-violet-950">{slotTitle(index)}</p>
-              {usePresetSlots && index >= 2 && (
-                <button
-                  type="button"
-                  onClick={() => removeTier(index)}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  {t.remove}
-                </button>
-              )}
-            </div>
-            {!usePresetSlots && (
+        {tiers.map((tier, index) => {
+          const charter = isCharterTier(tier);
+          return (
+            <div
+              key={`${index}-${tier.label}`}
+              className={`rounded-lg border p-3 space-y-2.5 shadow-sm ${
+                charter
+                  ? 'border-amber-200 bg-amber-50/60'
+                  : 'border-violet-100 bg-white'
+              }`}
+            >
+              {/* Row header */}
+              <div className="flex items-center justify-between gap-2">
+                {charter ? (
+                  <div className="flex items-center gap-1.5">
+                    <Anchor className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                    <span className="text-xs font-bold text-amber-900 uppercase tracking-wide">
+                      {t.charterTag}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-[10px] font-bold text-violet-500 uppercase tracking-wide">
+                    {defaultLabelForSlot(index)}
+                  </span>
+                )}
+                {(index >= 2 || !usePresetSlots || charter) && (
+                  <button
+                    type="button"
+                    onClick={() => removeTier(index)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {t.remove}
+                  </button>
+                )}
+              </div>
+
+              {/* Editable label — always shown so owners can add age ranges etc. */}
               <div>
                 <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
-                  {language === 'en' ? 'Label' : language === 'fr' ? 'Libellé' : 'Nem'}
+                  {charter ? t.charterName : t.labelField}
                 </label>
                 <input
                   type="text"
                   value={tier.label}
                   onChange={(e) => updateTier(index, { label: e.target.value })}
                   className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm"
-                  placeholder={language === 'en' ? 'e.g. Adult (13+)' : ''}
+                  placeholder={charter ? t.charterNamePlaceholder : t.labelPlaceholder}
+                  maxLength={60}
                 />
               </div>
-            )}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">{t.orig}</label>
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={tier.original_price_vt || ''}
-                  onChange={(e) =>
-                    updateTier(index, { original_price_vt: Math.max(0, Number(e.target.value) || 0) })
-                  }
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm"
-                />
+
+              {/* Price fields */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
+                    {charter ? t.origFlat : t.orig}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={tier.original_price_vt || ''}
+                    onChange={(e) =>
+                      updateTier(index, { original_price_vt: Math.max(0, Number(e.target.value) || 0) })
+                    }
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
+                    {charter ? t.dealFlat : t.deal}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={tier.deal_price_vt || ''}
+                    onChange={(e) =>
+                      updateTier(index, { deal_price_vt: Math.max(0, Number(e.target.value) || 0) })
+                    }
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">{t.deal}</label>
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={tier.deal_price_vt || ''}
-                  onChange={(e) =>
-                    updateTier(index, { deal_price_vt: Math.max(0, Number(e.target.value) || 0) })
-                  }
-                  className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm"
-                />
-              </div>
+
+              {/* Charter max-pax field */}
+              {charter && (
+                <div className="max-w-[12rem]">
+                  <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
+                    {t.maxPax}
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={200}
+                    step={1}
+                    value={tier.max_pax ?? ''}
+                    onChange={(e) => {
+                      const v = Math.max(1, Number(e.target.value) || 1);
+                      updateTier(index, { max_pax: v });
+                    }}
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm"
+                    placeholder="5"
+                  />
+                  <p className="text-[10px] text-gray-500 mt-0.5">{t.maxPaxHint}</p>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {usePresetSlots && tiers.length < 3 && (
-        <button
-          type="button"
-          onClick={addInfantTier}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border-2 border-dashed border-violet-300 text-violet-800 text-sm font-semibold hover:bg-violet-50 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          {t.addInfant}
-        </button>
-      )}
+      {/* Action buttons */}
+      <div className="flex flex-wrap gap-2">
+        {usePresetSlots && !hasInfants && (
+          <button
+            type="button"
+            onClick={addInfantTier}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-dashed border-violet-300 text-violet-800 text-sm font-semibold hover:bg-violet-50 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            {t.addInfant}
+          </button>
+        )}
 
-      {!usePresetSlots && (
-        <button
-          type="button"
-          onClick={addFreeformTier}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border-2 border-dashed border-violet-300 text-violet-800 text-sm font-semibold hover:bg-violet-50 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          {t.freeformAdd}
-        </button>
-      )}
+        {!hasCharter && (
+          <button
+            type="button"
+            onClick={addCharterTier}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-dashed border-amber-300 text-amber-800 text-sm font-semibold hover:bg-amber-50 transition-colors"
+          >
+            <Anchor className="w-4 h-4" />
+            {t.addCharter}
+          </button>
+        )}
+
+        {!usePresetSlots && (
+          <button
+            type="button"
+            onClick={addFreeformTier}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border-2 border-dashed border-violet-300 text-violet-800 text-sm font-semibold hover:bg-violet-50 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            {t.freeformAdd}
+          </button>
+        )}
+      </div>
     </div>
   );
 };
