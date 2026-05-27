@@ -82,19 +82,28 @@ const Footer: React.FC = () => {
           {/* About */}
           <div>
             <div className="mb-4">
-              <img
-                src="/logo-footer.svg"
-                alt="StikmNek — 100% locally owned · Supporting grassroots businesses"
-                className="h-14 w-auto max-w-[280px] opacity-95"
-                width={280}
-                height={56}
-                onError={(e) => {
-                  const img = e.currentTarget;
-                  img.onerror = null;
-                  img.src = '/logo-icon.svg';
-                  img.className = 'h-12 w-12 rounded-xl opacity-95';
-                }}
-              />
+              <div className="flex items-center gap-3">
+                <img
+                  src="/logo-icon.png"
+                  alt="StikmNek"
+                  className="h-12 w-12 rounded-2xl shadow-sm"
+                  width={48}
+                  height={48}
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    img.onerror = null;
+                    img.src = '/logo-icon.svg';
+                  }}
+                />
+                <div className="min-w-0">
+                  <p className="text-lg font-extrabold text-white leading-tight">StikmNek</p>
+                  <p className="text-xs text-gray-300 leading-snug">
+                    {t('footer.local_badge', language)}
+                  </p>
+                </div>
+              </div>
               <LocalOwnedBadge variant="footer" language={language} className="mt-3" />
             </div>
             <p className="text-sm text-gray-400 leading-relaxed mb-4">
