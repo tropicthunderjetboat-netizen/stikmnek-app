@@ -91,11 +91,6 @@ const Footer: React.FC = () => {
                   height={48}
                   loading="lazy"
                   decoding="async"
-                  onError={(e) => {
-                    const img = e.currentTarget;
-                    img.onerror = null;
-                    img.src = '/logo-icon.svg';
-                  }}
                 />
                 <div className="min-w-0">
                   <p className="text-lg font-extrabold text-white leading-tight">StikmNek</p>
