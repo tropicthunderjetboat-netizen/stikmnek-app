@@ -82,22 +82,15 @@ const Footer: React.FC = () => {
           {/* About */}
           <div>
             <div className="mb-4">
-              <div className="flex items-center gap-3">
-                <img
-                  src="/logo-icon.png"
-                  alt="StikmNek"
-                  className="h-12 w-12 rounded-2xl shadow-sm"
-                  width={48}
-                  height={48}
-                  loading="lazy"
-                  decoding="async"
-                />
-                <div className="min-w-0">
-                  <p className="text-lg font-extrabold text-white leading-tight">StikmNek</p>
-                  <p className="text-xs text-gray-300 leading-snug">
-                    {t('footer.local_badge', language)}
-                  </p>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 text-white" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                    <path d="M2 17l10 5 10-5" />
+                    <path d="M2 12l10 5 10-5" />
+                  </svg>
                 </div>
+                <span className="text-lg font-bold">StikmNek</span>
               </div>
               <LocalOwnedBadge variant="footer" language={language} className="mt-3" />
             </div>
@@ -271,7 +264,6 @@ const Footer: React.FC = () => {
           </div>
         </div>
 
-        {/* Meaning + mission strip (full-width, nicer reading width) */}
         <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <p className="text-sm font-bold text-gray-100">{t('footer.nameMeaningTitle', language)}</p>

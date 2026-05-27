@@ -11,7 +11,8 @@ import {
   prefetchChunk,
 } from '@/lib/heavyChunks';
 
-const APP_ICON = '/logo-icon.png';
+const APP_ICON =
+  'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg';
 
 const Navbar: React.FC = () => {
   const {
@@ -105,12 +106,12 @@ const Navbar: React.FC = () => {
           {/* Logo */}
           <button
             onClick={() => setCurrentView('home')}
-            className="flex items-center gap-2.5 group text-left"
+            className="flex items-center gap-2 group"
           >
-            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-teal-200 group-hover:shadow-teal-300 transition-shadow shrink-0">
+            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-teal-200 group-hover:shadow-teal-300 transition-shadow">
               <img
                 src={APP_ICON}
-                alt=""
+                alt="StikmNek"
                 className="w-full h-full object-cover"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
@@ -127,14 +128,9 @@ const Navbar: React.FC = () => {
                 }}
               />
             </div>
-            <div className="min-w-0">
-              <span className="block text-xl font-bold bg-gradient-to-r from-teal-700 to-emerald-600 bg-clip-text text-transparent leading-tight">
-                StikmNek
-              </span>
-              <span className="hidden xl:block text-[10px] font-medium text-teal-800/75 leading-snug max-w-[240px] truncate">
-                {t('footer.local_badge', language)}
-              </span>
-            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-teal-700 to-emerald-600 bg-clip-text text-transparent">
+              StikmNek
+            </span>
           </button>
 
           {/* Desktop Nav */}
