@@ -94,6 +94,12 @@ const Footer: React.FC = () => {
             <p className="text-sm text-gray-400 leading-relaxed mb-4">
               {t('footer.abouttext', language)}
             </p>
+            <div className="mb-4 space-y-2 text-sm leading-relaxed">
+              <p className="text-gray-200 font-semibold">{t('footer.nameMeaningTitle', language)}</p>
+              <p className="text-gray-400">{t('footer.nameMeaningBody', language)}</p>
+              <p className="text-gray-200 font-semibold pt-1">{t('footer.whyBuiltTitle', language)}</p>
+              <p className="text-gray-400">{t('footer.whyBuiltBody', language)}</p>
+            </div>
             <div className="space-y-2 text-sm text-gray-400">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-teal-500" />

@@ -71,6 +71,16 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
         icon: <HelpCircle className="w-4 h-4" />,
       },
       {
+        question: 'What does “StikmNek” mean?',
+        answer:
+          helpLang === 'fr'
+            ? 'C’est un terme d’argot en bichlamar : approcher avec confiance et charme pour susciter l’intérêt — une persuasion amicale à la manière du Vanuatu.'
+            : helpLang === 'bi'
+              ? 'Hemia Bislama slang: yu go klosap wetem konfiden mo smail blong mekem man i gat intres — frendli persuesen blong Vanuatu.'
+              : 'It’s Bislama slang for approaching with confidence and charm to get someone interested — the Vanuatu way of friendly persuasion.',
+        icon: <MessageSquare className="w-4 h-4" />,
+      },
+      {
         question: 'How do I purchase a pass?',
         answer: `Open Passes in the top menu, set your group and 24-hour or 7-day holiday duration (${passProductSummary}), pick a start date, and complete payment (card or PayPal where enabled). Your pass coverage follows the dates shown at checkout. Prices are in AUD.`,
         icon: <CreditCard className="w-4 h-4" />,
@@ -137,6 +147,11 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
   ];
 
   const businessGuide: { title: string; content: string; steps?: string[] }[] = [
+    {
+      title: 'What does “StikmNek” mean?',
+      content:
+        "It’s Bislama slang for approaching with confidence and charm to get someone interested — the Vanuatu way of friendly persuasion. StikmNek brings that energy online: your listing and deal help tourists notice you and choose you.",
+    },
     {
       title: '1. Create your business account',
       content:

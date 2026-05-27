@@ -617,6 +617,18 @@ export const translations: Record<string, Record<Language, string>> = {
   // Footer
   'footer.about': { en: 'About StikmNek', fr: 'À propos de StikmNek', bi: 'Abaotem StikmNek' },
   'footer.abouttext': { en: 'StikmNek connects tourists with the best local businesses across Vanuatu. Save money while experiencing authentic island culture.', fr: 'StikmNek connecte les touristes avec les meilleures entreprises locales à travers le Vanuatu. Économisez tout en vivant la culture insulaire authentique.', bi: 'StikmNek i konetim turis wetem beswan lokal bisnis long Vanuatu. Sevem mani taem yu eksperiens tru aelan kalsa.' },
+  'footer.nameMeaningTitle': { en: 'What does “StikmNek” mean?', fr: 'Que signifie « StikmNek » ?', bi: 'Wanem minim blong “StikmNek”?' },
+  'footer.nameMeaningBody': {
+    en: 'It’s Bislama slang for approaching with confidence and charm to get someone interested — the Vanuatu way of friendly persuasion.',
+    fr: 'C’est un terme d’argot en bichlamar : approcher avec confiance et charme pour susciter l’intérêt — une persuasion amicale à la manière du Vanuatu.',
+    bi: 'Hemia Bislama slang: yu go klosap wetem konfiden mo smail blong mekem man i gat intres — frendli persuesen blong Vanuatu.',
+  },
+  'footer.whyBuiltTitle': { en: 'Why we built StikmNek', fr: 'Pourquoi nous avons créé StikmNek', bi: 'From wanem mifala i mekem StikmNek' },
+  'footer.whyBuiltBody': {
+    en: 'Local businesses wanted tourists but didn’t have websites. Tourists said Vanuatu feels expensive. StikmNek helps businesses get discovered and helps tourists unlock fair local deals — keeping more value with grassroots operators.',
+    fr: 'Les entreprises locales voulaient plus de touristes sans avoir de site. Les voyageurs disaient que le Vanuatu est cher. StikmNek aide les entreprises à être trouvées et aide les touristes à accéder à des offres locales justes — en soutenant les opérateurs de proximité.',
+    bi: 'Ol lokal bisnis i wantem moa turis be oli no gat website. Turis i talem se Vanuatu i expensiv. StikmNek i halpem bisnis blong ol man i faenem, mo i halpem turis blong kasem gudfala lokal dils — sapotem smol bisnis.',
+  },
   'footer.local_badge': {
     en: '100% locally owned · Supporting grassroots businesses',
     fr: '100 % localement détenu · Soutien aux entreprises locales',
