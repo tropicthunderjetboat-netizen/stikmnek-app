@@ -338,7 +338,20 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
               {errors.businessPhone && <p className="text-xs text-red-600 mt-1">{errors.businessPhone}</p>}
             </div>
             <div>
-              <Label className="flex items-center gap-1.5 mb-1.5">WhatsApp</Label>
+              <Label className="flex items-center gap-1.5 mb-1.5">
+                {language === 'en'
+                  ? 'WhatsApp (highly recommended)'
+                  : language === 'fr'
+                    ? 'WhatsApp (fortement recommandé)'
+                    : 'WhatsApp (strongli recommend)'}
+              </Label>
+              <p className="text-xs text-gray-500 mb-1.5">
+                {language === 'en'
+                  ? 'Most guests contact businesses on WhatsApp. Include country code (e.g. +678). Optional — you can add or update it anytime.'
+                  : language === 'fr'
+                    ? 'La plupart des clients vous contactent sur WhatsApp. Indicatif pays recommandé (ex. +678). Optionnel — vous pouvez l’ajouter plus tard.'
+                    : 'Plentyf guest i kontaktem yu long WhatsApp. Country code (ex. +678). Opsional — yu save addem eni taem.'}
+              </p>
               <Input
                 type="tel"
                 value={whatsappNumber}

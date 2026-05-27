@@ -131,9 +131,10 @@ export function validateBusinessPhone(value: string): FieldErrorMessage {
   return null;
 }
 
+/** Optional on business profile & listings; validates format when a value is entered. */
 export function validateWhatsAppNumber(value: string): FieldErrorMessage {
   const raw = (value || '').trim();
-  if (!raw) return 'Enter a WhatsApp number so guests can message you.';
+  if (!raw) return null;
   const digits = digitsOnly(raw);
   if (digits.length < 7) return 'WhatsApp number looks too short — include country code (e.g. +678 …).';
   if (digits.length > 15) return 'WhatsApp number looks too long — check for typos.';

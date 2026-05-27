@@ -158,7 +158,7 @@ const CompleteBusinessProfile: React.FC = () => {
         hours: '',
         phone: businessPhone.trim(),
         email: businessEmail.trim(),
-        whatsapp_number: whatsappNumber.trim(),
+        whatsapp_number: whatsappNumber.trim() || null,
         tags: [category],
         active: false,
         map_url: mapUrl.trim() || null,
@@ -202,7 +202,7 @@ const CompleteBusinessProfile: React.FC = () => {
           business_phone: businessPhone.trim(),
           business_email: businessEmail.trim(),
           phone: businessPhone.trim(),
-          whatsapp_number: whatsappNumber.trim(),
+          whatsapp_number: whatsappNumber.trim() || null,
           onboarding_complete: true,
           updated_at: new Date().toISOString(),
         })
@@ -410,8 +410,19 @@ const CompleteBusinessProfile: React.FC = () => {
 
             <div>
               <Label htmlFor="cbp-wa">
-                {language === 'en' ? 'Business WhatsApp' : language === 'fr' ? 'WhatsApp' : 'WhatsApp'}
+                {language === 'en'
+                  ? 'Business WhatsApp (highly recommended)'
+                  : language === 'fr'
+                    ? 'WhatsApp (fortement recommandé)'
+                    : 'WhatsApp (strongli recommend)'}
               </Label>
+              <p className="text-xs text-gray-500 mt-1 mb-1.5">
+                {language === 'en'
+                  ? 'Most guests contact businesses on WhatsApp. Include country code (e.g. +678). You can save without it and add it later.'
+                  : language === 'fr'
+                    ? 'La plupart des clients vous contactent sur WhatsApp. Indiquez l’indicatif pays (ex. +678). Vous pouvez enregistrer sans numéro et l’ajouter plus tard.'
+                    : 'Plentyf guest i kontaktem yu long WhatsApp. Putem country code (ex. +678). Yu save sevem wetem no numba mo addem baeoa.'}
+              </p>
               <Input
                 id="cbp-wa"
                 type="tel"
@@ -420,7 +431,7 @@ const CompleteBusinessProfile: React.FC = () => {
                   setWhatsappNumber(e.target.value);
                   setErrors((p) => ({ ...p, whatsappNumber: '' }));
                 }}
-                className="mt-1.5"
+                className="mt-0"
                 placeholder="+678 …"
               />
               {errors.whatsappNumber && <p className="text-xs text-red-500 mt-1">{errors.whatsappNumber}</p>}
