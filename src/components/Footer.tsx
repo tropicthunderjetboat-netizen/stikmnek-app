@@ -85,21 +85,21 @@ const Footer: React.FC = () => {
               <img
                 src="/logo.svg"
                 alt="StikmNek — 100% locally owned · Supporting grassroots businesses"
-                className="h-14 w-auto max-w-[280px] brightness-0 invert opacity-95"
+                className="h-14 w-auto max-w-[280px] opacity-95"
                 width={280}
                 height={56}
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  img.onerror = null;
+                  img.src = '/logo-icon.svg';
+                  img.className = 'h-12 w-12 rounded-xl opacity-95';
+                }}
               />
               <LocalOwnedBadge variant="footer" language={language} className="mt-3" />
             </div>
             <p className="text-sm text-gray-400 leading-relaxed mb-4">
               {t('footer.abouttext', language)}
             </p>
-            <div className="mb-4 space-y-2 text-sm leading-relaxed">
-              <p className="text-gray-200 font-semibold">{t('footer.nameMeaningTitle', language)}</p>
-              <p className="text-gray-400">{t('footer.nameMeaningBody', language)}</p>
-              <p className="text-gray-200 font-semibold pt-1">{t('footer.whyBuiltTitle', language)}</p>
-              <p className="text-gray-400">{t('footer.whyBuiltBody', language)}</p>
-            </div>
             <div className="space-y-2 text-sm text-gray-400">
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-teal-500" />
@@ -264,6 +264,18 @@ const Footer: React.FC = () => {
                 </Link>
               </li>
             </ul>
+          </div>
+        </div>
+
+        {/* Meaning + mission strip (full-width, nicer reading width) */}
+        <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-sm font-bold text-gray-100">{t('footer.nameMeaningTitle', language)}</p>
+            <p className="mt-2 text-sm text-gray-300 leading-relaxed">{t('footer.nameMeaningBody', language)}</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+            <p className="text-sm font-bold text-gray-100">{t('footer.whyBuiltTitle', language)}</p>
+            <p className="mt-2 text-sm text-gray-300 leading-relaxed">{t('footer.whyBuiltBody', language)}</p>
           </div>
         </div>
       </div>
