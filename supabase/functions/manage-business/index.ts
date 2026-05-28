@@ -459,6 +459,157 @@ async function applyListingEditChangesToLive(
   return { error: null };
 }
 
+function storagePathFromPublicPhotoUrl(url: string): string {
+  const u = String(url || '').trim();
+  const marker = '/storage/v1/object/public/business-photos/';
+  const i = u.indexOf(marker);
+  if (i < 0) return '';
+  return decodeURIComponent(u.slice(i + marker.length).split('?')[0] || '');
+}
+
+/**
+ * Replace approved gallery rows for one offering (service role — bypasses owner DELETE RLS).
+ */
+async function syncListingGalleryPhotos(
+  supabase: SupabaseServiceClient,
+  args: {
+    profileBusinessId: string;
+    offeringId: string;
+    userId: string;
+    photos: Array<{ url?: string; filePath?: string; isMain?: boolean }>;
+  },
+): Promise<{ inserted: number; deleted: number; error: string | null }> {
+  const pid = String(args.profileBusinessId || '').trim();
+  const oid = String(args.offeringId || '').trim();
+  const userId = String(args.userId || '').trim();
+  if (!pid || !oid || !userId) {
+    return { inserted: 0, deleted: 0, error: 'Missing business, offering, or user id' };
+  }
+
+  const desired = (args.photos || [])
+    .map((p, index) => {
+      const url = String(p?.url || '').trim();
+      if (!url) return null;
+      const filePath =
+        String(p?.filePath || '').trim() ||
+        storagePathFromPublicPhotoUrl(url) ||
+        `legacy/${encodeURIComponent(url)}`;
+      return { url, filePath, isMain: index === 0 };
+    })
+    .filter((p): p is { url: string; filePath: string; isMain: boolean } => Boolean(p));
+
+  if (desired.length === 0) {
+    return { inserted: 0, deleted: 0, error: 'At least one photo is required.' };
+  }
+
+  const { data: ownRow, error: ownErr } = await supabase
+    .from('business_offerings')
+    .select('id')
+    .eq('id', oid)
+    .eq('business_id', pid)
+    .maybeSingle();
+  if (ownErr) return { inserted: 0, deleted: 0, error: ownErr.message };
+  if (!ownRow?.id) return { inserted: 0, deleted: 0, error: 'Offering not found for this business profile' };
+
+  const { data: existing, error: fetchErr } = await supabase
+    .from('business_photos')
+    .select('id, url, file_path')
+    .eq('business_id', pid)
+    .eq('offering_id', oid)
+    .eq('status', 'approved');
+
+  if (fetchErr) return { inserted: 0, deleted: 0, error: fetchErr.message };
+
+  const desiredUrlSet = new Set(desired.map((p) => p.url));
+  let deleted = 0;
+  for (const row of existing || []) {
+    const url = String(row.url || '').trim();
+    if (!desiredUrlSet.has(url)) {
+      const fp = String(row.file_path || '').trim();
+      if (fp && !fp.startsWith('legacy/')) {
+        await supabase.storage.from('business-photos').remove([fp]);
+      }
+      const { error: delErr } = await supabase.from('business_photos').delete().eq('id', row.id);
+      if (delErr) return { inserted: 0, deleted, error: delErr.message };
+      deleted++;
+    }
+  }
+
+  const existingUrls = new Set((existing || []).map((r) => String(r.url || '').trim()));
+  let inserted = 0;
+  for (const p of desired) {
+    if (existingUrls.has(p.url)) continue;
+    const { error } = await supabase.from('business_photos').insert({
+      business_id: pid,
+      offering_id: oid,
+      url: p.url,
+      file_path: p.filePath,
+      uploaded_by: userId,
+      is_main: p.isMain,
+      status: 'approved',
+    });
+    if (error) return { inserted, deleted, error: error.message };
+    inserted++;
+  }
+
+  await supabase
+    .from('business_photos')
+    .update({ is_main: false })
+    .eq('business_id', pid)
+    .eq('offering_id', oid);
+
+  const primary = desired[0];
+  if (primary.filePath && !primary.filePath.startsWith('legacy/')) {
+    await supabase
+      .from('business_photos')
+      .update({ is_main: true })
+      .eq('business_id', pid)
+      .eq('offering_id', oid)
+      .eq('file_path', primary.filePath);
+  } else {
+    await supabase
+      .from('business_photos')
+      .update({ is_main: true })
+      .eq('business_id', pid)
+      .eq('offering_id', oid)
+      .eq('url', primary.url);
+  }
+
+  const coverUrl = primary.url;
+  await supabase.from('business_offerings').update({ image: coverUrl }).eq('id', oid);
+
+  return { inserted, deleted, error: null };
+}
+
+async function resolveOfferingIdForGallerySync(
+  supabase: SupabaseServiceClient,
+  businessId: string,
+  offeringIdBody: string,
+): Promise<string | null> {
+  const bid = String(businessId || '').trim();
+  const oid = String(offeringIdBody || '').trim();
+  if (!bid) return null;
+  if (oid) {
+    const { data, error } = await supabase
+      .from('business_offerings')
+      .select('id')
+      .eq('id', oid)
+      .eq('business_id', bid)
+      .maybeSingle();
+    if (error || !data?.id) return null;
+    return String(data.id);
+  }
+  const { data, error } = await supabase
+    .from('business_offerings')
+    .select('id')
+    .eq('business_id', bid)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data?.id) return null;
+  return String(data.id);
+}
+
 /** Delete moderation photos (+ Storage objects) linked to a pending submission row. */
 async function deletePhotosLinkedToPendingSubmission(
   supabase: SupabaseServiceClient,
@@ -2101,6 +2252,52 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── SYNC_LISTING_GALLERY (approved live listing photos) ───
+    if (action === 'sync_listing_gallery') {
+      const businessId = body.businessId;
+      const offeringIdBody =
+        body.offeringId != null && String(body.offeringId).trim() !== ''
+          ? String(body.offeringId).trim()
+          : '';
+      const galleryPhotos = body.galleryPhotos;
+
+      if (!businessId || !Array.isArray(galleryPhotos)) {
+        return errorResponse(req, 'Missing businessId or galleryPhotos');
+      }
+
+      const denied = await assertAdminOrOwner(supabase, String(businessId), authUser, req);
+      if (denied) return denied;
+
+      let ownerIdForGallery = authUser.id;
+      if (await isAdminUser(supabase, authUser.id)) {
+        const { data: bizRow, error: bizErr } = await supabase
+          .from('businesses')
+          .select('owner_id')
+          .eq('id', businessId)
+          .maybeSingle();
+        if (bizErr || !bizRow?.owner_id) {
+          return errorResponse(req, 'Business not found', 404);
+        }
+        ownerIdForGallery = String(bizRow.owner_id);
+      }
+
+      const oid = await resolveOfferingIdForGallerySync(supabase, String(businessId), offeringIdBody);
+      if (!oid) {
+        return errorResponse(req, 'Could not resolve offering for gallery sync', 400);
+      }
+
+      const syncRes = await syncListingGalleryPhotos(supabase, {
+        profileBusinessId: String(businessId),
+        offeringId: oid,
+        userId: ownerIdForGallery,
+        photos: galleryPhotos,
+      });
+      if (syncRes.error) {
+        return errorResponse(req, syncRes.error, 500, { photosSyncFailed: true });
+      }
+      return jsonResponse(req, { success: true, photosSynced: syncRes });
+    }
+
     // ─── SUBMIT_EDIT ───
     if (action === 'submit_edit') {
       const userId = authUser.id;
@@ -2110,12 +2307,17 @@ Deno.serve(async (req) => {
         body.offeringId != null && String(body.offeringId).trim() !== ''
           ? String(body.offeringId).trim()
           : '';
+      const galleryPhotos = body.galleryPhotos;
+      const hasGallery =
+        Array.isArray(galleryPhotos) &&
+        galleryPhotos.some((p: { url?: string }) => String(p?.url || '').trim() !== '');
       const changes: Record<string, unknown> = { ...rawChanges };
       if (offeringIdBody) {
         changes._target_offering_id = offeringIdBody;
       }
+      const changeKeys = Object.keys(changes).filter((k) => k !== '_target_offering_id');
 
-      if (!businessId || Object.keys(changes).length === 0) {
+      if (!businessId || (changeKeys.length === 0 && !hasGallery)) {
         return errorResponse(req, 'Missing businessId or changes');
       }
 
@@ -2143,15 +2345,44 @@ Deno.serve(async (req) => {
         .eq('owner_id', ownerIdForEdit)
         .eq('status', 'pending');
 
-      const applyRes = await applyListingEditChangesToLive(
-        supabase,
-        String(businessId),
-        changes as Record<string, any>,
-      );
-      if (applyRes.error) {
-        return errorResponse(req, applyRes.error, 500);
+      let appliedLive = false;
+      if (changeKeys.length > 0) {
+        const applyRes = await applyListingEditChangesToLive(
+          supabase,
+          String(businessId),
+          changes as Record<string, any>,
+        );
+        if (applyRes.error) {
+          return errorResponse(req, applyRes.error, 500);
+        }
+        appliedLive = true;
       }
-      return jsonResponse(req, { success: true, appliedLive: true });
+
+      let photosSynced: { inserted: number; deleted: number } | null = null;
+      if (hasGallery) {
+        const oid = await resolveOfferingIdForGallerySync(
+          supabase,
+          String(businessId),
+          offeringIdBody,
+        );
+        if (!oid) {
+          return errorResponse(req, 'Could not resolve offering for gallery sync', 400, {
+            photosSyncFailed: true,
+          });
+        }
+        const syncRes = await syncListingGalleryPhotos(supabase, {
+          profileBusinessId: String(businessId),
+          offeringId: oid,
+          userId: ownerIdForEdit,
+          photos: galleryPhotos,
+        });
+        if (syncRes.error) {
+          return errorResponse(req, syncRes.error, 500, { photosSyncFailed: true });
+        }
+        photosSynced = { inserted: syncRes.inserted, deleted: syncRes.deleted };
+      }
+
+      return jsonResponse(req, { success: true, appliedLive, photosSynced });
     }
 
     // ─── REVIEW_EDIT ───

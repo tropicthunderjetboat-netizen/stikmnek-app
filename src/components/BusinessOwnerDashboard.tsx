@@ -1054,17 +1054,32 @@ const BusinessOwnerDashboard: React.FC = () => {
         String(selectedBusiness.id),
         selectedProfileId,
       );
-      const photoRecords = newGalleryPhotos.map((photo, index) => ({
-        business_id: selectedProfileId,
-        offering_id: listingOfferingId,
-        url: photo.url,
-        file_path: photo.filePath,
-        uploaded_by: user.id,
-        is_main: galleryPhotos.length === 0 && index === 0,
-        status: 'approved' as const,
-      }));
-      const { error } = await supabase.from('business_photos').insert(photoRecords);
+      const mergedGallery = [
+        ...galleryPhotos.map((p) => ({
+          url: p.url,
+          filePath: p.file_path || '',
+          isMain: p.is_main,
+        })),
+        ...newGalleryPhotos.map((photo, index) => ({
+          url: photo.url,
+          filePath: photo.filePath,
+          isMain: galleryPhotos.length === 0 && index === 0,
+        })),
+      ];
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: {
+          action: 'sync_listing_gallery',
+          userId: user.id,
+          businessId: selectedProfileId,
+          offeringId: listingOfferingId,
+          galleryPhotos: mergedGallery,
+        },
+      });
       if (error) throw error;
+      if (data?.error || data?.photosSyncFailed) {
+        throw new Error(String(data?.error || 'Failed to save photos'));
+      }
       toast.success(`${newGalleryPhotos.length} photo${newGalleryPhotos.length > 1 ? 's' : ''} added!`);
       setNewGalleryPhotos([]);
       await loadGalleryPhotos();

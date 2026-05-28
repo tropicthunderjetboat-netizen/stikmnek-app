@@ -29,7 +29,6 @@ import {
 import { categoryUsesPerUnitPricing } from '@/lib/categoryPricing';
 import { businessHoursFromProfileRow, normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
 import { listingHoursFieldCopy } from '@/lib/listingHoursLabels';
-import { syncEmbeddedEditGalleryPhotos } from '@/lib/syncEmbeddedListingPhotos';
 import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
 import { fetchApprovedPhotosForOffering, photoRowsToUploadedPhotos } from '@/lib/fetchApprovedPhotosForOffering';
 import { categories, type Business, type Category } from '@/data/businesses';
@@ -416,8 +415,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
   const [embeddedResolved, setEmbeddedResolved] = useState<EmbeddedListingResolved | null>(null);
   /** Bumps to re-run the embedded listing fetch (e.g. after syncing new gallery rows). */
   const [embeddedFetchNonce, setEmbeddedFetchNonce] = useState(0);
-  /** Approved photo URLs when the editor last loaded — used to insert only new `business_photos`. */
+  /** Approved photo URLs when the editor last loaded — used to detect gallery changes on save. */
   const embeddedApprovedPhotoUrlKeysRef = useRef<Set<string>>(new Set());
+  /** Prevents async listing reload from wiping in-progress photo uploads. */
+  const photosDirtyRef = useRef(false);
 
   useEffect(() => {
     if (!embeddedEdit) {
@@ -487,29 +488,31 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     const cat = asCategoryKey(lockedCategoryRaw);
     setPricingTiers(pricingTiersForEditor(b.pricingTiers ?? null));
     const img = (b.image || '').trim();
-    setPhotos(
-      galleryPhotos.length > 0
-        ? galleryPhotos.map((p) => ({ ...p }))
-        : img
-          ? [
-              {
-                id: `existing-${b.id}`,
-                url: img,
-                filePath: '',
-                name: 'cover',
-                size: 0,
-                preview: img,
-              },
-            ]
-          : [],
-    );
-    const galleryUrlKeys = new Set<string>();
-    for (const ph of galleryPhotos) {
-      const u = String(ph.url || '').trim();
-      if (u) galleryUrlKeys.add(u);
+    if (!photosDirtyRef.current) {
+      setPhotos(
+        galleryPhotos.length > 0
+          ? galleryPhotos.map((p) => ({ ...p }))
+          : img
+            ? [
+                {
+                  id: `existing-${b.id}`,
+                  url: img,
+                  filePath: '',
+                  name: 'cover',
+                  size: 0,
+                  preview: img,
+                },
+              ]
+            : [],
+      );
+      const galleryUrlKeys = new Set<string>();
+      for (const ph of galleryPhotos) {
+        const u = String(ph.url || '').trim();
+        if (u) galleryUrlKeys.add(u);
+      }
+      if (galleryUrlKeys.size === 0 && img) galleryUrlKeys.add(img);
+      embeddedApprovedPhotoUrlKeysRef.current = galleryUrlKeys;
     }
-    if (galleryUrlKeys.size === 0 && img) galleryUrlKeys.add(img);
-    embeddedApprovedPhotoUrlKeysRef.current = galleryUrlKeys;
     const tiered = categoryUsesTieredPricing(cat);
     const pct = deriveDiscountPercentFromBusiness(b);
     const origStr = !tiered && b.originalPrice > 0 ? String(b.originalPrice) : '';
@@ -852,50 +855,45 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         return;
       }
 
+      const offeringIdForPhotos = String(
+        embeddedResolved?.business?.id || embeddedEdit.offeringId || '',
+      ).trim();
+      const galleryPayload = photos
+        .map((p, index) => ({
+          url: String(p.url || '').trim(),
+          filePath: String(p.filePath || '').trim() || undefined,
+          isMain: index === 0,
+        }))
+        .filter((p) => p.url);
+
       setSubmitting(true);
       try {
-        let editApplied = false;
-        if (Object.keys(changes).length > 0) {
-          const { data, error } = await supabase.functions.invoke('manage-business', {
-            headers: await getEdgeAuthHeaders(),
-            body: {
-              action: 'submit_edit',
-              userId: user.id,
-              businessId: embeddedEdit.profileBusinessId,
-              offeringId:
-                String(embeddedResolved?.business?.id || embeddedEdit.offeringId || '')
-                  .trim() || undefined,
-              changes,
-            },
-          });
-          if (error) throw error;
-          if (data?.error) throw new Error(String(data.error));
-          editApplied = Boolean(data?.appliedLive);
+        const { data, error } = await supabase.functions.invoke('manage-business', {
+          headers: await getEdgeAuthHeaders(),
+          body: {
+            action: 'submit_edit',
+            userId: user.id,
+            businessId: embeddedEdit.profileBusinessId,
+            offeringId: offeringIdForPhotos || undefined,
+            ...(Object.keys(changes).length > 0 ? { changes } : {}),
+            ...(photosChanged ? { galleryPhotos: galleryPayload } : {}),
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(String(data.error));
+        if (data?.photosSyncFailed || (photosChanged && !data?.photosSynced)) {
+          throw new Error(
+            String(data?.error || 'Photos could not be saved. Please try again.'),
+          );
         }
 
-        const offeringIdForPhotos = String(
-          embeddedResolved?.business?.id || embeddedEdit.offeringId || '',
-        ).trim();
-        if (user.id && offeringIdForPhotos && photosChanged) {
-          const syncRes = await syncEmbeddedEditGalleryPhotos({
-            client: supabase,
-            userId: user.id,
-            profileBusinessId: embeddedEdit.profileBusinessId,
-            offeringId: offeringIdForPhotos,
-            photos,
-          });
-          if (syncRes.error) {
-            toast.error(
-              language === 'en'
-                ? `Listing saved but photos failed: ${syncRes.error}`
-                : `Annonce enregistrée mais photos: ${syncRes.error}`,
-            );
-          } else {
-            embeddedApprovedPhotoUrlKeysRef.current = new Set(
-              photos.map((p) => String(p.url || '').trim()).filter(Boolean),
-            );
-            setEmbeddedFetchNonce((n) => n + 1);
-          }
+        const editApplied = Boolean(data?.appliedLive);
+        if (photosChanged) {
+          embeddedApprovedPhotoUrlKeysRef.current = new Set(
+            galleryPayload.map((p) => p.url),
+          );
+          photosDirtyRef.current = false;
+          setEmbeddedFetchNonce((n) => n + 1);
         }
         toast.success(
           language === 'en'
@@ -1864,6 +1862,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 photos={photos}
                 onPhotosChange={(next) => {
                   setFieldErrors((fe) => ({ ...fe, photos: undefined }));
+                  photosDirtyRef.current = true;
                   setPhotos(next);
                 }}
                 maxPhotos={5}
