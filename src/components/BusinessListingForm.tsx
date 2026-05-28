@@ -52,7 +52,6 @@ import {
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import BusinessCredentialsSettings from './BusinessCredentialsSettings';
 
-
 /** Whole submit (RPC + edge + attach) — allow RPC + edge cold starts without false “slow connection” */
 const LISTING_SUBMIT_DEADLINE_MS = 150_000;
 
