@@ -1054,18 +1054,20 @@ const BusinessOwnerDashboard: React.FC = () => {
         String(selectedBusiness.id),
         selectedProfileId,
       );
-      const mergedGallery = [
+      const { buildGalleryPayloadFromPhotos } = await import('@/lib/listingGallerySave');
+      const mergedGallery = buildGalleryPayloadFromPhotos([
         ...galleryPhotos.map((p) => ({
           url: p.url,
           filePath: p.file_path || '',
-          isMain: p.is_main,
         })),
-        ...newGalleryPhotos.map((photo, index) => ({
+        ...newGalleryPhotos.map((photo) => ({
           url: photo.url,
           filePath: photo.filePath,
-          isMain: galleryPhotos.length === 0 && index === 0,
         })),
-      ];
+      ]);
+      if (mergedGallery.length === 0) {
+        throw new Error('No uploaded photos to save. Wait for uploads to finish.');
+      }
       const { data, error } = await supabase.functions.invoke('manage-business', {
         headers: await getEdgeAuthHeaders(),
         body: {
@@ -1079,6 +1081,12 @@ const BusinessOwnerDashboard: React.FC = () => {
       if (error) throw error;
       if (data?.error || data?.photosSyncFailed) {
         throw new Error(String(data?.error || 'Failed to save photos'));
+      }
+      const totalApproved = Number(data?.photosSynced?.totalApproved ?? 0);
+      if (totalApproved < mergedGallery.length) {
+        throw new Error(
+          `Only ${totalApproved} of ${mergedGallery.length} photos saved. Ask support to deploy manage-business, then try again.`,
+        );
       }
       toast.success(`${newGalleryPhotos.length} photo${newGalleryPhotos.length > 1 ? 's' : ''} added!`);
       setNewGalleryPhotos([]);

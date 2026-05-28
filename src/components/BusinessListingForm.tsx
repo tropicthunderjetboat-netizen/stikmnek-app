@@ -31,6 +31,12 @@ import { businessHoursFromProfileRow, normalizeListingCategoryKey } from '@/lib/
 import { listingHoursFieldCopy } from '@/lib/listingHoursLabels';
 import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
 import { fetchApprovedPhotosForOffering, photoRowsToUploadedPhotos } from '@/lib/fetchApprovedPhotosForOffering';
+import {
+  buildGalleryPayloadFromPhotos,
+  galleryPhotosChanged,
+  isPersistedPhotoUrl,
+  verifyGallerySavedCount,
+} from '@/lib/listingGallerySave';
 import { categories, type Business, type Category } from '@/data/businesses';
 import {
   hasMeaningfulDescriptionContent,
@@ -844,11 +850,11 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         changes.pricing_tiers = next.pricing_tiers;
       }
 
-      const photoUrlKey = (urls: string[]) =>
-        [...urls].map((u) => u.trim()).filter(Boolean).sort().join('\n');
       const currentPhotoUrls = photos.map((p) => String(p.url || '').trim()).filter(Boolean);
-      const baselinePhotoUrls = Array.from(embeddedApprovedPhotoUrlKeysRef.current);
-      const photosChanged = photoUrlKey(currentPhotoUrls) !== photoUrlKey(baselinePhotoUrls);
+      const photosChanged = galleryPhotosChanged(
+        currentPhotoUrls,
+        embeddedApprovedPhotoUrlKeysRef.current,
+      );
 
       if (Object.keys(changes).length === 0 && !photosChanged) {
         toast.info(language === 'en' ? 'No changes to submit.' : 'Aucune modification.');
@@ -858,40 +864,90 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       const offeringIdForPhotos = String(
         embeddedResolved?.business?.id || embeddedEdit.offeringId || '',
       ).trim();
-      const galleryPayload = photos
-        .map((p, index) => ({
-          url: String(p.url || '').trim(),
-          filePath: String(p.filePath || '').trim() || undefined,
-          isMain: index === 0,
-        }))
-        .filter((p) => p.url);
+      const galleryPayload = buildGalleryPayloadFromPhotos(photos);
+      const pendingUploadCount = photos.filter((p) => !isPersistedPhotoUrl(String(p.url || ''))).length;
+      if (photosChanged && galleryPayload.length === 0) {
+        toast.error(
+          language === 'en'
+            ? 'Photos are still uploading. Wait until each one shows as complete, then save again.'
+            : 'Les photos sont en cours de téléchargement. Attendez la fin, puis enregistrez.',
+        );
+        return;
+      }
+      if (photosChanged && pendingUploadCount > 0) {
+        toast.error(
+          language === 'en'
+            ? `${pendingUploadCount} photo(s) still uploading. Wait for all uploads to finish before saving.`
+            : `${pendingUploadCount} photo(s) en cours. Attendez la fin du téléchargement.`,
+        );
+        return;
+      }
 
       setSubmitting(true);
       try {
-        const { data, error } = await supabase.functions.invoke('manage-business', {
-          headers: await getEdgeAuthHeaders(),
-          body: {
-            action: 'submit_edit',
-            userId: user.id,
-            businessId: embeddedEdit.profileBusinessId,
-            offeringId: offeringIdForPhotos || undefined,
-            ...(Object.keys(changes).length > 0 ? { changes } : {}),
-            ...(photosChanged ? { galleryPhotos: galleryPayload } : {}),
-          },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(String(data.error));
-        if (data?.photosSyncFailed || (photosChanged && !data?.photosSynced)) {
-          throw new Error(
-            String(data?.error || 'Photos could not be saved. Please try again.'),
+        let editApplied = false;
+        if (Object.keys(changes).length > 0) {
+          const { data: editData, error: editError } = await supabase.functions.invoke(
+            'manage-business',
+            {
+              headers: await getEdgeAuthHeaders(),
+              body: {
+                action: 'submit_edit',
+                userId: user.id,
+                businessId: embeddedEdit.profileBusinessId,
+                offeringId: offeringIdForPhotos || undefined,
+                changes,
+              },
+            },
           );
+          if (editError) throw editError;
+          if (editData?.error) throw new Error(String(editData.error));
+          editApplied = Boolean(editData?.appliedLive);
         }
 
-        const editApplied = Boolean(data?.appliedLive);
-        if (photosChanged) {
-          embeddedApprovedPhotoUrlKeysRef.current = new Set(
-            galleryPayload.map((p) => p.url),
+        if (photosChanged && offeringIdForPhotos) {
+          const { data: syncData, error: syncError } = await supabase.functions.invoke(
+            'manage-business',
+            {
+              headers: await getEdgeAuthHeaders(),
+              body: {
+                action: 'sync_listing_gallery',
+                userId: user.id,
+                businessId: embeddedEdit.profileBusinessId,
+                offeringId: offeringIdForPhotos,
+                galleryPhotos: galleryPayload,
+              },
+            },
           );
+          if (syncError) throw syncError;
+          if (syncData?.error || syncData?.photosSyncFailed) {
+            throw new Error(
+              String(syncData?.error || 'Photos could not be saved. Please try again.'),
+            );
+          }
+          const totalApproved = Number(syncData?.photosSynced?.totalApproved ?? 0);
+          if (totalApproved < galleryPayload.length) {
+            throw new Error(
+              language === 'en'
+                ? `Only ${totalApproved} of ${galleryPayload.length} photos were saved. Deploy the latest manage-business function, then save again.`
+                : `Seulement ${totalApproved} sur ${galleryPayload.length} photos enregistrées.`,
+            );
+          }
+          const verified = await verifyGallerySavedCount({
+            client: supabase,
+            profileBusinessId: embeddedEdit.profileBusinessId,
+            offeringId: offeringIdForPhotos,
+            supabaseUrl: SUPABASE_URL,
+            expectedCount: galleryPayload.length,
+          });
+          if (verified.savedCount < galleryPayload.length) {
+            throw new Error(
+              language === 'en'
+                ? `Gallery sync incomplete (${verified.savedCount}/${galleryPayload.length} in database). Try saving again.`
+                : `Synchronisation incomplète (${verified.savedCount}/${galleryPayload.length}). Réessayez.`,
+            );
+          }
+          embeddedApprovedPhotoUrlKeysRef.current = new Set(verified.savedUrls);
           photosDirtyRef.current = false;
           setEmbeddedFetchNonce((n) => n + 1);
         }

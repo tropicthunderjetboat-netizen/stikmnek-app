@@ -478,7 +478,7 @@ async function syncListingGalleryPhotos(
     userId: string;
     photos: Array<{ url?: string; filePath?: string; isMain?: boolean }>;
   },
-): Promise<{ inserted: number; deleted: number; error: string | null }> {
+): Promise<{ inserted: number; deleted: number; totalApproved?: number; error: string | null }> {
   const pid = String(args.profileBusinessId || '').trim();
   const oid = String(args.offeringId || '').trim();
   const userId = String(args.userId || '').trim();
@@ -578,7 +578,17 @@ async function syncListingGalleryPhotos(
   const coverUrl = primary.url;
   await supabase.from('business_offerings').update({ image: coverUrl }).eq('id', oid);
 
-  return { inserted, deleted, error: null };
+  const { count: totalApproved, error: countErr } = await supabase
+    .from('business_photos')
+    .select('id', { count: 'exact', head: true })
+    .eq('business_id', pid)
+    .eq('offering_id', oid)
+    .eq('status', 'approved');
+  if (countErr) {
+    return { inserted, deleted, error: countErr.message };
+  }
+
+  return { inserted, deleted, error: null, totalApproved: totalApproved ?? desired.length };
 }
 
 async function resolveOfferingIdForGallerySync(
@@ -2295,7 +2305,14 @@ Deno.serve(async (req) => {
       if (syncRes.error) {
         return errorResponse(req, syncRes.error, 500, { photosSyncFailed: true });
       }
-      return jsonResponse(req, { success: true, photosSynced: syncRes });
+      return jsonResponse(req, {
+        success: true,
+        photosSynced: {
+          inserted: syncRes.inserted,
+          deleted: syncRes.deleted,
+          totalApproved: syncRes.totalApproved ?? 0,
+        },
+      });
     }
 
     // ─── SUBMIT_EDIT ───
@@ -2379,7 +2396,11 @@ Deno.serve(async (req) => {
         if (syncRes.error) {
           return errorResponse(req, syncRes.error, 500, { photosSyncFailed: true });
         }
-        photosSynced = { inserted: syncRes.inserted, deleted: syncRes.deleted };
+        photosSynced = {
+          inserted: syncRes.inserted,
+          deleted: syncRes.deleted,
+          totalApproved: syncRes.totalApproved ?? 0,
+        };
       }
 
       return jsonResponse(req, { success: true, appliedLive, photosSynced });
