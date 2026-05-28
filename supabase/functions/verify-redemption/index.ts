@@ -299,9 +299,14 @@ function hasUsableTieredPricing(pricingTiers: unknown): boolean {
   );
 }
 
+function categoryUsesPerUnitPricing(category: string): boolean {
+  return (category || '').toLowerCase() === 'shopping';
+}
+
 function computeRedemptionSavings(
   biz: { pricing_tiers: unknown; original_price: unknown; deal_price: unknown },
   party: PartyCounts,
+  opts?: { category?: string; itemQuantity?: number },
 ): {
   savedAmount: number;
   totalStandard: number;
@@ -309,6 +314,7 @@ function computeRedemptionSavings(
   savingsLine: string;
   isTiered: boolean;
   unitSavings: number;
+  itemQuantity?: number;
 } {
   if (hasUsableTieredPricing(biz.pricing_tiers)) {
     const tiers = pricingTiersFromDb(biz.pricing_tiers);
@@ -331,21 +337,34 @@ function computeRedemptionSavings(
 
   const o = Number(biz.original_price);
   const d = Number(biz.deal_price);
-  const partySize = Math.max(1, party.adults + party.children);
+  const perUnit = categoryUsesPerUnitPricing(String(opts?.category ?? ''));
+  const billCount = perUnit
+    ? Math.max(1, Math.min(99, Math.floor(Number(opts?.itemQuantity) || 1)))
+    : Math.max(1, party.adults + party.children);
   if (!Number.isFinite(o) || !Number.isFinite(d) || o <= d) {
-    return { savedAmount: 0, totalStandard: 0, totalDeal: 0, savingsLine: '—', isTiered: false, unitSavings: 0 };
+    return {
+      savedAmount: 0,
+      totalStandard: 0,
+      totalDeal: 0,
+      savingsLine: '—',
+      isTiered: false,
+      unitSavings: 0,
+      itemQuantity: perUnit ? billCount : undefined,
+    };
   }
   const unit = Math.round(o - d);
-  const saved = Math.max(0, unit * partySize);
-  const savingsLine =
-    `${unit.toLocaleString()} VT × ${partySize} ${partySize === 1 ? 'person' : 'people'} = ${saved.toLocaleString()} VT total saved`;
+  const saved = Math.max(0, unit * billCount);
+  const savingsLine = perUnit
+    ? `${unit.toLocaleString()} VT × ${billCount} ${billCount === 1 ? 'item' : 'items'} = ${saved.toLocaleString()} VT total saved`
+    : `${unit.toLocaleString()} VT × ${billCount} ${billCount === 1 ? 'person' : 'people'} = ${saved.toLocaleString()} VT total saved`;
   return {
     savedAmount: saved,
-    totalStandard: Math.round(o * partySize),
-    totalDeal: Math.round(d * partySize),
+    totalStandard: Math.round(o * billCount),
+    totalDeal: Math.round(d * billCount),
     savingsLine,
     isTiered: false,
     unitSavings: unit,
+    itemQuantity: perUnit ? billCount : undefined,
   };
 }
 
@@ -821,16 +840,20 @@ Deno.serve(async (req) => {
       const offeringIdCandidate =
         typeof rawOfferingId === 'string' ? rawOfferingId.trim() : '';
       let pricingRow: { pricing_tiers: unknown; original_price: unknown; deal_price: unknown } = bizRow;
+      let listingCategory = String((bizRow as { category?: string }).category ?? '');
       let resolvedOfferingId: string | null = null;
       if (offeringIdCandidate && PASS_ID_UUID_RE.test(offeringIdCandidate)) {
         const { data: offRow, error: offErr } = await supabase
           .from('business_offerings')
-          .select('id, business_id, pricing_tiers, original_price, deal_price')
+          .select('id, business_id, pricing_tiers, original_price, deal_price, tags')
           .eq('id', offeringIdCandidate)
           .maybeSingle();
         if (!offErr && offRow && String((offRow as { business_id?: string }).business_id ?? '') === String(businessId)) {
           pricingRow = offRow as typeof pricingRow;
           resolvedOfferingId = String((offRow as { id?: string }).id ?? offeringIdCandidate);
+          const tags = (offRow as { tags?: unknown }).tags;
+          const tag0 = Array.isArray(tags) && tags.length ? String(tags[0]) : '';
+          if (tag0) listingCategory = tag0;
         }
       }
 
@@ -849,8 +872,24 @@ Deno.serve(async (req) => {
       }
       const redeemParty = activityResolved.party;
 
+      const perUnit = categoryUsesPerUnitPricing(listingCategory);
+      let itemQuantity: number | undefined;
+      if (perUnit) {
+        const rawQty = bodyObj.itemQuantity ?? bodyObj.item_quantity;
+        const q = Math.floor(Number(rawQty));
+        if (!Number.isFinite(q) || q < 1 || q > 99) {
+          return errorResponse('Enter how many items (1–99) for this shopping redemption.', 400, {
+            reason: 'invalid_item_quantity',
+          });
+        }
+        itemQuantity = q;
+      }
+
       // Server-authoritative savings (ignore client savedAmount to prevent tampering)
-      const computed = computeRedemptionSavings(pricingRow, redeemParty);
+      const computed = computeRedemptionSavings(pricingRow, redeemParty, {
+        category: listingCategory,
+        itemQuantity,
+      });
       const savedAmount = computed.savedAmount;
       const dealAmountVt = Math.max(0, Math.round(Number(computed.totalDeal) || 0));
 
@@ -863,6 +902,7 @@ Deno.serve(async (req) => {
       };
       if (resolvedOfferingId) insertRow.offering_id = resolvedOfferingId;
       if (discount_label) insertRow.discount_label = discount_label;
+      if (itemQuantity != null) insertRow.item_quantity = itemQuantity;
 
       const selectWithDeal =
         'id, redeemed_at, saved_amount, deal_amount_vt, discount_label' as const;

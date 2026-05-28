@@ -18,6 +18,7 @@ import {
   computeTieredBookingTotals,
   pricingTiersFromDb,
 } from '@/lib/pricingTiers';
+import { categoryUsesPerUnitPricing, unitLabelForCategory } from '@/lib/categoryPricing';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
@@ -58,6 +59,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
   const [infants, setInfants] = useState(0);
+  const [itemQuantity, setItemQuantity] = useState(1);
   const [contactName, setContactName] = useState(user.name || '');
   const [contactEmail, setContactEmail] = useState('');
   const [contactWhatsapp, setContactWhatsapp] = useState('');
@@ -146,15 +148,21 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
   );
   const useTiered =
     categoryUsesTieredPricing(biz.category) && tierRows.length > 0;
+  const perUnit = categoryUsesPerUnitPricing(biz.category);
+  const unitLabels = unitLabelForCategory(biz.category, language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en');
 
   const { totalStandard, totalDeal } = useMemo(() => {
     if (useTiered) {
       if (totalGuests < 1) return { totalStandard: 0, totalDeal: 0 };
       return computeTieredBookingTotals(tierRows, adults, children, infants);
     }
-    if (totalPax < 1) return { totalStandard: 0, totalDeal: 0 };
     const original = Number(biz.originalPrice) || 0;
     const deal = Number(biz.dealPrice) || 0;
+    if (perUnit) {
+      const qty = Math.max(1, itemQuantity);
+      return { totalStandard: original * qty, totalDeal: deal * qty };
+    }
+    if (totalPax < 1) return { totalStandard: 0, totalDeal: 0 };
     return {
       totalStandard: original * totalPax,
       totalDeal: deal * totalPax,
@@ -163,6 +171,8 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
     totalPax,
     totalGuests,
     useTiered,
+    perUnit,
+    itemQuantity,
     tierRows,
     adults,
     children,
@@ -431,9 +441,34 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
             </div>
           </div>
 
-          {totalGuests < 1 ? (
+          {perUnit && (
+            <div className="grid gap-2 max-w-[12rem]">
+              <Label htmlFor="item-qty">
+                {language === 'en'
+                  ? `Number of ${unitLabels.plural}`
+                  : language === 'fr'
+                    ? `Nombre d'${unitLabels.plural}`
+                    : `Namba ${unitLabels.plural}`}
+              </Label>
+              <Input
+                id="item-qty"
+                type="number"
+                min={1}
+                max={99}
+                value={itemQuantity}
+                onChange={(e) => setItemQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              />
+              <p className="text-xs text-gray-500">
+                {language === 'en'
+                  ? 'Price is per item. Your pass still limits how many people (ages 6+) are on the booking.'
+                  : 'Prix par article. Le pass limite toujours le nombre de personnes (6+).'}
+              </p>
+            </div>
+          )}
+
+          {totalGuests < 1 && !perUnit ? (
             <p className="text-sm text-amber-700">{copy.paxHint}</p>
-          ) : (
+          ) : perUnit || totalGuests >= 1 ? (
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-1 text-sm">
               <div className="flex justify-between gap-2">
                 <span className="text-gray-600">{copy.standard}</span>
@@ -448,7 +483,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
                 <span className="font-bold tabular-nums text-emerald-600">{formatVT(savings)}</span>
               </div>
             </div>
-          )}
+          ) : null}
 
           <div className="border-t border-gray-100 pt-4 space-y-3">
             <div>

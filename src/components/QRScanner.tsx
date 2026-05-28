@@ -6,6 +6,7 @@ import {
   partyFromValidityApi,
   type PartyCounts,
 } from '@/lib/redemptionSavings';
+import { categoryUsesPerUnitPricing } from '@/lib/categoryPricing';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -386,7 +387,7 @@ const getFailureConfig = (status: string) => {
   }
 };
 
-type RedeemSubStep = 'none' | 'confirm_activity_pax' | 'pick_offer' | 'no_offers';
+type RedeemSubStep = 'none' | 'confirm_activity_pax' | 'confirm_item_quantity' | 'pick_offer' | 'no_offers';
 
 /** Max people ages 6+ allowed for this redemption visit (pass cap ∧ profile group). */
 function maxActivityPax6PlusForRedeem(check: ValidityResult): number {
@@ -428,6 +429,9 @@ const QRScanner: React.FC<QRScannerProps> = ({
   const [activityAdults, setActivityAdults] = useState(1);
   const [activityChildren, setActivityChildren] = useState(0);
   const [activityInfants, setActivityInfants] = useState(0);
+  /** Shopping / retail: number of items in this purchase (separate from pass people count). */
+  const [activityItemQuantity, setActivityItemQuantity] = useState(1);
+  const [pendingRedeemListing, setPendingRedeemListing] = useState<OwnerListingOffer | null>(null);
   const [ownerListings, setOwnerListings] = useState<OwnerListingOffer[]>([]);
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
   const [pendingRedeemQr, setPendingRedeemQr] = useState<string | null>(null);
@@ -526,13 +530,16 @@ const QRScanner: React.FC<QRScannerProps> = ({
     rawData: string,
     listing: OwnerListingOffer,
     party: PartyCounts,
+    itemQuantity?: number,
   ) => {
     const discountLine = formatOfferDiscountLine(listing);
-    const preview = computeRedemptionSavingsForListing(listing, party);
+    const perUnit = categoryUsesPerUnitPricing(listing.category ?? '');
+    const qty = perUnit ? Math.max(1, Math.min(99, Math.floor(Number(itemQuantity) || 1))) : undefined;
+    const preview = computeRedemptionSavingsForListing(listing, party, { itemQuantity: qty });
     const offeringIdForServer =
       listing.id && listing.profileBusinessId && listing.id !== listing.profileBusinessId
         ? listing.id
-        : undefined;
+        : listing.id || undefined;
     const { data, error } = await supabase.functions.invoke('verify-redemption', {
       body: {
         action: 'verify_and_redeem',
@@ -548,6 +555,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
         activityAdults: party.adults,
         activityChildren: party.children,
         activityInfants: party.infants,
+        ...(qty != null ? { itemQuantity: qty } : {}),
         verifiedBy: user?.id,
       },
     });
@@ -781,7 +789,14 @@ const QRScanner: React.FC<QRScannerProps> = ({
       }
 
       if (rows.length === 1) {
-        await executeRedeemForListing(rawData, rows[0], redeemParty);
+        const listing = rows[0];
+        if (categoryUsesPerUnitPricing(listing.category ?? '')) {
+          setPendingRedeemListing(listing);
+          setActivityItemQuantity(1);
+          setRedeemSubStep('confirm_item_quantity');
+          return;
+        }
+        await executeRedeemForListing(rawData, listing, redeemParty);
         return;
       }
 
@@ -945,6 +960,8 @@ const QRScanner: React.FC<QRScannerProps> = ({
     setActivityAdults(1);
     setActivityChildren(0);
     setActivityInfants(0);
+    setActivityItemQuantity(1);
+    setPendingRedeemListing(null);
     setOwnerListings([]);
     setSelectedListingId(null);
     setPendingRedeemQr(null);
@@ -996,6 +1013,12 @@ const QRScanner: React.FC<QRScannerProps> = ({
     }
     const listing = ownerListings.find((l) => l.id === selectedListingId);
     if (!listing) return;
+    if (categoryUsesPerUnitPricing(listing.category ?? '')) {
+      setPendingRedeemListing(listing);
+      setActivityItemQuantity(1);
+      setRedeemSubStep('confirm_item_quantity');
+      return;
+    }
     const party: PartyCounts = {
       adults: Math.max(0, Math.floor(activityAdults)),
       children: Math.max(0, Math.floor(activityChildren)),
@@ -1012,9 +1035,37 @@ const QRScanner: React.FC<QRScannerProps> = ({
     }
   };
 
+  const confirmItemQuantityAndRedeem = async () => {
+    const raw = pendingRedeemQr || lastScannedDataRef.current;
+    const listing = pendingRedeemListing;
+    if (!raw || !listing) {
+      toast.error('Something went wrong. Scan the code again.');
+      handleReset();
+      return;
+    }
+    const qty = Math.max(1, Math.min(99, Math.floor(Number(activityItemQuantity) || 1)));
+    const party: PartyCounts = {
+      adults: Math.max(0, Math.floor(activityAdults)),
+      children: Math.max(0, Math.floor(activityChildren)),
+      infants: Math.max(0, Math.floor(activityInfants)),
+    };
+    setVerifying(true);
+    try {
+      await executeRedeemForListing(raw, listing, party, qty);
+    } catch (e: any) {
+      console.error('[QRScanner] confirmItemQuantityAndRedeem', e);
+      setResult({ success: false, error: e?.message || 'Redemption failed.' });
+    } finally {
+      setVerifying(false);
+      setPendingRedeemListing(null);
+      setRedeemSubStep('none');
+    }
+  };
+
   const hasBarcodeDetector = 'BarcodeDetector' in window;
   const inOfferFlow =
     redeemSubStep === 'confirm_activity_pax' ||
+    redeemSubStep === 'confirm_item_quantity' ||
     redeemSubStep === 'pick_offer' ||
     redeemSubStep === 'no_offers';
   const hasResult = !!(result || validityResult);
@@ -1999,6 +2050,72 @@ const QRScanner: React.FC<QRScannerProps> = ({
               >
                 {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
                 Continue
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {/* ═══ SHOPPING: item quantity (separate from pass people count) ═══ */}
+          {redeemSubStep === 'confirm_item_quantity' && verifiedForOfferFlow && pendingRedeemListing && !result && (
+            <div className="space-y-4">
+              <div className="rounded-xl bg-violet-50 border border-violet-200 p-4">
+                <p className="text-sm font-extrabold text-violet-950">Shopping — how many items?</p>
+                <p className="text-xs text-violet-800 mt-1">
+                  The pass covers who is shopping (entered above). Enter how many items get the StikmNek price
+                  (e.g. 5 dresses). This is not limited to the number of people on the pass.
+                </p>
+                <p className="text-[11px] text-violet-900/80 mt-2 font-medium">
+                  {pendingRedeemListing.name}
+                </p>
+              </div>
+              <div>
+                <label htmlFor="act-items" className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
+                  Number of items
+                </label>
+                <input
+                  id="act-items"
+                  type="number"
+                  min={1}
+                  max={99}
+                  inputMode="numeric"
+                  value={activityItemQuantity}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (Number.isFinite(v)) setActivityItemQuantity(v);
+                    else if (e.target.value === '') setActivityItemQuantity(1);
+                  }}
+                  className="w-full px-3 py-3 rounded-lg border-2 border-gray-200 text-center text-lg font-bold focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+              </div>
+              {(() => {
+                const party: PartyCounts = {
+                  adults: Math.max(0, Math.floor(activityAdults)),
+                  children: Math.max(0, Math.floor(activityChildren)),
+                  infants: Math.max(0, Math.floor(activityInfants)),
+                };
+                const preview = computeRedemptionSavingsForListing(pendingRedeemListing, party, {
+                  itemQuantity: Math.max(1, Math.floor(Number(activityItemQuantity) || 1)),
+                });
+                return (
+                  <p className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    {preview.savingsLine}
+                  </p>
+                );
+              })()}
+              <button
+                type="button"
+                disabled={verifying}
+                onClick={() => void confirmItemQuantityAndRedeem()}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white font-bold hover:from-violet-700 hover:to-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <Receipt className="w-5 h-5" />}
+                Confirm redemption
               </button>
               <button
                 type="button"

@@ -1,3 +1,4 @@
+import { categoryUsesPerUnitPricing } from '@/lib/categoryPricing';
 import { pricingTiersFromDb, computeTieredBookingTotals } from '@/lib/pricingTiers';
 
 export type PartyCounts = { adults: number; children: number; infants: number };
@@ -52,11 +53,13 @@ export type RedemptionSavingsBreakdown = {
   totalStandard: number;
   totalDeal: number;
   isTiered: boolean;
-  /** Per-person savings for flat pricing (VT). */
+  /** Per-person or per-item savings for flat pricing (VT). */
   unitSavings: number;
-  /** For flat: adults + children (infants excluded). For tiered: paying headcount (adults + children, min 1). */
+  /** For flat per-person: adults + children. For per-unit: item quantity. For tiered: paying headcount. */
   partyBillingCount: number;
   savingsLine: string;
+  perUnit?: boolean;
+  itemQuantity?: number;
 };
 
 export function computeRedemptionSavingsForListing(
@@ -64,8 +67,10 @@ export function computeRedemptionSavingsForListing(
     pricing_tiers?: unknown;
     original_price?: number | null;
     deal_price?: number | null;
+    category?: string | null;
   },
   party: PartyCounts,
+  options?: { itemQuantity?: number },
 ): RedemptionSavingsBreakdown {
   if (hasUsableTieredPricing(listing.pricing_tiers)) {
     const tiers = pricingTiersFromDb(listing.pricing_tiers);
@@ -96,31 +101,39 @@ export function computeRedemptionSavingsForListing(
   }
 
   const o = Number(listing.original_price);
-  // If a listing has no discount configured yet, `deal_price` is often null/undefined.
-  // Treat that as "no discount" (deal == original) rather than "free".
   const d = listing.deal_price == null ? o : Number(listing.deal_price);
-  const partySize = Math.max(1, party.adults + party.children);
+  const perUnit = categoryUsesPerUnitPricing(String(listing.category ?? ''));
+  const billCount = perUnit
+    ? Math.max(1, Math.floor(Number(options?.itemQuantity) || 1))
+    : Math.max(1, party.adults + party.children);
+
   if (!Number.isFinite(o) || !Number.isFinite(d) || o <= d) {
     return {
       savedAmount: 0,
-      totalStandard: Number.isFinite(o) ? Math.round(o * partySize) : 0,
-      totalDeal: Number.isFinite(d) ? Math.round(d * partySize) : 0,
+      totalStandard: Number.isFinite(o) ? Math.round(o * billCount) : 0,
+      totalDeal: Number.isFinite(d) ? Math.round(d * billCount) : 0,
       isTiered: false,
       unitSavings: 0,
-      partyBillingCount: partySize,
+      partyBillingCount: billCount,
       savingsLine: '—',
+      perUnit,
+      itemQuantity: perUnit ? billCount : undefined,
     };
   }
   const unit = Math.round(o - d);
-  const saved = Math.max(0, unit * partySize);
-  const savingsLine = `${unit.toLocaleString()} VT × ${partySize} ${partySize === 1 ? 'person' : 'people'} = ${saved.toLocaleString()} VT total saved`;
+  const saved = Math.max(0, unit * billCount);
+  const savingsLine = perUnit
+    ? `${unit.toLocaleString()} VT × ${billCount} ${billCount === 1 ? 'item' : 'items'} = ${saved.toLocaleString()} VT total saved`
+    : `${unit.toLocaleString()} VT × ${billCount} ${billCount === 1 ? 'person' : 'people'} = ${saved.toLocaleString()} VT total saved`;
   return {
     savedAmount: saved,
-    totalStandard: Math.round(o * partySize),
-    totalDeal: Math.round(d * partySize),
+    totalStandard: Math.round(o * billCount),
+    totalDeal: Math.round(d * billCount),
     isTiered: false,
     unitSavings: unit,
-    partyBillingCount: partySize,
+    partyBillingCount: billCount,
     savingsLine,
+    perUnit,
+    itemQuantity: perUnit ? billCount : undefined,
   };
 }

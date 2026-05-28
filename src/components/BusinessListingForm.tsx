@@ -26,6 +26,7 @@ import {
   defaultPricingTiersForNewListing,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
+import { categoryUsesPerUnitPricing } from '@/lib/categoryPricing';
 import { businessHoursFromProfileRow, normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
 import { listingHoursFieldCopy } from '@/lib/listingHoursLabels';
 import { syncEmbeddedEditGalleryPhotos } from '@/lib/syncEmbeddedListingPhotos';
@@ -840,38 +841,48 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         changes.pricing_tiers = next.pricing_tiers;
       }
 
-      if (Object.keys(changes).length === 0) {
+      const photoUrlKey = (urls: string[]) =>
+        [...urls].map((u) => u.trim()).filter(Boolean).sort().join('\n');
+      const currentPhotoUrls = photos.map((p) => String(p.url || '').trim()).filter(Boolean);
+      const baselinePhotoUrls = Array.from(embeddedApprovedPhotoUrlKeysRef.current);
+      const photosChanged = photoUrlKey(currentPhotoUrls) !== photoUrlKey(baselinePhotoUrls);
+
+      if (Object.keys(changes).length === 0 && !photosChanged) {
         toast.info(language === 'en' ? 'No changes to submit.' : 'Aucune modification.');
         return;
       }
 
       setSubmitting(true);
       try {
-        const { data, error } = await supabase.functions.invoke('manage-business', {
-          headers: await getEdgeAuthHeaders(),
-          body: {
-            action: 'submit_edit',
-            userId: user.id,
-            businessId: embeddedEdit.profileBusinessId,
-            offeringId:
-              String(embeddedResolved?.business?.id || embeddedEdit.offeringId || '')
-                .trim() || undefined,
-            changes,
-          },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(String(data.error));
+        let editApplied = false;
+        if (Object.keys(changes).length > 0) {
+          const { data, error } = await supabase.functions.invoke('manage-business', {
+            headers: await getEdgeAuthHeaders(),
+            body: {
+              action: 'submit_edit',
+              userId: user.id,
+              businessId: embeddedEdit.profileBusinessId,
+              offeringId:
+                String(embeddedResolved?.business?.id || embeddedEdit.offeringId || '')
+                  .trim() || undefined,
+              changes,
+            },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(String(data.error));
+          editApplied = Boolean(data?.appliedLive);
+        }
+
         const offeringIdForPhotos = String(
           embeddedResolved?.business?.id || embeddedEdit.offeringId || '',
         ).trim();
-        if (user.id && offeringIdForPhotos) {
+        if (user.id && offeringIdForPhotos && photosChanged) {
           const syncRes = await syncEmbeddedEditGalleryPhotos({
             client: supabase,
             userId: user.id,
             profileBusinessId: embeddedEdit.profileBusinessId,
             offeringId: offeringIdForPhotos,
             photos,
-            existingUrlKeys: embeddedApprovedPhotoUrlKeysRef.current,
           });
           if (syncRes.error) {
             toast.error(
@@ -879,22 +890,21 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 ? `Listing saved but photos failed: ${syncRes.error}`
                 : `Annonce enregistrée mais photos: ${syncRes.error}`,
             );
-          } else if (syncRes.inserted > 0) {
+          } else {
+            embeddedApprovedPhotoUrlKeysRef.current = new Set(
+              photos.map((p) => String(p.url || '').trim()).filter(Boolean),
+            );
             setEmbeddedFetchNonce((n) => n + 1);
           }
         }
         toast.success(
-          data?.appliedLive
-            ? language === 'en'
-              ? 'Listing updated — changes are live on your deal page.'
-              : 'Annonce mise à jour — visible sur votre page.'
-            : data?.updated
-              ? language === 'en'
-                ? 'Pending edit updated.'
-                : 'Brouillon mis à jour'
-              : language === 'en'
-                ? 'Edit saved.'
-                : 'Enregistré.',
+          language === 'en'
+            ? photosChanged && !editApplied
+              ? 'Photos updated — your gallery is live on the deal page.'
+              : 'Listing updated — changes are live on your deal page.'
+            : photosChanged && !editApplied
+              ? 'Photos mises à jour — visibles sur votre page.'
+              : 'Annonce mise à jour — visible sur votre page.',
         );
         editBaselineRef.current = next;
         embeddedEdit.onEditSubmitted?.();
@@ -1475,7 +1485,13 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   />
                 </div>
                 <p className="text-[10px] text-gray-400 mt-0.5">
-                  {language === 'en' ? 'Regular price per person in Vatu' : 'Prix normal par personne en Vatu'}
+                  {categoryUsesPerUnitPricing(form.category)
+                    ? language === 'en'
+                      ? 'Regular price per item in Vatu'
+                      : 'Prix normal par article en Vatu'
+                    : language === 'en'
+                      ? 'Regular price per person in Vatu'
+                      : 'Prix normal par personne en Vatu'}
                 </p>
               </div>
 

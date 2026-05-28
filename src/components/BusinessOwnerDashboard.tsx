@@ -1022,11 +1022,12 @@ const BusinessOwnerDashboard: React.FC = () => {
     if (!selectedBusiness || !selectedProfileId) return;
     setGalleryLoading(true);
     try {
-      const listingOfferingId =
-        selectedBusiness._profileBusinessId &&
-        String(selectedBusiness.id) !== String(selectedBusiness._profileBusinessId)
-          ? String(selectedBusiness.id)
-          : null;
+      const { resolveGalleryOfferingId } = await import('@/lib/galleryOfferingId');
+      const listingOfferingId = await resolveGalleryOfferingId(
+        supabase,
+        String(selectedBusiness.id),
+        selectedProfileId,
+      );
       const { data, error } = await supabase
         .from('business_photos')
         .select('*')
@@ -1047,14 +1048,15 @@ const BusinessOwnerDashboard: React.FC = () => {
     if (!selectedBusiness || !user || !selectedProfileId || newGalleryPhotos.length === 0) return;
     setSavingGallery(true);
     try {
-      const listingOfferingId =
-        selectedBusiness._profileBusinessId &&
-        String(selectedBusiness.id) !== String(selectedBusiness._profileBusinessId)
-          ? String(selectedBusiness.id)
-          : null;
+      const { resolveGalleryOfferingId } = await import('@/lib/galleryOfferingId');
+      const listingOfferingId = await resolveGalleryOfferingId(
+        supabase,
+        String(selectedBusiness.id),
+        selectedProfileId,
+      );
       const photoRecords = newGalleryPhotos.map((photo, index) => ({
         business_id: selectedProfileId,
-        ...(listingOfferingId ? { offering_id: listingOfferingId } : {}),
+        offering_id: listingOfferingId,
         url: photo.url,
         file_path: photo.filePath,
         uploaded_by: user.id,
