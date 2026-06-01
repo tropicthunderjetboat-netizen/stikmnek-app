@@ -447,8 +447,8 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="w-4 h-4 text-teal-500" />
-                  <a href="tel:+67812345" className="text-teal-600 hover:underline">
-                    +678 12345
+                  <a href="tel:+6787766107" className="text-teal-600 hover:underline">
+                    +678 7766107
                   </a>
                 </div>
                 <div className="flex items-center gap-2">
