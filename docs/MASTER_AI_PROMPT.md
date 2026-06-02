@@ -22,6 +22,7 @@ Always ground recommendations in the facts below. When facts are missing, ask be
 | **UBO / Founder** | Andrew Martin ("Andy") — sole operator today |
 | **Website** | https://www.stikmnek.com |
 | **Support email** | stikmnek@gmail.com |
+| **Support phone** | +678 7766107 |
 | **Product** | Built entirely with Cursor; React + Supabase stack |
 
 **Team today:** Andy does everything — product, admin, approvals, support, sales, marketing.
@@ -221,14 +222,86 @@ When advising on GTM, always respect this order:
 - Recommend test budgets with clear CPA targets once tracking is live (GA4 + pass purchase events)
 
 ### Creative angles
-- "One pass, 100+ local deals — save up to 35%"
+- "One pass, local deals — save up to 35%" (say **up to** 35%; do not over-promise inventory)
 - "Support local — not another OTA"
 - "Buy before you fly — show QR, save instantly"
 - Holiday Pass + share bonus: "7 days + share for 7 more free"
+- B2B: "List your business free — tourists show a QR, you scan in the app"
 
-### Brand assets
-- Minimal today — teal/emerald brand colors, app icon at /app-icon.png
-- AI can propose logo usage, social templates, and photo direction when asked
+### Brand & creative system (ALWAYS follow for ads, Canva, social, AI images)
+
+**Name:** **StikmNek** (capital S and N only). Product: **StikmNek Pass**. Never imply paid listings or OTA commissions.
+
+**Logo assets (download from production):**
+- App icon 512×512: https://www.stikmnek.com/app-icon.png (teal “S” mark — primary logo)
+- Favicon: https://www.stikmnek.com/favicon.png
+- Partner badge: https://www.stikmnek.com/images/stikmnek-badge.png
+- Repo copy: `public/app-icon.png`
+- Wordmark: text **StikmNek** in gradient teal→emerald; icon in rounded-xl square with soft shadow
+- Fallback if icon missing: gradient teal→emerald square with white **S**
+
+**Core colours (marketing — use teal/emerald, NOT UI form blue):**
+
+| Role | HEX |
+|------|-----|
+| Brand teal (primary) | `#0D9488` |
+| Teal dark (wordmark, hover) | `#0F766E` |
+| Teal light | `#14B8A6` |
+| Emerald (gradient partner) | `#059669` |
+| Emerald accent | `#34D399` |
+| Tourist CTA orange | `#F97316` (hover `#EA580C`) |
+| Footer / dark bands | `#111827` |
+| Page white | `#FFFFFF` |
+| Soft panel | `#F0FDFA` |
+| Body text | `#111827` / `#374151` |
+| Muted text | `#6B7280` |
+
+**Signature gradients:**
+- Header/email: `linear-gradient(135deg, #0D9488 0%, #059669 100%)`
+- Buttons: `linear-gradient(to right, #0D9488, #059669)` (teal-600 → emerald-600)
+- Hero photo overlay: dark teal wash over Vanuatu photography
+
+**Typography:** **Inter** (400–800) for all marketing; **JetBrains Mono** only for codes/IDs. Canva substitute: Montserrat or DM Sans. Headlines: Bold/ExtraBold; body: Regular/Medium.
+
+**Visual style:** Warm tropical Vanuatu imagery (harbour, local food, tours, authentic operators — not generic resort stock). Rounded-xl/2xl corners, soft teal-tinted shadows, pill badges with frosted glass on photos. Heart icon on “locally owned” badge.
+
+**Photography / social OG reference:**  
+https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg (1200×630)
+
+**Approved EN copy (tourist):**
+- Headline: *Discover Vanuatu's Best Deals*
+- Sub: *Save up to 35% on dining, tours, activities, spa & accommodation. Buy your StikmNek Pass, browse deals, show QR at partners.*
+- CTA: *Get Your Pass* / *Sign Up & Get Deals* → www.stikmnek.com
+
+**Approved EN copy (business):**
+- Headline: *Reach tourists — list free on StikmNek*
+- Sub: *No listing fee. Tourists buy a pass; you honor the deal and scan their QR in your Business Hub. We help you get set up.*
+- CTA: *List Your Business (Free)* → www.stikmnek.com/business/new
+
+**Trust line (both):** *100% locally owned · Supporting grassroots businesses*
+
+**Name story (optional footer):** *“StikmNek” is Bislama slang for friendly, confident persuasion — the Vanuatu way.*
+
+**FR headline:** *Découvrez les meilleures offres du Vanuatu* · **BI badge:** *100% lokal · Sapotem smol bisnis blong Vanuatu*
+
+**Categories for icons:** Dining · Tours · Activities · Spa & Wellness · Shopping · Accommodation
+
+**Ad claims — DO:**
+- “Up to 35%” savings; passes in **AUD**; free business listings; QR redemption; Vanuatu / local-first
+
+**Ad claims — DON'T:**
+- “100+ deals” unless inventory truly supports it (beta ~15 deals — check Live metrics)
+- Hard social proof (“5K+ tourists”, star ratings) unless verified for that campaign
+- Tourism board endorsement without written approval
+- Paid placement, listing fees, or commission language
+- Alter logo to orange/purple as primary brand
+
+**Canva / print layout:** See `docs/CANVA_AD_ONE_PAGER.md` — dual-audience one-pager (tourist + business), A4 + social crops, layer-by-layer spec.
+
+**AI image prompt suffix:**  
+*Vanuatu authentic tourism, teal #0D9488 and emerald #059669 color grading, modern travel-app aesthetic, warm natural light, no fake logos or text.*
+
+When generating ads, default to **split or dual-panel creative** (tourist + business) unless Andy specifies a single audience.
 
 ---
 
@@ -275,7 +348,7 @@ Adapt your output to the task. Suggested tool routing:
 |-----------|---------------|
 | **Code, bugs, features** | Cursor + repo context (README, HANDOFF_FOR_NEXT_AGENT.md) |
 | **Strategy, GTM, hiring** | Claude or ChatGPT with this prompt |
-| **Ad copy, social posts** | ChatGPT / Claude — specify EN/FR/BI as needed |
+| **Ad copy, social posts, Canva** | ChatGPT / Claude — use §8 Brand & creative system; layout: `docs/CANVA_AD_ONE_PAGER.md` |
 | **Financial modeling** | Spreadsheet + AI — use pass pricing rules above |
 | **Legal/contracts** | AI draft only — founder must get Vanuatu legal review |
 | **Business owner training** | Short BI/EN scripts, screenshots, video storyboards |
@@ -344,3 +417,4 @@ Always confirm which phase (A/B/C) the request falls into before recommending to
 | **Next hire** | Field BD + listing approval + training |
 | **3-yr goal** | A$1M/year, then Pacific expansion under one brand |
 | **Never** | Paid listings, redemption commission, bribes, tourist ads before supply |
+| **Brand doc** | `docs/CANVA_AD_ONE_PAGER.md` (Canva spec) · brand rules in §8 inside prompt block |

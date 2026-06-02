@@ -362,9 +362,11 @@ const BusinessOwnerDashboard: React.FC = () => {
     signOut,
     refreshBusinesses,
     businessOwnerHasBusinessRow,
+    businessOwnerNeedsFirstListing,
   } = useAppContext();
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+  const autoOpenedSubmitRef = useRef(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
@@ -843,6 +845,22 @@ const BusinessOwnerDashboard: React.FC = () => {
     const currentStep: OnboardingStepNumber = hasRow ? 3 : 2;
     return { completedSteps, currentStep };
   }, [businessOwnerHasBusinessRow]);
+
+  /** Owners with a profile but no deal yet land on Submit listing (return visits + hub entry). */
+  useEffect(() => {
+    if (ownerDataLoading) return;
+    if (autoOpenedSubmitRef.current) return;
+    if (businessOwnerNeedsFirstListing !== true) return;
+    autoOpenedSubmitRef.current = true;
+    setActiveTab('submit');
+    toast.info(
+      language === 'en'
+        ? 'Submit your first deal to go live — add photos, prices, and your discount.'
+        : language === 'fr'
+          ? 'Soumettez votre première offre pour être visible — photos, prix et réduction.'
+          : 'Submitim fes deal blong yu — foto, praes, mo diskaon.',
+    );
+  }, [ownerDataLoading, businessOwnerNeedsFirstListing, language]);
 
   const selectedBusiness = unifiedBusinesses.find(b => b.id === selectedBusinessId) || (hasAnyBusinesses ? unifiedBusinesses[0] : null);
   const selectedIsApproved = selectedBusiness?._source === 'approved';

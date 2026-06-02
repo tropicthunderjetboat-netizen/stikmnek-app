@@ -12,6 +12,7 @@ import LocationMapPicker from '@/components/LocationMapPicker';
 import WebsiteUrlInput from '@/components/WebsiteUrlInput';
 import { parseLatLngFromMapUrl, normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 import { validateBusinessProfileOnboarding } from '@/lib/businessOnboardingValidation';
+import { checkBusinessOwnerNeedsFirstListing } from '@/lib/businessOwnerListingStatus';
 import OnboardingSteps from '@/components/OnboardingSteps';
 import BusinessCredentialsSettings from '@/components/BusinessCredentialsSettings';
 
@@ -223,16 +224,31 @@ const CompleteBusinessProfile: React.FC = () => {
       await refreshBusinesses();
       await refreshBusinessOwnerRowStatus();
 
+      const needsListing = await checkBusinessOwnerNeedsFirstListing(supabase, user.id);
+      if (needsListing) {
+        toast.success(
+          language === 'en'
+            ? 'Profile saved! Next: submit your deal — photos, prices, and discount.'
+            : language === 'fr'
+              ? 'Profil enregistré ! Étape suivante : soumettez votre offre.'
+              : 'Profail i sevem! Nekis step: submitim deal blong yu.',
+        );
+        continueToBusinessHub();
+        return;
+      }
+
       toast.success(
         language === 'en'
           ? wasUpdate
             ? 'Profile updated.'
-            : 'Business profile saved! Add your credentials below, then continue to submit your first listing.'
+            : 'Business profile saved!'
           : language === 'fr'
             ? wasUpdate
               ? 'Profil mis à jour.'
-              : 'Profil enregistré ! Ajoutez vos justificatifs ci-dessous, puis continuez.'
-            : 'Bisnis profail i sevem! Putem ol credential bihain mo go long hub.',
+              : 'Profil enregistré !'
+            : wasUpdate
+              ? 'Profail i update.'
+              : 'Bisnis profail i sevem!',
       );
     } catch (err: any) {
       console.error('[CompleteBusinessProfile]', err);

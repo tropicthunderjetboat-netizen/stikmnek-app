@@ -20,6 +20,7 @@ import type { PassProductId } from '@/data/passCatalog';
 import { passProductIdFromDb } from '@/data/passCatalog';
 import { clampPartySize, MAX_PARTY_SIZE } from '@/data/pricing';
 import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
+import { checkBusinessOwnerNeedsFirstListing } from '@/lib/businessOwnerListingStatus';
 
 export type { ViewMode };
 export type { PassProductId } from '@/data/passCatalog';
@@ -333,6 +334,8 @@ interface AppContextType {
   businessOwnerHasBusinessRow: boolean | null;
   /** True if this owner has a pending_businesses submission (awaiting review). */
   businessOwnerHasPendingSubmission: boolean;
+  /** Profile saved but no live offering and no pending submission — should submit a deal. */
+  businessOwnerNeedsFirstListing: boolean | null;
   /**
    * Last `refreshBusinessOwnerRowStatus` attempt counter: 0 = idle or last run succeeded;
    * 1–3 while retrying; 3 = all retries failed (row unknown — `businessOwnerHasBusinessRow` stays null).
@@ -386,6 +389,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   >(null);
   const [businessOwnerHasBusinessRow, setBusinessOwnerHasBusinessRow] = useState<boolean | null>(null);
   const [businessOwnerHasPendingSubmission, setBusinessOwnerHasPendingSubmission] = useState(false);
+  const [businessOwnerNeedsFirstListing, setBusinessOwnerNeedsFirstListing] = useState<boolean | null>(null);
   /** Bumps to cancel in-flight owner-row lookups when user/session changes (see `refreshBusinessOwnerRowStatus`). */
   const businessOwnerRowFetchGenRef = useRef(0);
   /** Attempt index for the current refresh (1-based); 0 after success; 3 after exhausted retries. */
@@ -894,15 +898,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const hasRow = Boolean(data?.id);
       setBusinessOwnerHasBusinessRow(hasRow);
       if (hasRow) {
-        toast.success('Welcome back!');
+        const needsListing = await checkBusinessOwnerNeedsFirstListing(supabase, userId);
+        setBusinessOwnerNeedsFirstListing(needsListing);
         setCurrentView('business-dashboard');
+        if (needsListing) {
+          toast.success(
+            'Welcome back! Submit your first deal next — photos, prices, and discount.',
+          );
+          window.setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('switch-dashboard-tab', { detail: { tab: 'submit' } }));
+          }, 150);
+        } else {
+          toast.success('Welcome back!');
+        }
       } else {
+        setBusinessOwnerNeedsFirstListing(false);
         toast.success('Welcome! Set up your business profile to continue.');
         setCurrentView('complete-business-profile');
       }
     } catch (err) {
       console.warn('[redirectBusinessUserAfterAuth]', err);
       setBusinessOwnerHasBusinessRow(null);
+      setBusinessOwnerNeedsFirstListing(null);
       toast.success('Welcome! Set up your business profile to continue.');
       setCurrentView('complete-business-profile');
     }
@@ -1132,6 +1149,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               setRedemptions([]);
               setBusinessOwnerHasBusinessRow(null);
               setBusinessOwnerHasPendingSubmission(false);
+              setBusinessOwnerNeedsFirstListing(null);
               setAuthLoading(false);
               break;
             }
@@ -1437,6 +1455,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBusinessOwnerRowLookupRetryCount(0);
     setBusinessOwnerHasBusinessRow(null);
     setBusinessOwnerHasPendingSubmission(false);
+    setBusinessOwnerNeedsFirstListing(null);
 
     try {
       await supabase.auth.signOut({ scope: 'local' });
@@ -1935,6 +1954,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setBusinessOwnerRowLookupRetryCount(0);
       setBusinessOwnerHasBusinessRow(null);
       setBusinessOwnerHasPendingSubmission(false);
+      setBusinessOwnerNeedsFirstListing(null);
       return;
     }
 
@@ -1950,7 +1970,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       try {
         const [bizRes, pendRes] = await Promise.all([
-          supabase.from('businesses').select('id').eq('owner_id', uid).limit(1),
+          supabase.from('businesses').select('id').eq('owner_id', uid),
           supabase
             .from('pending_businesses')
             .select('id')
@@ -1961,8 +1981,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (gen !== businessOwnerRowFetchGenRef.current) return;
         if (bizRes.error) throw bizRes.error;
         if (pendRes.error) throw pendRes.error;
-        setBusinessOwnerHasBusinessRow((bizRes.data?.length ?? 0) > 0);
-        setBusinessOwnerHasPendingSubmission((pendRes.data?.length ?? 0) > 0);
+        const hasRow = (bizRes.data?.length ?? 0) > 0;
+        const hasPending = (pendRes.data?.length ?? 0) > 0;
+        setBusinessOwnerHasBusinessRow(hasRow);
+        setBusinessOwnerHasPendingSubmission(hasPending);
+
+        let needsFirstListing = false;
+        if (hasRow) {
+          const profileIds = (bizRes.data ?? []).map((b) => String(b.id)).filter(Boolean);
+          if (profileIds.length > 0) {
+            const { data: offeringRows, error: offErr } = await supabase
+              .from('business_offerings')
+              .select('id')
+              .in('business_id', profileIds)
+              .limit(1);
+            if (gen !== businessOwnerRowFetchGenRef.current) return;
+            if (offErr) throw offErr;
+            const hasOffering = (offeringRows?.length ?? 0) > 0;
+            needsFirstListing = !hasOffering && !hasPending;
+          }
+        }
+        setBusinessOwnerNeedsFirstListing(needsFirstListing);
         setBusinessOwnerRowLookupRetryCount(0);
         return;
       } catch (e: unknown) {
@@ -1998,6 +2037,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       backoffMsDelays: [...backoffMs],
     });
     setBusinessOwnerHasBusinessRow(null);
+    setBusinessOwnerNeedsFirstListing(null);
     setBusinessOwnerRowLookupRetryCount(3);
   }, [user?.id, user?.type, user?.email]);
 
@@ -2062,6 +2102,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         retryUserProfileFetch,
         businessOwnerHasBusinessRow,
         businessOwnerHasPendingSubmission,
+        businessOwnerNeedsFirstListing,
         businessOwnerRowLookupRetryCount,
         refreshBusinessOwnerRowStatus,
         userProfileLoadError,
