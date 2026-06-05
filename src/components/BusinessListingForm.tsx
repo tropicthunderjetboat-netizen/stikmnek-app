@@ -268,6 +268,8 @@ type EditBaseline = {
   listing_title: string;
   /** Canonical category key (also drives offering `tags` when changed). */
   category: string;
+  discount_valid_from: string;
+  discount_valid_until: string;
 };
 
 /** Prefer `hours`, then DB `opening_hours` when the profile row split them across columns. */
@@ -288,6 +290,10 @@ function buildEditBaseline(b: Business): EditBaseline {
   }
   const wa = (b.whatsappNumber || b.whatsapp_number || '').trim();
   const cat = asCategoryKey(String(b.category || 'dining'));
+  const savedFrom =
+    (b.discountValidFrom && String(b.discountValidFrom).trim().split('T')[0]) || '';
+  const savedUntil =
+    (b.discountValidUntil && String(b.discountValidUntil).trim().split('T')[0]) || '';
   return {
     description: b.description || '',
     hours: hoursPrefillFromBusiness(b),
@@ -304,7 +310,16 @@ function buildEditBaseline(b: Business): EditBaseline {
     pricing_tiers,
     listing_title: (b.name || '').trim(),
     category: cat,
+    discount_valid_from: savedFrom,
+    discount_valid_until: savedUntil,
   };
+}
+
+function discountUntilFromForm(discountValidFrom: string, listingDuration: string): string {
+  const selectedDuration = DURATION_OPTIONS.find((d) => d.value === listingDuration);
+  return selectedDuration
+    ? addDays(discountValidFrom, selectedDuration.days)
+    : addDays(discountValidFrom, 30);
 }
 
 function baselineSnapshotFromFormState(args: {
@@ -322,6 +337,8 @@ function baselineSnapshotFromFormState(args: {
     mapUrl: string;
     website: string;
     category: string;
+    discountValidFrom: string;
+    listingDuration: string;
   };
   photos: { url: string }[];
   pricingTiers: PricingTierInput[];
@@ -351,6 +368,8 @@ function baselineSnapshotFromFormState(args: {
     pricing_tiers,
     listing_title: (args.form.name || '').trim(),
     category: cat,
+    discount_valid_from: (args.form.discountValidFrom || '').trim(),
+    discount_valid_until: discountUntilFromForm(args.form.discountValidFrom, args.form.listingDuration),
   };
 }
 
@@ -370,7 +389,9 @@ function editBaselinesEqual(a: EditBaseline, b: EditBaseline): boolean {
     a.image === b.image &&
     JSON.stringify(a.pricing_tiers) === JSON.stringify(b.pricing_tiers) &&
     a.listing_title === b.listing_title &&
-    a.category === b.category
+    a.category === b.category &&
+    a.discount_valid_from === b.discount_valid_from &&
+    a.discount_valid_until === b.discount_valid_until
   );
 }
 
@@ -416,6 +437,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
   });
 
   const editBaselineRef = useRef<EditBaseline | null>(null);
+  /** Original discount start date when editing — allows unchanged past dates to pass HTML5 validation. */
+  const savedDiscountValidFromRef = useRef<string | null>(null);
   /** Fresh `business_offerings` + gallery from DB (avoids stale `dbBusinesses` / unified row). */
   const [embeddedResolved, setEmbeddedResolved] = useState<EmbeddedListingResolved | null>(null);
   /** Bumps to re-run the embedded listing fetch (e.g. after syncing new gallery rows). */
@@ -473,6 +496,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
   useEffect(() => {
     if (!embeddedEdit) {
       editBaselineRef.current = null;
+      savedDiscountValidFromRef.current = null;
       return;
     }
     const oid = embeddedEdit.offeringId?.trim();
@@ -567,6 +591,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     setAgreedPartnerTerms(true);
     setSubmitted(false);
     setFieldErrors({});
+    savedDiscountValidFromRef.current = savedFrom || null;
     editBaselineRef.current = buildEditBaseline({ ...b, name: lockedTitle, category: cat });
   }, [
     embeddedResolved,
@@ -847,6 +872,12 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       if (next.image !== base.image) changes.image = next.image;
       if (JSON.stringify(next.pricing_tiers) !== JSON.stringify(base.pricing_tiers)) {
         changes.pricing_tiers = next.pricing_tiers;
+      }
+      if (next.discount_valid_from !== base.discount_valid_from) {
+        changes.discount_valid_from = next.discount_valid_from || null;
+      }
+      if (next.discount_valid_until !== base.discount_valid_until) {
+        changes.discount_valid_until = next.discount_valid_until || null;
       }
 
       const currentPhotoUrls = photos.map((p) => String(p.url || '').trim()).filter(Boolean);
@@ -1254,6 +1285,12 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
   const isEmbeddedEdit = Boolean(embeddedEdit);
   const credentialsProfileId =
     embeddedEdit?.profileBusinessId?.trim() || ownerProfileBusinessId || null;
+  const discountValidFromMin =
+    isEmbeddedEdit &&
+    savedDiscountValidFromRef.current &&
+    form.discountValidFrom === savedDiscountValidFromRef.current
+      ? savedDiscountValidFromRef.current
+      : todayStr();
 
   return (
     <section
@@ -1719,7 +1756,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 <input
                   type="date"
                   value={form.discountValidFrom}
-                  min={todayStr()}
+                  min={discountValidFromMin}
                   onChange={(e) => setForm((prev) => ({ ...prev, discountValidFrom: e.target.value }))}
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                 />

@@ -1,7 +1,14 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { Business, touristFacingOfferings } from '@/data/businesses';
+import {
+  Business,
+  touristFacingOfferings,
+  effectiveListingOriginalPrice,
+  listingHasActiveDiscount,
+  customerFacingListPrice,
+} from '@/data/businesses';
+import { formatVT } from '@/lib/utils';
 
 import {
   MapPin, Star, X, Phone, Clock, ExternalLink, Navigation,
@@ -576,6 +583,9 @@ const MapView: React.FC = () => {
           {/* Selected Business Detail Card (bottom overlay) */}
           {selectedMapBiz && (() => {
             const isSelectedFav = isListingFavorited(favorites, selectedMapBiz);
+            const displayPrice = customerFacingListPrice(selectedMapBiz);
+            const originalPrice = effectiveListingOriginalPrice(selectedMapBiz);
+            const hasDiscount = listingHasActiveDiscount(selectedMapBiz);
             return (
             <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-auto sm:right-4 sm:w-96 max-h-[55vh] sm:max-h-none overflow-y-auto bg-white rounded-xl shadow-2xl border border-gray-100 overflow-x-hidden z-[1000]">
               <div className="relative">
@@ -656,8 +666,10 @@ const MapView: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-lg font-bold text-teal-700">${selectedMapBiz.dealPrice}</span>
-                    <span className="text-sm text-gray-400 line-through">${selectedMapBiz.originalPrice}</span>
+                    <span className="text-lg font-bold text-teal-700">{formatVT(displayPrice)}</span>
+                    {hasDiscount && (
+                      <span className="text-sm text-gray-400 line-through">{formatVT(originalPrice)}</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {/* Favorite button in action row */}
