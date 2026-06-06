@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Building2, Mail, MapPin, Phone, RefreshCw, Trash2 } from 'lucide-react';
+import { Building2, Mail, MapPin, Phone, MessageCircle, RefreshCw, Trash2 } from 'lucide-react';
+import { normalizeWhatsAppForExport } from '@/lib/phoneUtils';
 import BusinessProfileLogo from '@/components/BusinessProfileLogo';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -12,6 +13,8 @@ export type IncompleteBusinessProfile = {
   created_at: string;
   email: string | null;
   phone: string | null;
+  whatsapp_number: string | null;
+  whatsapp_marketing_opt_in: boolean;
   location: string | null;
   logo_url: string | null;
   owner_email: string | null;
@@ -128,6 +131,17 @@ const AdminIncompleteProfiles: React.FC<AdminIncompleteProfilesProps> = ({
                     <span className="inline-flex items-center gap-1">
                       <Phone className="w-3.5 h-3.5" aria-hidden />
                       {p.phone}
+                    </span>
+                  )}
+                  {p.whatsapp_number ? (
+                    <span className="inline-flex items-center gap-1 text-green-700 font-medium">
+                      <MessageCircle className="w-3.5 h-3.5" aria-hidden />
+                      {normalizeWhatsAppForExport(p.whatsapp_number)}
+                      {p.whatsapp_marketing_opt_in ? ' · tips OK' : ''}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-gray-500">
+                      Phone/email only
                     </span>
                   )}
                   {p.location && (

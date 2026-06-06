@@ -33,6 +33,10 @@ import AdminBusinessCredentials from '@/components/AdminBusinessCredentials';
 import AdminIncompleteProfiles, {
   type IncompleteBusinessProfile,
 } from '@/components/AdminIncompleteProfiles';
+import AdminWhatsAppContacts, {
+  type BusinessWhatsAppContact,
+  fetchBusinessWhatsAppContactsForAdmin,
+} from '@/components/AdminWhatsAppContacts';
 import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
 import type { EmbeddedListingEdit } from '@/components/BusinessListingForm';
 
@@ -163,6 +167,8 @@ const AdminPanel: React.FC = () => {
   const [loadingPending, setLoadingPending] = useState(false);
   const [incompleteProfiles, setIncompleteProfiles] = useState<IncompleteBusinessProfile[]>([]);
   const [loadingIncompleteProfiles, setLoadingIncompleteProfiles] = useState(false);
+  const [whatsappContacts, setWhatsappContacts] = useState<BusinessWhatsAppContact[]>([]);
+  const [loadingWhatsappContacts, setLoadingWhatsappContacts] = useState(false);
   const [loadingBusinesses, setLoadingBusinesses] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
@@ -346,6 +352,19 @@ const AdminPanel: React.FC = () => {
       console.warn('[Admin] incomplete profiles load failed:', err);
     } finally {
       setLoadingIncompleteProfiles(false);
+    }
+  }, [user]);
+
+  const loadWhatsappContacts = useCallback(async () => {
+    if (!user) return;
+    setLoadingWhatsappContacts(true);
+    try {
+      const rows = await fetchBusinessWhatsAppContactsForAdmin();
+      setWhatsappContacts(rows);
+    } catch (err) {
+      console.warn('[Admin] whatsapp contacts load failed:', err);
+    } finally {
+      setLoadingWhatsappContacts(false);
     }
   }, [user]);
 
@@ -533,8 +552,9 @@ const AdminPanel: React.FC = () => {
     if (!user) return;
     loadPending();
     void loadIncompleteProfiles();
+    void loadWhatsappContacts();
     if (!editsLoadedRef.current) { editsLoadedRef.current = true; loadPendingEdits(); }
-  }, [user, loadIncompleteProfiles]);
+  }, [user, loadIncompleteProfiles, loadWhatsappContacts]);
 
   const loadPendingEdits = async (showToast = false) => {
     if (!user) return;
@@ -1699,6 +1719,11 @@ const AdminPanel: React.FC = () => {
         {/* ═══ APPROVALS TAB ═══ */}
         {activeTab === 'approvals' && (
           <div className="space-y-6">
+            <AdminWhatsAppContacts
+              contacts={whatsappContacts}
+              loading={loadingWhatsappContacts}
+              onRefresh={() => void loadWhatsappContacts()}
+            />
             <AdminIncompleteProfiles
               profiles={incompleteProfiles}
               loading={loadingIncompleteProfiles}

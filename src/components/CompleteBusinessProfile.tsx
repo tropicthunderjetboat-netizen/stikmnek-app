@@ -23,6 +23,7 @@ const PROFILE_VALIDATION_KEY_TO_FORM: Record<string, string> = {
   email: 'businessEmail',
   phone: 'businessPhone',
   whatsapp: 'whatsappNumber',
+  whatsappOptIn: 'whatsappOptIn',
   address: 'address',
 };
 
@@ -45,6 +46,8 @@ const CompleteBusinessProfile: React.FC = () => {
   const [businessEmail, setBusinessEmail] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [noWhatsApp, setNoWhatsApp] = useState(false);
+  const [whatsappMarketingOptIn, setWhatsappMarketingOptIn] = useState(true);
   const [category, setCategory] = useState<Category>('dining');
   const [address, setAddress] = useState('');
   const [mapUrl, setMapUrl] = useState('');
@@ -97,6 +100,7 @@ const CompleteBusinessProfile: React.FC = () => {
     );
     setBusinessPhone((userProfile.business_phone || userProfile.phone || '').trim());
     setWhatsappNumber((userProfile.whatsapp_number || '').trim());
+    setWhatsappMarketingOptIn(Boolean(userProfile.whatsapp_marketing_opt_in));
     setBusinessName((userProfile.business_name || '').trim());
     const cat = userProfile.business_category as Category | undefined;
     if (cat && categories.some((c) => c.key === cat)) setCategory(cat);
@@ -114,6 +118,9 @@ const CompleteBusinessProfile: React.FC = () => {
       email: businessEmail,
       phone: businessPhone,
       whatsapp: whatsappNumber,
+      whatsappMarketingOptIn,
+      requireWhatsAppOptIn: true,
+      noWhatsApp,
       address,
     });
     if (valid) {
@@ -159,7 +166,7 @@ const CompleteBusinessProfile: React.FC = () => {
         hours: '',
         phone: businessPhone.trim(),
         email: businessEmail.trim(),
-        whatsapp_number: whatsappNumber.trim() || null,
+        whatsapp_number: noWhatsApp ? null : whatsappNumber.trim() || null,
         tags: [category],
         active: false,
         map_url: mapUrl.trim() || null,
@@ -203,7 +210,10 @@ const CompleteBusinessProfile: React.FC = () => {
           business_phone: businessPhone.trim(),
           business_email: businessEmail.trim(),
           phone: businessPhone.trim(),
-          whatsapp_number: whatsappNumber.trim() || null,
+          whatsapp_number: noWhatsApp ? null : whatsappNumber.trim() || null,
+          whatsapp_marketing_opt_in: noWhatsApp ? false : whatsappMarketingOptIn,
+          whatsapp_marketing_opt_in_at:
+            !noWhatsApp && whatsappMarketingOptIn ? new Date().toISOString() : null,
           onboarding_complete: true,
           updated_at: new Date().toISOString(),
         })
@@ -425,33 +435,105 @@ const CompleteBusinessProfile: React.FC = () => {
             </div>
 
             <div>
-              <Label htmlFor="cbp-wa">
-                {language === 'en'
-                  ? 'Business WhatsApp (highly recommended)'
-                  : language === 'fr'
-                    ? 'WhatsApp (fortement recommandé)'
-                    : 'WhatsApp (strongli recommend)'}
+              <Label htmlFor="cbp-no-wa" className="flex items-start gap-3 cursor-pointer font-normal">
+                <input
+                  id="cbp-no-wa"
+                  type="checkbox"
+                  checked={noWhatsApp}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setNoWhatsApp(checked);
+                    if (checked) {
+                      setWhatsappNumber('');
+                      setWhatsappMarketingOptIn(false);
+                    }
+                    setErrors((p) => ({
+                      ...p,
+                      whatsappNumber: '',
+                      whatsappOptIn: '',
+                    }));
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                />
+                <span className="text-sm text-gray-700 leading-relaxed">
+                  {language === 'en'
+                    ? "I don't use WhatsApp — contact me by phone or email instead."
+                    : language === 'fr'
+                      ? "Je n'utilise pas WhatsApp — contactez-moi par téléphone ou e-mail."
+                      : 'Mi no yusum WhatsApp — kontaktem mi long fon o email.'}
+                </span>
               </Label>
-              <p className="text-xs text-gray-500 mt-1 mb-1.5">
-                {language === 'en'
-                  ? 'Most guests contact businesses on WhatsApp. Include country code (e.g. +678). You can save without it and add it later.'
-                  : language === 'fr'
-                    ? 'La plupart des clients vous contactent sur WhatsApp. Indiquez l’indicatif pays (ex. +678). Vous pouvez enregistrer sans numéro et l’ajouter plus tard.'
-                    : 'Plentyf guest i kontaktem yu long WhatsApp. Putem country code (ex. +678). Yu save sevem wetem no numba mo addem baeoa.'}
-              </p>
-              <Input
-                id="cbp-wa"
-                type="tel"
-                value={whatsappNumber}
-                onChange={(e) => {
-                  setWhatsappNumber(e.target.value);
-                  setErrors((p) => ({ ...p, whatsappNumber: '' }));
-                }}
-                className="mt-0"
-                placeholder="+678 …"
-              />
-              {errors.whatsappNumber && <p className="text-xs text-red-500 mt-1">{errors.whatsappNumber}</p>}
             </div>
+
+            {!noWhatsApp && (
+              <>
+                <div>
+                  <Label htmlFor="cbp-wa">
+                    {language === 'en'
+                      ? 'WhatsApp number *'
+                      : language === 'fr'
+                        ? 'Numéro WhatsApp *'
+                        : 'WhatsApp namba *'}
+                  </Label>
+                  <p className="text-xs text-gray-500 mt-1 mb-1.5">
+                    {language === 'en'
+                      ? 'Recommended — we send short setup tips here to help you finish your listing. Include country code (e.g. +678).'
+                      : language === 'fr'
+                        ? 'Recommandé — conseils et rappels pour finaliser votre annonce. Indicatif pays (ex. +678).'
+                        : 'Recommend — mifala bae sendem tips long WhatsApp. Putem country code (ex. +678).'}
+                  </p>
+                  <Input
+                    id="cbp-wa"
+                    type="tel"
+                    value={whatsappNumber}
+                    onChange={(e) => {
+                      setWhatsappNumber(e.target.value);
+                      setErrors((p) => ({ ...p, whatsappNumber: '' }));
+                    }}
+                    className="mt-0"
+                    placeholder="+678 …"
+                    required
+                  />
+                  {errors.whatsappNumber && (
+                    <p className="text-xs text-red-500 mt-1">{errors.whatsappNumber}</p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={whatsappMarketingOptIn}
+                      onChange={(e) => {
+                        setWhatsappMarketingOptIn(e.target.checked);
+                        setErrors((p) => ({ ...p, whatsappOptIn: '' }));
+                      }}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                    />
+                    <span className="text-sm text-gray-700 leading-relaxed">
+                      {language === 'en'
+                        ? 'Yes — send me WhatsApp tips from StikmNek to help set up my listing, upload photos, and get more bookings.'
+                        : language === 'fr'
+                          ? 'Oui — envoyez-moi des conseils WhatsApp de StikmNek pour configurer mon annonce et attirer plus de clients.'
+                          : 'Yes — sendem WhatsApp tips blong StikmNek blong helpim mi setim listing blong mi.'}
+                    </span>
+                  </label>
+                  {errors.whatsappOptIn && (
+                    <p className="text-xs text-red-500 mt-2 ml-7">{errors.whatsappOptIn}</p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {noWhatsApp && (
+              <p className="text-xs text-gray-500 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
+                {language === 'en'
+                  ? "We'll reach you on your business phone or email with listing help. You won't appear in our WhatsApp outreach list."
+                  : language === 'fr'
+                    ? 'Nous vous contacterons par téléphone ou e-mail. Vous ne serez pas dans notre liste WhatsApp.'
+                    : 'Mifala bae kontaktem yu long fon o email. Yu no go long WhatsApp list.'}
+              </p>
+            )}
 
             <div>
               <Label htmlFor="cbp-category">

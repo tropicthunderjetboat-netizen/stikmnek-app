@@ -53,6 +53,12 @@ export type BusinessProfileOnboardingInput = {
   phone: string;
   whatsapp: string;
   address: string;
+  /** Owner consents to WhatsApp education tips. */
+  whatsappMarketingOptIn?: boolean;
+  /** When true (initial profile setup), opt-in must be checked if they use WhatsApp. */
+  requireWhatsAppOptIn?: boolean;
+  /** Owner does not use WhatsApp — phone/email contact only. */
+  noWhatsApp?: boolean;
 };
 
 export type FlatListingPricingInput = {
@@ -131,15 +137,26 @@ export function validateBusinessPhone(value: string): FieldErrorMessage {
   return null;
 }
 
-/** Optional on business profile & listings; validates format when a value is entered. */
-export function validateWhatsAppNumber(value: string): FieldErrorMessage {
+/** Required on business profile — primary channel for owner education & support. */
+export function validateBusinessWhatsAppRequired(value: string): FieldErrorMessage {
   const raw = (value || '').trim();
-  if (!raw) return null;
+  if (!raw) {
+    return 'Enter your WhatsApp number — we use it to send setup tips and help you finish your listing.';
+  }
   const digits = digitsOnly(raw);
   if (digits.length < 7) return 'WhatsApp number looks too short — include country code (e.g. +678 …).';
   if (digits.length > 15) return 'WhatsApp number looks too long — check for typos.';
-  if (!/^[\d\s+().\-/]{7,}$/.test(raw)) return 'Use digits and common separators only (+, spaces, dashes, parentheses).';
+  if (!/^[\d\s+().\-/]{7,}$/.test(raw)) {
+    return 'Use digits and common separators only (+, spaces, dashes, parentheses).';
+  }
   return null;
+}
+
+/** Optional on listings; validates format when a value is entered. */
+export function validateWhatsAppNumber(value: string): FieldErrorMessage {
+  const raw = (value || '').trim();
+  if (!raw) return null;
+  return validateBusinessWhatsAppRequired(raw);
 }
 
 export function validateBusinessAddress(value: string): FieldErrorMessage {
@@ -316,13 +333,20 @@ function firstErrors(record: Record<string, string | null>): Record<string, stri
  * Full validation for the “complete business profile” step (stub `businesses` row + profile fields).
  */
 export function validateBusinessProfileOnboarding(input: BusinessProfileOnboardingInput): CompositeValidationResult {
+  const usesWhatsApp = !input.noWhatsApp;
   const errors = firstErrors({
     businessName: validateBusinessName(input.businessName),
     ownerName: validateOwnerName(input.ownerName),
     email: validateBusinessEmail(input.email),
     phone: validateBusinessPhone(input.phone),
-    whatsapp: validateWhatsAppNumber(input.whatsapp),
+    whatsapp: usesWhatsApp
+      ? validateBusinessWhatsAppRequired(input.whatsapp)
+      : validateWhatsAppNumber(input.whatsapp),
     address: validateBusinessAddress(input.address),
+    whatsappOptIn:
+      usesWhatsApp && input.requireWhatsAppOptIn && !input.whatsappMarketingOptIn
+        ? 'Please agree to receive WhatsApp tips so we can help you set up your listing.'
+        : null,
   });
   return { valid: Object.keys(errors).length === 0, errors };
 }
@@ -390,6 +414,7 @@ export const BUSINESS_PROFILE_VALIDATION_FIELD_ORDER = [
   'email',
   'phone',
   'whatsapp',
+  'whatsappOptIn',
   'address',
 ] as const;
 

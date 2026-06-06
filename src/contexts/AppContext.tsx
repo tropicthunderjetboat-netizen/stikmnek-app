@@ -70,6 +70,9 @@ export interface UserProfile {
   preferred_contact_method?: string | null;
   /** Tourist WhatsApp (may differ from `phone`). */
   whatsapp_number?: string | null;
+  /** Business owner opted in to StikmNek WhatsApp education / listing tips. */
+  whatsapp_marketing_opt_in?: boolean;
+  whatsapp_marketing_opt_in_at?: string | null;
   resort_name?: string | null;
   expected_arrival_date?: string | null;
   expected_departure_date?: string | null;
