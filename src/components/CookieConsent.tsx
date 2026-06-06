@@ -15,16 +15,20 @@ const CookieConsent: React.FC = () => {
     }
   }, []);
 
-  const handleAccept = () => {
-    localStorage.setItem('stikm-cookie-consent', 'accepted');
-    analytics.onConsentAccepted();
+  const resolveConsent = (value: 'accepted' | 'declined') => {
+    localStorage.setItem('stikm-cookie-consent', value);
+    window.dispatchEvent(new CustomEvent('stikmnek-cookie-consent-set'));
     setVisible(false);
   };
 
+  const handleAccept = () => {
+    analytics.onConsentAccepted();
+    resolveConsent('accepted');
+  };
+
   const handleDecline = () => {
-    localStorage.setItem('stikm-cookie-consent', 'declined');
     analytics.onConsentDeclined();
-    setVisible(false);
+    resolveConsent('declined');
   };
 
   if (!visible) return null;

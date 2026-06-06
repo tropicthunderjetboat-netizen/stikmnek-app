@@ -19,6 +19,7 @@ import ListYourBusinessCta from './ListYourBusinessCta';
 import Footer from './Footer';
 import AuthModal from './AuthModal';
 import CookieConsent from './CookieConsent';
+import InstallPrompt from './InstallPrompt';
 import ListingsLoadBanner from './ListingsLoadBanner';
 import PaymentConfirmation from './PaymentConfirmation';
 import FloatingPassButton from './FloatingPassButton';
@@ -411,6 +412,7 @@ const AppLayout: React.FC = () => {
       {!hideFooter && <Footer />}
       <AuthModal />
       <CookieConsent />
+      <InstallPrompt />
       <FloatingPassButton />
     </div>
   );
