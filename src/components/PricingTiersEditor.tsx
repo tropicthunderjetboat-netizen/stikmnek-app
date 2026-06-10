@@ -23,6 +23,14 @@ function isCharterTier(tier: PricingTierInput): boolean {
   return /^charter/i.test((tier.label || '').trim());
 }
 
+/** Stable list key — must not depend on editable fields like `label` or prices. */
+function tierStableKey(tier: PricingTierInput, index: number): string {
+  if (isCharterTier(tier)) return `charter-${index}`;
+  const preset = TIER_PRESET_SLOTS[index];
+  if (preset) return preset.key;
+  return `row-${index}`;
+}
+
 function dealFromOriginal(original: number, pct: number): number {
   return Math.max(0, Math.round(original * (1 - pct / 100)));
 }
@@ -179,7 +187,7 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
           const charter = isCharterTier(tier);
           return (
             <div
-              key={`${index}-${tier.label}`}
+              key={tierStableKey(tier, index)}
               className={`rounded-lg border p-3 space-y-2.5 shadow-sm ${
                 charter
                   ? 'border-amber-200 bg-amber-50/60'
