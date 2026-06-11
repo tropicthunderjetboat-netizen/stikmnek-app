@@ -17,62 +17,10 @@ if (isRecoveryOnWrongPage) {
   window.location.replace(window.location.origin + '/reset-password' + window.location.hash);
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// NUCLEAR FIX: Kill all service workers and clear all caches.
-// This runs on EVERY page load to ensure no stale SW can trap users.
-// ═══════════════════════════════════════════════════════════════════
-(async function nukeServiceWorkers() {
-  if (!('serviceWorker' in navigator)) return;
-  
-  try {
-    // Unregister ALL service workers
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    for (const reg of registrations) {
-      // If there's a waiting worker, activate it first so it can self-destruct
-      if (reg.waiting) {
-        reg.waiting.postMessage('SKIP_WAITING');
-      }
-      await reg.unregister();
-      console.log('[NUKE] Unregistered SW:', reg.scope);
-    }
-    
-    // Clear ALL caches
-    if ('caches' in window) {
-      const cacheNames = await caches.keys();
-      for (const name of cacheNames) {
-        await caches.delete(name);
-        console.log('[NUKE] Deleted cache:', name);
-      }
-    }
-    
-    if (registrations.length > 0) {
-      console.log('[NUKE] All service workers unregistered and caches cleared.');
-    }
-  } catch (err) {
-    console.warn('[NUKE] SW cleanup error (non-fatal):', err);
-  }
-})();
+// Register installable PWA service worker (enables native Add to Home on supported browsers).
+import { registerPwaServiceWorker } from '@/lib/pwaInstall';
 
-// Listen for any SW trying to take control and reload
-if ('serviceWorker' in navigator) {
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
-    refreshing = true;
-    console.log('[App] SW controller changed — reloading...');
-    window.location.reload();
-  });
-  
-  navigator.serviceWorker.addEventListener('message', (event) => {
-    if (event.data?.type === 'FORCE_RELOAD') {
-      if (!refreshing) {
-        refreshing = true;
-        console.log('[App] Force reload from SW v' + event.data.version);
-        window.location.reload();
-      }
-    }
-  });
-}
+void registerPwaServiceWorker();
 
 // ═══════════════════════════════════════════════════════════════════
 // Render the app (skip if we just triggered a redirect to /reset-password)
