@@ -32,3 +32,9 @@ verify_jwt = false
 # Optional auth in handler; do not block relay on Kong JWT validation.
 [functions.sentry-relay]
 verify_jwt = false
+
+# Daily ops digest: active deals expiring within 7 days (07:00 UTC).
+# Recipients: OPS_NOTIFY_EMAILS or PURCHASE_NOTIFY_EMAILS (see README).
+[functions.notify-expiring-deals]
+verify_jwt = false
+schedule = "0 7 * * *"

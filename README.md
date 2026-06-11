@@ -441,9 +441,21 @@ supabase secrets set PAYPAL_MODE=live
 | `RESEND_FROM_NAME` | Resend | Display name for the From header (optional) |
 | `RESEND_TEMPLATE_*` | Resend | Optional published template ids — see `supabase/resend-templates.md` |
 | `PURCHASE_NOTIFY_EMAILS` | Resend | Comma-separated ops inboxes notified on each pass sale (default `stikmnek@gmail.com` if unset) |
+| `OPS_NOTIFY_EMAILS` | Resend | Ops inboxes for daily **expiring business deals** digest (falls back to `PURCHASE_NOTIFY_EMAILS`) |
+| `CRON_SECRET` | Internal | Optional manual trigger secret for `notify-expiring-deals` (scheduled runs use service role) |
 | `SENTRY_DSN` | Sentry | Error tracking DSN |
 | `GA_MEASUREMENT_ID` | Google | Analytics measurement ID |
 | `GATEWAY_API_KEY` | Internal | API gateway key |
+
+### Expiring business deals (ops email)
+
+The `notify-expiring-deals` Edge Function runs **daily at 07:00 UTC** (see `supabase/config.toml`). It emails your ops inbox with every **active** deal whose `discount_valid_until` falls within the next **7 days**, including business name, deal title, expiry date, and owner contact details so you can chase renewals.
+
+1. Deploy: `npm run functions:deploy:notify-expiring-deals`
+2. Set `RESEND_API_KEY` and `OPS_NOTIFY_EMAILS` (or reuse `PURCHASE_NOTIFY_EMAILS`)
+3. Manual test: `curl -X POST "$SUPABASE_URL/functions/v1/notify-expiring-deals" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"`
+
+No email is sent when there are zero expiring deals.
 
 ### Frontend (Vite / `.env`)
 
