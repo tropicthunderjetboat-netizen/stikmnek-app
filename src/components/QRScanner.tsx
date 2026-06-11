@@ -389,12 +389,74 @@ const getFailureConfig = (status: string) => {
 
 type RedeemSubStep = 'none' | 'confirm_activity_pax' | 'confirm_item_quantity' | 'pick_offer' | 'no_offers';
 
-/** Max people ages 6+ allowed for this redemption visit (pass cap ∧ profile group). */
+/** Merchant-facing VT totals — charge amount prominent, tourist savings secondary. */
+function MerchantChargeBlock({
+  totalDeal,
+  totalStandard,
+  savedAmount,
+  variant = 'compact',
+}: {
+  totalDeal: number;
+  totalStandard?: number | null;
+  savedAmount?: number | null;
+  variant?: 'compact' | 'hero';
+}) {
+  const deal = Math.max(0, Math.round(Number(totalDeal) || 0));
+  const standard =
+    totalStandard != null && Number.isFinite(Number(totalStandard)) && Number(totalStandard) > 0
+      ? Math.round(Number(totalStandard))
+      : null;
+  const saved = Math.max(0, Math.round(Number(savedAmount) || 0));
+
+  if (variant === 'hero') {
+    return (
+      <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl p-4 border border-gray-200 text-center">
+        <p className="text-xs font-semibold text-gray-600 mb-1 uppercase tracking-wide">Amount to charge</p>
+        <p className="text-3xl font-extrabold text-gray-900">
+          {deal.toLocaleString()} <span className="text-lg">VT</span>
+        </p>
+        {saved > 0 && (
+          <p className="text-xs font-medium text-green-700 mt-2">
+            {standard != null && standard > deal && (
+              <span className="text-gray-400 line-through mr-1.5">{standard.toLocaleString()} VT standard</span>
+            )}
+            Tourist saves {saved.toLocaleString()} VT
+          </p>
+        )}
+        <div className="flex items-center justify-center gap-1.5 mt-2">
+          <CheckCircle className="w-3.5 h-3.5 text-teal-600" />
+          <span className="text-[10px] font-bold text-teal-700 uppercase tracking-wider">Redemption recorded</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (deal <= 0 && saved <= 0) return null;
+
+  return (
+    <div className="mt-2">
+      <p className="text-sm font-extrabold text-gray-900">Charge {deal.toLocaleString()} VT</p>
+      {saved > 0 && (
+        <p className="text-[10px] font-medium text-green-700 mt-0.5">
+          Tourist saves {saved.toLocaleString()} VT
+          {standard != null && standard > deal ? ` · Standard ${standard.toLocaleString()} VT` : ''}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Max people ages 6+ allowed for this redemption visit (pass capacity paid for). */
 function maxActivityPax6PlusForRedeem(check: ValidityResult): number {
+  const passMax =
+    typeof check.pass?.maxPeople === 'number' && check.pass.maxPeople > 0
+      ? check.pass.maxPeople
+      : typeof check.pass?.partySize === 'number' && check.pass.partySize > 0
+        ? check.pass.partySize
+        : null;
+  if (passMax != null) return passMax;
   const prof = partyFromValidityApi(check.party);
-  const profileSix = Math.max(1, prof.adults + prof.children);
-  const passMax = typeof check.pass?.maxPeople === 'number' && check.pass.maxPeople > 0 ? check.pass.maxPeople : null;
-  return passMax != null ? Math.min(passMax, profileSix) : profileSix;
+  return Math.max(1, prof.adults + prof.children);
 }
 
 const QRScanner: React.FC<QRScannerProps> = ({
@@ -754,7 +816,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
       return;
     }
     if (a + c > capSix) {
-      toast.error(`Ages 6+ on this visit cannot exceed ${capSix} (pass and profile).`);
+      toast.error(`Ages 6+ on this visit cannot exceed ${capSix} (pass limit).`);
       return;
     }
     if (inf > prof.infants) {
@@ -766,8 +828,9 @@ const QRScanner: React.FC<QRScannerProps> = ({
         typeof checkData.pass?.maxPeople === 'number' && checkData.pass.maxPeople > 0
           ? checkData.pass.maxPeople
           : null;
-      const profileTotal = Math.max(1, prof.adults + prof.children + prof.infants);
-      const maxTot = passMax != null ? Math.min(passMax, profileTotal) : profileTotal;
+      const maxTot =
+        passMax ??
+        Math.max(1, prof.adults + prof.children + prof.infants);
       if (a + c + inf > maxTot) {
         toast.error(`Total people this visit cannot exceed ${maxTot} for this pass.`);
         return;
@@ -1182,10 +1245,15 @@ const QRScanner: React.FC<QRScannerProps> = ({
               <span className="text-sm font-extrabold text-orange-600">{voucher.discount}</span>
             </div>
           )}
-          {'savedAmount' in voucher && voucher.savedAmount > 0 && (
-            <div className="flex items-center justify-between p-2.5 rounded-lg bg-white/60 border border-white/80">
-              <div className="flex items-center gap-2"><DollarSign className="w-4 h-4 text-green-500" /><span className="text-xs font-medium text-gray-600">{'originalPrice' in voucher ? `${voucher.originalPrice} VT → ${voucher.dealPrice} VT` : 'Savings'}</span></div>
-              <span className="text-sm font-extrabold text-green-600">Save {voucher.savedAmount} VT</span>
+          {'dealPrice' in voucher && typeof voucher.dealPrice === 'number' && voucher.dealPrice > 0 && (
+            <div className="p-2.5 rounded-lg bg-white/60 border border-white/80 text-center">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Amount to charge</p>
+              <p className="text-xl font-extrabold text-gray-900">{Number(voucher.dealPrice).toLocaleString()} VT</p>
+              {'savedAmount' in voucher && Number(voucher.savedAmount) > 0 && (
+                <p className="text-[10px] font-medium text-green-700 mt-0.5">
+                  Tourist saves {Number(voucher.savedAmount).toLocaleString()} VT
+                </p>
+              )}
             </div>
           )}
           {voucher.status === 'no_dates' && (
@@ -1323,17 +1391,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
                 <span className="text-sm font-bold text-orange-600">{r.discountApplied?.trim() ? r.discountApplied : '—'}</span>
               </div>
 
-              {(r.originalPrice != null && r.dealPrice != null && r.originalPrice > 0) && (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2"><CreditCard className="w-4 h-4 text-gray-400" /><span className="text-xs text-gray-500">Group total</span></div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400 line-through">{r.originalPrice} VT</span>
-                    <ArrowRight className="w-3 h-3 text-gray-300" />
-                    <span className="text-sm font-bold text-green-600">{r.dealPrice} VT</span>
-                  </div>
-                </div>
-              )}
-
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-gray-400" /><span className="text-xs text-gray-500">Pass Valid</span></div>
                 <span className="text-xs font-semibold text-gray-700">
@@ -1360,25 +1417,18 @@ const QRScanner: React.FC<QRScannerProps> = ({
               {/* Dashed separator */}
               <div className="border-t border-dashed border-gray-200 -mx-4" />
 
-              {/* Savings highlight */}
-              {r.savedAmount > 0 && (
-                <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200 text-center">
-                  <p className="text-xs font-semibold text-green-600 mb-1">Tourist savings (whole group)</p>
-                  <p className="text-3xl font-extrabold text-green-700">{r.savedAmount} <span className="text-lg">VT</span></p>
-                  {r.savingsLine && (
-                    <p className="text-[11px] font-semibold text-green-800 mt-2 leading-snug px-1">{r.savingsLine}</p>
-                  )}
-                  <div className="flex items-center justify-center gap-1.5 mt-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-green-500" />
-                    <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Redemption Recorded in Database</span>
-                  </div>
-                </div>
-              )}
-              {r.savedAmount <= 0 && (
+              {(r.dealPrice != null && r.dealPrice > 0) || r.savedAmount > 0 ? (
+                <MerchantChargeBlock
+                  variant="hero"
+                  totalDeal={r.dealPrice ?? 0}
+                  totalStandard={r.originalPrice}
+                  savedAmount={r.savedAmount}
+                />
+              ) : (
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-3 border border-green-200 text-center">
                   <div className="flex items-center justify-center gap-1.5">
                     <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-xs font-bold text-green-700">Redemption Recorded Successfully</span>
+                    <span className="text-xs font-bold text-green-700">Redemption recorded successfully</span>
                   </div>
                 </div>
               )}
@@ -1495,10 +1545,10 @@ const QRScanner: React.FC<QRScannerProps> = ({
     const isExpired = passStatus === 'date_range_expired' || passStatus === 'expired';
     const isActive = passStatus === 'active';
     const passCap =
-      typeof pass?.partySize === 'number' && pass.partySize > 0
-        ? pass.partySize
-        : typeof pass?.maxPeople === 'number' && pass.maxPeople > 0
-          ? pass.maxPeople
+      typeof pass?.maxPeople === 'number' && pass.maxPeople > 0
+        ? pass.maxPeople
+        : typeof pass?.partySize === 'number' && pass.partySize > 0
+          ? pass.partySize
           : null;
     const passValidityCalendarDays =
       pass?.validFrom && pass?.validUntil
@@ -1980,7 +2030,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                       {p.children > 0 ? `, ${p.children} child${p.children !== 1 ? 'ren' : ''}` : ''}
                       {p.infants > 0 ? `, ${p.infants} infant${p.infants !== 1 ? 's' : ''}` : ''} (infants under 6 free)
                       <span className="block font-normal text-emerald-800/90 mt-0.5">
-                        Enter who is on this visit. Max {cap} people ages 6+ (pass and profile). Tiered deals use adult vs child rates; flat deals use the 6+ total only.
+                        Enter who is on this visit. Max {cap} people ages 6+ on this pass. Tiered deals use adult vs child rates; flat deals use the 6+ total only.
                       </span>
                     </p>
                   );
@@ -2103,9 +2153,13 @@ const QRScanner: React.FC<QRScannerProps> = ({
                   itemQuantity: Math.max(1, Math.floor(Number(activityItemQuantity) || 1)),
                 });
                 return (
-                  <p className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3 border border-gray-100">
-                    {preview.savingsLine}
-                  </p>
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                    <MerchantChargeBlock
+                      totalDeal={preview.totalDeal}
+                      totalStandard={preview.totalStandard}
+                      savedAmount={preview.savedAmount}
+                    />
+                  </div>
                 );
               })()}
               <button
@@ -2148,7 +2202,7 @@ const QRScanner: React.FC<QRScannerProps> = ({
                       <span className="block font-normal text-emerald-800/90 mt-0.5">
                         This visit: <strong>{activityAdults}</strong> adult{activityAdults !== 1 ? 's' : ''},{' '}
                         <strong>{activityChildren}</strong> child{activityChildren !== 1 ? 'ren' : ''} (6+),{' '}
-                        <strong>{activityInfants}</strong> infant{activityInfants !== 1 ? 's' : ''} — savings use these counts (same VT the server stores).
+                        <strong>{activityInfants}</strong> infant{activityInfants !== 1 ? 's' : ''} — charge totals use these counts.
                       </span>
                     </p>
                   );
@@ -2178,14 +2232,11 @@ const QRScanner: React.FC<QRScannerProps> = ({
                     >
                       <p className="text-sm font-extrabold text-gray-900">{listing.name}</p>
                       <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">{line}</p>
-                      {savings.savedAmount > 0 && (
-                        <p className="text-[11px] font-bold text-teal-800 mt-2 leading-snug">{savings.savingsLine}</p>
-                      )}
-                      {savings.savedAmount <= 0 && (listing.original_price != null && listing.deal_price != null) && (
-                        <p className="text-[10px] text-gray-500 mt-1">
-                          {Number(listing.original_price)} VT → {Number(listing.deal_price)} VT (per person — add tier or profile party for totals)
-                        </p>
-                      )}
+                      <MerchantChargeBlock
+                        totalDeal={savings.totalDeal}
+                        totalStandard={savings.totalStandard}
+                        savedAmount={savings.savedAmount}
+                      />
                     </button>
                   );
                 })}

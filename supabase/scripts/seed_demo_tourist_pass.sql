@@ -42,7 +42,7 @@ BEGIN
     'Ima Tourist',
     'Ima Tourist',
     v_email,
-    2,
+    20,
     0,
     0,
     true,
@@ -55,7 +55,8 @@ BEGIN
     display_name = EXCLUDED.display_name,
     name = EXCLUDED.name,
     email = EXCLUDED.email,
-    num_adults = GREATEST(COALESCE(public.user_profiles.num_adults, 0), 2),
+    num_adults = 20,
+    num_children = 0,
     post_pass_profile_completed = true,
     onboarding_complete = true,
     updated_at = now();

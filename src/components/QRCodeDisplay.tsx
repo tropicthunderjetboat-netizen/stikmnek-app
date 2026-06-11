@@ -85,7 +85,7 @@ const QRCodeDisplay: React.FC = () => {
   const shareApplied =
     passRow != null ? passRow.shareBonusApplied : !!(user?.shareBonusApplied ?? false);
 
-  const effectiveMaxPeople =
+  const passPurchasedCapacity =
     user?.pass == null
       ? null
       : (passRow?.maxPeople ??
@@ -285,7 +285,7 @@ const QRCodeDisplay: React.FC = () => {
               <span className="text-sm text-gray-600">Valid for</span>
             </div>
             <span className="text-sm font-bold text-gray-900">
-              {effectiveMaxPeople ?? getBasePeople(user.pass)} people
+              {passPurchasedCapacity ?? getBasePeople(user.pass)} people
               {shareApplied && (
                 <span className="ml-1.5 text-xs font-medium text-emerald-600">(Share bonus applied)</span>
               )}

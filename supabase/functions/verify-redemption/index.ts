@@ -118,13 +118,13 @@ function resolveActivityRedeemParty(
   const passCap = passMaxPeople != null && passMaxPeople > 0 ? passMaxPeople : null;
 
   const maxSixPlusAllowed = (): number => {
-    const capProfile = passTypeStr === 'dynamic' ? Math.max(1, profileSixPlus) : profileTotal;
-    return passCap != null ? Math.min(passCap, capProfile) : capProfile;
+    if (passCap != null) return passCap;
+    return passTypeStr === 'dynamic' ? Math.max(1, profileSixPlus) : profileTotal;
   };
 
   const maxTotalPaxAllowed = (): number => {
-    const capProfile = profileTotal;
-    return passCap != null ? Math.min(passCap, capProfile) : capProfile;
+    if (passCap != null) return passCap;
+    return profileTotal;
   };
 
   const rawA = body.activityAdults ?? body.activity_adults;
@@ -152,8 +152,8 @@ function resolveActivityRedeemParty(
         party: profileParty,
         error:
           passTypeStr === 'dynamic'
-            ? `Ages 6+ on this visit (${a + c}) cannot exceed ${mx6} (pass limit and profile).`
-            : `People ages 6+ on this visit (${a + c}) cannot exceed ${mx6} (pass limit and profile).`,
+            ? `Ages 6+ on this visit (${a + c}) cannot exceed ${mx6} (pass limit).`
+            : `People ages 6+ on this visit (${a + c}) cannot exceed ${mx6} (pass limit).`,
         reason: 'activity_pax_over_cap',
       };
     }
@@ -169,7 +169,7 @@ function resolveActivityRedeemParty(
       if (a + c + inf > mtot) {
         return {
           party: profileParty,
-          error: `Total people on this visit (${a + c + inf}) cannot exceed ${mtot} (pass limit and profile).`,
+          error: `Total people on this visit (${a + c + inf}) cannot exceed ${mtot} (pass limit).`,
           reason: 'activity_total_over_cap',
         };
       }
@@ -195,8 +195,8 @@ function resolveActivityRedeemParty(
       party: profileParty,
       error:
         passTypeStr === 'dynamic'
-          ? `This visit cannot include more than ${maxAllowed} people ages 6+ (smaller of pass limit and profile group).`
-          : `This visit cannot include more than ${maxAllowed} people ages 6+ (pass limit and profile).`,
+          ? `This visit cannot include more than ${maxAllowed} people ages 6+ (pass limit).`
+          : `This visit cannot include more than ${maxAllowed} people ages 6+ (pass limit).`,
       reason: 'activity_pax_over_cap',
     };
   }
@@ -676,6 +676,7 @@ Deno.serve(async (req) => {
     /** Dynamic passes: capacity applies to ages 6+ (adults + children); infants free. Legacy passes: all pax. */
     const headcountAgainstPass =
       passTypeStr === 'dynamic' ? party.adults + party.children : totalPartySize;
+    const profileSixPlus = Math.max(0, party.adults + party.children);
 
     // ─── Party size vs pass capacity (max_people) — server-side enforcement ───
     if (canRedeem && passMaxPeople !== null && headcountAgainstPass > passMaxPeople) {
@@ -771,8 +772,9 @@ Deno.serve(async (req) => {
           expiresAt: pass.expires_at,
           purchasedAt: pass.purchased_at,
           maxPeople: passMaxPeople,
-          /** Same as maxPeople — people ages 6+ this pass covers (merchant display). */
+          /** People ages 6+ this pass was purchased for (same as maxPeople when set). */
           partySize: passMaxPeople,
+          profilePartySixPlus: profileSixPlus,
           totalPartySize,
           headcountAgainstPass,
         },
@@ -800,6 +802,7 @@ Deno.serve(async (req) => {
             status: passStatus,
             maxPeople: passMaxPeople,
             partySize: passMaxPeople,
+            profilePartySixPlus: profileSixPlus,
             totalPartySize,
             headcountAgainstPass,
           },

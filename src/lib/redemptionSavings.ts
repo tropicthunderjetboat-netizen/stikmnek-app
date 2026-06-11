@@ -38,6 +38,31 @@ export function partyFromValidityApi(party?: {
   };
 }
 
+/** Ages 6+ on the tourist profile (adults + children). */
+export function profileSixPlusCount(profile: PartyCounts): number {
+  return Math.max(0, profile.adults + profile.children);
+}
+
+/**
+ * People ages 6+ allowed on a redemption visit — the pass capacity paid for at checkout (`max_people`).
+ * Profile party size is used for adult/child/infant splits only, not to lower the pass cap.
+ */
+export function effectiveRedeemCapSixPlus(opts: {
+  passMaxPeople?: number | null;
+  profile?: PartyCounts;
+  passType?: string;
+}): number {
+  const passCap =
+    typeof opts.passMaxPeople === 'number' && opts.passMaxPeople > 0
+      ? Math.floor(opts.passMaxPeople)
+      : null;
+  if (passCap != null) return passCap;
+  const profile = opts.profile ?? { adults: 1, children: 0, infants: 0 };
+  const sixPlus = profileSixPlusCount(profile);
+  const passType = String(opts.passType ?? 'dynamic').toLowerCase();
+  return passType === 'dynamic' ? Math.max(1, sixPlus) : Math.max(1, sixPlus + profile.infants);
+}
+
 export function hasUsableTieredPricing(pricingTiers: unknown): boolean {
   const tiers = pricingTiersFromDb(pricingTiers);
   return tiers.some(
