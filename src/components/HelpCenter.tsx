@@ -147,6 +147,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
         'Enter your name, email, and a password you can remember.',
         'Check your email and confirm your account if asked — otherwise you may not be able to sign in.',
         'Sign in again. As a business user you are taken to your Business Hub (you can also use My Business in the top menu anytime).',
+        'On your phone, tap Save on the “Add to Home Screen” banner when it appears — this opens the scanner faster next time.',
       ],
     },
     {
@@ -154,75 +155,107 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       content:
         'After you sign in, your Business Hub is the sidebar area titled “Business Hub”. The menu names below are the exact labels you will see.',
       steps: [
-        'Overview — Summary of your listing, quick actions, and a way to open the QR scanner.',
-        'My Submissions — See listings waiting for approval or returned for changes.',
-        'New Listing — Form to submit another business or deal.',
-        'Edit Listing — Change description, prices, contact, WhatsApp, etc. (only after that listing is approved).',
+        'Overview — Summary, redemptions, quick actions, and open the QR scanner.',
+        'Business Profile — Your business identity: name, category, map pin, logo, and contact details (complete this after your first listing is approved).',
+        'My credentials — Optional insurance, permits, association docs, and first-aid certificates (see section 5).',
+        'My Submissions — Listings waiting for approval or returned for changes.',
+        'Edit Listing — Change description, prices, contact, WhatsApp, etc. (after that listing is approved).',
         'Analytics, Reviews, Photos, Emails — Tabs for those tasks.',
-        'If you have more than one listing, use “Your Businesses” in the sidebar to switch between them.',
+        'New Listing — Submit another business or deal.',
+        'If you have more than one live deal, use the listing picker at the top of Edit Listing, Analytics, Reviews, or Photos.',
       ],
     },
     {
       title: '3. Submit a listing and follow approval',
       content:
-        'New listings are checked by the StikmNek team before tourists see them. This keeps quality high for everyone.',
+        'New listings are checked by the StikmNek team before tourists see them. All prices are in Vanuatu vatu (VT).',
       steps: [
         'Open New Listing in the sidebar.',
-        'Fill in name, category, description, discount wording, prices, location, phone, hours, and optional WhatsApp.',
-        'If you are a tour or activity, you can add tiered pricing (e.g. adult / child) in the pricing section.',
+        'Fill in name, category, description, discount wording, location, phone, hours, and optional WhatsApp.',
+        'Enter original price (normal walk-in) and StikmNek deal price in VT — the deal price must be lower than the original.',
+        'Choose how long your discount runs (start date and listing duration).',
+        'Tours and activities: use tiered pricing — Adults, Children, optional Infants, and optional Private charter rows. Each tier has a standard VT price and a lower StikmNek VT price.',
         'Upload clear photos (good light, show what you sell).',
         'Submit for approval.',
-        'Watch My Submissions for status (pending / approved / needs changes). When approved, your deal can appear on the public site.',
+        'Watch My Submissions for status (pending / approved / needs changes). When approved, your deal can appear on the map and deals list.',
       ],
     },
     {
-      title: '4. QR Scanner — how to check a tourist’s pass',
+      title: '4. Business Profile (after approval)',
       content:
-        'When someone wants your StikmNek discount, they show a QR code from their pass on their phone. You scan it inside StikmNek (Business Hub) — you do not need a separate scanner app.',
+        'Once a listing is approved, complete your Business Profile so tourists trust you on the map.',
       steps: [
-        'In the Business Hub, open Overview, or use the floating Scan button on the edge of the screen when you see it.',
-        'Allow the browser to use the camera when asked — scanning needs camera access.',
-        'Ask the guest to brighten their screen and hold the QR code steady.',
-        'Point the camera at their QR code. The app will read the pass and show who they are and whether the pass is valid.',
-        'If you have several listings under one business, pick the correct listing when the app asks — the discount must match where they are redeeming.',
-        'Confirm the redemption when prompted. That records the visit and applies your deal rules (including tiered prices for tours/activities, if you use them).',
-        'If scanning fails, try a brighter screen, wipe the camera lens, or use manual code entry if the scanner screen offers it.',
+        'Open Business Profile in the sidebar.',
+        'Set your business name, category, phone, email, and hours.',
+        'Tap the map to drop your pin — tourists use this to find you.',
+        'Upload your logo if you have one.',
+        'Save. This profile applies to your whole business, not just one deal row.',
       ],
     },
     {
-      title: '5. After approval — listing on/off and daily use',
+      title: '5. My credentials (optional trust badges)',
+      content:
+        'Credentials are optional but help tourists see you are professional. Verified items can improve your rank on the StikmNek leaderboard. Tourists see verified badges on your listing — not your private documents.',
+      steps: [
+        'Open My credentials in the sidebar (available after your business profile exists).',
+        'Upload any that apply: Tourism permit, Public liability insurance, Association credentials, First aid certificate (guides/drivers — include completion date).',
+        'Accepted formats: PDF or image (JPEG, PNG, WebP).',
+        'Tap Save credentials. The StikmNek team reviews uploads and marks them verified.',
+        'If you replace a document, it must be verified again.',
+        'Markets and small shops without insurance can skip this section — it is not required to list.',
+      ],
+    },
+    {
+      title: '6. QR Scanner — verify a pass and charge the right amount',
+      content:
+        'When someone wants your StikmNek discount, they show a QR code from their pass. You scan inside StikmNek — no separate scanner app. The screen shows how much to charge in VT (the StikmNek deal total), with tourist savings shown smaller underneath.',
+      steps: [
+        'In the Business Hub, open Overview or tap the floating Scan button.',
+        'Allow camera access when the browser asks.',
+        'Ask the guest to brighten their screen and hold the QR steady.',
+        'The app shows whether the pass is valid and how many people (ages 6+) the pass covers.',
+        'If you have several listings, pick the correct deal when asked.',
+        'Tours and activities: enter how many adults, children (6+), and infants (under 6, usually free) are on this visit.',
+        'Shops and retail (per-item deals): enter the number of items in this purchase — separate from people on the pass.',
+        'Check Amount to charge (VT) — that is what the tourist pays you. Tourist saves (VT) is shown smaller for reference.',
+        'Tap Confirm redemption. The visit is recorded with the correct tiered or flat pricing.',
+        'If scanning fails: brighter screen, wipe the lens, or use manual code entry on the scanner screen.',
+      ],
+    },
+    {
+      title: '7. After approval — listing on/off and daily use',
       content:
         'Once a listing is approved, you control whether tourists still see it on the map and deals list.',
       steps: [
-        'Use Overview for a snapshot: redemptions, revenue-style summaries, and shortcuts.',
+        'Use Overview for a snapshot: redemptions, summaries, and shortcuts.',
         'Active / Inactive (under Edit Listing) hides or shows your listing to tourists immediately — no need to wait for admin.',
-        'Changes to text, prices, and photos in Edit Listing (except that on/off switch) usually go through admin review before they appear publicly.',
+        'Changes to text, prices, photos, and tiered pricing in Edit Listing (except that on/off switch) usually go through admin review before they appear publicly.',
       ],
     },
     {
-      title: '6. Edit Listing (what changes and what waits for review)',
+      title: '8. Edit Listing (what changes and what waits for review)',
       content:
         'Keeping information accurate helps tourists trust your business.',
       steps: [
         'Open Edit Listing. Use the tabs: Basic Info, Pricing, Contact, Preview.',
-        'Update description, tags, location, discount label, prices, phone, hours, WhatsApp, and tiered prices (tours/activities) as needed.',
+        'Update description, tags, location, discount label, flat or tiered VT prices, phone, hours, and WhatsApp as needed.',
         'Submit changes for review. You may see a pending edit notice until an admin approves.',
         'Use Discard all or Reset section if you change your mind before submitting.',
       ],
     },
     {
-      title: '7. Photos, reviews, emails, and analytics',
+      title: '9. Photos, reviews, emails, and analytics',
       content:
         'These tabs help you look professional and stay informed.',
       steps: [
         'Photos — Add gallery images; follow any moderation rules shown in the hub.',
-        'Reviews — Read feedback and reply politely where the app allows.',
+        'Reviews — Read tourist feedback and reply politely. Tourists can review within 30 days of a redemption at your business.',
         'Emails — See messages StikmNek sent you (e.g. listing live, reminders).',
-        'Analytics — Trends such as redemptions over time (available for approved listings).',
+        'Analytics — Redemptions and trends over time (for approved listings).',
       ],
     },
     {
-      title: '8. Need help?',
+      title: '10. Need help?',
       content:
         `If something is confusing or broken, email ${SUPPORT_EMAIL} with your business name and a screenshot if possible. We aim to reply within one business day.`,
     },
@@ -526,7 +559,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
               <div>
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Business Owner Guide</h2>
                 <p className="text-sm text-gray-500 mb-2">
-                  Plain-language steps for signing up, using your Business Hub, and scanning tourist passes. Menu names match what you see after you sign in.
+                  Plain-language steps for signing up, listing your deal, completing your profile and credentials, and scanning tourist passes. Menu names match what you see after you sign in.
                 </p>
                 <p className="text-sm mb-4">
                   <a
@@ -545,7 +578,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
                     In simple terms
                   </h3>
                   <p className="text-sm text-emerald-900/90 leading-relaxed">
-                    You sign up as a business, submit your deal, and wait for approval. Then tourists with a StikmNek pass show you a QR code on their phone — you open the scanner inside StikmNek (from your Business Hub), verify the pass, and confirm. Most text and price changes you make later are checked again before they go live; turning your listing off or on is immediate.
+                    You sign up as a business, submit your deal in VT, and wait for approval. Complete your Business Profile and optionally upload credentials for verified trust badges. When tourists visit, they show a QR code — you scan it in your Business Hub, see the amount to charge in VT, confirm the visit, and give the StikmNek discount. Turning your listing off or on is immediate; most other edits wait for a quick admin check.
                   </p>
                 </div>
                 {renderGuide(businessGuide)}
