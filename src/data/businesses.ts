@@ -1,6 +1,13 @@
 import { pricingTiersFromDb, representativePerPersonPricesFromTiers } from '@/lib/pricingTiers';
 
-export type Category = 'dining' | 'activities' | 'tours' | 'shopping' | 'spa' | 'accommodation';
+export type Category =
+  | 'dining'
+  | 'activities'
+  | 'tours'
+  | 'shopping'
+  | 'spa'
+  | 'accommodation'
+  | 'transportation';
 
 /** Raw `business_offerings` row shape when embedded from PostgREST (before mapping to `Business`). */
 export type EmbeddedBusinessOfferingRow = {
@@ -225,10 +232,27 @@ export const categories: { key: Category; label: string; labelFr: string; labelB
   { key: 'dining', label: 'Dining', labelFr: 'Restauration', labelBi: 'Kakae', icon: 'utensils' },
   { key: 'activities', label: 'Activities', labelFr: 'Activités', labelBi: 'Aktiviti', icon: 'waves' },
   { key: 'tours', label: 'Tours', labelFr: 'Visites', labelBi: 'Tua', icon: 'compass' },
+  { key: 'transportation', label: 'Transportation', labelFr: 'Transport', labelBi: 'Transport', icon: 'car' },
   { key: 'shopping', label: 'Shopping', labelFr: 'Shopping', labelBi: 'Soping', icon: 'shopping-bag' },
   { key: 'spa', label: 'Spa & Wellness', labelFr: 'Spa & Bien-être', labelBi: 'Spa & Helt', icon: 'heart' },
   { key: 'accommodation', label: 'Accommodation', labelFr: 'Hébergement', labelBi: 'Ples blong slip', icon: 'home' },
 ];
+
+/** Canonical keys for selects, filters, and admin forms. */
+export const CATEGORY_SELECT_KEYS: Category[] = categories.map((c) => c.key);
+
+export function categoryLabelForKey(
+  key: string,
+  language: 'en' | 'fr' | 'bi' = 'en',
+): string {
+  const c = categories.find((x) => x.key === key);
+  if (!c) {
+    return key.charAt(0).toUpperCase() + key.slice(1);
+  }
+  if (language === 'fr') return c.labelFr;
+  if (language === 'bi') return c.labelBi;
+  return c.label;
+}
 
 // Fallback data used when DB hasn't loaded yet
 // Prices are in Vanuatu Vatu (VT)

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { touristFacingOfferings, businessListingHasWhatsApp } from '@/data/businesses';
+import { touristFacingOfferings, businessListingHasWhatsApp, CATEGORY_SELECT_KEYS, categoryLabelForKey } from '@/data/businesses';
 import { Search, SlidersHorizontal, X, Clock, TrendingUp, ArrowUpDown, Star, ChevronDown, ChevronUp, DollarSign, Navigation, Loader2, Award, Tag, Sparkles, MessageCircle } from 'lucide-react';
 
 export type SortOption = 'featured' | 'leaderboard' | 'price-low' | 'price-high' | 'rating' | 'savings' | 'reviews' | 'near-me';
@@ -395,13 +395,13 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                   </button>
                 )}
                 {/* Browse Categories */}
-                {['dining', 'activities', 'tours', 'shopping', 'spa', 'accommodation'].map((cat, i) => (
+                {CATEGORY_SELECT_KEYS.map((cat, i) => (
                   <button
                     key={i}
                     onMouseDown={(e) => { e.preventDefault(); handleSearch(cat); }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 text-sm text-gray-600 hover:bg-gray-100 transition-colors capitalize"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 text-sm text-gray-600 hover:bg-gray-100 transition-colors"
                   >
-                    {cat}
+                    {categoryLabelForKey(cat)}
                   </button>
                 ))}
               </div>

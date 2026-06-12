@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { businesses as hardcodedBusinesses, Business } from '@/data/businesses';
+import { businesses as hardcodedBusinesses, Business, CATEGORY_SELECT_KEYS, categoryLabelForKey } from '@/data/businesses';
 
 import { FunctionsFetchError } from '@supabase/supabase-js';
 import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
@@ -2767,7 +2767,9 @@ const AdminPanel: React.FC = () => {
               <form onSubmit={handleAddBusinessSubmit} className="p-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div><label className="block text-xs font-semibold text-gray-600 mb-1">Business Name *</label><input type="text" value={addForm.name} onChange={e => setAddForm(p => ({...p, name: e.target.value}))} required className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="e.g. Island Café" /></div>
-                  <div><label className="block text-xs font-semibold text-gray-600 mb-1">Category</label><select value={addForm.category} onChange={e => setAddForm(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">{['dining','activities','tours','shopping','spa','accommodation'].map(c => <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}</select></div>
+                  <div><label className="block text-xs font-semibold text-gray-600 mb-1">Category</label><select value={addForm.category} onChange={e => setAddForm(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">{CATEGORY_SELECT_KEYS.map((c) => (
+                    <option key={c} value={c}>{categoryLabelForKey(c)}</option>
+                  ))}</select></div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Description *</label>
@@ -2844,7 +2846,9 @@ const AdminPanel: React.FC = () => {
               <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div><label className="block text-xs font-semibold text-gray-600 mb-1">Business Name *</label><input type="text" value={editForm.name} onChange={e => setEditForm(p => ({...p, name: e.target.value}))} required className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                  <div><label className="block text-xs font-semibold text-gray-600 mb-1">Category</label><select value={editForm.category} onChange={e => setEditForm(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">{['dining','activities','tours','shopping','spa','accommodation'].map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase()+c.slice(1)}</option>)}</select></div>
+                  <div><label className="block text-xs font-semibold text-gray-600 mb-1">Category</label><select value={editForm.category} onChange={e => setEditForm(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">{CATEGORY_SELECT_KEYS.map((c) => (
+                    <option key={c} value={c}>{categoryLabelForKey(c)}</option>
+                  ))}</select></div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>

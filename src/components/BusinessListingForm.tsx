@@ -26,7 +26,8 @@ import {
   defaultPricingTiersForNewListing,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
-import { categoryUsesPerUnitPricing } from '@/lib/categoryPricing';
+import { categoryUsesPerUnitPricing, perUnitPriceHint, unitLabelForCategory } from '@/lib/categoryPricing';
+import { CATEGORY_SELECT_KEYS, categoryLabelForKey } from '@/data/businesses';
 import { businessHoursFromProfileRow, normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
 import { listingHoursFieldCopy } from '@/lib/listingHoursLabels';
 import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
@@ -1471,12 +1472,11 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 }}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
               >
-                <option value="dining">Dining</option>
-                <option value="activities">Activities</option>
-                <option value="tours">Tours</option>
-                <option value="shopping">Shopping</option>
-                <option value="spa">Spa & Wellness</option>
-                <option value="accommodation">Accommodation</option>
+                {CATEGORY_SELECT_KEYS.map((key) => (
+                  <option key={key} value={key}>
+                    {categoryLabelForKey(key, language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en')}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -1576,12 +1576,15 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 </div>
                 <p className="text-[10px] text-gray-400 mt-0.5">
                   {categoryUsesPerUnitPricing(form.category)
-                    ? language === 'en'
-                      ? 'Regular price per item in Vatu'
-                      : 'Prix normal par article en Vatu'
+                    ? perUnitPriceHint(
+                        form.category,
+                        language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en',
+                      )
                     : language === 'en'
                       ? 'Regular price per person in Vatu'
-                      : 'Prix normal par personne en Vatu'}
+                      : language === 'fr'
+                        ? 'Prix normal par personne en Vatu'
+                        : 'Stanad praes long wan man (VT)'}
                 </p>
               </div>
 
@@ -1695,7 +1698,16 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   <span className="text-sm font-bold text-emerald-600">
                     {formatVT(parseFloat(form.originalPrice) - parseFloat(displayAutoDealPrice))}{' '}
                     <span className="text-xs font-normal text-gray-400">
-                      {language === 'en' ? 'per person' : 'par personne'}
+                      {categoryUsesPerUnitPricing(form.category)
+                        ? unitLabelForCategory(
+                            form.category,
+                            language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en',
+                          ).singular
+                        : language === 'en'
+                          ? 'per person'
+                          : language === 'fr'
+                            ? 'par personne'
+                            : 'long wan man'}
                     </span>
                   </span>
                 </div>

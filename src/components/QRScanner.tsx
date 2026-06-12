@@ -6,7 +6,11 @@ import {
   partyFromValidityApi,
   type PartyCounts,
 } from '@/lib/redemptionSavings';
-import { categoryUsesPerUnitPricing } from '@/lib/categoryPricing';
+import {
+  categoryUsesPerUnitPricing,
+  isTransportationCategory,
+  unitLabelForCategory,
+} from '@/lib/categoryPricing';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
@@ -2114,19 +2118,34 @@ const QRScanner: React.FC<QRScannerProps> = ({
           {/* ═══ SHOPPING: item quantity (separate from pass people count) ═══ */}
           {redeemSubStep === 'confirm_item_quantity' && verifiedForOfferFlow && pendingRedeemListing && !result && (
             <div className="space-y-4">
-              <div className="rounded-xl bg-violet-50 border border-violet-200 p-4">
-                <p className="text-sm font-extrabold text-violet-950">Shopping — how many items?</p>
-                <p className="text-xs text-violet-800 mt-1">
-                  The pass covers who is shopping (entered above). Enter how many items get the StikmNek price
-                  (e.g. 5 dresses). This is not limited to the number of people on the pass.
-                </p>
-                <p className="text-[11px] text-violet-900/80 mt-2 font-medium">
-                  {pendingRedeemListing.name}
-                </p>
-              </div>
+              {(() => {
+                const isTransport = isTransportationCategory(pendingRedeemListing.category ?? '');
+                const unitLabels = unitLabelForCategory(pendingRedeemListing.category ?? '');
+                const panelClass = isTransport
+                  ? 'rounded-xl bg-blue-50 border border-blue-200 p-4'
+                  : 'rounded-xl bg-violet-50 border border-violet-200 p-4';
+                const titleClass = isTransport ? 'text-sm font-extrabold text-blue-950' : 'text-sm font-extrabold text-violet-950';
+                const bodyClass = isTransport ? 'text-xs text-blue-800 mt-1' : 'text-xs text-violet-800 mt-1';
+                const metaClass = isTransport ? 'text-[11px] text-blue-900/80 mt-2 font-medium' : 'text-[11px] text-violet-900/80 mt-2 font-medium';
+                return (
+                  <div className={panelClass}>
+                    <p className={titleClass}>
+                      {isTransport ? 'Transportation — trips or rental days?' : 'Shopping — how many items?'}
+                    </p>
+                    <p className={bodyClass}>
+                      {isTransport
+                        ? 'Enter how many trips or rental days to charge (e.g. 1 airport transfer, or 3 car-hire days). The pass still covers who is travelling.'
+                        : 'The pass covers who is shopping (entered above). Enter how many items get the StikmNek price (e.g. 5 dresses). This is not limited to the number of people on the pass.'}
+                    </p>
+                    <p className={metaClass}>{pendingRedeemListing.name}</p>
+                  </div>
+                );
+              })()}
               <div>
                 <label htmlFor="act-items" className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
-                  Number of items
+                  {isTransportationCategory(pendingRedeemListing.category ?? '')
+                    ? `Number of ${unitLabelForCategory(pendingRedeemListing.category ?? '').plural}`
+                    : 'Number of items'}
                 </label>
                 <input
                   id="act-items"

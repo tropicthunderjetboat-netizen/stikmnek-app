@@ -88,6 +88,7 @@ function detailOfferingSwitcherLabel(
     if (c === 'activities') return `Autres activités proposées par ${host}`;
     if (c === 'dining') return `Autres offres restauration de ${host}`;
     if (c === 'shopping') return `Autres offres de ${host}`;
+    if (c === 'transportation' || c === 'transport') return `Autres offres transport de ${host}`;
     if (c === 'spa') return `Autres offres spa & bien-être de ${host}`;
     if (c === 'accommodation') return `Autres hébergements de ${host}`;
     return `Autres annonces de ${host}`;
@@ -103,6 +104,7 @@ function detailOfferingSwitcherLabel(
     return `Other activities offered by ${host}`;
   if (c === 'dining') return `Other dining offers from ${host}`;
   if (c === 'shopping') return `Other offers from ${host}`;
+  if (c === 'transportation' || c === 'transport') return `Other transport offers from ${host}`;
   if (c === 'spa') return `Other spa & wellness offers from ${host}`;
   if (c === 'accommodation') return `Other stays from ${host}`;
   return `Other listings from ${host}`;

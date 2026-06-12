@@ -1,4 +1,4 @@
-import { categoryUsesPerUnitPricing } from '@/lib/categoryPricing';
+import { categoryUsesPerUnitPricing, unitLabelForCategory } from '@/lib/categoryPricing';
 import { pricingTiersFromDb, computeTieredBookingTotals } from '@/lib/pricingTiers';
 
 export type PartyCounts = { adults: number; children: number; infants: number };
@@ -147,8 +147,10 @@ export function computeRedemptionSavingsForListing(
   }
   const unit = Math.round(o - d);
   const saved = Math.max(0, unit * billCount);
+  const unitLabels = unitLabelForCategory(String(listing.category ?? ''));
+  const unitWord = billCount === 1 ? unitLabels.singular : unitLabels.plural;
   const savingsLine = perUnit
-    ? `${unit.toLocaleString()} VT × ${billCount} ${billCount === 1 ? 'item' : 'items'} = ${saved.toLocaleString()} VT total saved`
+    ? `${unit.toLocaleString()} VT × ${billCount} ${unitWord} = ${saved.toLocaleString()} VT total saved`
     : `${unit.toLocaleString()} VT × ${billCount} ${billCount === 1 ? 'person' : 'people'} = ${saved.toLocaleString()} VT total saved`;
   return {
     savedAmount: saved,

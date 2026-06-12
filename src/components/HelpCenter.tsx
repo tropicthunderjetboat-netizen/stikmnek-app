@@ -57,7 +57,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
         title: t('passSelection.title', helpLang),
         desc: `Open Passes, set your group (ages 6+, up to ${MAX_PARTY_SIZE} per pass), choose 24-hour or 7-day holiday access, pick a start date, and pay (tiered: $${BASE_PRICE_AUD} first, $${GUEST_FEE_AUD} for 2–6, $${SEVENTH_GUEST_HEAD_CHARGE_AUD} on 7th, then $${GUEST_FEE_AUD} each; +$${EXTEND_FEE_AUD} holiday period). PayPal or card where enabled.`,
       },
-      { step: '3', title: 'Browse Deals', desc: 'Explore dining, tours, activities, spa, shopping, and accommodation on Deals and Map' },
+      { step: '3', title: 'Browse Deals', desc: 'Explore dining, tours, activities, transportation, spa, shopping, and accommodation on Deals and Map' },
       { step: '4', title: 'Show Your QR Code', desc: 'Present your pass QR code at a partner business; staff scan it in StikmNek' },
       { step: '5', title: 'Save Money', desc: 'Discounts follow each listing (deal price vs standard price)' },
     ];
@@ -623,7 +623,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
                         title: 'Prepare your business information',
                         time: '3 min',
                         details:
-                          'Gather: business name, category (dining, tours, activities, shopping, spa, accommodation), a short clear description, discount wording (e.g. 20% OFF), standard and StikmNek prices, address, phone, hours, and optional WhatsApp. Tours/activities can add tiered per-person prices in the form.',
+                          'Gather: business name, category (dining, tours, activities, transportation, shopping, spa, accommodation), a short clear description, discount wording (e.g. 20% OFF), standard and StikmNek prices, address, phone, hours, and optional WhatsApp. Tours/activities use tiered per-person prices; transportation uses per trip/day pricing.',
                       },
                       {
                         step: 3,

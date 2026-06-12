@@ -37,6 +37,7 @@ const categoryColors: Record<string, string> = {
   dining: '#FF6B35',
   activities: '#0EA5E9',
   tours: '#8B5CF6',
+  transportation: '#2563EB',
   shopping: '#EC4899',
   spa: '#10B981',
   accommodation: '#F59E0B',

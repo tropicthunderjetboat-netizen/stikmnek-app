@@ -2026,12 +2026,11 @@ const BusinessOwnerDashboard: React.FC = () => {
                   }}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
                 >
-                  <option value="dining">Dining</option>
-                  <option value="activities">Activities</option>
-                  <option value="tours">Tours</option>
-                  <option value="shopping">Shopping</option>
-                  <option value="spa">Spa & Wellness</option>
-                  <option value="accommodation">Accommodation</option>
+                  {categories.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {language === 'fr' ? c.labelFr : language === 'bi' ? c.labelBi : c.label}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>

@@ -19,7 +19,18 @@ import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { getResendApiKey, sendResendEmail } from '../_shared/resend.ts';
 import { purgePublicDataForAuthUser } from './purge-user.ts';
 
-const CATEGORIES = ['dining', 'accommodation', 'tours', 'activities', 'shopping', 'transport', 'services', 'other'];
+const CATEGORIES = [
+  'dining',
+  'accommodation',
+  'tours',
+  'activities',
+  'shopping',
+  'transportation',
+  'transport',
+  'spa',
+  'services',
+  'other',
+];
 
 /** Canonical tab keys (must match `src/data/businesses.ts` + admin listing editor). */
 const LISTING_TAB_CATEGORY_KEYS = new Set([
@@ -29,11 +40,13 @@ const LISTING_TAB_CATEGORY_KEYS = new Set([
   'shopping',
   'spa',
   'accommodation',
+  'transportation',
 ]);
 
 function normalizeListingTabCategory(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
-  const k = raw.trim().toLowerCase();
+  let k = raw.trim().toLowerCase();
+  if (k === 'transport') k = 'transportation';
   return LISTING_TAB_CATEGORY_KEYS.has(k) ? k : null;
 }
 

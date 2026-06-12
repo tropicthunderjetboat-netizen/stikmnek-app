@@ -167,7 +167,8 @@ function asCategory(raw: unknown): Category {
 /** Match DB / UI strings like `Tours` or ` TOURS ` to a canonical category key. */
 export function normalizeListingCategoryKey(raw: unknown): Category | null {
   if (typeof raw !== 'string') return null;
-  const k = raw.trim().toLowerCase();
+  let k = raw.trim().toLowerCase();
+  if (k === 'transport') k = 'transportation';
   return CATEGORY_KEYS.has(k as Category) ? (k as Category) : null;
 }
 

@@ -39,6 +39,13 @@ const CategoryShowcase: React.FC = () => {
       gradient: 'from-purple-600/80 to-violet-600/80',
     },
     {
+      key: 'transportation',
+      label: language === 'en' ? 'Transportation' : language === 'fr' ? 'Transport' : 'Transport',
+      desc: language === 'en' ? 'Car hire, airport transfers & taxis' : language === 'fr' ? 'Location, transferts aéroport & taxis' : 'Rent kar, airport transfer mo taxi',
+      image: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=800&q=80',
+      gradient: 'from-blue-600/80 to-indigo-600/80',
+    },
+    {
       key: 'spa',
       label: language === 'en' ? 'Spa & Wellness' : language === 'fr' ? 'Spa & Bien-être' : 'Spa & Helt',
       desc: language === 'en' ? 'Relax & rejuvenate' : language === 'fr' ? 'Détendez-vous & rajeunissez' : 'Rilaks & rifresen',

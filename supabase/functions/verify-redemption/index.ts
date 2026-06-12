@@ -300,7 +300,8 @@ function hasUsableTieredPricing(pricingTiers: unknown): boolean {
 }
 
 function categoryUsesPerUnitPricing(category: string): boolean {
-  return (category || '').toLowerCase() === 'shopping';
+  const c = (category || '').toLowerCase();
+  return c === 'shopping' || c === 'transportation' || c === 'transport';
 }
 
 function computeRedemptionSavings(
@@ -354,8 +355,13 @@ function computeRedemptionSavings(
   }
   const unit = Math.round(o - d);
   const saved = Math.max(0, unit * billCount);
+  const cat = String(opts?.category ?? '').toLowerCase();
+  const isTransport = cat === 'transportation' || cat === 'transport';
+  const perUnitWord = isTransport
+    ? (billCount === 1 ? 'trip/day' : 'trips/days')
+    : (billCount === 1 ? 'item' : 'items');
   const savingsLine = perUnit
-    ? `${unit.toLocaleString()} VT × ${billCount} ${billCount === 1 ? 'item' : 'items'} = ${saved.toLocaleString()} VT total saved`
+    ? `${unit.toLocaleString()} VT × ${billCount} ${perUnitWord} = ${saved.toLocaleString()} VT total saved`
     : `${unit.toLocaleString()} VT × ${billCount} ${billCount === 1 ? 'person' : 'people'} = ${saved.toLocaleString()} VT total saved`;
   return {
     savedAmount: saved,
@@ -881,9 +887,14 @@ Deno.serve(async (req) => {
         const rawQty = bodyObj.itemQuantity ?? bodyObj.item_quantity;
         const q = Math.floor(Number(rawQty));
         if (!Number.isFinite(q) || q < 1 || q > 99) {
-          return errorResponse('Enter how many items (1–99) for this shopping redemption.', 400, {
-            reason: 'invalid_item_quantity',
-          });
+          const isTransport = listingCategory === 'transportation' || listingCategory === 'transport';
+          return errorResponse(
+            isTransport
+              ? 'Enter how many trips or rental days (1–99) for this transportation redemption.'
+              : 'Enter how many items (1–99) for this shopping redemption.',
+            400,
+            { reason: 'invalid_item_quantity' },
+          );
         }
         itemQuantity = q;
       }

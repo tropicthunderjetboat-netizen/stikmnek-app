@@ -3,7 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase, SUPABASE_URL, getEdgeAuthHeaders } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Business } from '@/data/businesses';
+import { Business, categoryLabelForKey } from '@/data/businesses';
 import { getBusinessImageUrl } from '@/lib/utils';
 import {
   Clock, CheckCircle, XCircle, AlertCircle, FileText, RefreshCw,
@@ -891,17 +891,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
     }
   };
 
-  const getCategoryLabel = (cat: string) => {
-    const labels: Record<string, string> = {
-      dining: 'Dining',
-      activities: 'Activities',
-      tours: 'Tours',
-      shopping: 'Shopping',
-      spa: 'Spa & Wellness',
-      accommodation: 'Accommodation',
-    };
-    return labels[cat] || cat;
-  };
+  const getCategoryLabel = (cat: string) => categoryLabelForKey(cat);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {

@@ -34,6 +34,7 @@ export const translations: Record<string, Record<Language, string>> = {
   'cat.dining': { en: 'Dining', fr: 'Restauration', bi: 'Kakae' },
   'cat.activities': { en: 'Activities', fr: 'Activités', bi: 'Aktiviti' },
   'cat.tours': { en: 'Tours', fr: 'Visites', bi: 'Tua' },
+  'cat.transportation': { en: 'Transportation', fr: 'Transport', bi: 'Transport' },
   'cat.shopping': { en: 'Shopping', fr: 'Shopping', bi: 'Soping' },
   'cat.spa': { en: 'Spa & Wellness', fr: 'Spa & Bien-être', bi: 'Spa & Helt' },
   'cat.accommodation': { en: 'Accommodation', fr: 'Hébergement', bi: 'Ples blong slip' },

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronUp, Layers, Loader2, Save, FileText } from 'lucide-react';
 import type { Language } from '@/data/translations';
+import { CATEGORY_SELECT_KEYS, categoryLabelForKey } from '@/data/businesses';
 import {
   hasMeaningfulDescriptionContent,
   plainTextFromHtml,
@@ -329,9 +330,12 @@ const AdminPendingSubmissionReview: React.FC<Props> = ({ biz, language, onSaved 
                     onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
                     className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 capitalize"
                   >
-                    {['dining', 'activities', 'tours', 'shopping', 'spa', 'accommodation'].map((c) => (
+                    {CATEGORY_SELECT_KEYS.map((c) => (
                       <option key={c} value={c}>
-                        {c.charAt(0).toUpperCase() + c.slice(1)}
+                        {categoryLabelForKey(
+                          c,
+                          language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en',
+                        )}
                       </option>
                     ))}
                   </select>
