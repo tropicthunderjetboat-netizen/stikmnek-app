@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import {
@@ -29,7 +30,8 @@ interface HelpCenterProps {
 }
 
 const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
-  const { language, setCurrentView, user } = useAppContext();
+  const navigate = useNavigate();
+  const { language, setCurrentView } = useAppContext();
   const [activeSection, setActiveSection] = useState<HelpSection>(initialSection ?? 'overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
@@ -415,7 +417,10 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       <div className="bg-gradient-to-br from-teal-600 via-emerald-600 to-teal-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <button
-            onClick={() => setCurrentView('home')}
+            onClick={() => {
+              setCurrentView('home');
+              navigate('/');
+            }}
             className="flex items-center gap-2 text-white/70 hover:text-white text-sm mb-6 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />

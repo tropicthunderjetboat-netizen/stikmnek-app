@@ -2,8 +2,9 @@ import React, { Suspense, useEffect, useRef } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAppContext, isTouristProfileCompleteForGate } from '@/contexts/AppContext';
-import { isViewMode, type ViewMode } from '@/utils/viewModes';
+import { isRoutableAppPath, viewFromPathname, type ViewMode } from '@/utils/viewModes';
 import LegalDocumentPage from './LegalDocumentPage';
+import NotFound from '@/pages/NotFound';
 
 // ── Eagerly-loaded components ──
 import Navbar from './Navbar';
@@ -37,18 +38,6 @@ const HelpCenter = React.lazy(() => import('./HelpCenter'));
 const MapView = React.lazy(() => import('./MapView'));
 const BusinessDetail = React.lazy(() => import('./BusinessDetail'));
 const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
-
-/** URL path → in-app view (excludes /legal/* handled separately). */
-const PATH_TO_VIEW: Record<string, ViewMode> = {
-  '/': 'home',
-  '/deals': 'deals',
-  '/map': 'map',
-  '/passes': 'passes',
-  '/business/new': 'business-new',
-  '/help': 'help',
-  '/faq': 'faq',
-  '/business-guide': 'business-guide',
-};
 
 /**
  * Tourists with an incomplete profile may still open these views (soft gate).
@@ -151,8 +140,8 @@ const AppLayout: React.FC = () => {
   useEffect(() => {
     const p = location.pathname;
     if (p.startsWith('/legal/')) return;
-    const next = PATH_TO_VIEW[p];
-    if (next !== undefined && isViewMode(next)) {
+    const next = viewFromPathname(p);
+    if (next !== null) {
       setCurrentView(next);
     }
   }, [location.pathname, setCurrentView]);
@@ -259,6 +248,9 @@ const AppLayout: React.FC = () => {
 
   const renderView = () => {
     const legalSlug = legalSlugFromPath(location.pathname);
+    if (!legalSlug && !isRoutableAppPath(location.pathname)) {
+      return <NotFound />;
+    }
     if (legalSlug) {
       return (
         <div className="pt-16 min-h-[40vh] bg-white">
@@ -305,23 +297,11 @@ const AppLayout: React.FC = () => {
       case 'business-dashboard':
         return <BusinessOwnerDashboard />;
       case 'help':
-        return (
-          <div className="pt-16">
-            <HelpCenter />
-          </div>
-        );
+        return <HelpCenter />;
       case 'faq':
-        return (
-          <div className="pt-16">
-            <HelpCenter initialSection="tourist-faq" />
-          </div>
-        );
+        return <HelpCenter initialSection="tourist-faq" />;
       case 'business-guide':
-        return (
-          <div className="pt-16">
-            <HelpCenter initialSection="business-guide" />
-          </div>
-        );
+        return <HelpCenter initialSection="business-guide" />;
       case 'business-new':
         return <BusinessListingFormInLayout padded />;
       case 'home':

@@ -15,7 +15,7 @@ import {
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
-import type { ViewMode } from '@/utils/viewModes';
+import { viewFromPathname, type ViewMode } from '@/utils/viewModes';
 import type { PassProductId } from '@/data/passCatalog';
 import { passProductIdFromDb } from '@/data/passCatalog';
 import { clampPartySize, MAX_PARTY_SIZE } from '@/data/pricing';
@@ -367,7 +367,10 @@ export const useAppContext = () => useContext(AppContext);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [language, setLanguage] = useState<Language>('en');
-  const [currentView, setCurrentView] = useState<ViewMode>('home');
+  const [currentView, setCurrentView] = useState<ViewMode>(() => {
+    if (typeof window === 'undefined') return 'home';
+    return viewFromPathname(window.location.pathname) ?? 'home';
+  });
 
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);

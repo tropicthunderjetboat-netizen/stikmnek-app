@@ -25,7 +25,7 @@ import { supportMailtoUrl } from '@/data/contact';
 const APP_VERSION = '3.0.0';
 
 const Footer: React.FC = () => {
-  const { language } = useAppContext();
+  const { language, setCurrentView } = useAppContext();
   const [isUpdating, setIsUpdating] = useState(false);
 
   // Force clear all caches and reload - nuclear option for stuck PWA users
@@ -149,6 +149,7 @@ const Footer: React.FC = () => {
               <li>
                 <Link
                   to="/help"
+                  onClick={() => setCurrentView('help')}
                   className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
                 >
                   <span className="text-gray-500">
@@ -160,6 +161,7 @@ const Footer: React.FC = () => {
               <li>
                 <Link
                   to="/faq"
+                  onClick={() => setCurrentView('faq')}
                   className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
                 >
                   <span className="text-gray-500">
@@ -171,6 +173,7 @@ const Footer: React.FC = () => {
               <li>
                 <Link
                   to="/business-guide"
+                  onClick={() => setCurrentView('business-guide')}
                   className="text-sm text-gray-400 hover:text-teal-400 transition-colors flex items-center gap-2"
                 >
                   <span className="text-gray-500">
