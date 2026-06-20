@@ -1,10 +1,13 @@
 import React, { Suspense, useState } from 'react';
+import { useAppContext } from '@/contexts/AppContext';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import type { AdminOnboardContext } from './BusinessListingForm';
+import PhotoUploader, { type UploadedPhoto } from './PhotoUploader';
+import BusinessCredentialsSettings from './BusinessCredentialsSettings';
 import {
   UserPlus, Loader2, CheckCircle, Copy, RefreshCw, Mail, KeyRound,
-  ExternalLink, AlertCircle, ArrowRight, Store,
+  ExternalLink, AlertCircle, ArrowRight, Store, Image as ImageIcon, Save,
 } from 'lucide-react';
 
 const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
@@ -57,6 +60,7 @@ const inputClass =
 const labelClass = 'block text-sm font-medium text-gray-700 mb-1';
 
 const AdminBusinessOnboarding: React.FC = () => {
+  const { user } = useAppContext();
   const [phase, setPhase] = useState<Phase>('login');
   const [creating, setCreating] = useState(false);
 
@@ -66,6 +70,11 @@ const AdminBusinessOnboarding: React.FC = () => {
 
   const [ownerId, setOwnerId] = useState('');
   const [result, setResult] = useState<CreatedResult | null>(null);
+
+  // Post-creation finishing touches (need the live businessId).
+  const [logoPhotos, setLogoPhotos] = useState<UploadedPhoto[]>([]);
+  const [savingLogo, setSavingLogo] = useState(false);
+  const [logoSaved, setLogoSaved] = useState(false);
 
   const loginValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) && password.length >= 6;
 
@@ -83,6 +92,36 @@ const AdminBusinessOnboarding: React.FC = () => {
     setPassword('');
     setOwnerId('');
     setResult(null);
+    setLogoPhotos([]);
+    setLogoSaved(false);
+  };
+
+  const handleSaveLogo = async () => {
+    const logoUrl = logoPhotos[0]?.url?.trim();
+    if (!logoUrl || !result?.businessId) return;
+    setSavingLogo(true);
+    try {
+      const headers = await getEdgeAuthHeaders();
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        body: {
+          action: 'update_business',
+          businessId: result.businessId,
+          updates: { logo_url: logoUrl, image: logoUrl },
+        },
+        headers,
+      });
+      const payload = data as Record<string, unknown> | null;
+      if (error || payload?.success !== true) {
+        toast.error(await readEdgeError(error, data));
+        return;
+      }
+      setLogoSaved(true);
+      toast.success('Logo saved');
+    } catch (err) {
+      toast.error('Failed to save logo: ' + ((err as Error)?.message || 'Unknown error'));
+    } finally {
+      setSavingLogo(false);
+    }
   };
 
   const handleCreateLogin = async () => {
@@ -209,16 +248,57 @@ const AdminBusinessOnboarding: React.FC = () => {
                 The temporary password above is a fallback so they can sign in right away.
               </p>
             </div>
-
-            <button
-              onClick={resetAll}
-              className="w-full py-3 rounded-xl bg-teal-600 text-white font-semibold text-sm hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
-            >
-              <UserPlus className="w-4 h-4" />
-              Onboard another business
-            </button>
           </div>
         </div>
+
+        {/* Finishing touches: logo + credentials (need the live business profile). */}
+        <div className="mt-6 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+              <ImageIcon className="w-5 h-5 text-violet-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-extrabold text-gray-900">Business logo</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Optional — tourists see this on the map and in search. Upload, then drag/zoom to fit the square.
+              </p>
+            </div>
+          </div>
+          {user?.id && (
+            <PhotoUploader
+              photos={logoPhotos}
+              onPhotosChange={(next) => { setLogoPhotos(next); setLogoSaved(false); }}
+              maxPhotos={1}
+              userId={user.id}
+              logoCrop
+              label="Business logo"
+              sublabel="Optional — upload, then adjust to fit the square (like a profile photo)."
+            />
+          )}
+          <button
+            onClick={handleSaveLogo}
+            disabled={savingLogo || !logoPhotos[0]?.url || logoSaved}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-colors disabled:opacity-40"
+          >
+            {savingLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : logoSaved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+            {logoSaved ? 'Logo saved' : savingLogo ? 'Saving…' : 'Save logo'}
+          </button>
+        </div>
+
+        {/* Credentials uploader (same component owners use; admin is authorized). */}
+        {result.businessId && (
+          <div className="mt-6">
+            <BusinessCredentialsSettings profileBusinessId={result.businessId} />
+          </div>
+        )}
+
+        <button
+          onClick={resetAll}
+          className="mt-6 w-full max-w-2xl mx-auto py-3 rounded-xl bg-teal-600 text-white font-semibold text-sm hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
+        >
+          <UserPlus className="w-4 h-4" />
+          Onboard another business
+        </button>
       </div>
     );
   }
