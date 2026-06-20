@@ -228,8 +228,24 @@ export type EmbeddedListingEdit = {
 
 type EmbeddedListingResolved = { business: Business; galleryPhotos: UploadedPhoto[] };
 
+/** Admin "create on behalf" mode: same form + tiles, but creates a LIVE listing for `ownerId`. */
+export type AdminOnboardContext = {
+  ownerId: string;
+  ownerEmail: string;
+  ownerName: string;
+  onCreated: (result: {
+    businessId: string;
+    offeringId: string;
+    listingUrl: string;
+    emailSent: boolean;
+    emailError?: string;
+    passwordLinkGenerated: boolean;
+  }) => void;
+};
+
 type BusinessListingFormProps = {
   embeddedEdit?: EmbeddedListingEdit | null;
+  adminOnboard?: AdminOnboardContext | null;
 };
 
 function asCategoryKey(raw: string): Category {
@@ -396,7 +412,7 @@ function editBaselinesEqual(a: EditBaseline, b: EditBaseline): boolean {
   );
 }
 
-const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit = null }) => {
+const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit = null, adminOnboard = null }) => {
   const {
     language,
     user,
@@ -730,6 +746,12 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     };
   }, [user?.id, user?.type, prefillNonce, embeddedEdit]);
 
+  // Admin "create on behalf": default the public contact email to the new owner's login email.
+  useEffect(() => {
+    if (!adminOnboard) return;
+    setForm((prev) => (prev.email.trim() ? prev : { ...prev, email: adminOnboard.ownerEmail }));
+  }, [adminOnboard]);
+
   // Auto-calculate end date
   const selectedDuration = DURATION_OPTIONS.find(d => d.value === form.listingDuration);
   const discountValidUntil = selectedDuration
@@ -795,7 +817,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       return;
     }
 
-    if (!embeddedEdit && !agreedPartnerTerms) {
+    if (!embeddedEdit && !adminOnboard && !agreedPartnerTerms) {
       toast.error(
         language === 'en'
           ? 'Please read and accept the Business partner & listing terms to continue.'
@@ -843,6 +865,99 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     if (categoryUsesTieredPricing(form.category)) {
       const { data } = validatePricingTiersForSubmit(pricingTiers);
       tiersPayload = data ?? null;
+    }
+
+    // ─── Admin "create on behalf": create a LIVE listing for the new owner, then email them. ───
+    if (adminOnboard) {
+      const aoMainImage = photos.length > 0 ? String(photos[0].url || '').trim() : '';
+      const aoPendingUploads = photos.filter((p) => !isPersistedPhotoUrl(String(p.url || ''))).length;
+      if (aoPendingUploads > 0) {
+        toast.error(
+          language === 'en'
+            ? `${aoPendingUploads} photo(s) still uploading. Wait until each shows complete, then try again.`
+            : `${aoPendingUploads} photo(s) en cours de téléchargement. Réessayez après.`,
+        );
+        return;
+      }
+
+      const aoOriginalPrice = form.originalPrice ? Number(form.originalPrice) : 0;
+      let aoDealNumeric = form.dealPrice ? Number(form.dealPrice) : 0;
+      const aoPct = parseFloat(String(form.discountPercent).replace(/,/g, ''));
+      if (
+        (!Number.isFinite(aoDealNumeric) || aoDealNumeric <= 0) &&
+        aoOriginalPrice > 0 &&
+        Number.isFinite(aoPct) &&
+        aoPct > 0 &&
+        aoPct < 100
+      ) {
+        aoDealNumeric = aoOriginalPrice * (1 - aoPct / 100);
+      }
+      const aoDealPrice = Number.isFinite(aoDealNumeric) && aoDealNumeric > 0 ? aoDealNumeric : aoOriginalPrice;
+      let aoDiscount = String(form.discount || '').trim();
+      if (!aoDiscount && Number.isFinite(aoPct) && aoPct > 0 && aoPct < 100) {
+        aoDiscount = `${Math.round(aoPct)}% OFF`;
+      }
+      const aoWebsite = normalizeWebsiteForStorage(form.website) ?? null;
+      const aoDescription = trimBusinessDescriptionHtmlForStorage(form.description);
+      const aoPhotos = photos.map((photo, index) => ({
+        url: photo.url,
+        filePath: photo.filePath,
+        isMain: index === 0,
+      }));
+
+      setSubmitting(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('manage-business', {
+          headers: await getEdgeAuthHeaders(),
+          body: {
+            action: 'admin_create_listing_for_owner',
+            targetOwnerId: adminOnboard.ownerId,
+            ownerName: adminOnboard.ownerName,
+            name: form.name,
+            title: form.name,
+            category: form.category,
+            description: aoDescription,
+            discount: aoDiscount,
+            originalPrice: aoOriginalPrice,
+            dealPrice: aoDealPrice,
+            location: form.address || 'Port Vila, Vanuatu',
+            phone: form.phone,
+            email: form.email || adminOnboard.ownerEmail,
+            hours: form.hours,
+            whatsappNumber: form.whatsappNumber || null,
+            image: aoMainImage,
+            photos: aoPhotos,
+            mapUrl: form.mapUrl,
+            website: aoWebsite,
+            discountValidFrom: form.discountValidFrom,
+            discountValidUntil,
+            pricingTiers: tiersPayload,
+          },
+        });
+        const payload = data as Record<string, unknown> | null;
+        if (error || payload?.success !== true) {
+          const msg = await formatEdgeInvokeFailure(null, data, error);
+          toast.error(msg);
+          return;
+        }
+        const emailInfo = (payload?.email as { sent?: boolean; error?: string } | undefined) ?? {};
+        toast.success(
+          language === 'en' ? 'Business account and listing created.' : 'Compte et annonce créés.',
+        );
+        adminOnboard.onCreated({
+          businessId: String(payload?.businessId ?? ''),
+          offeringId: String(payload?.offeringId ?? ''),
+          listingUrl: String(payload?.listingUrl ?? ''),
+          emailSent: Boolean(emailInfo.sent),
+          emailError: emailInfo.error,
+          passwordLinkGenerated: Boolean(payload?.passwordLinkGenerated),
+        });
+      } catch (err: unknown) {
+        void formatListingSubmitCatchError(err, language).then((msg) => toast.error(msg));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
     }
 
     if (embeddedEdit) {
@@ -2004,7 +2119,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             </div>
           )}
 
-          {!isEmbeddedEdit && (
+          {!isEmbeddedEdit && !adminOnboard && (
             <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
@@ -2063,7 +2178,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           {/* Submit */}
           <button
             type="submit"
-            disabled={submitting || (!isEmbeddedEdit && !agreedPartnerTerms)}
+            disabled={submitting || (!isEmbeddedEdit && !adminOnboard && !agreedPartnerTerms)}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-sm hover:from-teal-700 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
             {submitting ? (
@@ -2074,27 +2189,35 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             ) : (
               <>
                 <Store className="w-5 h-5" />
-                {isEmbeddedEdit
+                {adminOnboard
                   ? language === 'en'
-                    ? 'Submit changes for review'
-                    : language === 'fr'
-                      ? 'Envoyer les modifications'
-                      : 'Submitem senis'
-                  : language === 'en'
-                    ? 'Submit for Review (Free)'
-                    : 'Soumettre pour examen (Gratuit)'}
+                    ? 'Create business & send email'
+                    : 'Créer l’entreprise & envoyer l’email'
+                  : isEmbeddedEdit
+                    ? language === 'en'
+                      ? 'Submit changes for review'
+                      : language === 'fr'
+                        ? 'Envoyer les modifications'
+                        : 'Submitem senis'
+                    : language === 'en'
+                      ? 'Submit for Review (Free)'
+                      : 'Soumettre pour examen (Gratuit)'}
               </>
             )}
           </button>
 
           <p className="text-xs text-center text-gray-400">
-            {isEmbeddedEdit
+            {adminOnboard
               ? language === 'en'
-                ? 'Edits are reviewed before they appear on the public site.'
-                : 'Les modifications sont vérifiées avant publication.'
-              : language === 'en'
-                ? 'Your listing will be reviewed within 24 hours. Listing is completely free.'
-                : 'Votre inscription sera examinée dans les 24 heures. L\'inscription est entièrement gratuite.'}
+                ? 'Creates a live listing for the owner and emails them to set a password and review it.'
+                : 'Crée une annonce en direct et envoie un email au propriétaire.'
+              : isEmbeddedEdit
+                ? language === 'en'
+                  ? 'Edits are reviewed before they appear on the public site.'
+                  : 'Les modifications sont vérifiées avant publication.'
+                : language === 'en'
+                  ? 'Your listing will be reviewed within 24 hours. Listing is completely free.'
+                  : 'Votre inscription sera examinée dans les 24 heures. L\'inscription est entièrement gratuite.'}
           </p>
         </form>
       </div>

@@ -972,6 +972,120 @@ async function sendAdminDecisionNotificationEmail(params: {
   }
 }
 
+/**
+ * Resend: welcome email for an admin-created business account.
+ * Tells the owner their listing is live (review it) and gives a link to set
+ * their own password (Supabase recovery link → /reset-password). Best-effort.
+ */
+async function sendBusinessOnboardingEmail(params: {
+  toEmail: string;
+  ownerName: string;
+  businessName: string;
+  loginEmail: string;
+  listingUrl: string;
+  setPasswordUrl: string;
+}): Promise<{ sent: boolean; skipped?: boolean; error?: string }> {
+  if (!getResendApiKey()) {
+    console.warn('[manage-business] RESEND_API_KEY not set — skipping onboarding email');
+    return { sent: false, skipped: true, error: 'RESEND_API_KEY not set' };
+  }
+  const emailStr = String(params.toEmail ?? '').trim();
+  if (!emailStr || !DECISION_EMAIL_RE.test(emailStr)) {
+    return { sent: false, error: 'Invalid recipient' };
+  }
+
+  const greetName = escapeHtmlEmail(String(params.ownerName || 'there').trim() || 'there');
+  const nameEsc = escapeHtmlEmail(params.businessName);
+  const listingEsc = escapeHtmlEmail(params.listingUrl);
+  const pwEsc = escapeHtmlEmail(params.setPasswordUrl);
+  const loginEsc = escapeHtmlEmail(params.loginEmail);
+  const subject = `Your StikmNek business account is ready — ${String(params.businessName ?? '').replace(/[\r\n\x00]/g, ' ').trim().slice(0, 120)}`;
+
+  const html = `
+<div style="font-family: Arial, sans-serif; line-height: 1.55; color: #111; max-width: 560px;">
+  <p>Hi ${greetName},</p>
+  <p>Good news — the StikmNek team has set up a business account and listing for <strong>${nameEsc}</strong> on your behalf. There are just two quick steps to finish.</p>
+  <h3 style="margin: 20px 0 8px; font-size: 1.05rem;">1) Set your password</h3>
+  <p>Your account sign-in email is <strong>${loginEsc}</strong>. Click below to choose your own password:</p>
+  <p>
+    <a href="${pwEsc}" style="display:inline-block;background:#0d9488;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:bold;">Set your password</a>
+  </p>
+  <p style="font-size:0.85rem;color:#555;">This secure link opens a page where you set a new password. It can expire — if it stops working, go to StikmNek, choose Sign In, and use “Forgot password”.</p>
+  <h3 style="margin: 22px 0 8px; font-size: 1.05rem;">2) Review your listing</h3>
+  <p>Please check the deal we set up and make sure the details are correct:</p>
+  <p>
+    <a href="${listingEsc}" style="display:inline-block;background:#fff;color:#0d9488;text-decoration:none;padding:10px 18px;border-radius:10px;font-weight:bold;border:1px solid #0d9488;">Review your listing</a>
+  </p>
+  <p style="font-size:0.9rem;">After you set your password, sign in and open <strong>My Business</strong> to edit prices, hours, photos, and more — or reply to this email and we’ll update it for you.</p>
+  <hr style="border:none;border-top:1px solid #eee;margin:22px 0;">
+  <p>Welcome to StikmNek!<br>The StikmNek Team</p>
+</div>
+`.trim();
+
+  const plain = [
+    `Hi ${String(params.ownerName || 'there').trim() || 'there'},`,
+    '',
+    `The StikmNek team has set up a business account and listing for ${params.businessName} on your behalf. Two quick steps to finish:`,
+    '',
+    `1) Set your password`,
+    `   Your sign-in email is ${params.loginEmail}.`,
+    `   Set your password here: ${params.setPasswordUrl}`,
+    `   (If the link expires, use "Forgot password" on the Sign In screen.)`,
+    '',
+    `2) Review your listing`,
+    `   ${params.listingUrl}`,
+    '',
+    `After setting your password, sign in and open "My Business" to edit your listing, or reply to this email and we'll update it for you.`,
+    '',
+    'Welcome to StikmNek!',
+    'The StikmNek Team',
+  ].join('\n');
+
+  try {
+    const res = await sendResendEmail({ to: emailStr, subject, html, text: plain });
+    if (!res.ok) {
+      console.error('[manage-business] Resend onboarding email FAILED:', res.status, res.body);
+      return { sent: false, error: `Resend error: ${res.status}` };
+    }
+    return { sent: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[manage-business] Resend onboarding email fetch error:', msg);
+    return { sent: false, error: msg };
+  }
+}
+
+/**
+ * Generate a Supabase password-recovery action link that redirects to /reset-password.
+ * The owner uses this to set their own password (ResetPassword page calls updateUser).
+ */
+async function generateSetPasswordUrl(
+  supabase: SupabaseServiceClient,
+  email: string,
+): Promise<string | null> {
+  const redirectTo = `${getAppBaseUrl()}/reset-password`;
+  try {
+    const { data, error } = await supabase.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: { redirectTo },
+    });
+    if (error) {
+      console.warn('[manage-business] generateLink recovery error:', error.message);
+      return null;
+    }
+    const link =
+      (data?.properties as { action_link?: string } | undefined)?.action_link ??
+      (data as { action_link?: string } | undefined)?.action_link ??
+      null;
+    return typeof link === 'string' && link ? link : null;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn('[manage-business] generateLink recovery exception:', msg);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID();
   const startMs = Date.now();
@@ -1689,6 +1803,269 @@ Deno.serve(async (req) => {
 
       if (error) return errorResponse(req, error.message, 500);
       return jsonResponse(req, { business: data });
+    }
+
+    // ─── ADMIN_CREATE_BUSINESS_USER ───
+    // Step 1 of admin onboarding: create the owner's login + business-role profile only.
+    // The listing is created next via admin_create_listing_for_owner (uses the normal listing form).
+    if (action === 'admin_create_business_user') {
+      const denied = await assertAdmin(supabase, authUser, req);
+      if (denied) return denied;
+
+      const email = String(body.email ?? '').trim().toLowerCase();
+      const password = String(body.password ?? '');
+      const ownerName = String(body.ownerName ?? body.displayName ?? '').trim();
+
+      if (!DECISION_EMAIL_RE.test(email)) {
+        return errorResponse(req, 'A valid login email is required', 400, { reason: 'invalid_email' });
+      }
+      if (password.length < 6) {
+        return errorResponse(req, 'Password must be at least 6 characters', 400, { reason: 'weak_password' });
+      }
+
+      const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          name: ownerName || email,
+          full_name: ownerName || email,
+          user_type: 'business',
+        },
+      });
+      if (createErr || !created?.user?.id) {
+        const m = createErr?.message || 'Failed to create login';
+        const already = /already|registered|exists/i.test(m);
+        return errorResponse(
+          req,
+          already ? 'A user with this email already exists. Use a different email or delete the existing user first.' : m,
+          already ? 409 : 500,
+          { reason: already ? 'email_exists' : 'create_user_failed' },
+        );
+      }
+      const ownerId = created.user.id;
+      const nowIso = new Date().toISOString();
+      const { error: profErr } = await supabase
+        .from('user_profiles')
+        .upsert(
+          {
+            user_id: ownerId,
+            name: ownerName || email,
+            full_name: ownerName || email,
+            display_name: ownerName || email,
+            role: 'business',
+            user_type: 'business',
+            email,
+            onboarding_complete: true,
+            created_at: nowIso,
+            updated_at: nowIso,
+          },
+          { onConflict: 'user_id' },
+        );
+      if (profErr) {
+        try {
+          await supabase.auth.admin.deleteUser(ownerId);
+        } catch (e) {
+          console.error('[manage-business] admin_create_business_user rollback failed:', e);
+        }
+        return errorResponse(req, 'Could not create user profile: ' + profErr.message, 500, {
+          reason: 'profile_insert_failed',
+        });
+      }
+
+      return jsonResponse(req, { success: true, ownerId, email });
+    }
+
+    // ─── ADMIN_CREATE_LISTING_FOR_OWNER ───
+    // Step 2 of admin onboarding: create a LIVE business profile + deal for an existing owner
+    // (created via admin_create_business_user), attach photos, then email the owner to set their
+    // own password and review the listing. Body mirrors the normal `submit_business` payload.
+    if (action === 'admin_create_listing_for_owner') {
+      const denied = await assertAdmin(supabase, authUser, req);
+      if (denied) return denied;
+
+      const targetOwnerId = String(body.targetOwnerId ?? body.ownerId ?? '').trim();
+      if (!targetOwnerId) return errorResponse(req, 'Missing targetOwnerId', 400, { reason: 'missing_owner' });
+
+      // Confirm the target is a real auth user before creating data for them.
+      try {
+        const { data: tgt, error: tgtErr } = await supabase.auth.admin.getUserById(targetOwnerId);
+        if (tgtErr || !tgt?.user?.id) {
+          return errorResponse(req, 'Target owner not found', 404, { reason: 'owner_not_found' });
+        }
+      } catch (_e) {
+        return errorResponse(req, 'Could not verify target owner', 500, { reason: 'owner_lookup_failed' });
+      }
+
+      const businessName = String(body.name ?? '').trim();
+      const category = normalizeListingTabCategory(body.category) ?? 'dining';
+      if (!businessName) {
+        return errorResponse(req, 'Business name is required', 400, { reason: 'missing_business_name' });
+      }
+
+      const originalPrice = Number(body.originalPrice) || 0;
+      const dealPrice = Number(body.dealPrice) || 0;
+      const pricingTiers = body.pricingTiers ?? null;
+      const hasTiers = Array.isArray(pricingTiers) && pricingTiers.length > 0;
+      if (!hasTiers && !(originalPrice > 0 && dealPrice > 0 && dealPrice <= originalPrice)) {
+        return errorResponse(
+          req,
+          'Enter an original price and a lower deal price (VT), or add tiered pricing',
+          400,
+          { reason: 'invalid_pricing' },
+        );
+      }
+
+      const ownerName = String(body.ownerName ?? '').trim();
+      const ownerLoginEmail = await resolveOwnerNotificationEmail(supabase, targetOwnerId, {
+        pendingEmail: String(body.email ?? '').trim() || null,
+      });
+      const contactEmail = String(body.email ?? '').trim() || ownerLoginEmail || '';
+      const tagArray = [category];
+      const nowIso = new Date().toISOString();
+      const mapUrl = body.mapUrl ?? body.map_url ?? null;
+      const website = body.website ?? null;
+      const whatsapp = body.whatsappNumber ?? body.whatsapp_number ?? null;
+
+      // Master business profile.
+      const { data: newBiz, error: bizErr } = await supabase
+        .from('businesses')
+        .insert({
+          owner_id: targetOwnerId,
+          name: businessName,
+          category,
+          location: String(body.location ?? '').trim() || 'Port Vila, Vanuatu',
+          phone: String(body.phone ?? '').trim(),
+          hours: String(body.hours ?? '').trim(),
+          map_url: mapUrl,
+          website,
+          whatsapp_number: whatsapp,
+          tags: tagArray,
+          email: contactEmail || null,
+          contact_email: contactEmail || null,
+          business_email: contactEmail || null,
+          active: true,
+          is_verified: true,
+          description: '',
+          description_fr: '',
+          description_bi: '',
+          image: '',
+          discount: '',
+          original_price: 0,
+          deal_price: 0,
+          pricing_tiers: null,
+          updated_at: nowIso,
+        })
+        .select('id')
+        .single();
+      if (bizErr || !newBiz?.id) {
+        return errorResponse(req, 'Could not create business profile: ' + (bizErr?.message || 'unknown'), 500, {
+          reason: 'business_insert_failed',
+        });
+      }
+      const liveBusinessId = String(newBiz.id);
+
+      // Live deal.
+      const vDesc = trimPendingDescription(body.description);
+      const mainImage = String(body.image ?? '').trim();
+      const { data: newOff, error: offErr } = await supabase
+        .from('business_offerings')
+        .insert({
+          business_id: liveBusinessId,
+          title: String(body.title ?? '').trim() || businessName,
+          description: vDesc,
+          description_fr: vDesc,
+          description_bi: vDesc,
+          discount: String(body.discount ?? '').trim(),
+          original_price: originalPrice,
+          deal_price: dealPrice,
+          image: mainImage,
+          map_url: mapUrl,
+          website,
+          discount_valid_from: body.discountValidFrom ?? body.discount_valid_from ?? null,
+          discount_valid_until: body.discountValidUntil ?? body.discount_valid_until ?? null,
+          whatsapp_number: whatsapp,
+          pricing_tiers: pricingTiers,
+          hours: String(body.hours ?? '').trim(),
+          tags: tagArray,
+          active: true,
+          featured: false,
+          updated_at: nowIso,
+        })
+        .select('id')
+        .single();
+      if (offErr || !newOff?.id) {
+        // Best-effort: remove the orphan profile row so a retry doesn't duplicate.
+        try {
+          await supabase.from('businesses').delete().eq('id', liveBusinessId);
+        } catch (_e) { /* ignore */ }
+        return errorResponse(req, 'Could not create the deal: ' + (offErr?.message || 'unknown'), 500, {
+          reason: 'offering_insert_failed',
+        });
+      }
+      const offeringId = String(newOff.id);
+
+      // Photos (already uploaded to storage by the form): link as approved gallery rows.
+      const photos = Array.isArray(body.photos) ? (body.photos as Record<string, unknown>[]) : [];
+      if (photos.length > 0) {
+        const photoRows = photos
+          .map((p, i) => ({
+            business_id: liveBusinessId,
+            offering_id: offeringId,
+            url: String(p?.url ?? '').trim(),
+            file_path: p?.filePath ?? p?.file_path ?? null,
+            uploaded_by: authUser.id,
+            is_main: typeof p?.isMain === 'boolean' ? p.isMain : i === 0,
+            status: 'approved',
+          }))
+          .filter((r) => r.url);
+        if (photoRows.length > 0) {
+          const { error: photoErr } = await supabase.from('business_photos').insert(photoRows);
+          if (photoErr) {
+            console.warn('[manage-business] admin_create_listing_for_owner photo insert failed:', photoErr.message);
+          }
+        }
+      }
+
+      // Password-set link + welcome email (best-effort).
+      const listingUrl = `${getAppBaseUrl()}/?business=${offeringId}`;
+      let onboardingEmail: { sent: boolean; skipped?: boolean; error?: string } = {
+        sent: false,
+        skipped: true,
+        error: 'No owner email',
+      };
+      let setPasswordUrl: string | null = null;
+      if (ownerLoginEmail) {
+        setPasswordUrl = await generateSetPasswordUrl(supabase, ownerLoginEmail);
+        if (setPasswordUrl) {
+          onboardingEmail = await sendBusinessOnboardingEmail({
+            toEmail: ownerLoginEmail,
+            ownerName: ownerName || businessName,
+            businessName,
+            loginEmail: ownerLoginEmail,
+            listingUrl,
+            setPasswordUrl,
+          });
+        } else {
+          onboardingEmail = { sent: false, skipped: false, error: 'Could not generate password link' };
+        }
+      }
+      if (!onboardingEmail.sent) {
+        console.warn(
+          '[manage-business] admin_create_listing_for_owner onboarding email not sent:',
+          onboardingEmail.skipped ? 'skipped' : onboardingEmail.error ?? 'unknown',
+        );
+      }
+
+      return jsonResponse(req, {
+        success: true,
+        ownerId: targetOwnerId,
+        businessId: liveBusinessId,
+        offeringId,
+        listingUrl,
+        email: onboardingEmail,
+        passwordLinkGenerated: Boolean(setPasswordUrl),
+      });
     }
 
     // ─── REVIEW_BUSINESS ───

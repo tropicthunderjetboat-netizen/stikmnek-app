@@ -11,7 +11,7 @@ import {
   CheckCircle, XCircle, AlertCircle, Clock, FileText, MessageSquare,
   Image as ImageIcon, Calendar, Loader2, RefreshCw, Edit3, ArrowRight,
   Wifi, WifiOff, Mail, Trash2, AlertTriangle, X, MapPin, Phone, Tag, Save,
-  Globe, Percent, CreditCard
+  Globe, Percent, CreditCard, UserPlus
 } from 'lucide-react';
 import { formatVT, getPhotoDisplayUrl } from '@/lib/utils';
 import { pricingTiersFromDb } from '@/lib/pricingTiers';
@@ -45,6 +45,7 @@ const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
 const AdminPurchaseOverview = React.lazy(() => import('./AdminPurchaseOverview'));
 const PassEditor = React.lazy(() => import('./PassEditor'));
 const AdminUserManager = React.lazy(() => import('./AdminUserManager'));
+const AdminBusinessOnboarding = React.lazy(() => import('./AdminBusinessOnboarding'));
 const EmailReceiptManager = React.lazy(() => import('./EmailReceiptManager'));
 const EmailNotificationCenter = React.lazy(() => import('./EmailNotificationCenter'));
 
@@ -142,7 +143,7 @@ interface PendingEdit {
 const AdminPanel: React.FC = () => {
   const { language, user, refreshBusinesses, dbBusinesses } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'businesses' | 'approvals' | 'reviews' | 'users' | 'passes' | 'emails' | 'reports'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'businesses' | 'approvals' | 'reviews' | 'users' | 'onboard' | 'passes' | 'emails' | 'reports'>('overview');
 
   // Review moderation (admin-only)
   const [adminReviews, setAdminReviews] = useState<any[]>([]);
@@ -1332,7 +1333,7 @@ const AdminPanel: React.FC = () => {
         {/* Tabs */}
         {/* Tabs */}
         <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm border border-gray-100 mb-8 w-fit overflow-x-auto">
-          {(['overview', 'businesses', 'approvals', 'reviews', 'users', 'passes', 'emails', 'reports'] as const).map(tab => (
+          {(['overview', 'businesses', 'approvals', 'reviews', 'users', 'onboard', 'passes', 'emails', 'reports'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1343,10 +1344,11 @@ const AdminPanel: React.FC = () => {
               }`}
             >
               {tab === 'users' && <Users className="w-3.5 h-3.5" />}
+              {tab === 'onboard' && <UserPlus className="w-3.5 h-3.5" />}
               {tab === 'emails' && <Mail className="w-3.5 h-3.5" />}
               {tab === 'passes' && <CreditCard className="w-3.5 h-3.5" />}
               {tab === 'reviews' && <MessageSquare className="w-3.5 h-3.5" />}
-              {tab}
+              {tab === 'onboard' ? 'Onboard' : tab}
               {tab === 'approvals' && (pendingCount + pendingEditCount) > 0 && (
                 <span className={`absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
                   activeTab === tab ? 'bg-white text-teal-600' : 'bg-red-500 text-white animate-pulse'
@@ -1364,6 +1366,13 @@ const AdminPanel: React.FC = () => {
         {activeTab === 'passes' && (
           <Suspense fallback={<AdminTabFallback />}>
             <PassEditor />
+          </Suspense>
+        )}
+
+        {/* ═══ ONBOARD TAB ═══ */}
+        {activeTab === 'onboard' && (
+          <Suspense fallback={<AdminTabFallback />}>
+            <AdminBusinessOnboarding />
           </Suspense>
         )}
 
