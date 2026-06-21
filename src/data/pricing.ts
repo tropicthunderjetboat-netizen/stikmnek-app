@@ -2,8 +2,8 @@
  * StikmNek dynamic pass pricing (single product model).
  * Legacy DB `pass_type` values (daily/weekly/…) remain for existing rows — see `passCatalog.ts`.
  *
- * Headcount (ages 6+): A$15 first guest + A$5 each for guests 2–6 + A$10 for the 7th guest +
- * A$5 each for guests 8–20. Whole-trip add-on: +A$15.
+ * Headcount (ages 6+): A$15 first guest + A$10 each for every additional guest (2–20).
+ * Whole-trip add-on: +A$15.
  * — Keep in sync with `supabase/functions/_shared/pricingDynamic.ts`.
  */
 
@@ -19,10 +19,13 @@ export type { DbPassType, PassProductId };
 export { passProductIdFromDb, toDbPassType, PASS_PRODUCT_ORDER };
 
 export const BASE_PRICE_AUD = 15;
-export const GUEST_FEE_AUD = 5;
-/** Extra vs a normal +A$5 step: the 7th paying guest is +A$10 instead of +A$5. */
-export const SEVENTH_GUEST_PREMIUM_AUD = 5;
-/** Total AUD added for the 7th paying guest (A$5 slot + A$5 premium = A$10). */
+export const GUEST_FEE_AUD = 10;
+/**
+ * Retained for backwards compatibility. Every additional guest now costs a flat
+ * A$10 (GUEST_FEE_AUD), so there is no longer a premium on the 7th guest.
+ */
+export const SEVENTH_GUEST_PREMIUM_AUD = 0;
+/** Total AUD added for the 7th paying guest (now a flat A$10 like every other guest). */
 export const SEVENTH_GUEST_HEAD_CHARGE_AUD = GUEST_FEE_AUD + SEVENTH_GUEST_PREMIUM_AUD;
 export const EXTEND_FEE_AUD = 15;
 export const MIN_PARTY_SIZE = 1;
@@ -57,7 +60,7 @@ export function extraGuestsFeeThroughSixthAud(partySize: number): number {
   return Math.min(p - 1, 5) * GUEST_FEE_AUD;
 }
 
-/** AUD for 7th guest onward (includes +A$10 for 7th vs a normal +A$5 step). */
+/** AUD for the 7th guest onward (a flat A$10 each, same as every other guest). */
 export function extraGuestsFeeFromSeventhAud(partySize: number): number {
   const p = clampPartySize(partySize);
   if (p < 7) return 0;

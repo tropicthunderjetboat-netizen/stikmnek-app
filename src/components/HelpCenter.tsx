@@ -7,7 +7,6 @@ import {
   EXTEND_FEE_AUD,
   GUEST_FEE_AUD,
   MAX_PARTY_SIZE,
-  SEVENTH_GUEST_HEAD_CHARGE_AUD,
 } from '@/data/pricing';
 import { SUPPORT_EMAIL, supportMailtoUrl } from '@/data/contact';
 import {
@@ -45,7 +44,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
 
   const passProductSummary = useMemo(
     () =>
-      `StikmNek Pass (AUD): $${BASE_PRICE_AUD} first person (ages 6+), $${GUEST_FEE_AUD} each for guests 2–6, $${SEVENTH_GUEST_HEAD_CHARGE_AUD} for the 7th, then $${GUEST_FEE_AUD} each up to ${MAX_PARTY_SIZE} per pass; 24-hour day pass or 7-day holiday pass (+$${EXTEND_FEE_AUD} for the holiday period)`,
+      `StikmNek Pass (AUD): $${BASE_PRICE_AUD} first person (ages 6+), then $${GUEST_FEE_AUD} each for every additional guest up to ${MAX_PARTY_SIZE} per pass; choose the 7-day holiday pass (+$${EXTEND_FEE_AUD} for the holiday period) or a 24-hour day pass`,
     [],
   );
 
@@ -57,7 +56,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       {
         step: '2',
         title: t('passSelection.title', helpLang),
-        desc: `Open Passes, set your group (ages 6+, up to ${MAX_PARTY_SIZE} per pass), choose 24-hour or 7-day holiday access, pick a start date, and pay (tiered: $${BASE_PRICE_AUD} first, $${GUEST_FEE_AUD} for 2–6, $${SEVENTH_GUEST_HEAD_CHARGE_AUD} on 7th, then $${GUEST_FEE_AUD} each; +$${EXTEND_FEE_AUD} holiday period). PayPal or card where enabled.`,
+        desc: `Open Passes, set your group (ages 6+, up to ${MAX_PARTY_SIZE} per pass), choose the 7-day holiday pass or a 24-hour day pass, pick a start date, and pay ($${BASE_PRICE_AUD} first guest, then $${GUEST_FEE_AUD} each additional guest; +$${EXTEND_FEE_AUD} holiday period). PayPal or card where enabled.`,
       },
       { step: '3', title: 'Browse Deals', desc: 'Explore dining, tours, activities, transportation, spa, shopping, and accommodation on Deals and Map' },
       { step: '4', title: 'Show Your QR Code', desc: 'Present your pass QR code at a partner business; staff scan it in StikmNek' },

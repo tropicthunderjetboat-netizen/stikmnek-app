@@ -57,9 +57,7 @@ English (primary), French, Bislama — full UI translation
 
 ### Pass pricing (AUD — current live model)
 - **A$15** — first paying guest (ages 6+)
-- **A$5** each — guests 2 through 6
-- **A$10** — 7th guest (premium step)
-- **A$5** each — guests 8 through 20
+- **A$10** each — every additional guest (2 through 20)
 - Under 6: free
 - **1-day pass:** 24-hour access (base pricing above)
 - **7-day Holiday Pass:** +A$15 add-on for 7 calendar days of deal access

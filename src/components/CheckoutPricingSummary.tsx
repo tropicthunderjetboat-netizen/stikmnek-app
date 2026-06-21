@@ -5,8 +5,6 @@ import {
   GUEST_FEE_AUD,
   calculatePassPrice,
   clampPartySize,
-  extraGuestsFeeFromSeventhAud,
-  extraGuestsFeeThroughSixthAud,
 } from '@/data/pricing';
 import { t } from '@/data/translations';
 import type { Language } from '@/data/translations';
@@ -17,8 +15,6 @@ export type CheckoutPricingSummaryProps = {
   language: Language;
   /** Sidebar column uses slightly tighter spacing. */
   variant?: 'default' | 'sidebar';
-  /** When false, hides the green savings strip (e.g. payment step uses the larger savings anchor). */
-  showSavingsCallout?: boolean;
 };
 
 /**
@@ -29,29 +25,19 @@ const CheckoutPricingSummary: React.FC<CheckoutPricingSummaryProps> = ({
   isExtended,
   language,
   variant = 'default',
-  showSavingsCallout = true,
 }) => {
   const p = clampPartySize(partySize);
   const totalPrice = calculatePassPrice(p, isExtended);
-  const feeThroughSix = extraGuestsFeeThroughSixthAud(p);
-  const feeFromSeven = extraGuestsFeeFromSeventhAud(p);
-  const guests2to6Count = p <= 1 ? 0 : Math.min(p - 1, 5);
-  const guestsFrom7Count = p < 7 ? 0 : p - 6;
-  const potentialSavings = p * 10;
+  const extraGuestsCount = p <= 1 ? 0 : p - 1;
+  const extraGuestsFee = extraGuestsCount * GUEST_FEE_AUD;
 
   const pad = variant === 'sidebar' ? 'p-3' : 'p-4';
   const textMain = variant === 'sidebar' ? 'text-xs' : 'text-sm';
   const textTotal = variant === 'sidebar' ? 'text-base' : 'text-lg';
 
-  const extraRow26Label = t('checkout.extra_guests_2_6_row', language)
-    .replace('__COUNT__', String(guests2to6Count))
+  const extraGuestsLabel = t('checkout.extra_guests_row', language)
+    .replace('__COUNT__', String(extraGuestsCount))
     .replace('__FEE__', String(GUEST_FEE_AUD));
-
-  const extraRow7Label = t('checkout.extra_guests_from_7_row', language)
-    .replace('__COUNT__', String(guestsFrom7Count))
-    .replace('__P__', String(p));
-
-  const savingsLine = t('checkout.potential_savings', language).replace('__AMOUNT__', String(potentialSavings));
 
   return (
     <div className={`bg-gray-50 rounded-lg ${pad} space-y-3 border border-gray-100`}>
@@ -63,17 +49,10 @@ const CheckoutPricingSummary: React.FC<CheckoutPricingSummaryProps> = ({
           <span className="font-semibold tabular-nums shrink-0">A${BASE_PRICE_AUD}</span>
         </div>
 
-        {feeThroughSix > 0 && (
+        {extraGuestsFee > 0 && (
           <div className="flex justify-between gap-3 text-gray-700">
-            <span>{extraRow26Label}</span>
-            <span className="font-semibold tabular-nums shrink-0">+A${feeThroughSix.toFixed(0)}</span>
-          </div>
-        )}
-
-        {feeFromSeven > 0 && (
-          <div className="flex justify-between gap-3 text-gray-700">
-            <span>{extraRow7Label}</span>
-            <span className="font-semibold tabular-nums shrink-0">+A${feeFromSeven.toFixed(0)}</span>
+            <span>{extraGuestsLabel}</span>
+            <span className="font-semibold tabular-nums shrink-0">+A${extraGuestsFee.toFixed(0)}</span>
           </div>
         )}
 
@@ -92,12 +71,6 @@ const CheckoutPricingSummary: React.FC<CheckoutPricingSummaryProps> = ({
           <span className="text-xs font-semibold text-gray-500 ml-1">AUD</span>
         </span>
       </div>
-
-      {showSavingsCallout && (
-        <div className="bg-green-100 rounded-lg p-2.5 text-center border border-green-200/80">
-          <p className="text-xs sm:text-sm text-green-800 font-semibold leading-snug">{savingsLine}</p>
-        </div>
-      )}
     </div>
   );
 };

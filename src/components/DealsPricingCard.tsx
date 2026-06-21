@@ -3,7 +3,7 @@ import { ArrowRight, CircleCheck, CreditCard, Gift, Lock, MapPin, Minus, Plus, Z
 
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
-import { BASE_PRICE_AUD, calculatePassPrice, clampPartySize, MAX_PARTY_SIZE } from '@/data/pricing';
+import { calculatePassPrice, clampPartySize, MAX_PARTY_SIZE } from '@/data/pricing';
 import { cn } from '@/lib/utils';
 
 interface DealsPricingCardProps {
@@ -12,8 +12,6 @@ interface DealsPricingCardProps {
   initialExtended?: boolean;
   purchaseDisabled?: boolean;
 }
-
-const estimatedFirstDaySavingsAud = (partySize: number) => partySize * BASE_PRICE_AUD;
 
 function CtaSheen({ roundedClass }: { roundedClass: string }) {
   return (
@@ -53,10 +51,6 @@ export default function DealsPricingCard({
     }).format(amount);
 
   const sub = t('passPricing.holiday_sub', language);
-  const saveAud = estimatedFirstDaySavingsAud(partySize);
-  const savingsText = t('passPricing.savings_anchor', language)
-    .replace('__COUNT__', String(partySize))
-    .replace('__SAVE__', String(saveAud));
 
   const maxPartyNote = t('passPricing.max_per_pass', language).replace('__N__', String(MAX_PARTY_SIZE));
 
@@ -215,16 +209,6 @@ export default function DealsPricingCard({
             <Zap className="h-3 w-3 shrink-0 text-teal-600" />
             {t('passPricing.chip_row_qr', language)}
           </span>
-        </div>
-
-        {/* 6. Savings + CTA */}
-        <div className="flex w-full max-w-[20rem] flex-col items-center">
-          <div className="relative w-full rounded-2xl bg-gradient-to-b from-emerald-500 to-emerald-600 px-3 py-2 text-center shadow-[0_4px_14px_rgba(5,150,105,0.25),0_12px_28px_-6px_rgba(16,185,129,0.35)] ring-1 ring-emerald-400/50">
-            <p className="text-[10px] font-semibold leading-snug text-white sm:text-[11px]">{savingsText}</p>
-          </div>
-          <div className="-mt-px flex justify-center" aria-hidden>
-            <div className="h-0 w-0 border-x-[9px] border-x-transparent border-t-[10px] border-t-emerald-600" />
-          </div>
         </div>
 
         <button

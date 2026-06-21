@@ -101,9 +101,9 @@ export const translations: Record<string, Record<Language, string>> = {
     bi: 'Holiday pas 7 dei',
   },
   'passPricing.simple_header': {
-    en: 'A$__BASE__ first guest (6+), A$__GUEST__ each for guests 2–6, then A$10 for the 7th and A$__GUEST__ each up to __MAX__ per pass. Under 6 free.',
-    fr: '__BASE__ $ 1re pers. (6+), __GUEST__ $ (pers. 2–6), puis 10 $ pour la 7e puis __GUEST__ $ jusqu’à __MAX__ / pass. Moins de 6 ans gratuits.',
-    bi: 'A$__BASE__ fes (6+), A$__GUEST__ long 2–6, mo A$10 long 7fala mo A$__GUEST__ kasem __MAX__/pas. Under 6 fri.',
+    en: 'A$__BASE__ first guest (ages 6+), then A$__GUEST__ each additional guest up to __MAX__ per pass. Children under 6 are free.',
+    fr: '__BASE__ $ 1re pers. (6 ans et +), puis __GUEST__ $ par invité supplémentaire jusqu’à __MAX__ / pass. Enfants de moins de 6 ans gratuits.',
+    bi: 'A$__BASE__ fes (6 yia mo antap), mo A$__GUEST__ long evri narafala man kasem __MAX__/pas. Pikinini andanit long 6 yia i fri.',
   },
   'passPricing.people_label': {
     en: 'People (ages 6+)',
@@ -515,9 +515,9 @@ export const translations: Record<string, Record<Language, string>> = {
     bi: 'Long bigfala grup o lon taem, wan pas i no save stret — askem support o tingbaot moa pas.',
   },
   'passFlow.checkout_preview': {
-    en: 'Checkout will use {party} guests (ages 6+) · {duration} — A$15 first, A$5 each for 2–6, A$10 on the 7th then A$5 each up to 20; +A$15 for whole-trip (edit before paying).',
-    fr: 'Paiement : {party} voyageurs (6+) · {duration} — 15 $ 1re pers., 5 $ (2–6), 10 $ pour la 7e puis 5 $ jusqu’à 20 ; +15 $ séjour (modifiable avant paiement).',
-    bi: 'Checkout: {party} man (6+) · {duration} — A$15 fes, A$5 long 2–6, A$10 long 7fala mo A$5 kasem 20; +A$15 ful trip (yu ken senis bifo pem).',
+    en: 'Checkout will use {party} guests (ages 6+) · {duration} — A$15 first, then A$10 each additional guest up to 20; +A$15 for whole-trip (edit before paying).',
+    fr: 'Paiement : {party} voyageurs (6+) · {duration} — 15 $ 1re pers., puis 10 $ par invité supplémentaire jusqu’à 20 ; +15 $ séjour (modifiable avant paiement).',
+    bi: 'Checkout: {party} man (6+) · {duration} — A$15 fes, mo A$10 long evri narafala man kasem 20; +A$15 ful trip (yu ken senis bifo pem).',
   },
   'passFlow.duration_short': { en: '1-day', fr: '1 jour', bi: 'wan-dei' },
   'passFlow.duration_extended': { en: 'whole-trip', fr: 'tout le séjour', bi: 'ful-trip' },

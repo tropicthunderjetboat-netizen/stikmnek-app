@@ -1489,7 +1489,6 @@ const PaymentCheckout: React.FC = () => {
                   partySize={partySize}
                   isExtended={isExtended}
                   language={checkoutLang}
-                  showSavingsCallout={false}
                 />
 
                 {/* Payment Error */}
@@ -1875,7 +1874,6 @@ const PaymentCheckout: React.FC = () => {
                     isExtended={isExtended}
                     language={checkoutLang}
                     variant="sidebar"
-                    showSavingsCallout={step !== 'payment'}
                   />
                 </div>
 

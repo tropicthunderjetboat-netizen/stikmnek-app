@@ -1,12 +1,13 @@
 /**
  * Dynamic StikmNek pass pricing — keep in sync with `src/data/pricing.ts`.
  *
- * Headcount: A$15 + A$5×(guests 2–6) + A$10 for 7th + A$5×(guests 8–20) + (extended ? A$15 : 0)
+ * Headcount: A$15 first guest + A$10×(each additional guest, 2–20) + (extended ? A$15 : 0)
  */
 
 export const BASE_PRICE_AUD = 15;
-export const GUEST_FEE_AUD = 5;
-export const SEVENTH_GUEST_PREMIUM_AUD = 5;
+export const GUEST_FEE_AUD = 10;
+/** Backwards-compatible: every additional guest is a flat A$10, so no 7th-guest premium. */
+export const SEVENTH_GUEST_PREMIUM_AUD = 0;
 export const SEVENTH_GUEST_HEAD_CHARGE_AUD = GUEST_FEE_AUD + SEVENTH_GUEST_PREMIUM_AUD;
 export const EXTEND_FEE_AUD = 15;
 export const MIN_PARTY_SIZE = 1;
