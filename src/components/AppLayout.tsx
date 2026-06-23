@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Store, ArrowRight } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAppContext, isTouristProfileCompleteForGate } from '@/contexts/AppContext';
 import {
@@ -81,8 +81,76 @@ function legalSlugFromPath(pathname: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+/**
+ * Sign-up gate shown at /business/new when the visitor can't submit yet (not signed in,
+ * or signed in as a tourist). Deliberately minimal — one clear "Sign up" action, almost no
+ * reading — so first-time businesses aren't put off by a wall of text or a dead-end form.
+ */
+function BusinessListingSignupGate({ isSignedIn }: { isSignedIn: boolean }) {
+  const { language, setShowAuth, setAuthMode } = useAppContext();
+
+  const heading =
+    language === 'fr'
+      ? 'Ajoutez votre entreprise — gratuit'
+      : language === 'bi'
+        ? 'Listem bisnis blong yu — fri'
+        : 'List your business — free';
+
+  const signUpLabel =
+    language === 'fr' ? "S'inscrire gratuitement" : language === 'bi' ? 'Saen up fri' : 'Sign up free';
+
+  return (
+    <div className="pt-16 max-w-md mx-auto px-4">
+      <div className="rounded-2xl border border-teal-100 bg-white shadow-sm p-6 sm:p-8 text-center">
+        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-md shadow-teal-600/25">
+          <Store className="h-7 w-7" aria-hidden />
+        </div>
+        <h1 className="text-2xl font-black tracking-tight text-gray-900 mb-6">{heading}</h1>
+
+        <button
+          type="button"
+          onClick={() => {
+            setAuthMode('signup-business');
+            setShowAuth(true);
+          }}
+          className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-base shadow-lg shadow-teal-600/30 hover:-translate-y-0.5 transition-transform"
+        >
+          {signUpLabel}
+          <ArrowRight className="w-5 h-5 shrink-0" aria-hidden />
+        </button>
+
+        {!isSignedIn && (
+          <button
+            type="button"
+            onClick={() => {
+              setAuthMode('signin');
+              setShowAuth(true);
+            }}
+            className="mt-4 text-sm font-semibold text-teal-700 hover:underline underline-offset-2"
+          >
+            {language === 'en'
+              ? 'Already signed up? Sign in'
+              : language === 'fr'
+                ? 'Déjà inscrit ? Se connecter'
+                : 'Gat akaont? Saen in'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Single listing form instance for home + /business/new (dashboard uses the same component in its Submit tab). */
 function BusinessListingFormInLayout({ padded }: { padded: boolean }) {
+  const { user } = useAppContext();
+  // Only signed-in business owners (and admins) can actually submit. Everyone else
+  // gets the sign-up gate so /business/new isn't a dead end for brand-new businesses.
+  // (Business owners without a profile row are redirected to complete-business-profile elsewhere.)
+  const canSubmit = user?.type === 'business' || user?.type === 'admin';
+  if (padded && !canSubmit) {
+    return <BusinessListingSignupGate isSignedIn={Boolean(user)} />;
+  }
+
   const form = (
     <Suspense
       fallback={
