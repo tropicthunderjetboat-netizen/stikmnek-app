@@ -1647,7 +1647,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </div>
             </div>
           )}
-          <div className={guided && step !== 0 ? 'hidden' : 'space-y-5'}>
+          {(!guided || step === 0) && (
+          <div className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1751,8 +1752,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </p>
             )}
           </div>
-          </div>
-          <div className={guided && step !== 1 ? 'hidden' : 'space-y-5'}>
+          </div>)}
+          {(!guided || step === 1) && (
+          <div className="space-y-5">
           {/* ─── Pricing & Discount (VT) ─── */}
           <div
             className={`p-5 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border ${
@@ -2062,8 +2064,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             )}
           </div>
 
-          </div>
-          <div className={guided && step !== 2 ? 'hidden' : 'space-y-5'}>
+          </div>)}
+          {(!guided || step === 2) && (
+          <div className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2186,8 +2189,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             </div>
           </div>
 
-          </div>
-          <div className={guided && step !== 3 ? 'hidden' : 'space-y-5'}>
+          </div>)}
+          {(!guided || step === 3) && (
+          <div className="space-y-5">
           {/* Photo Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2242,8 +2246,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             </div>
           )}
 
-          </div>
-          <div className={guided && step !== 4 ? 'hidden' : 'space-y-5'}>
+          </div>)}
+          {(!guided || step === 4) && (
+          <div className="space-y-5">
           {!isEmbeddedEdit && !adminOnboard && (
             <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
               <label className="flex items-start gap-3 cursor-pointer">
@@ -2344,7 +2349,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   ? 'Your listing will be reviewed within 24 hours. Listing is completely free.'
                   : 'Votre inscription sera examinée dans les 24 heures. L\'inscription est entièrement gratuite.'}
           </p>
-          </div>
+          </div>)}
           {guided && (
             <div className="flex items-center gap-3 pt-1">
               {step > 0 && (

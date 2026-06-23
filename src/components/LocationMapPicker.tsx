@@ -21,6 +21,11 @@ function MapClickHandler({ onPick }: { onPick: (lat: number, lng: number) => voi
 function MapFlyTo({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap();
   useEffect(() => {
+    // Guard: a zero-size map (e.g. mounted inside a hidden/display:none container)
+    // makes Leaflet's projection math return NaN and throws "Invalid LatLng object".
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const size = map.getSize();
+    if (!size || size.x === 0 || size.y === 0) return;
     map.flyTo([lat, lng], 15, { duration: 0.35 });
   }, [lat, lng, map]);
   return null;
