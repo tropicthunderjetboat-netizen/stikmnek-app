@@ -32,18 +32,34 @@ const LanguageFlag: React.FC<{ code: FlagCode; className?: string }> = ({ code, 
   }
 
   if (code === 'bi') {
-    // Vanuatu: red over green, black triangle at the hoist, yellow Y (fimbriated black).
+    // Vanuatu: red over green, black triangle at the hoist, yellow Y (fimbriated black),
+    // with the boar's-tusk ring + crossed namele fern emblem inside the triangle.
     return (
       <span className={wrapperClass} aria-hidden>
-        <svg viewBox="0 0 36 24" className="w-full h-full" preserveAspectRatio="none">
-          <rect width="36" height="12" fill="#D21034" />
-          <rect y="12" width="36" height="12" fill="#009543" />
-          <path d="M0,0 L16,12 L0,24 Z" fill="#000" />
-          <g fill="none" strokeLinejoin="round" strokeLinecap="round">
+        <svg viewBox="0 0 540 360" className="w-full h-full" preserveAspectRatio="none">
+          <rect width="540" height="180" fill="#D21034" />
+          <rect y="180" width="540" height="180" fill="#009543" />
+          {/* Black triangle at the hoist */}
+          <path d="M0,0 L228,180 L0,360 Z" fill="#000" />
+          <g fill="none" strokeLinejoin="round" strokeLinecap="butt">
             {/* black fimbriation of the Y */}
-            <path d="M0,0 L16,12 L0,24 M16,12 L36,12" stroke="#000" strokeWidth="6" />
+            <path d="M0,0 L228,180 L0,360 M212,180 L540,180" stroke="#000" strokeWidth="56" />
             {/* yellow Y */}
-            <path d="M0,0 L16,12 L0,24 M16,12 L36,12" stroke="#FDCE12" strokeWidth="3.2" />
+            <path d="M0,0 L228,180 L0,360 M212,180 L540,180" stroke="#FDCE12" strokeWidth="30" />
+          </g>
+          {/* Emblem: boar's tusk ring + crossed namele ferns (concentric at the group origin) */}
+          <g transform="translate(96,180)">
+            <path
+              d="M 50.8,-35.6 A 62,62 0 1 0 50.8,35.6"
+              fill="none"
+              stroke="#FDCE12"
+              strokeWidth="13"
+              strokeLinecap="round"
+            />
+            <g fill="#FDCE12">
+              <ellipse cx="0" cy="0" rx="50" ry="8" transform="rotate(40)" />
+              <ellipse cx="0" cy="0" rx="50" ry="8" transform="rotate(-40)" />
+            </g>
           </g>
         </svg>
       </span>
