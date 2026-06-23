@@ -4,7 +4,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { FunctionsHttpError, FunctionsFetchError, PostgrestError } from '@supabase/supabase-js';
 import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
 import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
-import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, AlertTriangle, Globe, Info } from 'lucide-react';
+import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, ArrowLeft, AlertTriangle, Globe, Info } from 'lucide-react';
 
 import { formatVT } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -412,6 +412,14 @@ function editBaselinesEqual(a: EditBaseline, b: EditBaseline): boolean {
   );
 }
 
+/**
+ * Guided (wizard) mode groups the listing fields into one-thing-at-a-time steps.
+ * The field-error keys per step let us gate "Next" and jump back to the first
+ * step that still has a problem when the owner hits submit.
+ */
+const WIZARD_STEP_KEYS: string[][] = [['title', 'description'], ['pricing'], [], ['photos'], []];
+const WIZARD_LAST_STEP = WIZARD_STEP_KEYS.length - 1;
+
 const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit = null, adminOnboard = null }) => {
   const {
     language,
@@ -436,6 +444,20 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
   /** Bumps after successful submit so contact prefill runs again on an empty form. */
   const [prefillNonce, setPrefillNonce] = useState(0);
   const [agreedPartnerTerms, setAgreedPartnerTerms] = useState(false);
+  /** Current wizard step (guided mode only). */
+  const [step, setStep] = useState(0);
+  const wizardFormRef = useRef<HTMLFormElement | null>(null);
+  const wizardMountedRef = useRef(false);
+
+  // Guided mode: bring the new step's question to the top on each change (mobile-friendly).
+  useEffect(() => {
+    if (embeddedEdit || adminOnboard) return;
+    if (!wizardMountedRef.current) {
+      wizardMountedRef.current = true;
+      return;
+    }
+    wizardFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [step, embeddedEdit, adminOnboard]);
   const [form, setForm] = useState({
     name: '', category: 'dining', description: '', discount: '',
     originalPrice: '', discountPercent: '', dealPrice: '',
@@ -857,6 +879,13 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         language,
       );
       setFieldErrors(nextErrors);
+      // Guided mode: jump to the first step that has a problem so the error is visible.
+      if (!embeddedEdit && !adminOnboard) {
+        const firstBadStep = WIZARD_STEP_KEYS.findIndex((keys) =>
+          keys.some((k) => (nextErrors as Record<string, unknown>)[k]),
+        );
+        if (firstBadStep >= 0) setStep(firstBadStep);
+      }
       toast.error(toastMessage);
       return;
     }
@@ -1408,6 +1437,77 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       ? savedDiscountValidFromRef.current
       : todayStr();
 
+  // ─── Guided wizard (first-deal / new-listing path) ───
+  // Full form stays for dashboard editing and admin onboarding.
+  const guided = !isEmbeddedEdit && !adminOnboard;
+
+  const wizardTitles = [
+    language === 'en' ? 'Your deal' : language === 'fr' ? 'Votre offre' : 'Dil blong yu',
+    language === 'en' ? 'Price' : language === 'fr' ? 'Prix' : 'Praes',
+    language === 'en' ? 'Details' : language === 'fr' ? 'Détails' : 'Ol samting',
+    language === 'en' ? 'Photos' : language === 'fr' ? 'Photos' : 'Foto',
+    language === 'en' ? 'Finish' : language === 'fr' ? 'Terminer' : 'Finisim',
+  ];
+
+  /** Reuses the exact submit validators so step gating matches the final check. */
+  const computeListingFieldErrors = (): Record<string, string> => {
+    const titleForSubmit = embeddedEdit
+      ? (form.name?.trim() || embeddedEdit.listingTitle?.trim())
+      : form.name?.trim();
+    const mainImageUrl = photos.length > 0 ? String(photos[0].url || '').trim() : '';
+    const v = validateListingSubmissionOnboarding({
+      title: titleForSubmit ?? '',
+      descriptionHtml: form.description,
+      category: form.category,
+      mainImageUrl,
+      flatPricing: categoryUsesTieredPricing(form.category)
+        ? null
+        : {
+            originalPrice: form.originalPrice,
+            dealPrice: form.dealPrice,
+            discountPercent: form.discountPercent,
+          },
+      pricingTiers: categoryUsesTieredPricing(form.category) ? pricingTiers : null,
+    });
+    if (v.valid) return {};
+    const { fieldErrors: fe } = localizedListingSubmitValidationFeedback(v.errors, form.description, language);
+    return fe as Record<string, string>;
+  };
+
+  const goWizardNext = () => {
+    const keys = WIZARD_STEP_KEYS[step] || [];
+    if (keys.length > 0) {
+      const fe = computeListingFieldErrors();
+      const bad = keys.filter((k) => fe[k]);
+      if (bad.length > 0) {
+        setFieldErrors((prev) => ({ ...prev, ...Object.fromEntries(bad.map((k) => [k, fe[k]])) }));
+        toast.error(
+          language === 'en'
+            ? 'Please complete this step.'
+            : language === 'fr'
+              ? 'Veuillez compléter cette étape.'
+              : 'Plis kompletem step ia.',
+        );
+        return;
+      }
+    }
+    setStep((s) => Math.min(s + 1, WIZARD_LAST_STEP));
+  };
+
+  const goWizardBack = () => setStep((s) => Math.max(s - 1, 0));
+
+  /** In guided mode, stop Enter in single-line inputs from submitting before the last step. */
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (
+      guided &&
+      step < WIZARD_LAST_STEP &&
+      e.key === 'Enter' &&
+      (e.target as HTMLElement).tagName !== 'TEXTAREA'
+    ) {
+      e.preventDefault();
+    }
+  };
+
   return (
     <section
       className={`${isEmbeddedEdit ? 'py-8' : 'py-20'} bg-gradient-to-b from-teal-50 to-white`}
@@ -1458,7 +1558,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           </p>
         </div>
 
-        {user?.type === 'business' && !isEmbeddedEdit && (
+        {user?.type === 'business' && !isEmbeddedEdit && !guided && (
           <div className="mb-6 rounded-xl border border-teal-100 bg-white p-4 text-left text-sm text-gray-700 shadow-sm">
             <p className="font-semibold text-teal-900 mb-1">
               {language === 'en' ? 'Simple flow' : language === 'fr' ? 'Parcours simple' : 'Wanwan wok'}
@@ -1530,7 +1630,24 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         )}
 
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-gray-100 space-y-5">
+        <form ref={wizardFormRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-gray-100 space-y-5">
+          {guided && (
+            <div className="mb-1">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-400">
+                  {language === 'en' ? 'Step' : language === 'fr' ? 'Étape' : 'Step'} {step + 1} / {WIZARD_LAST_STEP + 1}
+                </span>
+                <span className="text-sm font-bold text-teal-700">{wizardTitles[step]}</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-600 transition-all"
+                  style={{ width: `${Math.round(((step + 1) / (WIZARD_LAST_STEP + 1)) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+          <div className={guided && step !== 0 ? 'hidden' : 'space-y-5'}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1634,6 +1751,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </p>
             )}
           </div>
+          </div>
+          <div className={guided && step !== 1 ? 'hidden' : 'space-y-5'}>
           {/* ─── Pricing & Discount (VT) ─── */}
           <div
             className={`p-5 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border ${
@@ -1943,6 +2062,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             )}
           </div>
 
+          </div>
+          <div className={guided && step !== 2 ? 'hidden' : 'space-y-5'}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2065,6 +2186,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             </div>
           </div>
 
+          </div>
+          <div className={guided && step !== 3 ? 'hidden' : 'space-y-5'}>
           {/* Photo Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2119,6 +2242,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             </div>
           )}
 
+          </div>
+          <div className={guided && step !== 4 ? 'hidden' : 'space-y-5'}>
           {!isEmbeddedEdit && !adminOnboard && (
             <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
               <label className="flex items-start gap-3 cursor-pointer">
@@ -2219,6 +2344,30 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   ? 'Your listing will be reviewed within 24 hours. Listing is completely free.'
                   : 'Votre inscription sera examinée dans les 24 heures. L\'inscription est entièrement gratuite.'}
           </p>
+          </div>
+          {guided && (
+            <div className="flex items-center gap-3 pt-1">
+              {step > 0 && (
+                <button
+                  type="button"
+                  onClick={goWizardBack}
+                  className="h-12 px-4 shrink-0 rounded-xl border border-gray-200 text-gray-600 font-semibold inline-flex items-center justify-center hover:bg-gray-50"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+              )}
+              {step < WIZARD_LAST_STEP && (
+                <button
+                  type="button"
+                  onClick={goWizardNext}
+                  className="flex-1 h-12 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold inline-flex items-center justify-center gap-2 hover:from-teal-700 hover:to-emerald-700"
+                >
+                  {language === 'en' ? 'Next' : language === 'fr' ? 'Suivant' : 'Nekis'}
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          )}
         </form>
       </div>
     </section>
