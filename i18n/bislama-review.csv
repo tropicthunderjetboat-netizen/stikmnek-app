@@ -7,7 +7,7 @@ TR-0005,Dashboard,Tableau de bord,Dasbod,table: nav.dashboard
 TR-0006,Admin,Admin,Admin,table: nav.admin
 TR-0007,Sign In,Connexion,Saen In,table: nav.signin
 TR-0008,Sign Out,Déconnexion,Saen Aot,table: nav.signout
-TR-0009,Discover Vanuatu's Best Deals,Découvrez les meilleures offres du Vanuatu,Faenem Beswan Dils blong Vanuatu,table: hero.title
+TR-0009,Discover Vanuatu's Best Deals,Découvrez les meilleures offres du Vanuatu,Saen Aot,table: hero.title
 TR-0010,"Unlock exclusive discounts up to 35% on dining, tours, and activities. Join thousands of happy travelers and local businesses.","Profitez de réductions exclusives jusqu'à 35 % sur la restauration, les visites et les activités. Rejoignez des milliers de voyageurs et d'entreprises locales satisfaits.","Openem eksklusiv diskaon kasem 35% long kakae, tua, mo aktiviti. Joinem tausen blong hapi turis mo lokal bisnis.",table: hero.subtitle
 TR-0011,Sign Up & Get Deals,Inscrivez-vous et profitez des offres,Saen Ap & Karem Dils,table: hero.ctaTourist
 TR-0012,List Your Business (Free),Inscrivez votre entreprise (gratuit),Listem Bisnis Blong Yu (Fri),table: hero.ctaBusiness
@@ -40,10 +40,10 @@ TR-0038,24h access,Accès 24 h,24 owa,table: passPricing.card_1d_hint
 TR-0039,7 days,7 jours,7 dei,table: passPricing.card_7d_title
 TR-0040,Holiday pass,Pass vacances,Holiday pas,table: passPricing.card_7d_hint
 TR-0041,Best value,Meilleur rapport,Bes wolju,table: passPricing.badge_best_value
-TR-0042,35% off,-35 %,35% of,table: passPricing.chip_35
+TR-0042,35% off,-35%,35% of,table: passPricing.chip_35
 TR-0043,Maps,Cartes,Map,table: passPricing.chip_map
 TR-0044,QR,QR,QR,table: passPricing.chip_qr
-TR-0045,35% Off,-35 %,35% Of,table: passPricing.chip_row_35
+TR-0045,35% Off,-35%,35% Of,table: passPricing.chip_row_35
 TR-0046,Live Map,Carte live,Map laev,table: passPricing.chip_row_map
 TR-0047,Fast QR,QR rapide,QR fas,table: passPricing.chip_row_qr
 TR-0048,"Buy 1 week, get ","Achetez 1 semaine, ","Bae wan wik, ",table: passPricing.holiday_ribbon_prefix
