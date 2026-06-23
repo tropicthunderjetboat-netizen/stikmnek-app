@@ -73,7 +73,10 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden sm:rounded-2xl">
+      <DialogContent
+        className="max-w-lg p-0 gap-0 overflow-hidden sm:rounded-2xl z-[120]"
+        overlayClassName="z-[120]"
+      >
         <DialogHeader className="px-5 pt-5 pb-2">
           <DialogTitle>{t.title}</DialogTitle>
           <DialogDescription>{t.hint}</DialogDescription>
