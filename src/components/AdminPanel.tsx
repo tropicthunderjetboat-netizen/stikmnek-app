@@ -215,6 +215,15 @@ const AdminPanel: React.FC = () => {
     listingDuration: '1_month',
   });
 
+  // ─── Edit Business Profile modal state (admin full access to the company profile) ───
+  const [profileEditId, setProfileEditId] = useState<string | null>(null);
+  const [profileEditLoading, setProfileEditLoading] = useState(false);
+  const [profileEditSaving, setProfileEditSaving] = useState(false);
+  const [profileEditForm, setProfileEditForm] = useState({
+    name: '', category: 'dining', location: '', phone: '',
+    contactEmail: '', businessEmail: '', whatsapp: '', website: '', mapUrl: '',
+  });
+
   // ─── Preview Business modal state ───
   const [previewBusinessId, setPreviewBusinessId] = useState<string | null>(null);
   const [credentialsBusinessId, setCredentialsBusinessId] = useState<string | null>(null);
@@ -889,6 +898,72 @@ const AdminPanel: React.FC = () => {
       await refreshBusinesses();
     } catch (err: any) { toast.error('Failed to update business: ' + (err.message || 'Unknown error')); }
     finally { setSavingEdit(false); }
+  };
+
+  // ─── Open Edit Business Profile (company profile: name + contact details) ───
+  const openProfileEdit = useCallback(async (profileId: string, fallbackName: string) => {
+    if (!profileId) return;
+    setProfileEditId(profileId);
+    setProfileEditLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('id, name, category, location, phone, email, contact_email, business_email, whatsapp_number, website, map_url')
+        .eq('id', profileId)
+        .maybeSingle();
+      if (error) throw error;
+      const b = (data ?? {}) as Record<string, unknown>;
+      setProfileEditForm({
+        name: String(b.name ?? fallbackName ?? ''),
+        category: String(b.category ?? 'dining'),
+        location: String(b.location ?? ''),
+        phone: String(b.phone ?? ''),
+        contactEmail: String(b.contact_email ?? b.email ?? ''),
+        businessEmail: String(b.business_email ?? ''),
+        whatsapp: String(b.whatsapp_number ?? ''),
+        website: String(b.website ?? ''),
+        mapUrl: String(b.map_url ?? ''),
+      });
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Could not load business profile');
+      setProfileEditId(null);
+    } finally {
+      setProfileEditLoading(false);
+    }
+  }, []);
+
+  // ─── Save Edit Business Profile (admin direct via update_business) ───
+  const handleSaveProfileEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileEditId) return;
+    if (!profileEditForm.name.trim()) { toast.error('Business name is required.'); return; }
+    setProfileEditSaving(true);
+    try {
+      const updates: Record<string, unknown> = {
+        name: profileEditForm.name.trim(),
+        category: profileEditForm.category,
+        location: profileEditForm.location.trim(),
+        phone: profileEditForm.phone.trim(),
+        contact_email: profileEditForm.contactEmail.trim() || null,
+        business_email: profileEditForm.businessEmail.trim() || null,
+        whatsapp_number: profileEditForm.whatsapp.trim() || null,
+        website: normalizeWebsiteForStorage(profileEditForm.website) ?? '',
+        map_url: profileEditForm.mapUrl.trim() || null,
+      };
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: { action: 'update_business', businessId: profileEditId, updates },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success('Business profile updated.');
+      setProfileEditId(null);
+      await refreshBusinesses();
+    } catch (err: unknown) {
+      toast.error('Failed to update profile: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setProfileEditSaving(false);
+    }
   };
 
 
@@ -1750,7 +1825,20 @@ const AdminPanel: React.FC = () => {
 
                         {/* Profile-level actions */}
                         {!sampleProfile && (
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                            <button
+                              onClick={() => void openProfileEdit(group.profileId, group.profileName)}
+                              disabled={profileEditLoading && profileEditId === group.profileId}
+                              className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-colors flex items-center gap-1 disabled:opacity-50"
+                              title="Edit the business profile (name & contact details)"
+                            >
+                              {profileEditLoading && profileEditId === group.profileId ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Building2 className="w-3.5 h-3.5" />
+                              )}
+                              Edit profile
+                            </button>
                             <button
                               onClick={() => {
                                 setCredentialsBusinessId(group.profileId);
@@ -2965,6 +3053,57 @@ const AdminPanel: React.FC = () => {
                   <button type="submit" disabled={addingBusiness} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-colors disabled:opacity-50">{addingBusiness ? <><Loader2 className="w-4 h-4 animate-spin" />Adding...</> : <><Plus className="w-4 h-4" />Add Business</>}</button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ EDIT BUSINESS PROFILE MODAL (company profile: name + contact details) ═══ */}
+        {profileEditId && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !profileEditSaving && setProfileEditId(null)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><Building2 className="w-5 h-5 text-blue-600" /></div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Edit Business Profile</h3>
+                    <p className="text-xs text-gray-500">Company name &amp; contact details — shared across all this business&apos;s deals (admin)</p>
+                  </div>
+                </div>
+                <button onClick={() => setProfileEditId(null)} className="p-2 rounded-lg hover:bg-gray-100 transition-colors"><X className="w-5 h-5 text-gray-400" /></button>
+              </div>
+              {profileEditLoading ? (
+                <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-blue-600 animate-spin" /></div>
+              ) : (
+                <form onSubmit={handleSaveProfileEdit} className="p-6 space-y-4">
+                  <div className="rounded-xl bg-blue-50/60 border border-blue-100 px-4 py-3 text-xs text-blue-900">
+                    This is the <strong>company profile</strong>, not a single deal. Use this to fix a business name that shows a deal/tour title, or to update contact details. To edit a deal&apos;s pricing or photos, use <strong>Edit listing</strong> on the deal.
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-semibold text-gray-600 mb-1">Business Name *</label><input type="text" value={profileEditForm.name} onChange={e => setProfileEditForm(p => ({...p, name: e.target.value}))} required className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g. Quinzy Authentic Tours Vanuatu" /></div>
+                    <div><label className="block text-xs font-semibold text-gray-600 mb-1">Category</label><select value={profileEditForm.category} onChange={e => setProfileEditForm(p => ({...p, category: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">{CATEGORY_SELECT_KEYS.map((c) => (
+                      <option key={c} value={c}>{categoryLabelForKey(c)}</option>
+                    ))}</select></div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-semibold text-gray-600 mb-1">Location</label><input type="text" value={profileEditForm.location} onChange={e => setProfileEditForm(p => ({...p, location: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Port Vila, Vanuatu" /></div>
+                    <div><label className="block text-xs font-semibold text-gray-600 mb-1">Phone</label><input type="text" value={profileEditForm.phone} onChange={e => setProfileEditForm(p => ({...p, phone: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="+678 ..." /></div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-semibold text-gray-600 mb-1">Public contact email</label><input type="email" value={profileEditForm.contactEmail} onChange={e => setProfileEditForm(p => ({...p, contactEmail: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="hello@business.com" /></div>
+                    <div><label className="block text-xs font-semibold text-gray-600 mb-1">Account / billing email</label><input type="email" value={profileEditForm.businessEmail} onChange={e => setProfileEditForm(p => ({...p, businessEmail: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="owner@business.com" /></div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-semibold text-gray-600 mb-1">WhatsApp number</label><input type="text" value={profileEditForm.whatsapp} onChange={e => setProfileEditForm(p => ({...p, whatsapp: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="+678 ..." /></div>
+                    <div><label className="block text-xs font-semibold text-gray-600 mb-1">Website</label><input type="text" value={profileEditForm.website} onChange={e => setProfileEditForm(p => ({...p, website: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://..." /></div>
+                  </div>
+                  <div><label className="block text-xs font-semibold text-gray-600 mb-1">Google Maps URL</label><input type="text" value={profileEditForm.mapUrl} onChange={e => setProfileEditForm(p => ({...p, mapUrl: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://maps.google.com/..." /></div>
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                    <button type="button" onClick={() => setProfileEditId(null)} disabled={profileEditSaving} className="px-5 py-2.5 rounded-xl bg-white border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
+                    <button type="submit" disabled={profileEditSaving} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50">{profileEditSaving ? <><Loader2 className="w-4 h-4 animate-spin" />Saving...</> : <><Save className="w-4 h-4" />Save profile</>}</button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}
