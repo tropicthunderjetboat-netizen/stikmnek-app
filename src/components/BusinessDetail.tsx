@@ -51,8 +51,11 @@ import BusinessProfileLogo from '@/components/BusinessProfileLogo';
 import {
   CREDENTIALS_VIEW_COLUMNS,
   credentialsFromBusinessListing,
+  hasAnyPublicCredential,
+  mapCredentialsFromDbRow,
   mapCredentialsFromListingRow,
   type BusinessCredentialsPublic,
+  type BusinessCredentialsRow,
 } from '@/lib/businessCredentials';
 import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
 
@@ -143,6 +146,8 @@ const BusinessDetail: React.FC = () => {
     }
     let cancelled = false;
     void (async () => {
+      // 1) Public path: the view exposes verified credential flags to everyone
+      //    (including anonymous tourists, who cannot read business_credentials directly).
       const { data, error } = await supabase
         .from('business_listings_view')
         .select(CREDENTIALS_VIEW_COLUMNS)
@@ -150,8 +155,35 @@ const BusinessDetail: React.FC = () => {
         .limit(1)
         .maybeSingle();
       if (cancelled) return;
-      if (!error && data) {
-        setProfileCredentials(mapCredentialsFromListingRow(data as Record<string, unknown>));
+      const viewCreds =
+        !error && data ? mapCredentialsFromListingRow(data as Record<string, unknown>) : null;
+      if (viewCreds && hasAnyPublicCredential(viewCreds)) {
+        setProfileCredentials(viewCreds);
+        return;
+      }
+
+      // 2) Resilient fallback: owners/admins can read business_credentials directly via RLS,
+      //    so verified credentials still display even if the public view is stale or missing
+      //    its credential columns (a common cause of green ticks flipping to red crosses).
+      const { data: credRow, error: credErr } = await supabase
+        .from('business_credentials')
+        .select(
+          'business_id, verified_tourism_permit, tourism_permit_path, verified_liability_insurance, liability_insurance_path, verified_association_credentials, association_credentials_path, verified_first_aid, first_aid_certificate_path, first_aid_completed_at',
+        )
+        .eq('business_id', profileId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (!credErr && credRow) {
+        const dbCreds = mapCredentialsFromDbRow(credRow as BusinessCredentialsRow);
+        if (hasAnyPublicCredential(dbCreds)) {
+          setProfileCredentials(dbCreds);
+          return;
+        }
+      }
+
+      // 3) Use whatever the view returned (even if empty), then the in-memory listing row.
+      if (viewCreds) {
+        setProfileCredentials(viewCreds);
         return;
       }
       if (selectedBusiness && profileBusinessIdFor(selectedBusiness) === profileId) {

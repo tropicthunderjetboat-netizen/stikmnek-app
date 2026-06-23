@@ -11,7 +11,7 @@ import {
   CheckCircle, XCircle, AlertCircle, Clock, FileText, MessageSquare,
   Image as ImageIcon, Calendar, Loader2, RefreshCw, Edit3, ArrowRight,
   Wifi, WifiOff, Mail, Trash2, AlertTriangle, X, MapPin, Phone, Tag, Save,
-  Globe, Percent, CreditCard, UserPlus
+  Globe, Percent, CreditCard, UserPlus, ShieldCheck, Building2
 } from 'lucide-react';
 import { formatVT, getPhotoDisplayUrl } from '@/lib/utils';
 import { pricingTiersFromDb } from '@/lib/pricingTiers';
@@ -155,6 +155,8 @@ const AdminPanel: React.FC = () => {
 
 
   const [searchBiz, setSearchBiz] = useState('');
+  /** Business profiles whose deal list is expanded in the Businesses tab. */
+  const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
   const [pendingBusinesses, setPendingBusinesses] = useState<PendingBusiness[]>([]);
   const [businessPhotos, setBusinessPhotos] = useState<Record<string, BusinessPhoto[]>>({});
   const [rpcPhotoMap, setRpcPhotoMap] = useState<Record<string, BusinessPhoto[]>>({});
@@ -1299,10 +1301,78 @@ const AdminPanel: React.FC = () => {
     return [...dbBusinesses, ...fromHardcoded];
   })();
 
-  const filteredBiz = allBusinesses.filter(b =>
-    b.name.toLowerCase().includes(searchBiz.toLowerCase()) ||
-    b.category.toLowerCase().includes(searchBiz.toLowerCase())
-  );
+  const filteredBiz = allBusinesses.filter(b => {
+    const q = searchBiz.toLowerCase();
+    return (
+      b.name.toLowerCase().includes(q) ||
+      (b.profileName || '').toLowerCase().includes(q) ||
+      b.category.toLowerCase().includes(q) ||
+      (b.location || '').toLowerCase().includes(q)
+    );
+  });
+
+  // ─── Group deals/listings under their parent business profile ───
+  // The data model already separates company profiles (`businesses`: contact details +
+  // credentials) from their deals (`business_offerings`). The Businesses tab groups the
+  // flat deal rows back under one profile so admins manage a company, not scattered deals.
+  type BusinessProfileGroup = {
+    profileId: string;
+    profileName: string;
+    location: string;
+    logo: string;
+    phone: string;
+    email: string;
+    whatsapp: string;
+    isFromDb: boolean;
+    credVerifiedCount: number;
+    deals: Business[];
+  };
+
+  const businessProfileGroups = useMemo<BusinessProfileGroup[]>(() => {
+    const dbIds = new Set(dbBusinesses.map((b) => b.id));
+    const map = new Map<string, BusinessProfileGroup>();
+    for (const biz of filteredBiz) {
+      const profileId = profileBusinessIdFor(biz);
+      let group = map.get(profileId);
+      if (!group) {
+        group = {
+          profileId,
+          profileName: (biz.profileName || biz.name || '').trim() || 'Unnamed business',
+          location: biz.location || '',
+          logo: biz.profileLogoUrl || '',
+          phone: biz.phone || '',
+          email: biz.contactEmail || '',
+          whatsapp: biz.whatsappNumber || biz.whatsapp_number || '',
+          isFromDb: false,
+          credVerifiedCount: 0,
+          deals: [],
+        };
+        map.set(profileId, group);
+      }
+      group.deals.push(biz);
+      if (dbIds.has(biz.id)) group.isFromDb = true;
+      if (!group.location && biz.location) group.location = biz.location;
+      if (!group.logo && biz.profileLogoUrl) group.logo = biz.profileLogoUrl;
+      if (!group.phone && biz.phone) group.phone = biz.phone;
+      if (!group.email && biz.contactEmail) group.email = biz.contactEmail;
+      if (!group.whatsapp && (biz.whatsappNumber || biz.whatsapp_number)) {
+        group.whatsapp = (biz.whatsappNumber || biz.whatsapp_number) as string;
+      }
+      group.credVerifiedCount = Math.max(group.credVerifiedCount, biz.credVerifiedCount || 0);
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.profileName.localeCompare(b.profileName),
+    );
+  }, [filteredBiz, dbBusinesses]);
+
+  const toggleProfileExpanded = useCallback((profileId: string) => {
+    setExpandedProfiles((prev) => {
+      const next = new Set(prev);
+      if (next.has(profileId)) next.delete(profileId);
+      else next.add(profileId);
+      return next;
+    });
+  }, []);
 
 
 
@@ -1568,13 +1638,13 @@ const AdminPanel: React.FC = () => {
                   type="text"
                   value={searchBiz}
                   onChange={(e) => setSearchBiz(e.target.value)}
-                  placeholder="Search businesses..."
+                  placeholder="Search by business, deal, or location..."
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm text-gray-500 font-medium">
-                  {filteredBiz.length} businesses ({dbBusinesses.length} from DB, {hardcodedBusinesses.length} sample)
+                  {businessProfileGroups.length} business{businessProfileGroups.length === 1 ? '' : 'es'} · {filteredBiz.length} deal{filteredBiz.length === 1 ? '' : 's'}
                 </span>
                 <button
                   onClick={handleRefreshBusinesses}
@@ -1592,133 +1662,192 @@ const AdminPanel: React.FC = () => {
                 <Loader2 className="w-8 h-8 text-teal-600 animate-spin mx-auto mb-4" />
                 <p className="text-gray-500">Loading businesses from database...</p>
               </div>
+            ) : businessProfileGroups.length === 0 ? (
+              <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 text-center">
+                <Store className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No businesses found matching your search.</p>
+              </div>
             ) : (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-gray-100">
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Business</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Category</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Rating</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Discount</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Source</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Status</th>
-                        <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider px-5 py-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {filteredBiz.map(biz => {
-                        const isFromDb = dbBusinesses.some(db => db.id === biz.id);
-                        return (
-                          <tr key={biz.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-5 py-3">
-                              <div className="flex items-center gap-3">
+              <div className="space-y-3">
+                <p className="text-xs text-gray-400">
+                  Each card is one <strong className="text-gray-500">business profile</strong> (contact details &amp; credentials). Expand a card to manage its deals / listings.
+                </p>
+                {businessProfileGroups.map((group) => {
+                  const expanded = expandedProfiles.has(group.profileId);
+                  const sampleProfile = !group.isFromDb;
+                  const dealCount = group.deals.length;
+                  const previewDeal = group.deals[0];
+                  return (
+                    <div
+                      key={group.profileId}
+                      className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+                    >
+                      {/* ── Business profile header ── */}
+                      <div className="flex items-start gap-3 p-4">
+                        <button
+                          onClick={() => toggleProfileExpanded(group.profileId)}
+                          className="mt-1 p-1 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shrink-0"
+                          aria-expanded={expanded}
+                          aria-label={expanded ? 'Collapse deals' : 'Expand deals'}
+                        >
+                          <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+                        </button>
+
+                        {group.logo ? (
+                          <img src={group.logo} alt={group.profileName} className="w-12 h-12 rounded-xl object-cover border border-gray-100 shrink-0" />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-100 flex items-center justify-center shrink-0">
+                            <Building2 className="w-6 h-6 text-teal-500" />
+                          </div>
+                        )}
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                              onClick={() => toggleProfileExpanded(group.profileId)}
+                              className="text-sm font-bold text-gray-900 hover:text-teal-700 transition-colors text-left"
+                            >
+                              {group.profileName}
+                            </button>
+                            <span className="px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 text-[11px] font-bold">
+                              {dealCount} deal{dealCount === 1 ? '' : 's'}
+                            </span>
+                            {group.credVerifiedCount > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold">
+                                <ShieldCheck className="w-3 h-3" />
+                                {group.credVerifiedCount} verified
+                              </span>
+                            )}
+                            {sampleProfile ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-gray-400">
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                                Sample
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                Database
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Contact details (profile-level) */}
+                          <div className="flex items-center gap-x-4 gap-y-1 flex-wrap mt-1.5 text-xs text-gray-500">
+                            {group.location && (
+                              <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-gray-400" />{group.location}</span>
+                            )}
+                            {group.phone && (
+                              <span className="inline-flex items-center gap-1"><Phone className="w-3.5 h-3.5 text-gray-400" />{group.phone}</span>
+                            )}
+                            {group.email && (
+                              <span className="inline-flex items-center gap-1"><Mail className="w-3.5 h-3.5 text-gray-400" />{group.email}</span>
+                            )}
+                            {!group.location && !group.phone && !group.email && (
+                              <span className="italic text-gray-400">No contact details on profile</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Profile-level actions */}
+                        {!sampleProfile && (
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => {
+                                setCredentialsBusinessId(group.profileId);
+                                setCredentialsBusinessName(group.profileName);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100 transition-colors flex items-center gap-1"
+                              title="Review and verify this company's credentials"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              Credentials
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDeleteEntireBusinessProfile(true);
+                                setConfirmDeleteId(previewDeal?.id ?? null);
+                              }}
+                              disabled={!previewDeal}
+                              className="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center gap-1"
+                              title="Delete the entire business profile and all its deals"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Delete business
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ── Deals / listings under this profile ── */}
+                      {expanded && (
+                        <div className="border-t border-gray-100 bg-gray-50/60 divide-y divide-gray-100">
+                          {group.deals.map((biz) => {
+                            const isFromDb = dbBusinesses.some((db) => db.id === biz.id);
+                            return (
+                              <div key={biz.id} className="flex items-center gap-3 px-4 py-3 pl-12">
                                 {biz.image ? (
-                                  <img src={biz.image} alt={biz.name} className="w-10 h-10 rounded-lg object-cover" />
+                                  <img src={biz.image} alt={biz.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
                                 ) : (
-                                  <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                                    <Store className="w-5 h-5 text-gray-400" />
+                                  <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                                    <Tag className="w-4 h-4 text-gray-400" />
                                   </div>
                                 )}
-                                <div>
-                                  <p className="text-sm font-semibold text-gray-900">{biz.name}</p>
-                                  <p className="text-xs text-gray-400">{biz.location}</p>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-900 truncate">{biz.name}</p>
+                                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                                    <span className="px-1.5 py-0.5 rounded bg-gray-100 text-[11px] font-medium text-gray-600 capitalize">{biz.category}</span>
+                                    {biz.discount && (
+                                      <span className="text-[11px] font-bold text-orange-600">{biz.discount}</span>
+                                    )}
+                                    <span className="text-[11px] text-gray-400">{biz.rating} ★ ({biz.reviewCount})</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    onClick={() => void openAdminFullEdit(biz.id)}
+                                    disabled={adminFullEditLoading}
+                                    className="px-3 py-1 rounded-lg bg-teal-50 text-teal-700 text-xs font-semibold hover:bg-teal-100 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                    Edit listing
+                                  </button>
+                                  <button
+                                    onClick={() => setPreviewBusinessId(biz.id)}
+                                    className="px-3 py-1 rounded-lg bg-white border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-100 transition-colors flex items-center gap-1"
+                                    title="Preview listing"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                  {isFromDb ? (
+                                    <button
+                                      onClick={() => {
+                                        setDeleteEntireBusinessProfile(false);
+                                        setConfirmDeleteId(biz.id);
+                                      }}
+                                      disabled={deletingId === biz.id}
+                                      className="px-3 py-1 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center gap-1"
+                                      title="Remove just this deal"
+                                    >
+                                      {deletingId === biz.id ? (
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                  ) : (
+                                    <span className="px-3 py-1 rounded-lg bg-gray-50 text-gray-300 text-xs font-semibold cursor-not-allowed flex items-center gap-1" title="Sample listings cannot be deleted">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                            </td>
-                            <td className="px-5 py-3">
-                              <span className="px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-600 capitalize">{biz.category}</span>
-                            </td>
-                            <td className="px-5 py-3">
-                              <span className="text-sm font-semibold text-gray-900">{biz.rating}</span>
-                              <span className="text-xs text-gray-400 ml-1">({biz.reviewCount})</span>
-                            </td>
-                            <td className="px-5 py-3">
-                              <span className="text-sm font-bold text-orange-600">{biz.discount || '-'}</span>
-                            </td>
-                            <td className="px-5 py-3">
-                              {isFromDb ? (
-                                <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-600">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                  Database
-                                </span>
-                              ) : (
-                                <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                                  Sample
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-5 py-3">
-                              <span className="flex items-center gap-1.5 text-xs font-semibold text-green-600">
-                                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                                Active
-                              </span>
-                            </td>
-                            <td className="px-5 py-3">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => void openAdminFullEdit(biz.id)}
-                                  disabled={adminFullEditLoading}
-                                  className="px-3 py-1 rounded-lg bg-teal-50 text-teal-700 text-xs font-semibold hover:bg-teal-100 transition-colors flex items-center gap-1 disabled:opacity-50"
-                                >
-                                  <Edit3 className="w-3 h-3" />
-                                  Edit listing
-                                </button>
-                                <button onClick={() => setPreviewBusinessId(biz.id)} className="px-3 py-1 rounded-lg bg-gray-50 text-gray-600 text-xs font-semibold hover:bg-gray-100 transition-colors flex items-center gap-1" title="Preview business details">
-                                  <Eye className="w-3.5 h-3.5" />
-                                </button>
-
-                                {isFromDb ? (
-                                  <button
-                                    onClick={() => {
-                                      setCredentialsBusinessId(profileBusinessIdFor(biz));
-                                      setCredentialsBusinessName(biz.profileName || biz.name);
-                                    }}
-                                    className="px-3 py-1 rounded-lg bg-amber-50 text-amber-800 text-xs font-semibold hover:bg-amber-100 transition-colors flex items-center gap-1"
-                                  >
-                                    <FileText className="w-3 h-3" />
-                                    Credentials
-                                  </button>
-                                ) : null}
-                                {isFromDb ? (
-                                  <button
-                                    onClick={() => {
-                                      setDeleteEntireBusinessProfile(false);
-                                      setConfirmDeleteId(biz.id);
-                                    }}
-                                    disabled={deletingId === biz.id}
-                                    className="px-3 py-1 rounded-lg bg-red-50 text-red-600 text-xs font-semibold hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center gap-1"
-                                  >
-                                    {deletingId === biz.id ? (
-                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    )}
-                                    Delete
-                                  </button>
-                                ) : (
-                                  <span className="px-3 py-1 rounded-lg bg-gray-50 text-gray-300 text-xs font-semibold cursor-not-allowed flex items-center gap-1" title="Sample businesses cannot be deleted">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    Delete
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                {filteredBiz.length === 0 && (
-                  <div className="p-8 text-center">
-                    <Store className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No businesses found matching your search.</p>
-                  </div>
-                )}
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

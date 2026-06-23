@@ -166,18 +166,25 @@ const Navbar: React.FC = () => {
 
           {/* Right Side */}
           <div className="flex items-center gap-2">
-            {/* Language Switcher */}
-            <div className="hidden sm:flex items-center bg-gray-100 rounded-lg p-0.5">
+            {/* Language Switcher — always visible (incl. mobile) with flags so it's easy to find */}
+            <div
+              className="flex items-center gap-0.5 bg-gray-100 rounded-full p-1 shadow-sm ring-1 ring-gray-200/70"
+              role="group"
+              aria-label={language === 'en' ? 'Change language' : language === 'fr' ? 'Changer de langue' : 'Jenisim lanwis'}
+            >
               {langOptions.map(opt => (
                 <button
                   key={opt.code}
                   onClick={() => setLanguage(opt.code)}
-                  className={`px-2 py-1 rounded-md text-xs font-semibold transition-all ${
+                  aria-pressed={language === opt.code}
+                  title={opt.label}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold transition-all ${
                     language === opt.code
                       ? 'bg-white text-teal-700 shadow-sm'
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
+                  <span aria-hidden className="text-sm leading-none">{opt.flag}</span>
                   {opt.label}
                 </button>
               ))}
@@ -264,20 +271,27 @@ const Navbar: React.FC = () => {
                 {item.label}
               </button>
             ))}
-            <div className="flex items-center gap-1 pt-2 border-t border-gray-100 mt-2">
-              {langOptions.map(opt => (
-                <button
-                  key={opt.code}
-                  onClick={() => setLanguage(opt.code)}
-                  className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
-                    language === opt.code
-                      ? 'bg-teal-50 text-teal-700'
-                      : 'text-gray-500 hover:bg-gray-50'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+            <div className="pt-2 border-t border-gray-100 mt-2">
+              <p className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                {language === 'en' ? 'Language' : language === 'fr' ? 'Langue' : 'Lanwis'}
+              </p>
+              <div className="flex items-center gap-1">
+                {langOptions.map(opt => (
+                  <button
+                    key={opt.code}
+                    onClick={() => setLanguage(opt.code)}
+                    aria-pressed={language === opt.code}
+                    className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                      language === opt.code
+                        ? 'bg-teal-50 text-teal-700 ring-1 ring-teal-200'
+                        : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span aria-hidden className="text-base leading-none">{opt.flag}</span>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
             {!user && (
               <div className="space-y-2 pt-2">
