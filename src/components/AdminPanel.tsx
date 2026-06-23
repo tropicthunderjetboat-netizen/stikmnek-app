@@ -29,6 +29,7 @@ import PricingDiscountFields from './PricingDiscountFields';
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import AdminPendingSubmissionReview, { type AdminPendingBusiness } from './AdminPendingSubmissionReview';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import PhotoUploader, { type UploadedPhoto } from '@/components/PhotoUploader';
 import AdminBusinessCredentials from '@/components/AdminBusinessCredentials';
 import AdminIncompleteProfiles, {
   type IncompleteBusinessProfile,
@@ -223,6 +224,7 @@ const AdminPanel: React.FC = () => {
     name: '', category: 'dining', location: '', phone: '',
     contactEmail: '', businessEmail: '', whatsapp: '', website: '', mapUrl: '',
   });
+  const [profileEditLogo, setProfileEditLogo] = useState<UploadedPhoto[]>([]);
 
   // ─── Preview Business modal state ───
   const [previewBusinessId, setPreviewBusinessId] = useState<string | null>(null);
@@ -908,7 +910,7 @@ const AdminPanel: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('businesses')
-        .select('id, name, category, location, phone, email, contact_email, business_email, whatsapp_number, website, map_url')
+        .select('id, name, category, location, phone, email, contact_email, business_email, whatsapp_number, website, map_url, logo_url, image')
         .eq('id', profileId)
         .maybeSingle();
       if (error) throw error;
@@ -924,6 +926,12 @@ const AdminPanel: React.FC = () => {
         website: String(b.website ?? ''),
         mapUrl: String(b.map_url ?? ''),
       });
+      const logo = String(b.logo_url ?? b.image ?? '').trim();
+      setProfileEditLogo(
+        logo
+          ? [{ id: 'existing-logo', url: logo, filePath: logo, name: 'logo', size: 0, preview: logo }]
+          : [],
+      );
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Could not load business profile');
       setProfileEditId(null);
@@ -949,6 +957,7 @@ const AdminPanel: React.FC = () => {
         whatsapp_number: profileEditForm.whatsapp.trim() || null,
         website: normalizeWebsiteForStorage(profileEditForm.website) ?? '',
         map_url: profileEditForm.mapUrl.trim() || null,
+        logo_url: profileEditLogo[0]?.url?.trim() || null,
       };
       const { data, error } = await supabase.functions.invoke('manage-business', {
         headers: await getEdgeAuthHeaders(),
@@ -3098,6 +3107,19 @@ const AdminPanel: React.FC = () => {
                     <div><label className="block text-xs font-semibold text-gray-600 mb-1">Website</label><input type="text" value={profileEditForm.website} onChange={e => setProfileEditForm(p => ({...p, website: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://..." /></div>
                   </div>
                   <div><label className="block text-xs font-semibold text-gray-600 mb-1">Google Maps URL</label><input type="text" value={profileEditForm.mapUrl} onChange={e => setProfileEditForm(p => ({...p, mapUrl: e.target.value}))} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://maps.google.com/..." /></div>
+                  {user?.id && (
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-2">Business logo</label>
+                      <PhotoUploader
+                        photos={profileEditLogo}
+                        onPhotosChange={setProfileEditLogo}
+                        maxPhotos={1}
+                        userId={user.id}
+                        logoCrop
+                        sublabel="Upload then drag and zoom to fit the square. Shared across all this business's listings."
+                      />
+                    </div>
+                  )}
                   <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
                     <button type="button" onClick={() => setProfileEditId(null)} disabled={profileEditSaving} className="px-5 py-2.5 rounded-xl bg-white border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
                     <button type="submit" disabled={profileEditSaving} className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-50">{profileEditSaving ? <><Loader2 className="w-4 h-4 animate-spin" />Saving...</> : <><Save className="w-4 h-4" />Save profile</>}</button>
