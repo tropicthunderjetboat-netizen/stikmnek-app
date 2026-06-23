@@ -127,16 +127,6 @@ export function pricingTiersFromDb(value: unknown): PricingTierInput[] {
   return out;
 }
 
-function rowHasAnyInput(t: PricingTierInput): boolean {
-  return (
-    (t.label || '').trim().length > 0 ||
-    (Number(t.original_price_vt) || 0) > 0 ||
-    (Number(t.deal_price_vt) || 0) > 0 ||
-    (Number(t.min_pax) || 0) > 0 ||
-    (t.max_pax !== null && t.max_pax !== undefined && String(t.max_pax).trim() !== '')
-  );
-}
-
 /**
  * Validates tier rows and returns JSON for Supabase, or null if no tiers.
  * Returns `{ error }` if a partially filled row is invalid.
@@ -145,7 +135,12 @@ export function validatePricingTiersForSubmit(tiers: PricingTierInput[]): {
   data: unknown[] | null;
   error: string | null;
 } {
-  const active = tiers.filter(rowHasAnyInput);
+  // A row only counts once it has a price. This keeps optional rows (e.g. a
+  // "Children" slot the owner left blank) from blocking submission — they're
+  // simply not offered. Rows with a partial price (one side filled) still error below.
+  const active = tiers.filter(
+    (t) => (Number(t.original_price_vt) || 0) > 0 || (Number(t.deal_price_vt) || 0) > 0,
+  );
   if (active.length === 0) return { data: null, error: null };
 
   const cleaned: {

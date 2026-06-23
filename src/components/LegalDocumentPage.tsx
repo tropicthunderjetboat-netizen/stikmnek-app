@@ -14,9 +14,9 @@ const VALID_SLUGS = new Set([
   'data-protection',
 ]);
 
-type Lang = 'en' | 'fr' | 'bi';
+export type Lang = 'en' | 'fr' | 'bi';
 
-const TITLES: Record<string, Record<Lang, string>> = {
+export const TITLES: Record<string, Record<Lang, string>> = {
   privacy: {
     en: 'Privacy Policy',
     fr: 'Politique de confidentialité',
@@ -49,7 +49,7 @@ const TITLES: Record<string, Record<Lang, string>> = {
   },
 };
 
-function bodyFor(slug: string, lang: Lang): React.ReactNode {
+export function bodyFor(slug: string, lang: Lang): React.ReactNode {
   const p = (chunks: Record<Lang, string[]>) =>
     chunks[lang].map((para, i) => (
       <p key={i} className="text-gray-600 leading-relaxed mb-4">

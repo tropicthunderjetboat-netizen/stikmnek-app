@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { FunctionsHttpError, FunctionsFetchError, PostgrestError } from '@supabase/supabase-js';
 import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
 import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
-import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, ArrowLeft, AlertTriangle, Globe, Info } from 'lucide-react';
+import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, ArrowLeft, AlertTriangle, Globe, Info, X, FileText } from 'lucide-react';
+import { bodyFor as legalBodyFor, TITLES as LEGAL_TITLES } from './LegalDocumentPage';
 
 import { formatVT } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -420,6 +420,64 @@ function editBaselinesEqual(a: EditBaseline, b: EditBaseline): boolean {
 const WIZARD_STEP_KEYS: string[][] = [['title', 'description'], ['pricing'], [], ['photos'], []];
 const WIZARD_LAST_STEP = WIZARD_STEP_KEYS.length - 1;
 
+/**
+ * Local draft autosave for the new-listing wizard. Owners often leave the page
+ * (e.g. to read the terms) and come back — without this their work is lost.
+ * Only persisted photo URLs are kept (blob previews die on reload).
+ */
+const LISTING_DRAFT_KEY = 'stikmnek:listing-draft:v1';
+
+interface ListingDraft {
+  form: Record<string, string>;
+  photos: UploadedPhoto[];
+  pricingTiers: PricingTierInput[];
+  step: number;
+  savedAt: number;
+}
+
+function loadListingDraft(): ListingDraft | null {
+  try {
+    const raw = localStorage.getItem(LISTING_DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as Partial<ListingDraft> | null;
+    if (!d || typeof d !== 'object' || !d.form || typeof d.form !== 'object') return null;
+    const photos = Array.isArray(d.photos)
+      ? d.photos
+          .filter((p) => isPersistedPhotoUrl(String(p?.url || '')))
+          .map((p) => ({ ...p, preview: p.url }))
+      : [];
+    const stepRaw = Number(d.step);
+    return {
+      form: d.form as Record<string, string>,
+      photos,
+      pricingTiers: Array.isArray(d.pricingTiers) ? d.pricingTiers : [],
+      step: Number.isFinite(stepRaw) ? Math.max(0, Math.min(WIZARD_LAST_STEP, Math.floor(stepRaw))) : 0,
+      savedAt: Number(d.savedAt) || 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveListingDraft(d: Omit<ListingDraft, 'savedAt'>): void {
+  try {
+    const photos = d.photos
+      .filter((p) => isPersistedPhotoUrl(String(p?.url || '')))
+      .map((p) => ({ id: p.id, url: p.url, filePath: p.filePath, name: p.name, size: p.size, preview: p.url }));
+    localStorage.setItem(LISTING_DRAFT_KEY, JSON.stringify({ ...d, photos, savedAt: Date.now() }));
+  } catch {
+    /* ignore quota / privacy-mode errors */
+  }
+}
+
+function clearListingDraft(): void {
+  try {
+    localStorage.removeItem(LISTING_DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit = null, adminOnboard = null }) => {
   const {
     language,
@@ -430,10 +488,13 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     setShowAuth,
     setAuthMode,
   } = useAppContext();
+  /** Only the public new-listing wizard autosaves a draft (not edit / admin onboarding). */
+  const isDraftScope = !embeddedEdit && !adminOnboard;
+  const [initialDraft] = useState<ListingDraft | null>(() => (isDraftScope ? loadListingDraft() : null));
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
-  const [pricingTiers, setPricingTiers] = useState<PricingTierInput[]>([]);
+  const [photos, setPhotos] = useState<UploadedPhoto[]>(() => initialDraft?.photos ?? []);
+  const [pricingTiers, setPricingTiers] = useState<PricingTierInput[]>(() => initialDraft?.pricingTiers ?? []);
   /** Inline validation for submit (images, description, pricing). */
   const [fieldErrors, setFieldErrors] = useState<{
     title?: string;
@@ -444,8 +505,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
   /** Bumps after successful submit so contact prefill runs again on an empty form. */
   const [prefillNonce, setPrefillNonce] = useState(0);
   const [agreedPartnerTerms, setAgreedPartnerTerms] = useState(false);
+  /** Show the partner terms in a modal so reading them never navigates away (and loses the draft). */
+  const [showTerms, setShowTerms] = useState(false);
   /** Current wizard step (guided mode only). */
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => initialDraft?.step ?? 0);
   const wizardFormRef = useRef<HTMLFormElement | null>(null);
   const wizardMountedRef = useRef(false);
 
@@ -458,14 +521,17 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     }
     wizardFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [step, embeddedEdit, adminOnboard]);
-  const [form, setForm] = useState({
-    name: '', category: 'dining', description: '', discount: '',
-    originalPrice: '', discountPercent: '', dealPrice: '',
-    address: '', phone: '', email: '', hours: '',
-    whatsappNumber: '',
-    mapUrl: '', website: '',
-    discountValidFrom: todayStr(),
-    listingDuration: '1_month',
+  const [form, setForm] = useState(() => {
+    const defaults = {
+      name: '', category: 'dining', description: '', discount: '',
+      originalPrice: '', discountPercent: '', dealPrice: '',
+      address: '', phone: '', email: '', hours: '',
+      whatsappNumber: '',
+      mapUrl: '', website: '',
+      discountValidFrom: todayStr(),
+      listingDuration: '1_month',
+    };
+    return initialDraft?.form ? { ...defaults, ...initialDraft.form } : defaults;
   });
 
   /** When the owner has exactly one profile, link new pending rows to it (multi-offer workflow). */
@@ -728,6 +794,12 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     }
   }, [form.category, embeddedEdit]);
 
+  // Autosave a local draft so leaving the page (e.g. to read the terms) never loses work.
+  useEffect(() => {
+    if (!isDraftScope || submitted) return;
+    saveListingDraft({ form, photos, pricingTiers, step });
+  }, [isDraftScope, submitted, form, photos, pricingTiers, step]);
+
   // Pre-fill contact & location from the owner's primary business profile (not the deal title).
   useEffect(() => {
     if (embeddedEdit) return;
@@ -792,6 +864,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     });
     setPhotos([]);
     setPricingTiers([]);
+    setStep(0);
+    setAgreedPartnerTerms(false);
+    clearListingDraft();
     setPrefillNonce((n) => n + 1);
   }, []);
 
@@ -1437,6 +1512,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       ? savedDiscountValidFromRef.current
       : todayStr();
 
+  const legalLang: 'en' | 'fr' | 'bi' = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+
   // ─── Guided wizard (first-deal / new-listing path) ───
   // Full form stays for dashboard editing and admin onboarding.
   const guided = !isEmbeddedEdit && !adminOnboard;
@@ -1645,6 +1722,31 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   style={{ width: `${Math.round(((step + 1) / (WIZARD_LAST_STEP + 1)) * 100)}%` }}
                 />
               </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs font-semibold text-emerald-600 inline-flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5" aria-hidden />
+                  {language === 'en'
+                    ? 'Saved automatically'
+                    : language === 'fr'
+                      ? 'Enregistré automatiquement'
+                      : 'Sevem otomatik'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const msg =
+                      language === 'en'
+                        ? 'Clear this listing and start over?'
+                        : language === 'fr'
+                          ? 'Effacer cette annonce et recommencer ?'
+                          : 'Klialem listing ia mo stat bakegen?';
+                    if (window.confirm(msg)) resetFormAfterSuccess();
+                  }}
+                  className="text-xs font-semibold text-gray-400 hover:text-red-500 underline underline-offset-2"
+                >
+                  {language === 'en' ? 'Start over' : language === 'fr' ? 'Recommencer' : 'Stat bakegen'}
+                </button>
+              </div>
             </div>
           )}
           {(!guided || step === 0) && (
@@ -1684,7 +1786,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   {fieldErrors.title}
                 </p>
               )}
-              <p className="text-[11px] text-gray-500 mt-1">
+              <p className="text-xs text-gray-600 mt-1">
                 {language === 'en'
                   ? 'This is the name tourists see for this deal. Save to update your live listing.'
                   : language === 'fr'
@@ -1772,7 +1874,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 {language === 'en' ? 'Discount Optional' : 'Remise optionnelle'}
               </span>
             </div>
-            <p className="text-xs text-gray-500 mb-4">
+            <p className="text-sm text-gray-700 mb-4">
               {categoryUsesTieredPricing(form.category)
                 ? language === 'en'
                   ? 'Enter a single per-person price in Vatu (VT) (used if you add no tiers). Discount is optional — businesses offering discounts get featured priority.'
@@ -1810,7 +1912,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                     placeholder="5000"
                   />
                 </div>
-                <p className="text-[10px] text-gray-400 mt-0.5">
+                <p className="text-xs text-gray-600 mt-0.5">
                   {categoryUsesPerUnitPricing(form.category)
                     ? perUnitPriceHint(
                         form.category,
@@ -1846,7 +1948,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                     placeholder="20"
                   />
                 </div>
-                <p className="text-[10px] text-gray-400 mt-0.5">
+                <p className="text-xs text-gray-600 mt-0.5">
                   {language === 'en' ? 'Percentage off for pass holders' : 'Pourcentage de réduction'}
                 </p>
               </div>
@@ -1873,7 +1975,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                     }`}
                   />
                 </div>
-                <p className="text-[10px] text-gray-400 mt-0.5">
+                <p className="text-xs text-gray-600 mt-0.5">
                   {language === 'en' ? 'Calculated from price & discount' : 'Calculé automatiquement'}
                 </p>
               </div>
@@ -1991,7 +2093,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 {language === 'en' ? 'Discount Validity Period' : language === 'fr' ? 'Période de validité de la remise' : 'Taem blong Diskaon'}
               </h3>
             </div>
-            <p className="text-xs text-gray-500 mb-3">
+            <p className="text-sm text-gray-700 mb-3">
               {language === 'en'
                 ? 'Select when your discount starts and choose a listing duration. The end date is automatically calculated.'
                 : 'Sélectionnez la date de début et choisissez une durée. La date de fin est calculée automatiquement.'}
@@ -2024,7 +2126,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                     </option>
                   ))}
                 </select>
-                <p className="text-[10px] text-gray-400 mt-0.5">
+                <p className="text-xs text-gray-600 mt-0.5">
                   {language === 'en' ? 'End date auto-calculated from option' : 'Date de fin calculée automatiquement'}
                 </p>
               </div>
@@ -2038,7 +2140,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   readOnly
                   className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm bg-gray-50 text-gray-600 cursor-not-allowed"
                 />
-                <p className="text-[10px] text-gray-400 mt-0.5">
+                <p className="text-xs text-gray-600 mt-0.5">
                   {language === 'en' ? 'Auto-set from duration' : 'Défini automatiquement'}
                 </p>
               </div>
@@ -2079,7 +2181,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 placeholder={hoursFieldCopy.placeholder}
               />
-              <p className="text-[11px] text-gray-400 mt-1">{hoursFieldCopy.hint}</p>
+              <p className="text-xs text-gray-600 mt-1">{hoursFieldCopy.hint}</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2129,7 +2231,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 {language === 'en' ? 'WhatsApp Number (Optional)' : language === 'fr' ? 'Numéro WhatsApp (Optionnel)' : 'WhatsApp Namba (Opsonal)'}
               </h3>
             </div>
-            <p className="text-xs text-gray-500 mb-3">
+            <p className="text-sm text-gray-700 mb-3">
               {language === 'en'
                 ? 'Add your WhatsApp number so tourists can message you directly. Include country code (e.g. +678).'
                 : language === 'fr'
@@ -2169,7 +2271,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 {language === 'en' ? 'Online Presence & Map' : language === 'fr' ? 'Présence en ligne et carte' : 'Onlaen mo Map'}
               </h3>
             </div>
-            <p className="text-xs text-gray-500 mb-3">
+            <p className="text-sm text-gray-700 mb-3">
               {language === 'en'
                 ? 'Set your location on the map and add your website so tourists can find you easily.'
                 : 'Indiquez votre emplacement sur la carte et votre site web pour que les touristes vous trouvent facilement.'}
@@ -2198,7 +2300,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               {language === 'en' ? 'Business photos' : 'Photos de l\'entreprise'}
               <span className="text-red-600 font-semibold" aria-hidden> *</span>
             </label>
-            <p className="text-xs text-gray-500 mb-2">
+            <p className="text-sm text-gray-700 mb-2">
               {language === 'en'
                 ? 'At least one photo is required. Drag to reorder or use Set cover — the first photo is your listing cover.'
                 : 'Au moins une photo est requise. Glissez pour réordonner ou « Définir couverture » — la première est l’image principale.'}
@@ -2263,40 +2365,37 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   {language === 'en' ? (
                     <>
                       I have read and agree to the{' '}
-                      <Link
-                        to="/legal/business-partner"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-teal-600 font-semibold hover:underline"
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTerms(true); }}
+                        className="text-teal-600 font-bold underline underline-offset-2"
                       >
                         Business partner &amp; listing terms
-                      </Link>
+                      </button>
                       , including maintaining appropriate insurance and permits, conducting business honestly, and honouring StikmNek passes at the agreed discounted rates.
                     </>
                   ) : language === 'fr' ? (
                     <>
                       J’ai lu et j’accepte les{' '}
-                      <Link
-                        to="/legal/business-partner"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-teal-600 font-semibold hover:underline"
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTerms(true); }}
+                        className="text-teal-600 font-bold underline underline-offset-2"
                       >
                         conditions Partenaires commerciaux et d’inscription
-                      </Link>
+                      </button>
                       , y compris l’assurance et les autorisations appropriées, une activité honnête, et le respect des pass StikmNek aux tarifs réduits convenus.
                     </>
                   ) : (
                     <>
                       Mi bin ridim mo mi agri long{' '}
-                      <Link
-                        to="/legal/business-partner"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-teal-600 font-semibold hover:underline"
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowTerms(true); }}
+                        className="text-teal-600 font-bold underline underline-offset-2"
                       >
                         Business partner &amp; listing terms
-                      </Link>
+                      </button>
                       : insuren mo pemit we i stret, wok honest mo professional, mo honor ol StikmNek pas long diskon we i stap long listing.
                     </>
                   )}
@@ -2375,6 +2474,60 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           )}
         </form>
       </div>
+
+      {showTerms && (
+        <div
+          className="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center bg-black/50 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowTerms(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="w-5 h-5 text-teal-600 shrink-0" aria-hidden />
+                <h3 className="text-base font-extrabold text-gray-900 truncate">
+                  {LEGAL_TITLES['business-partner'][legalLang]}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTerms(false)}
+                className="w-9 h-9 shrink-0 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500"
+                aria-label={language === 'en' ? 'Close' : language === 'fr' ? 'Fermer' : 'Klosem'}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4 text-sm">
+              {legalBodyFor('business-partner', legalLang)}
+            </div>
+            <div className="px-5 py-4 border-t border-gray-100 space-y-2">
+              <button
+                type="button"
+                onClick={() => { setAgreedPartnerTerms(true); setShowTerms(false); }}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold shadow-lg"
+              >
+                {language === 'en'
+                  ? 'I agree to these terms'
+                  : language === 'fr'
+                    ? "J'accepte ces conditions"
+                    : 'Mi agri long ol taem ia'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowTerms(false)}
+                className="w-full py-2 text-sm font-semibold text-gray-500 hover:text-gray-700"
+              >
+                {language === 'en' ? 'Close' : language === 'fr' ? 'Fermer' : 'Klosem'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };
