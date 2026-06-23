@@ -1,8 +1,16 @@
-import React, { Suspense, useEffect, useRef } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAppContext, isTouristProfileCompleteForGate } from '@/contexts/AppContext';
-import { isRoutableAppPath, viewFromPathname, type ViewMode } from '@/utils/viewModes';
+import {
+  dealSlugFromPathname,
+  isRoutableAppPath,
+  viewFromPathname,
+  type ViewMode,
+} from '@/utils/viewModes';
+import { dealSlugForBusiness, offeringIdFromDealSlug } from '@/lib/dealUrl';
+import { fetchOfferingById } from '@/lib/loadListings';
+import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import LegalDocumentPage from './LegalDocumentPage';
 import NotFound from '@/pages/NotFound';
 
@@ -134,8 +142,13 @@ const AppLayout: React.FC = () => {
     userProfileLoadError,
     retryUserProfileFetch,
     language,
+    dbBusinesses,
+    dataLoaded,
+    selectedBusiness,
+    setSelectedBusiness,
   } = useAppContext();
   const prevViewRef = useRef(currentView);
+  const [dealNotFound, setDealNotFound] = useState(false);
 
   useEffect(() => {
     const p = location.pathname;
@@ -145,6 +158,61 @@ const AppLayout: React.FC = () => {
       setCurrentView(next);
     }
   }, [location.pathname, setCurrentView]);
+
+  // ─── Deep-link resolver for /deal/:slug ───
+  // Maps a shared URL back to the right listing: prefer the already-loaded
+  // `dbBusinesses`, fall back to a direct fetch for cold loads / not-yet-loaded data.
+  useEffect(() => {
+    const slug = dealSlugFromPathname(location.pathname);
+    if (!slug) {
+      setDealNotFound(false);
+      return;
+    }
+
+    const offId = offeringIdFromDealSlug(slug);
+
+    // Already showing the right deal — nothing to do.
+    if (
+      selectedBusiness &&
+      ((offId && String(selectedBusiness.id) === offId) ||
+        dealSlugForBusiness(selectedBusiness) === slug)
+    ) {
+      setDealNotFound(false);
+      return;
+    }
+
+    const fromMemory = dbBusinesses.find(
+      (b) => (offId && String(b.id) === offId) || dealSlugForBusiness(b) === slug,
+    );
+    if (fromMemory) {
+      setSelectedBusiness(fromMemory);
+      setDealNotFound(false);
+      return;
+    }
+
+    if (!offId) {
+      // No resolvable id and not in memory — only a 404 once listings have loaded.
+      if (dataLoaded) setDealNotFound(true);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      const biz = await fetchOfferingById(supabase, SUPABASE_URL, offId);
+      if (cancelled) return;
+      if (biz) {
+        setSelectedBusiness(biz);
+        setDealNotFound(false);
+      } else {
+        setDealNotFound(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // `dealNotFound` is intentionally omitted: it's set here, not read, so including
+    // it would re-run the effect and loop on a failed lookup.
+  }, [location.pathname, dbBusinesses, dataLoaded, selectedBusiness, setSelectedBusiness]);
 
   // ─── Role-based view access control ───
   useEffect(() => {
@@ -264,8 +332,19 @@ const AppLayout: React.FC = () => {
         return <CompleteTouristProfile />;
       case 'complete-business-profile':
         return <CompleteBusinessProfile />;
-      case 'business-detail':
+      case 'business-detail': {
+        // Deep link to a deal that doesn't exist (deleted / bad slug).
+        if (dealNotFound) return <NotFound />;
+        // Resolving a /deal/:slug cold load — show a skeleton until the listing arrives.
+        if (!selectedBusiness && dealSlugFromPathname(location.pathname)) {
+          return (
+            <div className="pt-16">
+              <LoadingSkeleton />
+            </div>
+          );
+        }
         return <BusinessDetail />;
+      }
       case 'deals':
         return (
           <div className="pt-16">

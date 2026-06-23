@@ -61,6 +61,63 @@ function mapOfferingJoinRows(
 }
 
 /**
+ * Resolve a single offering (by `business_offerings.id`) into a `Business`.
+ * Used for deep links (`/deal/:slug`) when the listing isn't already in memory.
+ * Tries `business_listings_view` first, then the `business_offerings` + `businesses` join.
+ */
+export async function fetchOfferingById(
+  supabase: SupabaseClient,
+  supabaseUrl: string,
+  offeringId: string,
+): Promise<Business | null> {
+  const DBG = '[fetchOfferingById]';
+  const id = String(offeringId ?? '').trim();
+  if (!id) return null;
+
+  const { data: viewRow, error: viewErr } = await supabase
+    .from('business_listings_view')
+    .select(BUSINESS_LISTINGS_VIEW_COLUMNS)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!viewErr && viewRow) {
+    const { o, b } = splitBusinessListingsViewRow(viewRow as Record<string, unknown>);
+    if (b?.id) {
+      try {
+        return mapJoinedOfferingToBusiness(o, b, supabaseUrl);
+      } catch (mapErr) {
+        console.warn(`${DBG} view row map failed:`, mapErr);
+      }
+    }
+  } else if (viewErr) {
+    console.warn(`${DBG} business_listings_view failed:`, viewErr.message);
+  }
+
+  const { data: joinRow, error: joinErr } = await supabase
+    .from('business_offerings')
+    .select(`${OFFERING_LISTING_COLUMNS}, businesses(${BUSINESS_PROFILE_EMBED_COLS})`)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (!joinErr && joinRow) {
+    const row = joinRow as Record<string, unknown>;
+    const profile = unwrapPostgrestEmbed(row.businesses);
+    if (profile?.id) {
+      const { businesses: _embed, ...offering } = row;
+      try {
+        return mapJoinedOfferingToBusiness(offering as Record<string, unknown>, profile, supabaseUrl);
+      } catch (mapErr) {
+        console.warn(`${DBG} join row map failed:`, mapErr);
+      }
+    }
+  } else if (joinErr) {
+    console.warn(`${DBG} business_offerings join failed:`, joinErr.message);
+  }
+
+  return null;
+}
+
+/**
  * Load active tourist listings. Tries `business_listings_view` first (current schema),
  * then falls back to `business_offerings` + `businesses` if the view is missing or errors
  * (e.g. production DB migration not applied yet).

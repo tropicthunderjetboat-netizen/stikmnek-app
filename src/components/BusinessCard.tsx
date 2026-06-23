@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import {
@@ -16,6 +17,7 @@ import { trackInteractionEvent } from '@/lib/interactionEvents';
 import { toast } from 'sonner';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
+import { absoluteDealUrl, dealPathForBusiness } from '@/lib/dealUrl';
 import { isListingFavorited } from '@/lib/favoritesUi';
 import BusinessProfileLogo from '@/components/BusinessProfileLogo';
 
@@ -46,6 +48,7 @@ const iconActionBtn =
   'inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2';
 
 const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false }) => {
+  const navigate = useNavigate();
   const {
     language,
     favorites,
@@ -95,6 +98,8 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
     });
     setSelectedBusiness(business);
     setCurrentView('business-detail');
+    // Push the shareable URL so the address bar + back button stay in sync.
+    navigate(dealPathForBusiness(business));
   };
 
   const handleFavorite = (e: React.MouseEvent) => {
@@ -151,7 +156,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
     const shareData = {
       title: `${business.name}${dealBit}`,
       text: `Check out ${business.name}${dealBit} on StikmNek!`,
-      url: window.location.origin,
+      url: absoluteDealUrl(business),
     };
     try {
       if (navigator.share) {

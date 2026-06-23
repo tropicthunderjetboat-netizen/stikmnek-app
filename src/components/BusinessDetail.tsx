@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useAppContext } from '@/contexts/AppContext';
+import { absoluteDealUrl } from '@/lib/dealUrl';
 import { t } from '@/data/translations';
 import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, MessageSquarePlus, Sparkles, ExternalLink, Store, Layers, Globe } from 'lucide-react';
 import { toast } from 'sonner';
@@ -111,6 +114,7 @@ function detailOfferingSwitcherLabel(
 }
 
 const BusinessDetail: React.FC = () => {
+  const navigate = useNavigate();
   const {
     language, selectedBusiness, setCurrentView, setSelectedBusiness,
     favorites, toggleFavorite, user, userProfile, setShowAuth, setAuthMode,
@@ -533,6 +537,8 @@ const BusinessDetail: React.FC = () => {
   const handleBack = () => {
     setSelectedBusiness(null);
     setCurrentView('deals');
+    // Leave the /deal/:slug URL so the address bar matches the deals view.
+    navigate('/deals');
   };
 
   const handleRequestBooking = () => {
@@ -603,7 +609,7 @@ const BusinessDetail: React.FC = () => {
 
   const handleShare = async () => {
     const shareBody = plainTextFromHtml(desc || '') || biz.name;
-    const shareData = { title: biz.name, text: shareBody, url: window.location.href };
+    const shareData = { title: biz.name, text: shareBody, url: absoluteDealUrl(biz) };
     try {
       if (navigator.share) {
         await navigator.share(shareData);
@@ -621,8 +627,32 @@ const BusinessDetail: React.FC = () => {
   };
 
 
+  const metaTitle = `${biz.name} · StikmNek`;
+  const metaDescription =
+    (plainTextFromHtml(desc || '') || `${biz.name} on StikmNek — Vanuatu’s local deals & experiences.`)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200);
+  const metaImage = (displayCoverImage || biz.image || '').trim();
+  const metaUrl = absoluteDealUrl(biz);
+
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
+      <Helmet prioritizeSeoTags>
+        <title>{metaTitle}</title>
+        <meta name="description" content={metaDescription} />
+        <link rel="canonical" href={metaUrl} />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="StikmNek" />
+        <meta property="og:title" content={metaTitle} />
+        <meta property="og:description" content={metaDescription} />
+        <meta property="og:url" content={metaUrl} />
+        {metaImage && <meta property="og:image" content={metaImage} />}
+        <meta name="twitter:card" content={metaImage ? 'summary_large_image' : 'summary'} />
+        <meta name="twitter:title" content={metaTitle} />
+        <meta name="twitter:description" content={metaDescription} />
+        {metaImage && <meta name="twitter:image" content={metaImage} />}
+      </Helmet>
       <div className="max-w-4xl mx-auto px-4 py-4">
         <button onClick={handleBack} className="flex items-center gap-2 text-gray-600 hover:text-teal-700 transition-colors text-sm font-medium">
           <ArrowLeft className="w-4 h-4" />
