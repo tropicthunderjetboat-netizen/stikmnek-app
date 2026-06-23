@@ -52,6 +52,7 @@ import {
 } from '@/lib/businessOnboardingValidation';
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import BusinessCredentialsSettings from './BusinessCredentialsSettings';
+import WizardLanguageToggle from './WizardLanguageToggle';
 
 /** Whole submit (RPC + edge + attach) — allow RPC + edge cold starts without false “slow connection” */
 const LISTING_SUBMIT_DEADLINE_MS = 150_000;
@@ -1710,6 +1711,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         <form ref={wizardFormRef} onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-gray-100 space-y-5">
           {guided && (
             <div className="mb-1">
+              <div className="flex justify-center mb-3">
+                <WizardLanguageToggle />
+              </div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold uppercase tracking-wide text-gray-400">
                   {language === 'en' ? 'Step' : language === 'fr' ? 'Étape' : 'Step'} {step + 1} / {WIZARD_LAST_STEP + 1}

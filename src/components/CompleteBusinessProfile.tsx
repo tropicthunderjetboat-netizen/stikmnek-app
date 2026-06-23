@@ -15,6 +15,7 @@ import { parseLatLngFromMapUrl } from '@/lib/urlHelpers';
 import { validateBusinessProfileOnboarding } from '@/lib/businessOnboardingValidation';
 import { checkBusinessOwnerNeedsFirstListing } from '@/lib/businessOwnerListingStatus';
 import BusinessCredentialsSettings from '@/components/BusinessCredentialsSettings';
+import WizardLanguageToggle from '@/components/WizardLanguageToggle';
 
 /** Maps `validateBusinessProfileOnboarding` error keys → local `errors` state keys used by this form. */
 const PROFILE_VALIDATION_KEY_TO_FORM: Record<string, string> = {
@@ -646,6 +647,9 @@ const CompleteBusinessProfile: React.FC = () => {
         </div>
         <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
           <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 transition-all" style={{ width: `${progressPct}%` }} />
+        </div>
+        <div className="flex justify-center mt-3">
+          <WizardLanguageToggle />
         </div>
       </div>
 

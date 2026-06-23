@@ -1,0 +1,6942 @@
+[
+  {
+    "id": "TR-0001",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "nav.home",
+    "start": 179,
+    "end": 184,
+    "original": "'Hom'",
+    "bi": "Hom"
+  },
+  {
+    "id": "TR-0002",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "nav.deals",
+    "start": 236,
+    "end": 242,
+    "original": "'Dils'",
+    "bi": "Dils"
+  },
+  {
+    "id": "TR-0003",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "nav.map",
+    "start": 289,
+    "end": 294,
+    "original": "'Map'",
+    "bi": "Map"
+  },
+  {
+    "id": "TR-0004",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "nav.passes",
+    "start": 346,
+    "end": 351,
+    "original": "'Pas'",
+    "bi": "Pas"
+  },
+  {
+    "id": "TR-0005",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "nav.dashboard",
+    "start": 420,
+    "end": 428,
+    "original": "'Dasbod'",
+    "bi": "Dasbod"
+  },
+  {
+    "id": "TR-0006",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "nav.admin",
+    "start": 479,
+    "end": 486,
+    "original": "'Admin'",
+    "bi": "Admin"
+  },
+  {
+    "id": "TR-0007",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "nav.signin",
+    "start": 544,
+    "end": 553,
+    "original": "'Saen In'",
+    "bi": "Saen In"
+  },
+  {
+    "id": "TR-0008",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "nav.signout",
+    "start": 615,
+    "end": 625,
+    "original": "'Saen Aot'",
+    "bi": "Saen Aot"
+  },
+  {
+    "id": "TR-0009",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.title",
+    "start": 752,
+    "end": 786,
+    "original": "'Faenem Beswan Dils blong Vanuatu'",
+    "bi": "Faenem Beswan Dils blong Vanuatu"
+  },
+  {
+    "id": "TR-0010",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.subtitle",
+    "start": 1141,
+    "end": 1255,
+    "original": "'Openem eksklusiv diskaon kasem 35% long kakae, tua, mo aktiviti. Joinem tausen blong hapi turis mo lokal bisnis.'",
+    "bi": "Openem eksklusiv diskaon kasem 35% long kakae, tua, mo aktiviti. Joinem tausen blong hapi turis mo lokal bisnis."
+  },
+  {
+    "id": "TR-0011",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.ctaTourist",
+    "start": 1361,
+    "end": 1383,
+    "original": "'Saen Ap & Karem Dils'",
+    "bi": "Saen Ap & Karem Dils"
+  },
+  {
+    "id": "TR-0012",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.ctaBusiness",
+    "start": 1492,
+    "end": 1522,
+    "original": "'Listem Bisnis Blong Yu (Fri)'",
+    "bi": "Listem Bisnis Blong Yu (Fri)"
+  },
+  {
+    "id": "TR-0013",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.businessOwnersHint",
+    "start": 1615,
+    "end": 1631,
+    "original": "'Yu gat bisnis?'",
+    "bi": "Yu gat bisnis?"
+  },
+  {
+    "id": "TR-0014",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.cta",
+    "start": 1702,
+    "end": 1722,
+    "original": "'Karem Pas Blong Yu'",
+    "bi": "Karem Pas Blong Yu"
+  },
+  {
+    "id": "TR-0015",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.explore",
+    "start": 1798,
+    "end": 1815,
+    "original": "'Eksploarem Dils'",
+    "bi": "Eksploarem Dils"
+  },
+  {
+    "id": "TR-0016",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.browseDeals",
+    "start": 1890,
+    "end": 1905,
+    "original": "'Lukim ol dils'",
+    "bi": "Lukim ol dils"
+  },
+  {
+    "id": "TR-0017",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.welcomeBack",
+    "start": 2029,
+    "end": 2059,
+    "original": "'Welkam bak — faenem nix dils'",
+    "bi": "Welkam bak — faenem nix dils"
+  },
+  {
+    "id": "TR-0018",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.businesses",
+    "start": 2141,
+    "end": 2155,
+    "original": "'Lokal Bisnis'",
+    "bi": "Lokal Bisnis"
+  },
+  {
+    "id": "TR-0019",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.savings",
+    "start": 2232,
+    "end": 2246,
+    "original": "'Averej Sevin'",
+    "bi": "Averej Sevin"
+  },
+  {
+    "id": "TR-0020",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "hero.tourists",
+    "start": 2325,
+    "end": 2337,
+    "original": "'Hapi Turis'",
+    "bi": "Hapi Turis"
+  },
+  {
+    "id": "TR-0021",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "cat.all",
+    "start": 2402,
+    "end": 2410,
+    "original": "'Olgeta'",
+    "bi": "Olgeta"
+  },
+  {
+    "id": "TR-0022",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "cat.dining",
+    "start": 2470,
+    "end": 2477,
+    "original": "'Kakae'",
+    "bi": "Kakae"
+  },
+  {
+    "id": "TR-0023",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "cat.activities",
+    "start": 2542,
+    "end": 2552,
+    "original": "'Aktiviti'",
+    "bi": "Aktiviti"
+  },
+  {
+    "id": "TR-0024",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "cat.tours",
+    "start": 2605,
+    "end": 2610,
+    "original": "'Tua'",
+    "bi": "Tua"
+  },
+  {
+    "id": "TR-0025",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "cat.transportation",
+    "start": 2683,
+    "end": 2694,
+    "original": "'Transport'",
+    "bi": "Transport"
+  },
+  {
+    "id": "TR-0026",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "cat.shopping",
+    "start": 2754,
+    "end": 2762,
+    "original": "'Soping'",
+    "bi": "Soping"
+  },
+  {
+    "id": "TR-0027",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "cat.spa",
+    "start": 2830,
+    "end": 2842,
+    "original": "'Spa & Helt'",
+    "bi": "Spa & Helt"
+  },
+  {
+    "id": "TR-0028",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "cat.accommodation",
+    "start": 2915,
+    "end": 2932,
+    "original": "'Ples blong slip'",
+    "bi": "Ples blong slip"
+  },
+  {
+    "id": "TR-0029",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.title",
+    "start": 3026,
+    "end": 3039,
+    "original": "'Mekem Pasem'",
+    "bi": "Mekem Pasem"
+  },
+  {
+    "id": "TR-0030",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.subtitle",
+    "start": 3201,
+    "end": 3245,
+    "original": "'Kostomem yor travel long fleksibel pricing'",
+    "bi": "Kostomem yor travel long fleksibel pricing"
+  },
+  {
+    "id": "TR-0031",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passSelection.title",
+    "start": 3336,
+    "end": 3349,
+    "original": "'Mekem Pasem'",
+    "bi": "Mekem Pasem"
+  },
+  {
+    "id": "TR-0032",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passSelection.subtitle",
+    "start": 3520,
+    "end": 3564,
+    "original": "'Kostomem yor travel long fleksibel pricing'",
+    "bi": "Kostomem yor travel long fleksibel pricing"
+  },
+  {
+    "id": "TR-0033",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.build_how_desc",
+    "start": 3861,
+    "end": 3949,
+    "original": "'Sign ap, putem hu mas i travelem, dat blong trip, pei wetem kredit kad, mo stat sevem.'",
+    "bi": "Sign ap, putem hu mas i travelem, dat blong trip, pei wetem kredit kad, mo stat sevem."
+  },
+  {
+    "id": "TR-0034",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.page_title",
+    "start": 4101,
+    "end": 4126,
+    "original": "'Jusum adventja blong yu'",
+    "bi": "Jusum adventja blong yu"
+  },
+  {
+    "id": "TR-0035",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.page_subtitle",
+    "start": 4282,
+    "end": 4320,
+    "original": "'Wan pas — premium dils long Vanuatu.'",
+    "bi": "Wan pas — premium dils long Vanuatu."
+  },
+  {
+    "id": "TR-0036",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.pricing_micro",
+    "start": 4553,
+    "end": 4629,
+    "original": "'A$__BASE__ fes + A$__GUEST__/narafala (6+) · under 6 fri · mak __MAX__/pas'",
+    "bi": "A$__BASE__ fes + A$__GUEST__/narafala (6+) · under 6 fri · mak __MAX__/pas"
+  },
+  {
+    "id": "TR-0037",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.card_1d_title",
+    "start": 4700,
+    "end": 4707,
+    "original": "'1 dei'",
+    "bi": "1 dei"
+  },
+  {
+    "id": "TR-0038",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.card_1d_hint",
+    "start": 4783,
+    "end": 4791,
+    "original": "'24 owa'",
+    "bi": "24 owa"
+  },
+  {
+    "id": "TR-0039",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.card_7d_title",
+    "start": 4861,
+    "end": 4868,
+    "original": "'7 dei'",
+    "bi": "7 dei"
+  },
+  {
+    "id": "TR-0040",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.card_7d_hint",
+    "start": 4949,
+    "end": 4962,
+    "original": "'Holiday pas'",
+    "bi": "Holiday pas"
+  },
+  {
+    "id": "TR-0041",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.badge_best_value",
+    "start": 5048,
+    "end": 5059,
+    "original": "'Bes wolju'",
+    "bi": "Bes wolju"
+  },
+  {
+    "id": "TR-0042",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.chip_35",
+    "start": 5122,
+    "end": 5130,
+    "original": "'35% of'",
+    "bi": "35% of"
+  },
+  {
+    "id": "TR-0043",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.chip_map",
+    "start": 5192,
+    "end": 5197,
+    "original": "'Map'",
+    "bi": "Map"
+  },
+  {
+    "id": "TR-0044",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.chip_qr",
+    "start": 5252,
+    "end": 5256,
+    "original": "'QR'",
+    "bi": "QR"
+  },
+  {
+    "id": "TR-0045",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.chip_row_35",
+    "start": 5323,
+    "end": 5331,
+    "original": "'35% Of'",
+    "bi": "35% Of"
+  },
+  {
+    "id": "TR-0046",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.chip_row_map",
+    "start": 5405,
+    "end": 5415,
+    "original": "'Map laev'",
+    "bi": "Map laev"
+  },
+  {
+    "id": "TR-0047",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.chip_row_qr",
+    "start": 5486,
+    "end": 5494,
+    "original": "'QR fas'",
+    "bi": "QR fas"
+  },
+  {
+    "id": "TR-0048",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.holiday_ribbon_prefix",
+    "start": 5606,
+    "end": 5621,
+    "original": "'Bae wan wik, '",
+    "bi": "Bae wan wik, "
+  },
+  {
+    "id": "TR-0049",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.holiday_ribbon_emphasis",
+    "start": 5736,
+    "end": 5748,
+    "original": "'1 WIK FREE'",
+    "bi": "1 WIK FREE"
+  },
+  {
+    "id": "TR-0050",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.holiday_ribbon_title",
+    "start": 5866,
+    "end": 5885,
+    "original": "'Holiday pas 7 dei'",
+    "bi": "Holiday pas 7 dei"
+  },
+  {
+    "id": "TR-0051",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.simple_header",
+    "start": 6217,
+    "end": 6343,
+    "original": "'A$__BASE__ fes (6 yia mo antap), mo A$__GUEST__ long evri narafala man kasem __MAX__/pas. Pikinini andanit long 6 yia i fri.'",
+    "bi": "A$__BASE__ fes (6 yia mo antap), mo A$__GUEST__ long evri narafala man kasem __MAX__/pas. Pikinini andanit long 6 yia i fri."
+  },
+  {
+    "id": "TR-0052",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.people_label",
+    "start": 6452,
+    "end": 6462,
+    "original": "'Man (6+)'",
+    "bi": "Man (6+)"
+  },
+  {
+    "id": "TR-0053",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.coverage_label",
+    "start": 6541,
+    "end": 6547,
+    "original": "'Kava'",
+    "bi": "Kava"
+  },
+  {
+    "id": "TR-0054",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.max_per_pass",
+    "start": 6651,
+    "end": 6678,
+    "original": "'Maksem __N__ long wan pas'",
+    "bi": "Maksem __N__ long wan pas"
+  },
+  {
+    "id": "TR-0055",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.duration_1d",
+    "start": 6747,
+    "end": 6754,
+    "original": "'1 dei'",
+    "bi": "1 dei"
+  },
+  {
+    "id": "TR-0056",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.duration_7d",
+    "start": 6822,
+    "end": 6829,
+    "original": "'7 dei'",
+    "bi": "7 dei"
+  },
+  {
+    "id": "TR-0057",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.total_label",
+    "start": 6894,
+    "end": 6901,
+    "original": "'Total'",
+    "bi": "Total"
+  },
+  {
+    "id": "TR-0058",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.savings_anchor",
+    "start": 7136,
+    "end": 7200,
+    "original": "'Wet __COUNT__ man, yu save kasem A$__SAVE__ long fes dei nomo!'",
+    "bi": "Wet __COUNT__ man, yu save kasem A$__SAVE__ long fes dei nomo!"
+  },
+  {
+    "id": "TR-0059",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.holiday_headline",
+    "start": 7347,
+    "end": 7384,
+    "original": "'Bae wan wik, karem narafala wik fri'",
+    "bi": "Bae wan wik, karem narafala wik fri"
+  },
+  {
+    "id": "TR-0060",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.holiday_sub",
+    "start": 7634,
+    "end": 7706,
+    "original": "'Holiday pas 7 dei + share app afta bai blong anlokem wik 2 blong dils.'",
+    "bi": "Holiday pas 7 dei + share app afta bai blong anlokem wik 2 blong dils."
+  },
+  {
+    "id": "TR-0061",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.included_meals",
+    "start": 7838,
+    "end": 7870,
+    "original": "'Kasem 35% of long kakae mo tua'",
+    "bi": "Kasem 35% of long kakae mo tua"
+  },
+  {
+    "id": "TR-0062",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.included_map",
+    "start": 8013,
+    "end": 8050,
+    "original": "'Map we i laev + traeka blong saving'",
+    "bi": "Map we i laev + traeka blong saving"
+  },
+  {
+    "id": "TR-0063",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.included_qr",
+    "start": 8167,
+    "end": 8187,
+    "original": "'QR i redim stretwe'",
+    "bi": "QR i redim stretwe"
+  },
+  {
+    "id": "TR-0064",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.purchase",
+    "start": 8270,
+    "end": 8280,
+    "original": "'Baem pas'",
+    "bi": "Baem pas"
+  },
+  {
+    "id": "TR-0065",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.purchase_locked",
+    "start": 8360,
+    "end": 8373,
+    "original": "'Pas i aktiv'",
+    "bi": "Pas i aktiv"
+  },
+  {
+    "id": "TR-0066",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.holiday_addon_micro",
+    "start": 8494,
+    "end": 8515,
+    "original": "'+A$15 · 7-dei anlok'",
+    "bi": "+A$15 · 7-dei anlok"
+  },
+  {
+    "id": "TR-0067",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.aria_decrease_party",
+    "start": 8642,
+    "end": 8665,
+    "original": "'Lesen namba blong man'",
+    "bi": "Lesen namba blong man"
+  },
+  {
+    "id": "TR-0068",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.aria_increase_party",
+    "start": 8794,
+    "end": 8814,
+    "original": "'Ap nemba blong man'",
+    "bi": "Ap nemba blong man"
+  },
+  {
+    "id": "TR-0069",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.value_2nd_week_headline",
+    "start": 8930,
+    "end": 8943,
+    "original": "'Wik 2 FREE!'",
+    "bi": "Wik 2 FREE!"
+  },
+  {
+    "id": "TR-0070",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.cta_secure_line",
+    "start": 9048,
+    "end": 9059,
+    "original": "'Sekua pem'",
+    "bi": "Sekua pem"
+  },
+  {
+    "id": "TR-0071",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.card_header_holiday",
+    "start": 9176,
+    "end": 9195,
+    "original": "'Holiday pas 7 dei'",
+    "bi": "Holiday pas 7 dei"
+  },
+  {
+    "id": "TR-0072",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.coverage_helper_7d",
+    "start": 9387,
+    "end": 9431,
+    "original": "'Signature pas blong long taem — bes wolju.'",
+    "bi": "Signature pas blong long taem — bes wolju."
+  },
+  {
+    "id": "TR-0073",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.coverage_nudge_7d",
+    "start": 9623,
+    "end": 9664,
+    "original": "'Wan wik o moa? Josen 7 dei — wik 2 fri.'",
+    "bi": "Wan wik o moa? Josen 7 dei — wik 2 fri."
+  },
+  {
+    "id": "TR-0074",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.port_stay_hint",
+    "start": 9868,
+    "end": 9928,
+    "original": "'Sot taem long po? Wan-dei pas i gat ful saving insaed app.'",
+    "bi": "Sot taem long po? Wan-dei pas i gat ful saving insaed app."
+  },
+  {
+    "id": "TR-0075",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.hero_1d_title",
+    "start": 10021,
+    "end": 10034,
+    "original": "'Pas wan dei'",
+    "bi": "Pas wan dei"
+  },
+  {
+    "id": "TR-0076",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.hero_1d_sub",
+    "start": 10183,
+    "end": 10226,
+    "original": "'Ful akses long dils long wan kalenda dei.'",
+    "bi": "Ful akses long dils long wan kalenda dei."
+  },
+  {
+    "id": "TR-0077",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPricing.secure_pay_micro",
+    "start": 10333,
+    "end": 10344,
+    "original": "'Sekua pem'",
+    "bi": "Sekua pem"
+  },
+  {
+    "id": "TR-0078",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.breakdown_title",
+    "start": 10478,
+    "end": 10494,
+    "original": "'Prais brekdaon'",
+    "bi": "Prais brekdaon"
+  },
+  {
+    "id": "TR-0079",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.base_pass_row",
+    "start": 10629,
+    "end": 10651,
+    "original": "'Bes pas (fes man 6+)'",
+    "bi": "Bes pas (fes man 6+)"
+  },
+  {
+    "id": "TR-0080",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.extra_guests_row",
+    "start": 10815,
+    "end": 10853,
+    "original": "'Narafala man (__COUNT__ × A$__FEE__)'",
+    "bi": "Narafala man (__COUNT__ × A$__FEE__)"
+  },
+  {
+    "id": "TR-0081",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.extra_guests_2_6_row",
+    "start": 11006,
+    "end": 11039,
+    "original": "'Man 2–6 (__COUNT__ × A$__FEE__)'",
+    "bi": "Man 2–6 (__COUNT__ × A$__FEE__)"
+  },
+  {
+    "id": "TR-0082",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.extra_guests_from_7_row",
+    "start": 11226,
+    "end": 11272,
+    "original": "'Long 7fala man (__COUNT__ man, slot 7–__P__)'",
+    "bi": "Long 7fala man (__COUNT__ man, slot 7–__P__)"
+  },
+  {
+    "id": "TR-0083",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.extension_row",
+    "start": 11403,
+    "end": 11432,
+    "original": "'Opsen long ful trip (+A$15)'",
+    "bi": "Opsen long ful trip (+A$15)"
+  },
+  {
+    "id": "TR-0084",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.total_row",
+    "start": 11495,
+    "end": 11502,
+    "original": "'Total'",
+    "bi": "Total"
+  },
+  {
+    "id": "TR-0085",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.potential_savings",
+    "start": 11768,
+    "end": 11855,
+    "original": "'💰 Saving we i save: kasem A$__AMOUNT__+ long kakae mo tua — dis pas i save pei bake.'",
+    "bi": "💰 Saving we i save: kasem A$__AMOUNT__+ long kakae mo tua — dis pas i save pei bake."
+  },
+  {
+    "id": "TR-0086",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.savings_before_one",
+    "start": 12014,
+    "end": 12043,
+    "original": "'Wet wan man, yu save kasem '",
+    "bi": "Wet wan man, yu save kasem "
+  },
+  {
+    "id": "TR-0087",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.savings_before_many",
+    "start": 12220,
+    "end": 12255,
+    "original": "'Wet __COUNT__ man, yu save kasem '",
+    "bi": "Wet __COUNT__ man, yu save kasem "
+  },
+  {
+    "id": "TR-0088",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.savings_after_amount",
+    "start": 12383,
+    "end": 12410,
+    "original": "' long wan kakae o wan tua'",
+    "bi": " long wan kakae o wan tua"
+  },
+  {
+    "id": "TR-0089",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.savings_subline",
+    "start": 12557,
+    "end": 12584,
+    "original": "'Dis pas i pei bake stret!'",
+    "bi": "Dis pas i pei bake stret!"
+  },
+  {
+    "id": "TR-0090",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.profile_party_title",
+    "start": 12694,
+    "end": 12712,
+    "original": "'Long rejistresen'",
+    "bi": "Long rejistresen"
+  },
+  {
+    "id": "TR-0091",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.profile_party_line",
+    "start": 13038,
+    "end": 13148,
+    "original": "'__ADULTS__ bigman, __CHILDREN__ pikinini (6+), __INFANTS__ under 6 / infen (fri). Grup blong pem: __PARTY__.'",
+    "bi": "__ADULTS__ bigman, __CHILDREN__ pikinini (6+), __INFANTS__ under 6 / infen (fri). Grup blong pem: __PARTY__."
+  },
+  {
+    "id": "TR-0092",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.option_day_title",
+    "start": 13240,
+    "end": 13257,
+    "original": "'Diskaun wan dei'",
+    "bi": "Diskaun wan dei"
+  },
+  {
+    "id": "TR-0093",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.option_day_desc",
+    "start": 13439,
+    "end": 13492,
+    "original": "'Sot visit — diskount long wan kalenda dei yu josem.'",
+    "bi": "Sot visit — diskount long wan kalenda dei yu josem."
+  },
+  {
+    "id": "TR-0094",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.option_extended_title",
+    "start": 13601,
+    "end": 13619,
+    "original": "'Ful trip (+A$15)'",
+    "bi": "Ful trip (+A$15)"
+  },
+  {
+    "id": "TR-0095",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.option_extended_desc",
+    "start": 13877,
+    "end": 13967,
+    "original": "'Long visit we i long — __CAL__ kalenda dei blong akses long ol dils long det blong stat.'",
+    "bi": "Long visit we i long — __CAL__ kalenda dei blong akses long ol dils long det blong stat."
+  },
+  {
+    "id": "TR-0096",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.option_extended_badge",
+    "start": 14131,
+    "end": 14173,
+    "original": "'Rekomendem blong __NIGHTS__ naet yu stap'",
+    "bi": "Rekomendem blong __NIGHTS__ naet yu stap"
+  },
+  {
+    "id": "TR-0097",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.option_total",
+    "start": 14239,
+    "end": 14246,
+    "original": "'Total'",
+    "bi": "Total"
+  },
+  {
+    "id": "TR-0098",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.how_it_works_compact",
+    "start": 14604,
+    "end": 14714,
+    "original": "'Jusum hu i kava (6+), wan dei pas o 7 dei holiday pas, mo det blong stat. Pikinini under 6 i fri wetem grup.'",
+    "bi": "Jusum hu i kava (6+), wan dei pas o 7 dei holiday pas, mo det blong stat. Pikinini under 6 i fri wetem grup."
+  },
+  {
+    "id": "TR-0099",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.party_summary_label",
+    "start": 14796,
+    "end": 14810,
+    "original": "'Pas blong yu'",
+    "bi": "Pas blong yu"
+  },
+  {
+    "id": "TR-0100",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.party_summary_line",
+    "start": 14950,
+    "end": 14976,
+    "original": "'Pas blong __N__ man (6+)'",
+    "bi": "Pas blong __N__ man (6+)"
+  },
+  {
+    "id": "TR-0101",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.party_edit",
+    "start": 15042,
+    "end": 15049,
+    "original": "'Senis'",
+    "bi": "Senis"
+  },
+  {
+    "id": "TR-0102",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.party_done",
+    "start": 15111,
+    "end": 15118,
+    "original": "'Finis'",
+    "bi": "Finis"
+  },
+  {
+    "id": "TR-0103",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.plan_pick_title",
+    "start": 15203,
+    "end": 15215,
+    "original": "'Jusum plan'",
+    "bi": "Jusum plan"
+  },
+  {
+    "id": "TR-0104",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.plan_day_title",
+    "start": 15300,
+    "end": 15312,
+    "original": "'Pas 24 Awa'",
+    "bi": "Pas 24 Awa"
+  },
+  {
+    "id": "TR-0105",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.plan_day_sub",
+    "start": 15465,
+    "end": 15498,
+    "original": "'Bes blong kruz sip mo sot stop.'",
+    "bi": "Bes blong kruz sip mo sot stop."
+  },
+  {
+    "id": "TR-0106",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.plan_holiday_title",
+    "start": 15599,
+    "end": 15618,
+    "original": "'Holiday Pas 7 Dei'",
+    "bi": "Holiday Pas 7 Dei"
+  },
+  {
+    "id": "TR-0107",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.plan_holiday_sub",
+    "start": 15992,
+    "end": 16114,
+    "original": "'Bes blong taem yu stap — 7 kalenda dei akses (+A$15). Serem app afta bai blong 7 dei moa blong free (14 dei long total).'",
+    "bi": "Bes blong taem yu stap — 7 kalenda dei akses (+A$15). Serem app afta bai blong 7 dei moa blong free (14 dei long total)."
+  },
+  {
+    "id": "TR-0108",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.share_second_week_unlock",
+    "start": 16305,
+    "end": 16358,
+    "original": "'Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!'",
+    "bi": "Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!"
+  },
+  {
+    "id": "TR-0109",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.holiday_banner_days",
+    "start": 16649,
+    "end": 16702,
+    "original": "'Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!'",
+    "bi": "Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!"
+  },
+  {
+    "id": "TR-0110",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.holiday_banner_days_n",
+    "start": 16895,
+    "end": 16952,
+    "original": "'Sherem olgeta ap ia mo kasem __N__ dei moa BLONG FREE!!'",
+    "bi": "Sherem olgeta ap ia mo kasem __N__ dei moa BLONG FREE!!"
+  },
+  {
+    "id": "TR-0111",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.holiday_banner_combo",
+    "start": 17174,
+    "end": 17233,
+    "original": "'Sherem ap — +__PEOPLE__ man fri mo 7 dei moa BLONG FREE!!'",
+    "bi": "Sherem ap — +__PEOPLE__ man fri mo 7 dei moa BLONG FREE!!"
+  },
+  {
+    "id": "TR-0112",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.holiday_banner_people_only",
+    "start": 17442,
+    "end": 17494,
+    "original": "'Sherem ap mo anlokem +__PEOPLE__ narafala man fri!'",
+    "bi": "Sherem ap mo anlokem +__PEOPLE__ narafala man fri!"
+  },
+  {
+    "id": "TR-0113",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.holiday_pill_days",
+    "start": 17597,
+    "end": 17615,
+    "original": "'7 dei blong free'",
+    "bi": "7 dei blong free"
+  },
+  {
+    "id": "TR-0114",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.extra_days_pill_n",
+    "start": 17726,
+    "end": 17748,
+    "original": "'__N__ dei blong free'",
+    "bi": "__N__ dei blong free"
+  },
+  {
+    "id": "TR-0115",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.holiday_card_subtext",
+    "start": 18035,
+    "end": 18137,
+    "original": "'Anlokem bonus wik! Sherem wetem ol frend blong kasem 7 dei moa blong free long Holiday Pas blong yu.'",
+    "bi": "Anlokem bonus wik! Sherem wetem ol frend blong kasem 7 dei moa blong free long Holiday Pas blong yu."
+  },
+  {
+    "id": "TR-0116",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.holiday_cta_header_sub",
+    "start": 18341,
+    "end": 18398,
+    "original": "'Holiday pas 7+7 — sherem ap blong 7 dei moa BLONG FREE!'",
+    "bi": "Holiday pas 7+7 — sherem ap blong 7 dei moa BLONG FREE!"
+  },
+  {
+    "id": "TR-0117",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.holiday_navigator_body",
+    "start": 18584,
+    "end": 18637,
+    "original": "'Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!'",
+    "bi": "Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!"
+  },
+  {
+    "id": "TR-0118",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.qr_holiday_prompt",
+    "start": 18901,
+    "end": 18986,
+    "original": "'Yu gat 7 dei blong dils — sherem ap ia blong 7 dei moa BLONG FREE long Holiday Pas!'",
+    "bi": "Yu gat 7 dei blong dils — sherem ap ia blong 7 dei moa BLONG FREE long Holiday Pas!"
+  },
+  {
+    "id": "TR-0119",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.dashboard_unlock_button",
+    "start": 19124,
+    "end": 19154,
+    "original": "'Sherem ap — 7 dei blong free'",
+    "bi": "Sherem ap — 7 dei blong free"
+  },
+  {
+    "id": "TR-0120",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.dashboard_coverage_pill",
+    "start": 19363,
+    "end": 19429,
+    "original": "'7 dei i stap insaed · sherem blong 7 dei moa blong free (14 dei)'",
+    "bi": "7 dei i stap insaed · sherem blong 7 dei moa blong free (14 dei)"
+  },
+  {
+    "id": "TR-0121",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.dashboard_week1_validity",
+    "start": 19645,
+    "end": 19709,
+    "original": "'Fes wik 7 dei i soem. Sherem ap ia blong 7 dei moa blong free!'",
+    "bi": "Fes wik 7 dei i soem. Sherem ap ia blong 7 dei moa blong free!"
+  },
+  {
+    "id": "TR-0122",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.qr_unlock_button",
+    "start": 19840,
+    "end": 19870,
+    "original": "'Sherem ap — 7 dei blong free'",
+    "bi": "Sherem ap — 7 dei blong free"
+  },
+  {
+    "id": "TR-0123",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.qr_period_bonus_hint",
+    "start": 20057,
+    "end": 20107,
+    "original": "' · Sherem ap blong 7 dei moa blong free (14 dei)'",
+    "bi": " · Sherem ap blong 7 dei moa blong free (14 dei)"
+  },
+  {
+    "id": "TR-0124",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.receipt_holiday_subline_pending",
+    "start": 20434,
+    "end": 20534,
+    "original": "'Bai blong yu i gat wan wik blong dils. Sherem daun blong 7 dei moa blong free (14 dei long total).'",
+    "bi": "Bai blong yu i gat wan wik blong dils. Sherem daun blong 7 dei moa blong free (14 dei long total)."
+  },
+  {
+    "id": "TR-0125",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "share.receipt_header_holiday_pending",
+    "start": 20754,
+    "end": 20811,
+    "original": "'7 dei dils · sherem blong 7 dei moa blong free (14 dei)'",
+    "bi": "7 dei dils · sherem blong 7 dei moa blong free (14 dei)"
+  },
+  {
+    "id": "TR-0126",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.savings_anchor_v2",
+    "start": 21119,
+    "end": 21214,
+    "original": "'Wet __COUNT__ man, bae yu save moa long kost blong dis pas (A$__PASS__) long fes kakae o tua!'",
+    "bi": "Wet __COUNT__ man, bae yu save moa long kost blong dis pas (A$__PASS__) long fes kakae o tua!"
+  },
+  {
+    "id": "TR-0127",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.period_badge_one_day",
+    "start": 21289,
+    "end": 21298,
+    "original": "'wan dei'",
+    "bi": "wan dei"
+  },
+  {
+    "id": "TR-0128",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.period_badge_trip_nights",
+    "start": 21434,
+    "end": 21466,
+    "original": "'Trip blong yu: __NIGHTS__ naet'",
+    "bi": "Trip blong yu: __NIGHTS__ naet"
+  },
+  {
+    "id": "TR-0129",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.period_badge_extended_generic",
+    "start": 21599,
+    "end": 21619,
+    "original": "'Kava long ful trip'",
+    "bi": "Kava long ful trip"
+  },
+  {
+    "id": "TR-0130",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.period_legal_extended",
+    "start": 21799,
+    "end": 21860,
+    "original": "'__CAL__ kalenda dei blong akses long dils (i kaont olgeta).'",
+    "bi": "__CAL__ kalenda dei blong akses long dils (i kaont olgeta)."
+  },
+  {
+    "id": "TR-0131",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.end_date_helper_short",
+    "start": 22054,
+    "end": 22107,
+    "original": "'Sem wan kalenda dei — diskount long det blong stat.'",
+    "bi": "Sem wan kalenda dei — diskount long det blong stat."
+  },
+  {
+    "id": "TR-0132",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.end_date_helper_extended",
+    "start": 22382,
+    "end": 22470,
+    "original": "'Kasem det blong finis (i kaont). Akses long dils i last __CAL__ kalenda dei long stat.'",
+    "bi": "Kasem det blong finis (i kaont). Akses long dils i last __CAL__ kalenda dei long stat."
+  },
+  {
+    "id": "TR-0133",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.section_pass_group",
+    "start": 22558,
+    "end": 22571,
+    "original": "'Pas mo grup'",
+    "bi": "Pas mo grup"
+  },
+  {
+    "id": "TR-0134",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.section_dates",
+    "start": 22678,
+    "end": 22698,
+    "original": "'Taem diskount i ap'",
+    "bi": "Taem diskount i ap"
+  },
+  {
+    "id": "TR-0135",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.section_dates_sub",
+    "start": 22943,
+    "end": 23025,
+    "original": "'Jusum taem diskount i stat — det blong finis i kam otomatik long taem blong pas.'",
+    "bi": "Jusum taem diskount i stat — det blong finis i kam otomatik long taem blong pas."
+  },
+  {
+    "id": "TR-0136",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.discount_window_card_title",
+    "start": 23154,
+    "end": 23176,
+    "original": "'Windo blong diskount'",
+    "bi": "Windo blong diskount"
+  },
+  {
+    "id": "TR-0137",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.period_badge_pass_window",
+    "start": 23308,
+    "end": 23343,
+    "original": "'__CAL__ dei blong akses long dils'",
+    "bi": "__CAL__ dei blong akses long dils"
+  },
+  {
+    "id": "TR-0138",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.window_trip_hint",
+    "start": 23585,
+    "end": 23670,
+    "original": "'Trip blong yu __NIGHTS__ naet — josem det blong stat wetem taem yu laik yusum dils.'",
+    "bi": "Trip blong yu __NIGHTS__ naet — josem det blong stat wetem taem yu laik yusum dils."
+  },
+  {
+    "id": "TR-0139",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.window_label_start",
+    "start": 23742,
+    "end": 23748,
+    "original": "'Stat'",
+    "bi": "Stat"
+  },
+  {
+    "id": "TR-0140",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.window_label_end",
+    "start": 23811,
+    "end": 23818,
+    "original": "'Finis'",
+    "bi": "Finis"
+  },
+  {
+    "id": "TR-0141",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.order_summary_deals_short",
+    "start": 24000,
+    "end": 24041,
+    "original": "'Ol dils we i no lim long taem yu josem.'",
+    "bi": "Ol dils we i no lim long taem yu josem."
+  },
+  {
+    "id": "TR-0142",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.order_summary_deals_extended",
+    "start": 24286,
+    "end": 24367,
+    "original": "'Akses long dils i ran __CAL__ kalenda dei long det blong stat (i kaont olgeta).'",
+    "bi": "Akses long dils i ran __CAL__ kalenda dei long det blong stat (i kaont olgeta)."
+  },
+  {
+    "id": "TR-0143",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.summary_duration_label",
+    "start": 24454,
+    "end": 24468,
+    "original": "'Taem yu stap'",
+    "bi": "Taem yu stap"
+  },
+  {
+    "id": "TR-0144",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "checkout.summary_calendar_note",
+    "start": 24606,
+    "end": 24639,
+    "original": "'__CAL__ kalenda dei blong akses'",
+    "bi": "__CAL__ kalenda dei blong akses"
+  },
+  {
+    "id": "TR-0145",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.buy",
+    "start": 24696,
+    "end": 24706,
+    "original": "'Baem Nao'",
+    "bi": "Baem Nao"
+  },
+  {
+    "id": "TR-0146",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.feature1",
+    "start": 24792,
+    "end": 24811,
+    "original": "'Akses olgeta dils'",
+    "bi": "Akses olgeta dils"
+  },
+  {
+    "id": "TR-0147",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.feature2",
+    "start": 24886,
+    "end": 24901,
+    "original": "'QR kod kupons'",
+    "bi": "QR kod kupons"
+  },
+  {
+    "id": "TR-0148",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.feature3",
+    "start": 24976,
+    "end": 24991,
+    "original": "'Map navigesen'",
+    "bi": "Map navigesen"
+  },
+  {
+    "id": "TR-0149",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.know_before_title",
+    "start": 25089,
+    "end": 25107,
+    "original": "'Save bifo yu bai'",
+    "bi": "Save bifo yu bai"
+  },
+  {
+    "id": "TR-0150",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.know_trip_line",
+    "start": 25401,
+    "end": 25494,
+    "original": "'Long profil: {days} dei · {party} man long pas (bigman mo pikinini taswe; bebi i no kaont).'",
+    "bi": "Long profil: {days} dei · {party} man long pas (bigman mo pikinini taswe; bebi i no kaont)."
+  },
+  {
+    "id": "TR-0151",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.know_bullet_1",
+    "start": 25757,
+    "end": 25843,
+    "original": "'Bonus afta serem — i adem moa pipol mo/oba moa dei diskount afta yu bai (serem app).'",
+    "bi": "Bonus afta serem — i adem moa pipol mo/oba moa dei diskount afta yu bai (serem app)."
+  },
+  {
+    "id": "TR-0152",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.know_bullet_2",
+    "start": 26097,
+    "end": 26163,
+    "original": "'Evri kaed i soem base lim — kompem wetem len blong trip mo grup.'",
+    "bi": "Evri kaed i soem base lim — kompem wetem len blong trip mo grup."
+  },
+  {
+    "id": "TR-0153",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.know_bullet_3",
+    "start": 26382,
+    "end": 26437,
+    "original": "'Afta bai, yusum Serem app long skrin pas blong bonus.'",
+    "bi": "Afta bai, yusum Serem app long skrin pas blong bonus."
+  },
+  {
+    "id": "TR-0154",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.know_bullet_4",
+    "start": 26700,
+    "end": 26790,
+    "original": "'Yu josem dei blong yusum diskount; pas i finis long det blong hem, no taem yu liv aelan.'",
+    "bi": "Yu josem dei blong yusum diskount; pas i finis long det blong hem, no taem yu liv aelan."
+  },
+  {
+    "id": "TR-0155",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "pass.know_support",
+    "start": 27080,
+    "end": 27171,
+    "original": "'Long bigfala grup o lon taem, wan pas i no save stret — askem support o tingbaot moa pas.'",
+    "bi": "Long bigfala grup o lon taem, wan pas i no save stret — askem support o tingbaot moa pas."
+  },
+  {
+    "id": "TR-0156",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passFlow.checkout_preview",
+    "start": 27552,
+    "end": 27686,
+    "original": "'Checkout: {party} man (6+) · {duration} — A$15 fes, mo A$10 long evri narafala man kasem 20; +A$15 ful trip (yu ken senis bifo pem).'",
+    "bi": "Checkout: {party} man (6+) · {duration} — A$15 fes, mo A$10 long evri narafala man kasem 20; +A$15 ful trip (yu ken senis bifo pem)."
+  },
+  {
+    "id": "TR-0157",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passFlow.duration_short",
+    "start": 27755,
+    "end": 27764,
+    "original": "'wan-dei'",
+    "bi": "wan-dei"
+  },
+  {
+    "id": "TR-0158",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passFlow.duration_extended",
+    "start": 27846,
+    "end": 27856,
+    "original": "'ful-trip'",
+    "bi": "ful-trip"
+  },
+  {
+    "id": "TR-0159",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passFlow.redirecting",
+    "start": 27972,
+    "end": 27991,
+    "original": "'Go long checkout…'",
+    "bi": "Go long checkout…"
+  },
+  {
+    "id": "TR-0160",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passFlow.home_skip_title",
+    "start": 28069,
+    "end": 28083,
+    "original": "'Pas blong yu'",
+    "bi": "Pas blong yu"
+  },
+  {
+    "id": "TR-0161",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passFlow.home_skip_desc",
+    "start": 28374,
+    "end": 28468,
+    "original": "'Go long sef checkout. Grup mo taem i blong profil blong yu — yu ken senis eni taem bifo pem.'",
+    "bi": "Go long sef checkout. Grup mo taem i blong profil blong yu — yu ken senis eni taem bifo pem."
+  },
+  {
+    "id": "TR-0162",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passFlow.home_skip_cta",
+    "start": 28562,
+    "end": 28580,
+    "original": "'Go long checkout'",
+    "bi": "Go long checkout"
+  },
+  {
+    "id": "TR-0163",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passFlow.home_passes_info_link",
+    "start": 28706,
+    "end": 28730,
+    "original": "'Ful infomesen mo praes'",
+    "bi": "Ful infomesen mo praes"
+  },
+  {
+    "id": "TR-0164",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "biz.featured",
+    "start": 28823,
+    "end": 28836,
+    "original": "'Fitjad Dils'",
+    "bi": "Fitjad Dils"
+  },
+  {
+    "id": "TR-0165",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "biz.all",
+    "start": 28901,
+    "end": 28914,
+    "original": "'Olgeta Dils'",
+    "bi": "Olgeta Dils"
+  },
+  {
+    "id": "TR-0166",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "biz.viewdeal",
+    "start": 28980,
+    "end": 28991,
+    "original": "'Lukim Dil'",
+    "bi": "Lukim Dil"
+  },
+  {
+    "id": "TR-0167",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "biz.reviews",
+    "start": 29045,
+    "end": 29053,
+    "original": "'rivius'",
+    "bi": "rivius"
+  },
+  {
+    "id": "TR-0168",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "biz.hours",
+    "start": 29107,
+    "end": 29113,
+    "original": "'Taem'",
+    "bi": "Taem"
+  },
+  {
+    "id": "TR-0169",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "biz.phone",
+    "start": 29168,
+    "end": 29173,
+    "original": "'Fon'",
+    "bi": "Fon"
+  },
+  {
+    "id": "TR-0170",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "biz.location",
+    "start": 29236,
+    "end": 29242,
+    "original": "'Ples'",
+    "bi": "Ples"
+  },
+  {
+    "id": "TR-0171",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "biz.save",
+    "start": 29297,
+    "end": 29304,
+    "original": "'Sevem'",
+    "bi": "Sevem"
+  },
+  {
+    "id": "TR-0172",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "map.title",
+    "start": 29391,
+    "end": 29411,
+    "original": "'Eksploarem Vanuatu'",
+    "bi": "Eksploarem Vanuatu"
+  },
+  {
+    "id": "TR-0173",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "map.subtitle",
+    "start": 29553,
+    "end": 29601,
+    "original": "'Faenem dils klosap long yu long intaraktiv map'",
+    "bi": "Faenem dils klosap long yu long intaraktiv map"
+  },
+  {
+    "id": "TR-0174",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "review.title",
+    "start": 29705,
+    "end": 29726,
+    "original": "'Wanem Turis i Talem'",
+    "bi": "Wanem Turis i Talem"
+  },
+  {
+    "id": "TR-0175",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "review.write",
+    "start": 29798,
+    "end": 29816,
+    "original": "'Raetim Wan Riviu'",
+    "bi": "Raetim Wan Riviu"
+  },
+  {
+    "id": "TR-0176",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "review.submit",
+    "start": 29891,
+    "end": 29905,
+    "original": "'Sendim Riviu'",
+    "bi": "Sendim Riviu"
+  },
+  {
+    "id": "TR-0177",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "dash.title",
+    "start": 29996,
+    "end": 30013,
+    "original": "'Dasbod Blong Mi'",
+    "bi": "Dasbod Blong Mi"
+  },
+  {
+    "id": "TR-0178",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "dash.passes",
+    "start": 30073,
+    "end": 30087,
+    "original": "'Pas Blong Mi'",
+    "bi": "Pas Blong Mi"
+  },
+  {
+    "id": "TR-0179",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "dash.favorites",
+    "start": 30149,
+    "end": 30157,
+    "original": "'Favrit'",
+    "bi": "Favrit"
+  },
+  {
+    "id": "TR-0180",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "dash.favorites_list_heading",
+    "start": 30270,
+    "end": 30288,
+    "original": "'Ples we yu sevem'",
+    "bi": "Ples we yu sevem"
+  },
+  {
+    "id": "TR-0181",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "dash.favorites_list_empty",
+    "start": 30499,
+    "end": 30564,
+    "original": "'Lukluk long ol diskaon mo tap long hating blong sevem long hia.'",
+    "bi": "Lukluk long ol diskaon mo tap long hating blong sevem long hia."
+  },
+  {
+    "id": "TR-0182",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "dash.favorites_back_dashboard",
+    "start": 30682,
+    "end": 30702,
+    "original": "'Go bak long dasbod'",
+    "bi": "Go bak long dasbod"
+  },
+  {
+    "id": "TR-0183",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "dash.history",
+    "start": 30792,
+    "end": 30812,
+    "original": "'Histri blong Yusim'",
+    "bi": "Histri blong Yusim"
+  },
+  {
+    "id": "TR-0184",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "dash.nopass",
+    "start": 30956,
+    "end": 31003,
+    "original": "'No gat aktiv pas. Karem wan blong stat sevem!'",
+    "bi": "No gat aktiv pas. Karem wan blong stat sevem!"
+  },
+  {
+    "id": "TR-0185",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "dash.pass_prefs_title",
+    "start": 31105,
+    "end": 31126,
+    "original": "'Pas checkout difolt'",
+    "bi": "Pas checkout difolt"
+  },
+  {
+    "id": "TR-0186",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "dash.pass_prefs_sub",
+    "start": 31318,
+    "end": 31377,
+    "original": "'Yu savem taem yu openem checkout (yu ken senis bifo pem).'",
+    "bi": "Yu savem taem yu openem checkout (yu ken senis bifo pem)."
+  },
+  {
+    "id": "TR-0187",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.group_label",
+    "start": 31476,
+    "end": 31487,
+    "original": "'Grup saes'",
+    "bi": "Grup saes"
+  },
+  {
+    "id": "TR-0188",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.group_hint_none",
+    "start": 31700,
+    "end": 31762,
+    "original": "'No gat difolt — checkout i yusum grup blong trabel o 1 gest.'",
+    "bi": "No gat difolt — checkout i yusum grup blong trabel o 1 gest."
+  },
+  {
+    "id": "TR-0189",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.group_hint_saved",
+    "start": 31941,
+    "end": 31986,
+    "original": "'Nekis checkout bae stat wetem grup saes ia.'",
+    "bi": "Nekis checkout bae stat wetem grup saes ia."
+  },
+  {
+    "id": "TR-0190",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.just_me",
+    "start": 32092,
+    "end": 32115,
+    "original": "'Mi wan (klearim saes)'",
+    "bi": "Mi wan (klearim saes)"
+  },
+  {
+    "id": "TR-0191",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.people_n",
+    "start": 32188,
+    "end": 32199,
+    "original": "'{n} pipol'",
+    "bi": "{n} pipol"
+  },
+  {
+    "id": "TR-0192",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.duration_label",
+    "start": 32298,
+    "end": 32314,
+    "original": "'Taem blong pas'",
+    "bi": "Taem blong pas"
+  },
+  {
+    "id": "TR-0193",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.duration_short",
+    "start": 32404,
+    "end": 32421,
+    "original": "'24 ao (wan dei)'",
+    "bi": "24 ao (wan dei)"
+  },
+  {
+    "id": "TR-0194",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.duration_extended",
+    "start": 32525,
+    "end": 32547,
+    "original": "'7 dei (+ serem → 14)'",
+    "bi": "7 dei (+ serem → 14)"
+  },
+  {
+    "id": "TR-0195",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.save",
+    "start": 32620,
+    "end": 32638,
+    "original": "'Sevem preference'",
+    "bi": "Sevem preference"
+  },
+  {
+    "id": "TR-0196",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.saving",
+    "start": 32708,
+    "end": 32716,
+    "original": "'Sevem…'",
+    "bi": "Sevem…"
+  },
+  {
+    "id": "TR-0197",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.saved",
+    "start": 32804,
+    "end": 32824,
+    "original": "'Preference i sevem'",
+    "bi": "Preference i sevem"
+  },
+  {
+    "id": "TR-0198",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.save_failed",
+    "start": 32927,
+    "end": 32947,
+    "original": "'No save preference'",
+    "bi": "No save preference"
+  },
+  {
+    "id": "TR-0199",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.post_title",
+    "start": 33055,
+    "end": 33078,
+    "original": "'Memorisaem pas setup?'",
+    "bi": "Memorisaem pas setup?"
+  },
+  {
+    "id": "TR-0200",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.post_desc",
+    "start": 33302,
+    "end": 33370,
+    "original": "'Sevem grup mo taem blong pas yu bao olsem difolt blong nekis taem.'",
+    "bi": "Sevem grup mo taem blong pas yu bao olsem difolt blong nekis taem."
+  },
+  {
+    "id": "TR-0201",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.post_remember",
+    "start": 33472,
+    "end": 33492,
+    "original": "'Sevem olsem difolt'",
+    "bi": "Sevem olsem difolt"
+  },
+  {
+    "id": "TR-0202",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.post_save",
+    "start": 33558,
+    "end": 33565,
+    "original": "'Sevem'",
+    "bi": "Sevem"
+  },
+  {
+    "id": "TR-0203",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "passPrefs.post_skip",
+    "start": 33637,
+    "end": 33645,
+    "original": "'No nau'",
+    "bi": "No nau"
+  },
+  {
+    "id": "TR-0204",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.about",
+    "start": 33738,
+    "end": 33756,
+    "original": "'Abaotem StikmNek'",
+    "bi": "Abaotem StikmNek"
+  },
+  {
+    "id": "TR-0205",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.abouttext",
+    "start": 34086,
+    "end": 34199,
+    "original": "'StikmNek i konetim turis wetem beswan lokal bisnis long Vanuatu. Sevem mani taem yu eksperiens tru aelan kalsa.'",
+    "bi": "StikmNek i konetim turis wetem beswan lokal bisnis long Vanuatu. Sevem mani taem yu eksperiens tru aelan kalsa."
+  },
+  {
+    "id": "TR-0206",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.nameMeaningTitle",
+    "start": 34307,
+    "end": 34338,
+    "original": "'Wanem minim blong “StikmNek”?'",
+    "bi": "Wanem minim blong “StikmNek”?"
+  },
+  {
+    "id": "TR-0207",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.nameMeaningBody",
+    "start": 34678,
+    "end": 34801,
+    "original": "'Hemia Bislama slang: yu go klosap wetem konfiden mo smail blong mekem man i gat intres — frendli persuesen blong Vanuatu.'",
+    "bi": "Hemia Bislama slang: yu go klosap wetem konfiden mo smail blong mekem man i gat intres — frendli persuesen blong Vanuatu."
+  },
+  {
+    "id": "TR-0208",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.whyBuiltTitle",
+    "start": 34910,
+    "end": 34946,
+    "original": "'From wanem mifala i mekem StikmNek'",
+    "bi": "From wanem mifala i mekem StikmNek"
+  },
+  {
+    "id": "TR-0209",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.whyBuiltBody",
+    "start": 35507,
+    "end": 35723,
+    "original": "'Ol lokal bisnis i wantem moa turis be oli no gat website. Turis i talem se Vanuatu i expensiv. StikmNek i halpem bisnis blong ol man i faenem, mo i halpem turis blong kasem gudfala lokal dils — sapotem smol bisnis.'",
+    "bi": "Ol lokal bisnis i wantem moa turis be oli no gat website. Turis i talem se Vanuatu i expensiv. StikmNek i halpem bisnis blong ol man i faenem, mo i halpem turis blong kasem gudfala lokal dils — sapotem smol bisnis."
+  },
+  {
+    "id": "TR-0210",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.local_badge",
+    "start": 35898,
+    "end": 35946,
+    "original": "'100% lokal · Sapotem smol bisnis blong Vanuatu'",
+    "bi": "100% lokal · Sapotem smol bisnis blong Vanuatu"
+  },
+  {
+    "id": "TR-0211",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.links",
+    "start": 36017,
+    "end": 36028,
+    "original": "'Kwik Link'",
+    "bi": "Kwik Link"
+  },
+  {
+    "id": "TR-0212",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.support",
+    "start": 36088,
+    "end": 36095,
+    "original": "'Sapot'",
+    "bi": "Sapot"
+  },
+  {
+    "id": "TR-0213",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.legal",
+    "start": 36149,
+    "end": 36155,
+    "original": "'Ligo'",
+    "bi": "Ligo"
+  },
+  {
+    "id": "TR-0214",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.privacy",
+    "start": 36243,
+    "end": 36260,
+    "original": "'Praevesi Polisi'",
+    "bi": "Praevesi Polisi"
+  },
+  {
+    "id": "TR-0215",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.terms",
+    "start": 36345,
+    "end": 36363,
+    "original": "'Tems blong Sevis'",
+    "bi": "Tems blong Sevis"
+  },
+  {
+    "id": "TR-0216",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.business_partner",
+    "start": 36500,
+    "end": 36529,
+    "original": "'Bisnis patna mo listem taem'",
+    "bi": "Bisnis patna mo listem taem"
+  },
+  {
+    "id": "TR-0217",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.gdpr",
+    "start": 36605,
+    "end": 36621,
+    "original": "'GDPR Komplaens'",
+    "bi": "GDPR Komplaens"
+  },
+  {
+    "id": "TR-0218",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.contact",
+    "start": 36691,
+    "end": 36709,
+    "original": "'Kontaktem Mifala'",
+    "bi": "Kontaktem Mifala"
+  },
+  {
+    "id": "TR-0219",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.faq",
+    "start": 36757,
+    "end": 36762,
+    "original": "'FAQ'",
+    "bi": "FAQ"
+  },
+  {
+    "id": "TR-0220",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.business",
+    "start": 36853,
+    "end": 36877,
+    "original": "'Listem Bisnis Blong Yu'",
+    "bi": "Listem Bisnis Blong Yu"
+  },
+  {
+    "id": "TR-0221",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "footer.copyright",
+    "start": 37000,
+    "end": 37041,
+    "original": "'© 2026 StikmNek. Olgeta raets i risevd.'",
+    "bi": "© 2026 StikmNek. Olgeta raets i risevd."
+  },
+  {
+    "id": "TR-0222",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "auth.signin",
+    "start": 37113,
+    "end": 37122,
+    "original": "'Saen In'",
+    "bi": "Saen In"
+  },
+  {
+    "id": "TR-0223",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "auth.signup",
+    "start": 37183,
+    "end": 37192,
+    "original": "'Saen Ap'",
+    "bi": "Saen Ap"
+  },
+  {
+    "id": "TR-0224",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "auth.email",
+    "start": 37244,
+    "end": 37250,
+    "original": "'Imel'",
+    "bi": "Imel"
+  },
+  {
+    "id": "TR-0225",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "auth.password",
+    "start": 37315,
+    "end": 37323,
+    "original": "'Paswod'",
+    "bi": "Paswod"
+  },
+  {
+    "id": "TR-0226",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "auth.name",
+    "start": 37384,
+    "end": 37393,
+    "original": "'Ful Nem'",
+    "bi": "Ful Nem"
+  },
+  {
+    "id": "TR-0227",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "auth.tourist",
+    "start": 37452,
+    "end": 37459,
+    "original": "'Turis'",
+    "bi": "Turis"
+  },
+  {
+    "id": "TR-0228",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "auth.business",
+    "start": 37544,
+    "end": 37556,
+    "original": "'Bisnis Ona'",
+    "bi": "Bisnis Ona"
+  },
+  {
+    "id": "TR-0229",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "general.search",
+    "start": 37682,
+    "end": 37705,
+    "original": "'Sejem dils, bisnis...'",
+    "bi": "Sejem dils, bisnis..."
+  },
+  {
+    "id": "TR-0230",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "general.loading",
+    "start": 37775,
+    "end": 37785,
+    "original": "'Lodim...'",
+    "bi": "Lodim..."
+  },
+  {
+    "id": "TR-0231",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "general.close",
+    "start": 37841,
+    "end": 37849,
+    "original": "'Klosem'",
+    "bi": "Klosem"
+  },
+  {
+    "id": "TR-0232",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "general.back",
+    "start": 37903,
+    "end": 37908,
+    "original": "'Bak'",
+    "bi": "Bak"
+  },
+  {
+    "id": "TR-0233",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "general.save",
+    "start": 37967,
+    "end": 37974,
+    "original": "'Sevem'",
+    "bi": "Sevem"
+  },
+  {
+    "id": "TR-0234",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "general.cancel",
+    "start": 38033,
+    "end": 38043,
+    "original": "'Kanselim'",
+    "bi": "Kanselim"
+  },
+  {
+    "id": "TR-0235",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "general.off",
+    "start": 38101,
+    "end": 38105,
+    "original": "'OF'",
+    "bi": "OF"
+  },
+  {
+    "id": "TR-0236",
+    "source": "translations",
+    "file": "src/data/translations.ts",
+    "key": "general.per_person",
+    "start": 38177,
+    "end": 38186,
+    "original": "'wan man'",
+    "bi": "wan man"
+  },
+  {
+    "id": "IN-0237",
+    "source": "inline",
+    "file": "src/components/AdvancedSearch.tsx",
+    "key": null,
+    "start": 10136,
+    "end": 10171,
+    "original": "'Sejem bae nem, tag, o kategori...'",
+    "bi": "Sejem bae nem, tag, o kategori..."
+  },
+  {
+    "id": "IN-0238",
+    "source": "inline",
+    "file": "src/components/AdvancedSearch.tsx",
+    "key": null,
+    "start": 22516,
+    "end": 22569,
+    "original": "'Soem nomo bisnis we yu save kontaktem long WhatsApp'",
+    "bi": "Soem nomo bisnis we yu save kontaktem long WhatsApp"
+  },
+  {
+    "id": "IN-0239",
+    "source": "inline",
+    "file": "src/components/AppLayout.tsx",
+    "key": null,
+    "start": 3785,
+    "end": 3815,
+    "original": "'Listem bisnis blong yu — fri'",
+    "bi": "Listem bisnis blong yu — fri"
+  },
+  {
+    "id": "IN-0240",
+    "source": "inline",
+    "file": "src/components/AppLayout.tsx",
+    "key": null,
+    "start": 3950,
+    "end": 3963,
+    "original": "'Saen up fri'",
+    "bi": "Saen up fri"
+  },
+  {
+    "id": "IN-0241",
+    "source": "inline",
+    "file": "src/components/AppLayout.tsx",
+    "key": null,
+    "start": 5479,
+    "end": 5500,
+    "original": "'Gat akaont? Saen in'",
+    "bi": "Gat akaont? Saen in"
+  },
+  {
+    "id": "IN-0242",
+    "source": "inline",
+    "file": "src/components/AppLayout.tsx",
+    "key": null,
+    "start": 17208,
+    "end": 17219,
+    "original": "'Traem gen'",
+    "bi": "Traem gen"
+  },
+  {
+    "id": "IN-0243",
+    "source": "inline",
+    "file": "src/components/AppLayout.tsx",
+    "key": null,
+    "start": 17709,
+    "end": 17760,
+    "original": "'Finisem travel profil blong yu blong yusum fulap.'",
+    "bi": "Finisem travel profil blong yu blong yusum fulap."
+  },
+  {
+    "id": "IN-0244",
+    "source": "inline",
+    "file": "src/components/AppLayout.tsx",
+    "key": null,
+    "start": 18094,
+    "end": 18102,
+    "original": "'Go hed'",
+    "bi": "Go hed"
+  },
+  {
+    "id": "IN-0245",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 2576,
+    "end": 2616,
+    "original": "'Lukim email blong yu blong reset link.'",
+    "bi": "Lukim email blong yu blong reset link."
+  },
+  {
+    "id": "IN-0246",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 4755,
+    "end": 4771,
+    "original": "'Bisnis Saen Ap'",
+    "bi": "Bisnis Saen Ap"
+  },
+  {
+    "id": "IN-0247",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 4865,
+    "end": 4880,
+    "original": "'Turis Saen Ap'",
+    "bi": "Turis Saen Ap"
+  },
+  {
+    "id": "IN-0248",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 5039,
+    "end": 5071,
+    "original": "'Bae mifala sendem link long yu'",
+    "bi": "Bae mifala sendem link long yu"
+  },
+  {
+    "id": "IN-0249",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 5204,
+    "end": 5230,
+    "original": "'Welkam bak long StikmNek'",
+    "bi": "Welkam bak long StikmNek"
+  },
+  {
+    "id": "IN-0250",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 5381,
+    "end": 5411,
+    "original": "'Mekem bisnis akaont blong yu'",
+    "bi": "Mekem bisnis akaont blong yu"
+  },
+  {
+    "id": "IN-0251",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 5539,
+    "end": 5574,
+    "original": "'Mekem akaont blong yu blong sevem'",
+    "bi": "Mekem akaont blong yu blong sevem"
+  },
+  {
+    "id": "IN-0252",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 7253,
+    "end": 7270,
+    "original": "'Joinim StikmNek'",
+    "bi": "Joinim StikmNek"
+  },
+  {
+    "id": "IN-0253",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 7485,
+    "end": 7529,
+    "original": "'Jusim olsem wanem yu wantem yusim StikmNek'",
+    "bi": "Jusim olsem wanem yu wantem yusim StikmNek"
+  },
+  {
+    "id": "IN-0254",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 8420,
+    "end": 8434,
+    "original": "'Mi wan Turis'",
+    "bi": "Mi wan Turis"
+  },
+  {
+    "id": "IN-0255",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 8834,
+    "end": 8909,
+    "original": "'Faenem dils, baem diskount pas, mo sevem mani taem yu eksploarem Vanuatu.'",
+    "bi": "Faenem dils, baem diskount pas, mo sevem mani taem yu eksploarem Vanuatu."
+  },
+  {
+    "id": "IN-0256",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 10320,
+    "end": 10335,
+    "original": "'Mi wan Bisnis'",
+    "bi": "Mi wan Bisnis"
+  },
+  {
+    "id": "IN-0257",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 10733,
+    "end": 10804,
+    "original": "'Listem bisnis blong yu, mekem ofa blong turis, mo groem kastoma beis.'",
+    "bi": "Listem bisnis blong yu, mekem ofa blong turis, mo groem kastoma beis."
+  },
+  {
+    "id": "IN-0258",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 11581,
+    "end": 11601,
+    "original": "'Gat akaont finis? '",
+    "bi": "Gat akaont finis? "
+  },
+  {
+    "id": "IN-0259",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 12276,
+    "end": 12298,
+    "original": "'Lukim Email Blong Yu'",
+    "bi": "Lukim Email Blong Yu"
+  },
+  {
+    "id": "IN-0260",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 12402,
+    "end": 12419,
+    "original": "'Fogetem Paswod?'",
+    "bi": "Fogetem Paswod?"
+  },
+  {
+    "id": "IN-0261",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 12654,
+    "end": 12696,
+    "original": "'Mifala i sendem link long email blong yu'",
+    "bi": "Mifala i sendem link long email blong yu"
+  },
+  {
+    "id": "IN-0262",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 12903,
+    "end": 12948,
+    "original": "'Putum email blong yu blong karem reset link'",
+    "bi": "Putum email blong yu blong karem reset link"
+  },
+  {
+    "id": "IN-0263",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 13621,
+    "end": 13692,
+    "original": "'Sapos gat akaont long email ia, bae yu karem link. Lukim spam folder.'",
+    "bi": "Sapos gat akaont long email ia, bae yu karem link. Lukim spam folder."
+  },
+  {
+    "id": "IN-0264",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 14108,
+    "end": 14129,
+    "original": "'Go Bak long Saen In'",
+    "bi": "Go Bak long Saen In"
+  },
+  {
+    "id": "IN-0265",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 15669,
+    "end": 15688,
+    "original": "'Sendem Reset Link'",
+    "bi": "Sendem Reset Link"
+  },
+  {
+    "id": "IN-0266",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 16704,
+    "end": 16761,
+    "original": "'Afta saen ap, bae yu go setupem bisnis profael blong yu'",
+    "bi": "Afta saen ap, bae yu go setupem bisnis profael blong yu"
+  },
+  {
+    "id": "IN-0267",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 17167,
+    "end": 17190,
+    "original": "'Nem blong yu (Kontak)'",
+    "bi": "Nem blong yu (Kontak)"
+  },
+  {
+    "id": "IN-0268",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 20255,
+    "end": 20272,
+    "original": "'Fogetem Paswod?'",
+    "bi": "Fogetem Paswod?"
+  },
+  {
+    "id": "IN-0269",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 21322,
+    "end": 21331,
+    "original": "'Saen In'",
+    "bi": "Saen In"
+  },
+  {
+    "id": "IN-0270",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 21479,
+    "end": 21500,
+    "original": "'Mekem Bisnis Akaont'",
+    "bi": "Mekem Bisnis Akaont"
+  },
+  {
+    "id": "IN-0271",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 21617,
+    "end": 21637,
+    "original": "'Mekem Turis Akaont'",
+    "bi": "Mekem Turis Akaont"
+  },
+  {
+    "id": "IN-0272",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 21882,
+    "end": 21899,
+    "original": "'No gat akaont? '",
+    "bi": "No gat akaont? "
+  },
+  {
+    "id": "IN-0273",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 22286,
+    "end": 22306,
+    "original": "'Gat akaont finis? '",
+    "bi": "Gat akaont finis? "
+  },
+  {
+    "id": "IN-0274",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 23226,
+    "end": 23308,
+    "original": "'Taem yu kontiniu, yu agri long Tems blong Sevis mo Praevesi Polisi blong mifala.'",
+    "bi": "Taem yu kontiniu, yu agri long Tems blong Sevis mo Praevesi Polisi blong mifala."
+  },
+  {
+    "id": "IN-0275",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 23877,
+    "end": 23910,
+    "original": "'Saen in o mekem akaont StikmNek'",
+    "bi": "Saen in o mekem akaont StikmNek"
+  },
+  {
+    "id": "IN-0276",
+    "source": "inline",
+    "file": "src/components/AuthModal.tsx",
+    "key": null,
+    "start": 24279,
+    "end": 24347,
+    "original": "'Jusum we blong saen in o mekem akaont, afta putum email mo paswod.'",
+    "bi": "Jusum we blong saen in o mekem akaont, afta putum email mo paswod."
+  },
+  {
+    "id": "IN-0277",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 9131,
+    "end": 9147,
+    "original": "'Bukin ask long'",
+    "bi": "Bukin ask long"
+  },
+  {
+    "id": "IN-0278",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 9532,
+    "end": 9628,
+    "original": "'Visit mo kontakt i fulap long profil — jenjem sapos yu nidim. Bihain yusum baten blong bisnis.'",
+    "bi": "Visit mo kontakt i fulap long profil — jenjem sapos yu nidim. Bihain yusum baten blong bisnis."
+  },
+  {
+    "id": "IN-0279",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 9767,
+    "end": 9787,
+    "original": "'Infomesen blong yu'",
+    "bi": "Infomesen blong yu"
+  },
+  {
+    "id": "IN-0280",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 10140,
+    "end": 10220,
+    "original": "'Konfirm nem. Imel, WhatsApp mo fon i kam long profil — jenjem hia long ask ia.'",
+    "bi": "Konfirm nem. Imel, WhatsApp mo fon i kam long profil — jenjem hia long ask ia."
+  },
+  {
+    "id": "IN-0281",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 10316,
+    "end": 10331,
+    "original": "'Imel blong yu'",
+    "bi": "Imel blong yu"
+  },
+  {
+    "id": "IN-0282",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 10429,
+    "end": 10448,
+    "original": "'WhatsApp blong yu'",
+    "bi": "WhatsApp blong yu"
+  },
+  {
+    "id": "IN-0283",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 10547,
+    "end": 10561,
+    "original": "'Fon blong yu'",
+    "bi": "Fon blong yu"
+  },
+  {
+    "id": "IN-0284",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 10660,
+    "end": 10681,
+    "original": "'Smol pikinini (0–4)'",
+    "bi": "Smol pikinini (0–4)"
+  },
+  {
+    "id": "IN-0285",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 10836,
+    "end": 10854,
+    "original": "'Kontaktem bisnis'",
+    "bi": "Kontaktem bisnis"
+  },
+  {
+    "id": "IN-0286",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 11131,
+    "end": 11183,
+    "original": "'Olgeta i yusum kontakt blong bisnis — no blong yu.'",
+    "bi": "Olgeta i yusum kontakt blong bisnis — no blong yu."
+  },
+  {
+    "id": "IN-0287",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 11269,
+    "end": 11286,
+    "original": "'Dei blong visit'",
+    "bi": "Dei blong visit"
+  },
+  {
+    "id": "IN-0288",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 11363,
+    "end": 11371,
+    "original": "'Ol man'",
+    "bi": "Ol man"
+  },
+  {
+    "id": "IN-0289",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 11452,
+    "end": 11462,
+    "original": "'Pikinini'",
+    "bi": "Pikinini"
+  },
+  {
+    "id": "IN-0290",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 11567,
+    "end": 11581,
+    "original": "'Stanad praes'",
+    "bi": "Stanad praes"
+  },
+  {
+    "id": "IN-0291",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 11686,
+    "end": 11702,
+    "original": "'StikmNek praes'",
+    "bi": "StikmNek praes"
+  },
+  {
+    "id": "IN-0292",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 11789,
+    "end": 11805,
+    "original": "'Sevin blong yu'",
+    "bi": "Sevin blong yu"
+  },
+  {
+    "id": "IN-0293",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 11885,
+    "end": 11899,
+    "original": "'Nem blong yu'",
+    "bi": "Nem blong yu"
+  },
+  {
+    "id": "IN-0294",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 12015,
+    "end": 12035,
+    "original": "'Send ask long imel'",
+    "bi": "Send ask long imel"
+  },
+  {
+    "id": "IN-0295",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 12135,
+    "end": 12157,
+    "original": "'Toktok long WhatsApp'",
+    "bi": "Toktok long WhatsApp"
+  },
+  {
+    "id": "IN-0296",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 12233,
+    "end": 12240,
+    "original": "'Kolem'",
+    "bi": "Kolem"
+  },
+  {
+    "id": "IN-0297",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 12483,
+    "end": 12517,
+    "original": "'No gat kontakt long lisiting ia.'",
+    "bi": "No gat kontakt long lisiting ia."
+  },
+  {
+    "id": "IN-0298",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 12710,
+    "end": 12747,
+    "original": "'Putum kasem 1 man long lukim praes.'",
+    "bi": "Putum kasem 1 man long lukim praes."
+  },
+  {
+    "id": "IN-0299",
+    "source": "inline",
+    "file": "src/components/BookingInquiryModal.tsx",
+    "key": null,
+    "start": 15294,
+    "end": 15333,
+    "original": "'Rikwes i send! Bisnis bae kontakt yu.'",
+    "bi": "Rikwes i send! Bisnis bae kontakt yu."
+  },
+  {
+    "id": "IN-0300",
+    "source": "inline",
+    "file": "src/components/BusinessCard.tsx",
+    "key": null,
+    "start": 5991,
+    "end": 6076,
+    "original": "'Yu nidim StikmNek pas blong mesej bisnis long WhatsApp mo kasem praes blong membas.'",
+    "bi": "Yu nidim StikmNek pas blong mesej bisnis long WhatsApp mo kasem praes blong membas."
+  },
+  {
+    "id": "IN-0301",
+    "source": "inline",
+    "file": "src/components/BusinessCredentialsSettings.tsx",
+    "key": null,
+    "start": 8095,
+    "end": 8133,
+    "original": "'Kredensel i sevem. Admin bae verify.'",
+    "bi": "Kredensel i sevem. Admin bae verify."
+  },
+  {
+    "id": "IN-0302",
+    "source": "inline",
+    "file": "src/components/BusinessCredentialsSettings.tsx",
+    "key": null,
+    "start": 8597,
+    "end": 8617,
+    "original": "'Kredensel blong mi'",
+    "bi": "Kredensel blong mi"
+  },
+  {
+    "id": "IN-0303",
+    "source": "inline",
+    "file": "src/components/BusinessCredentialsSettings.tsx",
+    "key": null,
+    "start": 9009,
+    "end": 9105,
+    "original": "'Optional — upload insurance, permit o sertifikat. Sapos admin i verify, yu save rank moa high.'",
+    "bi": "Optional — upload insurance, permit o sertifikat. Sapos admin i verify, yu save rank moa high."
+  },
+  {
+    "id": "IN-0304",
+    "source": "inline",
+    "file": "src/components/BusinessCredentialsSettings.tsx",
+    "key": null,
+    "start": 9996,
+    "end": 10057,
+    "original": "'Blong olgeta bisnis — evri listing i yusum semak kredensel.'",
+    "bi": "Blong olgeta bisnis — evri listing i yusum semak kredensel."
+  },
+  {
+    "id": "IN-0305",
+    "source": "inline",
+    "file": "src/components/BusinessCredentialsSettings.tsx",
+    "key": null,
+    "start": 12227,
+    "end": 12248,
+    "original": "'Dei blong first aid'",
+    "bi": "Dei blong first aid"
+  },
+  {
+    "id": "IN-0306",
+    "source": "inline",
+    "file": "src/components/BusinessCredentialsSettings.tsx",
+    "key": null,
+    "start": 13023,
+    "end": 13040,
+    "original": "'Sevem kredensel'",
+    "bi": "Sevem kredensel"
+  },
+  {
+    "id": "IN-0307",
+    "source": "inline",
+    "file": "src/components/BusinessCredentialsTile.tsx",
+    "key": null,
+    "start": 876,
+    "end": 896,
+    "original": "'Kredensel blong mi'",
+    "bi": "Kredensel blong mi"
+  },
+  {
+    "id": "IN-0308",
+    "source": "inline",
+    "file": "src/components/BusinessCredentialsTile.tsx",
+    "key": null,
+    "start": 1125,
+    "end": 1180,
+    "original": "'StikmNek i check — grin tick = verify, red X = no gat'",
+    "bi": "StikmNek i check — grin tick = verify, red X = no gat"
+  },
+  {
+    "id": "IN-0309",
+    "source": "inline",
+    "file": "src/components/BusinessCredentialsTile.tsx",
+    "key": null,
+    "start": 1415,
+    "end": 1461,
+    "original": "'Yu save lukim wanem dokumen bisnis ia i gat.'",
+    "bi": "Yu save lukim wanem dokumen bisnis ia i gat."
+  },
+  {
+    "id": "IN-0310",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 4725,
+    "end": 4736,
+    "original": "'bisnis ia'",
+    "bi": "bisnis ia"
+  },
+  {
+    "id": "IN-0311",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 19326,
+    "end": 19339,
+    "original": "'Taem & lego'",
+    "bi": "Taem & lego"
+  },
+  {
+    "id": "IN-0312",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 19467,
+    "end": 19477,
+    "original": "'Taem wok'",
+    "bi": "Taem wok"
+  },
+  {
+    "id": "IN-0313",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 21844,
+    "end": 21900,
+    "original": "'Yu nidim aktiv pas blong askem bukin mo kasem diskaon!'",
+    "bi": "Yu nidim aktiv pas blong askem bukin mo kasem diskaon!"
+  },
+  {
+    "id": "IN-0314",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 22623,
+    "end": 22708,
+    "original": "'Yu nidim StikmNek pas blong mesej bisnis long WhatsApp mo kasem praes blong membas.'",
+    "bi": "Yu nidim StikmNek pas blong mesej bisnis long WhatsApp mo kasem praes blong membas."
+  },
+  {
+    "id": "IN-0315",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 24001,
+    "end": 24021,
+    "original": "'Link i kopi finis!'",
+    "bi": "Link i kopi finis!"
+  },
+  {
+    "id": "IN-0316",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 26219,
+    "end": 26249,
+    "original": "'No save lod listing detaels.'",
+    "bi": "No save lod listing detaels."
+  },
+  {
+    "id": "IN-0317",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 26776,
+    "end": 26814,
+    "original": "'No gat aktiv ofa yet long bisnis ia.'",
+    "bi": "No gat aktiv ofa yet long bisnis ia."
+  },
+  {
+    "id": "IN-0318",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 27682,
+    "end": 27706,
+    "original": "'Jus wan narafa listing'",
+    "bi": "Jus wan narafa listing"
+  },
+  {
+    "id": "IN-0319",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 32517,
+    "end": 32529,
+    "original": "'Ridim smol'",
+    "bi": "Ridim smol"
+  },
+  {
+    "id": "IN-0320",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 32716,
+    "end": 32727,
+    "original": "'Ridim moa'",
+    "bi": "Ridim moa"
+  },
+  {
+    "id": "IN-0321",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 33757,
+    "end": 33785,
+    "original": "'Praes long wanwan man (VT)'",
+    "bi": "Praes long wanwan man (VT)"
+  },
+  {
+    "id": "IN-0322",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 34208,
+    "end": 34275,
+    "original": "'Praes blong wanwan kaen man. Yusum Askem bukin blong lukim totel.'",
+    "bi": "Praes blong wanwan kaen man. Yusum Askem bukin blong lukim totel."
+  },
+  {
+    "id": "IN-0323",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 34799,
+    "end": 34809,
+    "original": "'Kaen man'",
+    "bi": "Kaen man"
+  },
+  {
+    "id": "IN-0324",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 34991,
+    "end": 34996,
+    "original": "'Man'",
+    "bi": "Man"
+  },
+  {
+    "id": "IN-0325",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 35186,
+    "end": 35194,
+    "original": "'Stanad'",
+    "bi": "Stanad"
+  },
+  {
+    "id": "IN-0326",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 36715,
+    "end": 36727,
+    "original": "'Flat praes'",
+    "bi": "Flat praes"
+  },
+  {
+    "id": "IN-0327",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 39409,
+    "end": 39431,
+    "original": "'Toktok long WhatsApp'",
+    "bi": "Toktok long WhatsApp"
+  },
+  {
+    "id": "IN-0328",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 39836,
+    "end": 39874,
+    "original": "'Sendem mesej daerekli long bisnis ia'",
+    "bi": "Sendem mesej daerekli long bisnis ia"
+  },
+  {
+    "id": "IN-0329",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 40209,
+    "end": 40274,
+    "original": "'I save wok sapos yu gat aktiv StikmNek pas — semak Askem bukin.'",
+    "bi": "I save wok sapos yu gat aktiv StikmNek pas — semak Askem bukin."
+  },
+  {
+    "id": "IN-0330",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 41460,
+    "end": 41477,
+    "original": "'Openem WhatsApp'",
+    "bi": "Openem WhatsApp"
+  },
+  {
+    "id": "IN-0331",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 41993,
+    "end": 42061,
+    "original": "'Openem WhatsApp wetem mesej we i redi. I wok long fon mo kompyuta.'",
+    "bi": "Openem WhatsApp wetem mesej we i redi. I wok long fon mo kompyuta."
+  },
+  {
+    "id": "IN-0332",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 42818,
+    "end": 42859,
+    "original": "'Login mo kasem pas blong yusum WhatsApp'",
+    "bi": "Login mo kasem pas blong yusum WhatsApp"
+  },
+  {
+    "id": "IN-0333",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 47050,
+    "end": 47088,
+    "original": "'Yu no save riviu lista blong yu yet.'",
+    "bi": "Yu no save riviu lista blong yu yet."
+  },
+  {
+    "id": "IN-0334",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 51200,
+    "end": 51216,
+    "original": "'Bisnis i talem'",
+    "bi": "Bisnis i talem"
+  },
+  {
+    "id": "IN-0335",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 52039,
+    "end": 52102,
+    "original": "'No gat riviu yet. Yu faswan blong searem eksperiens blong yu!'",
+    "bi": "No gat riviu yet. Yu faswan blong searem eksperiens blong yu!"
+  },
+  {
+    "id": "IN-0336",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 54733,
+    "end": 54741,
+    "original": "'Stanad'",
+    "bi": "Stanad"
+  },
+  {
+    "id": "IN-0337",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 55273,
+    "end": 55301,
+    "original": "'Praes blong memba StikmNek'",
+    "bi": "Praes blong memba StikmNek"
+  },
+  {
+    "id": "IN-0338",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 58540,
+    "end": 58553,
+    "original": "'Askem bukin'",
+    "bi": "Askem bukin"
+  },
+  {
+    "id": "IN-0339",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 59194,
+    "end": 59215,
+    "original": "'Mesej long WhatsApp'",
+    "bi": "Mesej long WhatsApp"
+  },
+  {
+    "id": "IN-0340",
+    "source": "inline",
+    "file": "src/components/BusinessDetail.tsx",
+    "key": null,
+    "start": 62620,
+    "end": 62644,
+    "original": "'Lukim long Google Maps'",
+    "bi": "Lukim long Google Maps"
+  },
+  {
+    "id": "IN-0341",
+    "source": "inline",
+    "file": "src/components/BusinessGrid.tsx",
+    "key": null,
+    "start": 12636,
+    "end": 12689,
+    "original": "'Faenem nambawan dils from lokal bisnis long Vanuatu'",
+    "bi": "Faenem nambawan dils from lokal bisnis long Vanuatu"
+  },
+  {
+    "id": "IN-0342",
+    "source": "inline",
+    "file": "src/components/BusinessGrid.tsx",
+    "key": null,
+    "start": 19086,
+    "end": 19128,
+    "original": "'No gat dil i faenem. Traem narafala sej.'",
+    "bi": "No gat dil i faenem. Traem narafala sej."
+  },
+  {
+    "id": "IN-0343",
+    "source": "inline",
+    "file": "src/components/BusinessGrid.tsx",
+    "key": null,
+    "start": 20943,
+    "end": 20962,
+    "original": "'Lukim Olgeta Dils'",
+    "bi": "Lukim Olgeta Dils"
+  },
+  {
+    "id": "IN-0344",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 1080,
+    "end": 1096,
+    "original": "'Skanem wan Pas'",
+    "bi": "Skanem wan Pas"
+  },
+  {
+    "id": "IN-0345",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 1253,
+    "end": 1280,
+    "original": "'Skanem QR kod blong turis'",
+    "bi": "Skanem QR kod blong turis"
+  },
+  {
+    "id": "IN-0346",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 1729,
+    "end": 1754,
+    "original": "'Editim Listing Blong Mi'",
+    "bi": "Editim Listing Blong Mi"
+  },
+  {
+    "id": "IN-0347",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 1897,
+    "end": 1935,
+    "original": "'Apdeitim ditel blong bisnis blong yu'",
+    "bi": "Apdeitim ditel blong bisnis blong yu"
+  },
+  {
+    "id": "IN-0348",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 2444,
+    "end": 2455,
+    "original": "'Kredensel'",
+    "bi": "Kredensel"
+  },
+  {
+    "id": "IN-0349",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 2691,
+    "end": 2721,
+    "original": "'Uploadem permit mo insurance'",
+    "bi": "Uploadem permit mo insurance"
+  },
+  {
+    "id": "IN-0350",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 3212,
+    "end": 3235,
+    "original": "'Mekem Niufala Listing'",
+    "bi": "Mekem Niufala Listing"
+  },
+  {
+    "id": "IN-0351",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 3378,
+    "end": 3408,
+    "original": "'Sakem niufala bisnis listing'",
+    "bi": "Sakem niufala bisnis listing"
+  },
+  {
+    "id": "IN-0352",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 3856,
+    "end": 3872,
+    "original": "'Riviu Blong Mi'",
+    "bi": "Riviu Blong Mi"
+  },
+  {
+    "id": "IN-0353",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 4004,
+    "end": 4028,
+    "original": "'Ridim mo ansarem riviu'",
+    "bi": "Ridim mo ansarem riviu"
+  },
+  {
+    "id": "IN-0354",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 4512,
+    "end": 4517,
+    "original": "'Hom'",
+    "bi": "Hom"
+  },
+  {
+    "id": "IN-0355",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 4648,
+    "end": 4670,
+    "original": "'Go bak long main app'",
+    "bi": "Go bak long main app"
+  },
+  {
+    "id": "IN-0356",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 5062,
+    "end": 5068,
+    "original": "'Stat'",
+    "bi": "Stat"
+  },
+  {
+    "id": "IN-0357",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 5216,
+    "end": 5245,
+    "original": "'Lukim analitiks mo pefomans'",
+    "bi": "Lukim analitiks mo pefomans"
+  },
+  {
+    "id": "IN-0358",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 6506,
+    "end": 6518,
+    "original": "'Welkam bak'",
+    "bi": "Welkam bak"
+  },
+  {
+    "id": "IN-0359",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 6790,
+    "end": 6824,
+    "original": "'Managem bisnis blong yu long hia'",
+    "bi": "Managem bisnis blong yu long hia"
+  },
+  {
+    "id": "IN-0360",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 11398,
+    "end": 11409,
+    "original": "'Kwik Tips'",
+    "bi": "Kwik Tips"
+  },
+  {
+    "id": "IN-0361",
+    "source": "inline",
+    "file": "src/components/BusinessHomeScreen.tsx",
+    "key": null,
+    "start": 11607,
+    "end": 11632,
+    "original": "'Kasem moa long StikmNek'",
+    "bi": "Kasem moa long StikmNek"
+  },
+  {
+    "id": "IN-0362",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 34519,
+    "end": 34593,
+    "original": "'Plis ridim mo agri long Business partner & listing terms bifo yu submit.'",
+    "bi": "Plis ridim mo agri long Business partner & listing terms bifo yu submit."
+  },
+  {
+    "id": "IN-0363",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 58492,
+    "end": 58569,
+    "original": "'Optional: upload insurance o permit long Business Profile → My credentials.'",
+    "bi": "Optional: upload insurance o permit long Business Profile → My credentials."
+  },
+  {
+    "id": "IN-0364",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 59371,
+    "end": 59389,
+    "original": "'Upload kredensel'",
+    "bi": "Upload kredensel"
+  },
+  {
+    "id": "IN-0365",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 60551,
+    "end": 60565,
+    "original": "'Dil blong yu'",
+    "bi": "Dil blong yu"
+  },
+  {
+    "id": "IN-0366",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 60630,
+    "end": 60637,
+    "original": "'Praes'",
+    "bi": "Praes"
+  },
+  {
+    "id": "IN-0367",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 60707,
+    "end": 60719,
+    "original": "'Ol samting'",
+    "bi": "Ol samting"
+  },
+  {
+    "id": "IN-0368",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 60787,
+    "end": 60793,
+    "original": "'Foto'",
+    "bi": "Foto"
+  },
+  {
+    "id": "IN-0369",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 60863,
+    "end": 60872,
+    "original": "'Finisim'",
+    "bi": "Finisim"
+  },
+  {
+    "id": "IN-0370",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 62459,
+    "end": 62484,
+    "original": "'Plis kompletem step ia.'",
+    "bi": "Plis kompletem step ia."
+  },
+  {
+    "id": "IN-0371",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 64699,
+    "end": 64716,
+    "original": "'Senisim listing'",
+    "bi": "Senisim listing"
+  },
+  {
+    "id": "IN-0372",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 64917,
+    "end": 64945,
+    "original": "'Listem Bisnis Blong Yu Fri'",
+    "bi": "Listem Bisnis Blong Yu Fri"
+  },
+  {
+    "id": "IN-0373",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 65524,
+    "end": 65574,
+    "original": "'Joinem 120+ lokal bisnis we i rijim plante turis'",
+    "bi": "Joinem 120+ lokal bisnis we i rijim plante turis"
+  },
+  {
+    "id": "IN-0374",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 65951,
+    "end": 65963,
+    "original": "'Wanwan wok'",
+    "bi": "Wanwan wok"
+  },
+  {
+    "id": "IN-0375",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 66699,
+    "end": 66844,
+    "original": "'Fes komplitim profil bisnis long dashboard. Hia yu adem evri dil. Scroll daon blong upload kredensel (optional). Yusum klia titel blong dil ia.'",
+    "bi": "Fes komplitim profil bisnis long dashboard. Hia yu adem evri dil. Scroll daon blong upload kredensel (optional). Yusum klia titel blong dil ia."
+  },
+  {
+    "id": "IN-0376",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 67463,
+    "end": 67484,
+    "original": "'Mekem Bisnis Akaont'",
+    "bi": "Mekem Bisnis Akaont"
+  },
+  {
+    "id": "IN-0377",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 67837,
+    "end": 67893,
+    "original": "'Saen ap olsem bisnis ona blong listem bisnis blong yu.'",
+    "bi": "Saen ap olsem bisnis ona blong listem bisnis blong yu."
+  },
+  {
+    "id": "IN-0378",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 68458,
+    "end": 68480,
+    "original": "'Saen Ap olsem Bisnis'",
+    "bi": "Saen Ap olsem Bisnis"
+  },
+  {
+    "id": "IN-0379",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 68892,
+    "end": 68913,
+    "original": "'Gat akaont? Saen In'",
+    "bi": "Gat akaont? Saen In"
+  },
+  {
+    "id": "IN-0380",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 69530,
+    "end": 69553,
+    "original": "'Bisnis Akaont i Nidim'",
+    "bi": "Bisnis Akaont i Nidim"
+  },
+  {
+    "id": "IN-0381",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 69985,
+    "end": 70055,
+    "original": "'Yu saen in olsem turis. Blong listem bisnis, yu nidim bisnis akaont.'",
+    "bi": "Yu saen in olsem turis. Blong listem bisnis, yu nidim bisnis akaont."
+  },
+  {
+    "id": "IN-0382",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 70990,
+    "end": 70996,
+    "original": "'Step'",
+    "bi": "Step"
+  },
+  {
+    "id": "IN-0383",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 71968,
+    "end": 71984,
+    "original": "'Sevem otomatik'",
+    "bi": "Sevem otomatik"
+  },
+  {
+    "id": "IN-0384",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 72377,
+    "end": 72414,
+    "original": "'Klialem listing ia mo stat bakegen?'",
+    "bi": "Klialem listing ia mo stat bakegen?"
+  },
+  {
+    "id": "IN-0385",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 72729,
+    "end": 72743,
+    "original": "'Stat bakegen'",
+    "bi": "Stat bakegen"
+  },
+  {
+    "id": "IN-0386",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 73244,
+    "end": 73261,
+    "original": "'Titel blong dil'",
+    "bi": "Titel blong dil"
+  },
+  {
+    "id": "IN-0387",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 74212,
+    "end": 74242,
+    "original": "'ex. Semi-sub tua – Port Vila'",
+    "bi": "ex. Semi-sub tua – Port Vila"
+  },
+  {
+    "id": "IN-0388",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 74907,
+    "end": 74963,
+    "original": "'Nem ia turis bae luk long dil ia. Sevem blong apdetem.'",
+    "bi": "Nem ia turis bae luk long dil ia. Sevem blong apdetem."
+  },
+  {
+    "id": "IN-0389",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 78518,
+    "end": 78541,
+    "original": "'Praes mo Diskaon (VT)'",
+    "bi": "Praes mo Diskaon (VT)"
+  },
+  {
+    "id": "IN-0390",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 79367,
+    "end": 79490,
+    "original": "'Putum wan praes long Vatu (VT) (hem i wok sapos yu no putum tiers). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'",
+    "bi": "Putum wan praes long Vatu (VT) (hem i wok sapos yu no putum tiers). Diskaon i opsonal — bisnis we i gat diskaon i go fas."
+  },
+  {
+    "id": "IN-0391",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 79855,
+    "end": 79938,
+    "original": "'Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'",
+    "bi": "Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas."
+  },
+  {
+    "id": "IN-0392",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 80327,
+    "end": 80348,
+    "original": "'Praes blong yu (VT)'",
+    "bi": "Praes blong yu (VT)"
+  },
+  {
+    "id": "IN-0393",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 81708,
+    "end": 81740,
+    "original": "'Stanad praes long wan man (VT)'",
+    "bi": "Stanad praes long wan man (VT)"
+  },
+  {
+    "id": "IN-0394",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 82019,
+    "end": 82032,
+    "original": "'Diskaon (%)'",
+    "bi": "Diskaon (%)"
+  },
+  {
+    "id": "IN-0395",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 83336,
+    "end": 83353,
+    "original": "'Niu Praes (oto)'",
+    "bi": "Niu Praes (oto)"
+  },
+  {
+    "id": "IN-0396",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 84978,
+    "end": 84995,
+    "original": "'Kastoma bae luk'",
+    "bi": "Kastoma bae luk"
+  },
+  {
+    "id": "IN-0397",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 87143,
+    "end": 87160,
+    "original": "'Kastoma i sevem'",
+    "bi": "Kastoma i sevem"
+  },
+  {
+    "id": "IN-0398",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 87923,
+    "end": 87937,
+    "original": "'long wan man'",
+    "bi": "long wan man"
+  },
+  {
+    "id": "IN-0399",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 89751,
+    "end": 89771,
+    "original": "'Taem blong Diskaon'",
+    "bi": "Taem blong Diskaon"
+  },
+  {
+    "id": "IN-0400",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 90443,
+    "end": 90455,
+    "original": "'Stat Dei *'",
+    "bi": "Stat Dei *"
+  },
+  {
+    "id": "IN-0401",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 91134,
+    "end": 91146,
+    "original": "'Hamas Taem'",
+    "bi": "Hamas Taem"
+  },
+  {
+    "id": "IN-0402",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 92203,
+    "end": 92211,
+    "original": "'En Dei'",
+    "bi": "En Dei"
+  },
+  {
+    "id": "IN-0403",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 98070,
+    "end": 98096,
+    "original": "'WhatsApp Namba (Opsonal)'",
+    "bi": "WhatsApp Namba (Opsonal)"
+  },
+  {
+    "id": "IN-0404",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 98506,
+    "end": 98575,
+    "original": "'Addem WhatsApp namba blong yu blong turis i save mesej yu daerekli.'",
+    "bi": "Addem WhatsApp namba blong yu blong turis i save mesej yu daerekli."
+  },
+  {
+    "id": "IN-0405",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 100901,
+    "end": 100967,
+    "original": "'Turis bae save openem WhatsApp mo sendem mesej long yu daerekli.'",
+    "bi": "Turis bae save openem WhatsApp mo sendem mesej long yu daerekli."
+  },
+  {
+    "id": "IN-0406",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 101486,
+    "end": 101501,
+    "original": "'Onlaen mo Map'",
+    "bi": "Onlaen mo Map"
+  },
+  {
+    "id": "IN-0407",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 104382,
+    "end": 104404,
+    "original": "'Optional — kredensel'",
+    "bi": "Optional — kredensel"
+  },
+  {
+    "id": "IN-0408",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 105167,
+    "end": 105240,
+    "original": "'Save profail bisnis long dashboard first, bae yu save upload kredensel.'",
+    "bi": "Save profail bisnis long dashboard first, bae yu save upload kredensel."
+  },
+  {
+    "id": "IN-0409",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 109306,
+    "end": 109322,
+    "original": "'Submitem senis'",
+    "bi": "Submitem senis"
+  },
+  {
+    "id": "IN-0410",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 111275,
+    "end": 111282,
+    "original": "'Nekis'",
+    "bi": "Nekis"
+  },
+  {
+    "id": "IN-0411",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 112648,
+    "end": 112656,
+    "original": "'Klosem'",
+    "bi": "Klosem"
+  },
+  {
+    "id": "IN-0412",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 113448,
+    "end": 113473,
+    "original": "'Mi agri long ol taem ia'",
+    "bi": "Mi agri long ol taem ia"
+  },
+  {
+    "id": "IN-0413",
+    "source": "inline",
+    "file": "src/components/BusinessListingForm.tsx",
+    "key": null,
+    "start": 113793,
+    "end": 113801,
+    "original": "'Klosem'",
+    "bi": "Klosem"
+  },
+  {
+    "id": "IN-0414",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 33813,
+    "end": 33868,
+    "original": "'Submitim fes deal blong yu — foto, praes, mo diskaon.'",
+    "bi": "Submitim fes deal blong yu — foto, praes, mo diskaon."
+  },
+  {
+    "id": "IN-0415",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 64975,
+    "end": 64991,
+    "original": "'Bisnis profail'",
+    "bi": "Bisnis profail"
+  },
+  {
+    "id": "IN-0416",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 65213,
+    "end": 65233,
+    "original": "'Kredensel blong mi'",
+    "bi": "Kredensel blong mi"
+  },
+  {
+    "id": "IN-0417",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 66897,
+    "end": 66972,
+    "original": "'Yu gat plante live dil. Pikim wan blong apdeit — no nid openem said menu.'",
+    "bi": "Yu gat plante live dil. Pikim wan blong apdeit — no nid openem said menu."
+  },
+  {
+    "id": "IN-0418",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 67250,
+    "end": 67303,
+    "original": "'Ol namba long daon i blong listing we yu pikim hia.'",
+    "bi": "Ol namba long daon i blong listing we yu pikim hia."
+  },
+  {
+    "id": "IN-0419",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 67627,
+    "end": 67694,
+    "original": "'Ol riviu long daon i blong listing ia taem oli link long wan dil.'",
+    "bi": "Ol riviu long daon i blong listing ia taem oli link long wan dil."
+  },
+  {
+    "id": "IN-0420",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 67987,
+    "end": 68080,
+    "original": "'Ol foto long daon i blong gallery blong listing ia (evri dil i save gat ol foto blong hem).'",
+    "bi": "Ol foto long daon i blong gallery blong listing ia (evri dil i save gat ol foto blong hem)."
+  },
+  {
+    "id": "IN-0421",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 68420,
+    "end": 68434,
+    "original": "'Wan listing?'",
+    "bi": "Wan listing?"
+  },
+  {
+    "id": "IN-0422",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 88338,
+    "end": 88355,
+    "original": "'Titel blong dil'",
+    "bi": "Titel blong dil"
+  },
+  {
+    "id": "IN-0423",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 89679,
+    "end": 89689,
+    "original": "'Kategori'",
+    "bi": "Kategori"
+  },
+  {
+    "id": "IN-0424",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 90793,
+    "end": 90806,
+    "original": "'Description'",
+    "bi": "Description"
+  },
+  {
+    "id": "IN-0425",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 98637,
+    "end": 98643,
+    "original": "'Foto'",
+    "bi": "Foto"
+  },
+  {
+    "id": "IN-0426",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 99151,
+    "end": 99207,
+    "original": "'Wan foto o kava i nidim. Ol foto bifo i save kam bake.'",
+    "bi": "Wan foto o kava i nidim. Ol foto bifo i save kam bake."
+  },
+  {
+    "id": "IN-0427",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 112662,
+    "end": 112688,
+    "original": "'Wan senisim fon o email?'",
+    "bi": "Wan senisim fon o email?"
+  },
+  {
+    "id": "IN-0428",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 113088,
+    "end": 113111,
+    "original": "'Openem Bisnis profail'",
+    "bi": "Openem Bisnis profail"
+  },
+  {
+    "id": "IN-0429",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 113591,
+    "end": 113619,
+    "original": "'Save profail bisnis first.'",
+    "bi": "Save profail bisnis first."
+  },
+  {
+    "id": "IN-0430",
+    "source": "inline",
+    "file": "src/components/BusinessOwnerDashboard.tsx",
+    "key": null,
+    "start": 114070,
+    "end": 114098,
+    "original": "'Save profail bisnis first.'",
+    "bi": "Save profail bisnis first."
+  },
+  {
+    "id": "IN-0431",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 3023,
+    "end": 3050,
+    "original": "'No faenem bisnis profail.'",
+    "bi": "No faenem bisnis profail."
+  },
+  {
+    "id": "IN-0432",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 4812,
+    "end": 4832,
+    "original": "'No loadem profail.'",
+    "bi": "No loadem profail."
+  },
+  {
+    "id": "IN-0433",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 6192,
+    "end": 6209,
+    "original": "'Fiksem ol erro.'",
+    "bi": "Fiksem ol erro."
+  },
+  {
+    "id": "IN-0434",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 8899,
+    "end": 8918,
+    "original": "'Profail i apdeit.'",
+    "bi": "Profail i apdeit."
+  },
+  {
+    "id": "IN-0435",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 9420,
+    "end": 9436,
+    "original": "'Bisnis profail'",
+    "bi": "Bisnis profail"
+  },
+  {
+    "id": "IN-0436",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 9822,
+    "end": 9933,
+    "original": "'Apdeit fon, email, adres mo taem blong olgeta bisnis. Evri listing i save gat diffren taem long Edit listing.'",
+    "bi": "Apdeit fon, email, adres mo taem blong olgeta bisnis. Evri listing i save gat diffren taem long Edit listing."
+  },
+  {
+    "id": "IN-0437",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 11129,
+    "end": 11147,
+    "original": "'Nem blong bisnis'",
+    "bi": "Nem blong bisnis"
+  },
+  {
+    "id": "IN-0438",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 11758,
+    "end": 11776,
+    "original": "'Man blong kontak'",
+    "bi": "Man blong kontak"
+  },
+  {
+    "id": "IN-0439",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 12304,
+    "end": 12314,
+    "original": "'Kategori'",
+    "bi": "Kategori"
+  },
+  {
+    "id": "IN-0440",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 14588,
+    "end": 14643,
+    "original": "'Mi no yusum WhatsApp — kontaktem mi long fon o email.'",
+    "bi": "Mi no yusum WhatsApp — kontaktem mi long fon o email."
+  },
+  {
+    "id": "IN-0441",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 14942,
+    "end": 14952,
+    "original": "'WhatsApp'",
+    "bi": "WhatsApp"
+  },
+  {
+    "id": "IN-0442",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 15357,
+    "end": 15414,
+    "original": "'Recommend blong guest mo tips. Country code (ex. +678).'",
+    "bi": "Recommend blong guest mo tips. Country code (ex. +678)."
+  },
+  {
+    "id": "IN-0443",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 16821,
+    "end": 16894,
+    "original": "'Sendem WhatsApp tips blong StikmNek (help long listing, foto, booking).'",
+    "bi": "Sendem WhatsApp tips blong StikmNek (help long listing, foto, booking)."
+  },
+  {
+    "id": "IN-0444",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 17399,
+    "end": 17454,
+    "original": "'Mifala bae yusum fon mo email. No long WhatsApp list.'",
+    "bi": "Mifala bae yusum fon mo email. No long WhatsApp list."
+  },
+  {
+    "id": "IN-0445",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 18374,
+    "end": 18397,
+    "original": "'Taem wok blong bisnis'",
+    "bi": "Taem wok blong bisnis"
+  },
+  {
+    "id": "IN-0446",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 19091,
+    "end": 19160,
+    "original": "'Blong kontak blong bisnis. Taem blong wan tour � long Edit listing.'",
+    "bi": "Blong kontak blong bisnis. Taem blong wan tour � long Edit listing."
+  },
+  {
+    "id": "IN-0447",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 20068,
+    "end": 20074,
+    "original": "'Logo'",
+    "bi": "Logo"
+  },
+  {
+    "id": "IN-0448",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 20585,
+    "end": 20628,
+    "original": "'Upload, drag mo zoom blong fillum square.'",
+    "bi": "Upload, drag mo zoom blong fillum square."
+  },
+  {
+    "id": "IN-0449",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 21022,
+    "end": 21037,
+    "original": "'Sevem profail'",
+    "bi": "Sevem profail"
+  },
+  {
+    "id": "IN-0450",
+    "source": "inline",
+    "file": "src/components/BusinessProfileSettings.tsx",
+    "key": null,
+    "start": 21254,
+    "end": 21263,
+    "original": "'Discard'",
+    "bi": "Discard"
+  },
+  {
+    "id": "IN-0451",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 827,
+    "end": 834,
+    "original": "'Kakae'",
+    "bi": "Kakae"
+  },
+  {
+    "id": "IN-0452",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 963,
+    "end": 989,
+    "original": "'Fres sifud & lokal kakae'",
+    "bi": "Fres sifud & lokal kakae"
+  },
+  {
+    "id": "IN-0453",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 1268,
+    "end": 1278,
+    "original": "'Aktiviti'",
+    "bi": "Aktiviti"
+  },
+  {
+    "id": "IN-0454",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 1388,
+    "end": 1413,
+    "original": "'Snokling, daeving & moa'",
+    "bi": "Snokling, daeving & moa"
+  },
+  {
+    "id": "IN-0455",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 1679,
+    "end": 1684,
+    "original": "'Tua'",
+    "bi": "Tua"
+  },
+  {
+    "id": "IN-0456",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 1804,
+    "end": 1826,
+    "original": "'Kalsa & advencha tua'",
+    "bi": "Kalsa & advencha tua"
+  },
+  {
+    "id": "IN-0457",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 2116,
+    "end": 2127,
+    "original": "'Transport'",
+    "bi": "Transport"
+  },
+  {
+    "id": "IN-0458",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 2263,
+    "end": 2299,
+    "original": "'Rent kar, airport transfer mo taxi'",
+    "bi": "Rent kar, airport transfer mo taxi"
+  },
+  {
+    "id": "IN-0459",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 2565,
+    "end": 2577,
+    "original": "'Spa & Helt'",
+    "bi": "Spa & Helt"
+  },
+  {
+    "id": "IN-0460",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 2686,
+    "end": 2705,
+    "original": "'Rilaks & rifresen'",
+    "bi": "Rilaks & rifresen"
+  },
+  {
+    "id": "IN-0461",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 2994,
+    "end": 3011,
+    "original": "'Ples blong slip'",
+    "bi": "Ples blong slip"
+  },
+  {
+    "id": "IN-0462",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 3113,
+    "end": 3128,
+    "original": "'Bichfron stei'",
+    "bi": "Bichfron stei"
+  },
+  {
+    "id": "IN-0463",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 3404,
+    "end": 3412,
+    "original": "'Soping'",
+    "bi": "Soping"
+  },
+  {
+    "id": "IN-0464",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 3527,
+    "end": 3550,
+    "original": "'Lokal kraft & suvenia'",
+    "bi": "Lokal kraft & suvenia"
+  },
+  {
+    "id": "IN-0465",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 4361,
+    "end": 4386,
+    "original": "'Eksploarem bae Kategori'",
+    "bi": "Eksploarem bae Kategori"
+  },
+  {
+    "id": "IN-0466",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 4653,
+    "end": 4699,
+    "original": "'Faenem nambawan dil blong evri kaen advencha'",
+    "bi": "Faenem nambawan dil blong evri kaen advencha"
+  },
+  {
+    "id": "IN-0467",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 5019,
+    "end": 5034,
+    "original": "'aktiv listing'",
+    "bi": "aktiv listing"
+  },
+  {
+    "id": "IN-0468",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 7236,
+    "end": 7241,
+    "original": "'dil'",
+    "bi": "dil"
+  },
+  {
+    "id": "IN-0469",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 7329,
+    "end": 7335,
+    "original": "'dils'",
+    "bi": "dils"
+  },
+  {
+    "id": "IN-0470",
+    "source": "inline",
+    "file": "src/components/CategoryShowcase.tsx",
+    "key": null,
+    "start": 7475,
+    "end": 7483,
+    "original": "'i stap'",
+    "bi": "i stap"
+  },
+  {
+    "id": "IN-0471",
+    "source": "inline",
+    "file": "src/components/CompleteTouristProfile.tsx",
+    "key": null,
+    "start": 1270,
+    "end": 1299,
+    "original": "'Go bek long profil blong yu'",
+    "bi": "Go bek long profil blong yu"
+  },
+  {
+    "id": "IN-0472",
+    "source": "inline",
+    "file": "src/components/CompleteTouristProfile.tsx",
+    "key": null,
+    "start": 1487,
+    "end": 1514,
+    "original": "'Komplitim profil blong yu'",
+    "bi": "Komplitim profil blong yu"
+  },
+  {
+    "id": "IN-0473",
+    "source": "inline",
+    "file": "src/components/CompleteTouristProfile.tsx",
+    "key": null,
+    "start": 1919,
+    "end": 1968,
+    "original": "'Go hed wea yu stap — ol samting i save lelebet.'",
+    "bi": "Go hed wea yu stap — ol samting i save lelebet."
+  },
+  {
+    "id": "IN-0474",
+    "source": "inline",
+    "file": "src/components/CompleteTouristProfile.tsx",
+    "key": null,
+    "start": 2294,
+    "end": 2376,
+    "original": "'Mifala i yusum blong soem ol lim long pas wetem grup mo det blong trip blong yu.'",
+    "bi": "Mifala i yusum blong soem ol lim long pas wetem grup mo det blong trip blong yu."
+  },
+  {
+    "id": "IN-0475",
+    "source": "inline",
+    "file": "src/components/CompleteTouristProfile.tsx",
+    "key": null,
+    "start": 3270,
+    "end": 3281,
+    "original": "'Traem gen'",
+    "bi": "Traem gen"
+  },
+  {
+    "id": "IN-0476",
+    "source": "inline",
+    "file": "src/components/CompleteTouristProfile.tsx",
+    "key": null,
+    "start": 4286,
+    "end": 4369,
+    "original": "'Biaen, yu go long checkout — pas i blong profil blong yu (yu ken senis bifo pem).'",
+    "bi": "Biaen, yu go long checkout — pas i blong profil blong yu (yu ken senis bifo pem)."
+  },
+  {
+    "id": "IN-0477",
+    "source": "inline",
+    "file": "src/components/CookieConsent.tsx",
+    "key": null,
+    "start": 1723,
+    "end": 1761,
+    "original": "'Mifala i respektem praevesi blong yu'",
+    "bi": "Mifala i respektem praevesi blong yu"
+  },
+  {
+    "id": "IN-0478",
+    "source": "inline",
+    "file": "src/components/CookieConsent.tsx",
+    "key": null,
+    "start": 2464,
+    "end": 2619,
+    "original": "'Mifala i yusim kukis mo analytics blong mekem eksperiens blong yu i moa gud. Taem yu klikim \"Akseptim\", yu agri long yus blong kukis mo Google Analytics.'",
+    "bi": "Mifala i yusim kukis mo analytics blong mekem eksperiens blong yu i moa gud. Taem yu klikim \"Akseptim\", yu agri long yus blong kukis mo Google Analytics."
+  },
+  {
+    "id": "IN-0479",
+    "source": "inline",
+    "file": "src/components/CookieConsent.tsx",
+    "key": null,
+    "start": 3064,
+    "end": 3073,
+    "original": "'Refusim'",
+    "bi": "Refusim"
+  },
+  {
+    "id": "IN-0480",
+    "source": "inline",
+    "file": "src/components/CookieConsent.tsx",
+    "key": null,
+    "start": 3393,
+    "end": 3403,
+    "original": "'Akseptim'",
+    "bi": "Akseptim"
+  },
+  {
+    "id": "IN-0481",
+    "source": "inline",
+    "file": "src/components/CredentialUploader.tsx",
+    "key": null,
+    "start": 1147,
+    "end": 1165,
+    "original": "'Faol i mas 10 MB'",
+    "bi": "Faol i mas 10 MB"
+  },
+  {
+    "id": "IN-0482",
+    "source": "inline",
+    "file": "src/components/CredentialUploader.tsx",
+    "key": null,
+    "start": 3537,
+    "end": 3569,
+    "original": "'Dokumen i upload — klikim Save'",
+    "bi": "Dokumen i upload — klikim Save"
+  },
+  {
+    "id": "IN-0483",
+    "source": "inline",
+    "file": "src/components/CredentialUploader.tsx",
+    "key": null,
+    "start": 5491,
+    "end": 5510,
+    "original": "'Upload PDF o foto'",
+    "bi": "Upload PDF o foto"
+  },
+  {
+    "id": "IN-0484",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 6201,
+    "end": 6208,
+    "original": "'Kakae'",
+    "bi": "Kakae"
+  },
+  {
+    "id": "IN-0485",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 6295,
+    "end": 6305,
+    "original": "'Aktiviti'",
+    "bi": "Aktiviti"
+  },
+  {
+    "id": "IN-0486",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 6380,
+    "end": 6385,
+    "original": "'Tua'",
+    "bi": "Tua"
+  },
+  {
+    "id": "IN-0487",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 6583,
+    "end": 6600,
+    "original": "'Ples blong slip'",
+    "bi": "Ples blong slip"
+  },
+  {
+    "id": "IN-0488",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 15400,
+    "end": 15407,
+    "original": "'Yusim'",
+    "bi": "Yusim"
+  },
+  {
+    "id": "IN-0489",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 18055,
+    "end": 18061,
+    "original": "'rid.'",
+    "bi": "rid."
+  },
+  {
+    "id": "IN-0490",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 18328,
+    "end": 18349,
+    "original": "'Total sevem (redim)'",
+    "bi": "Total sevem (redim)"
+  },
+  {
+    "id": "IN-0491",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 20977,
+    "end": 20987,
+    "original": "'Expire: '",
+    "bi": "Expire: "
+  },
+  {
+    "id": "IN-0492",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 21589,
+    "end": 21610,
+    "original": "'Taem blong Diskount'",
+    "bi": "Taem blong Diskount"
+  },
+  {
+    "id": "IN-0493",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 22244,
+    "end": 22250,
+    "original": "'Stat'",
+    "bi": "Stat"
+  },
+  {
+    "id": "IN-0494",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 22601,
+    "end": 22605,
+    "original": "'go'",
+    "bi": "go"
+  },
+  {
+    "id": "IN-0495",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 22867,
+    "end": 22874,
+    "original": "'Finis'",
+    "bi": "Finis"
+  },
+  {
+    "id": "IN-0496",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 24321,
+    "end": 24329,
+    "original": "'Serem…'",
+    "bi": "Serem…"
+  },
+  {
+    "id": "IN-0497",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 26667,
+    "end": 26678,
+    "original": "'Analitiks'",
+    "bi": "Analitiks"
+  },
+  {
+    "id": "IN-0498",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 29399,
+    "end": 29440,
+    "original": "'No gat yusim yet. Stat eksploarem dils!'",
+    "bi": "No gat yusim yet. Stat eksploarem dils!"
+  },
+  {
+    "id": "IN-0499",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 30379,
+    "end": 30398,
+    "original": "'Grup blong travel'",
+    "bi": "Grup blong travel"
+  },
+  {
+    "id": "IN-0500",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 30911,
+    "end": 30962,
+    "original": "'Checkout i yusim namba long profil blong yu (6+).'",
+    "bi": "Checkout i yusim namba long profil blong yu (6+)."
+  },
+  {
+    "id": "IN-0501",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 31291,
+    "end": 31298,
+    "original": "'Adult'",
+    "bi": "Adult"
+  },
+  {
+    "id": "IN-0502",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 31680,
+    "end": 31695,
+    "original": "'Pikinini (6+)'",
+    "bi": "Pikinini (6+)"
+  },
+  {
+    "id": "IN-0503",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 32409,
+    "end": 32422,
+    "original": "'Edit profil'",
+    "bi": "Edit profil"
+  },
+  {
+    "id": "IN-0504",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 33342,
+    "end": 33358,
+    "original": "'Sevin blong yu'",
+    "bi": "Sevin blong yu"
+  },
+  {
+    "id": "IN-0505",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 33507,
+    "end": 33525,
+    "original": "'Openem analitiks'",
+    "bi": "Openem analitiks"
+  },
+  {
+    "id": "IN-0506",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 35867,
+    "end": 35886,
+    "original": "'No gat favrit yet'",
+    "bi": "No gat favrit yet"
+  },
+  {
+    "id": "IN-0507",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 36507,
+    "end": 36530,
+    "original": "'Konetim long Database'",
+    "bi": "Konetim long Database"
+  },
+  {
+    "id": "IN-0508",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 36696,
+    "end": 36718,
+    "original": "'Riel-taem sink aktiv'",
+    "bi": "Riel-taem sink aktiv"
+  },
+  {
+    "id": "IN-0509",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 37158,
+    "end": 37208,
+    "original": "'Data blong yu i sef mo sink akros olgeta divaes.'",
+    "bi": "Data blong yu i sef mo sink akros olgeta divaes."
+  },
+  {
+    "id": "IN-0510",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 39036,
+    "end": 39069,
+    "original": "'Sevin i win long pass — go hed!'",
+    "bi": "Sevin i win long pass — go hed!"
+  },
+  {
+    "id": "IN-0511",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 39313,
+    "end": 39350,
+    "original": "'Lukim wetem yu bin du long StikmNek'",
+    "bi": "Lukim wetem yu bin du long StikmNek"
+  },
+  {
+    "id": "IN-0512",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 43561,
+    "end": 43574,
+    "original": "'Total deals'",
+    "bi": "Total deals"
+  },
+  {
+    "id": "IN-0513",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 47128,
+    "end": 47178,
+    "original": "'Ol VT ia i helpem pocket blong yu — gudfala wok!'",
+    "bi": "Ol VT ia i helpem pocket blong yu — gudfala wok!"
+  },
+  {
+    "id": "IN-0514",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 48575,
+    "end": 48591,
+    "original": "'Pem blong pass'",
+    "bi": "Pem blong pass"
+  },
+  {
+    "id": "IN-0515",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 49759,
+    "end": 49807,
+    "original": "'Pem blong pass bae i kam afta checkout i sink.'",
+    "bi": "Pem blong pass bae i kam afta checkout i sink."
+  },
+  {
+    "id": "IN-0516",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 50170,
+    "end": 50188,
+    "original": "'Sevin long deals'",
+    "bi": "Sevin long deals"
+  },
+  {
+    "id": "IN-0517",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 52227,
+    "end": 52262,
+    "original": "'Balans rid (sevin − pass long VT)'",
+    "bi": "Balans rid (sevin − pass long VT)"
+  },
+  {
+    "id": "IN-0518",
+    "source": "inline",
+    "file": "src/components/Dashboard.tsx",
+    "key": null,
+    "start": 54228,
+    "end": 54245,
+    "original": "'Antap long pass'",
+    "bi": "Antap long pass"
+  },
+  {
+    "id": "IN-0519",
+    "source": "inline",
+    "file": "src/components/DashboardOverview.tsx",
+    "key": null,
+    "start": 4827,
+    "end": 4843,
+    "original": "'Bisnis profail'",
+    "bi": "Bisnis profail"
+  },
+  {
+    "id": "IN-0520",
+    "source": "inline",
+    "file": "src/components/DashboardOverview.tsx",
+    "key": null,
+    "start": 5049,
+    "end": 5068,
+    "original": "'Fon, email, adres'",
+    "bi": "Fon, email, adres"
+  },
+  {
+    "id": "IN-0521",
+    "source": "inline",
+    "file": "src/components/DashboardOverview.tsx",
+    "key": null,
+    "start": 5436,
+    "end": 5447,
+    "original": "'Kredensel'",
+    "bi": "Kredensel"
+  },
+  {
+    "id": "IN-0522",
+    "source": "inline",
+    "file": "src/components/DashboardOverview.tsx",
+    "key": null,
+    "start": 5659,
+    "end": 5690,
+    "original": "'Permit, insurance, sertifikat'",
+    "bi": "Permit, insurance, sertifikat"
+  },
+  {
+    "id": "IN-0523",
+    "source": "inline",
+    "file": "src/components/DealsPricingCard.tsx",
+    "key": null,
+    "start": 12401,
+    "end": 12407,
+    "original": "'Kaed'",
+    "bi": "Kaed"
+  },
+  {
+    "id": "IN-0524",
+    "source": "inline",
+    "file": "src/components/FeaturedLeaderboard.tsx",
+    "key": null,
+    "start": 3574,
+    "end": 3588,
+    "original": "'Laev Ranking'",
+    "bi": "Laev Ranking"
+  },
+  {
+    "id": "IN-0525",
+    "source": "inline",
+    "file": "src/components/FeaturedLeaderboard.tsx",
+    "key": null,
+    "start": 3808,
+    "end": 3835,
+    "original": "'Lidabod blong Fitjad Dils'",
+    "bi": "Lidabod blong Fitjad Dils"
+  },
+  {
+    "id": "IN-0526",
+    "source": "inline",
+    "file": "src/components/FeaturedLeaderboard.tsx",
+    "key": null,
+    "start": 4203,
+    "end": 4264,
+    "original": "'Beswan dils i rank bae reting, riviu, Super Stars, mo valu.'",
+    "bi": "Beswan dils i rank bae reting, riviu, Super Stars, mo valu."
+  },
+  {
+    "id": "IN-0527",
+    "source": "inline",
+    "file": "src/components/FeaturedLeaderboard.tsx",
+    "key": null,
+    "start": 17408,
+    "end": 17427,
+    "original": "'Lukim Olgeta Dils'",
+    "bi": "Lukim Olgeta Dils"
+  },
+  {
+    "id": "IN-0528",
+    "source": "inline",
+    "file": "src/components/Footer.tsx",
+    "key": null,
+    "start": 5688,
+    "end": 5700,
+    "original": "'Help Senta'",
+    "bi": "Help Senta"
+  },
+  {
+    "id": "IN-0529",
+    "source": "inline",
+    "file": "src/components/Footer.tsx",
+    "key": null,
+    "start": 6741,
+    "end": 6754,
+    "original": "'Bisnis Gaed'",
+    "bi": "Bisnis Gaed"
+  },
+  {
+    "id": "IN-0530",
+    "source": "inline",
+    "file": "src/components/Footer.tsx",
+    "key": null,
+    "start": 9662,
+    "end": 9675,
+    "original": "'Kuki Polisi'",
+    "bi": "Kuki Polisi"
+  },
+  {
+    "id": "IN-0531",
+    "source": "inline",
+    "file": "src/components/Footer.tsx",
+    "key": null,
+    "start": 10180,
+    "end": 10196,
+    "original": "'Data Proteksen'",
+    "bi": "Data Proteksen"
+  },
+  {
+    "id": "IN-0532",
+    "source": "inline",
+    "file": "src/components/Footer.tsx",
+    "key": null,
+    "start": 11626,
+    "end": 11642,
+    "original": "'GDPR Komplaent'",
+    "bi": "GDPR Komplaent"
+  },
+  {
+    "id": "IN-0533",
+    "source": "inline",
+    "file": "src/components/Footer.tsx",
+    "key": null,
+    "start": 11901,
+    "end": 11916,
+    "original": "'Plante Lanwis'",
+    "bi": "Plante Lanwis"
+  },
+  {
+    "id": "IN-0534",
+    "source": "inline",
+    "file": "src/components/Hero.tsx",
+    "key": null,
+    "start": 5167,
+    "end": 5183,
+    "original": "'Lukim long map'",
+    "bi": "Lukim long map"
+  },
+  {
+    "id": "IN-0535",
+    "source": "inline",
+    "file": "src/components/HowItWorks.tsx",
+    "key": null,
+    "start": 901,
+    "end": 918,
+    "original": "'Eksploarem Dils'",
+    "bi": "Eksploarem Dils"
+  },
+  {
+    "id": "IN-0536",
+    "source": "inline",
+    "file": "src/components/HowItWorks.tsx",
+    "key": null,
+    "start": 1108,
+    "end": 1178,
+    "original": "'Lukim 120+ dils long map o bae kategori. Faenem wanem i eksaetem yu!'",
+    "bi": "Lukim 120+ dils long map o bae kategori. Faenem wanem i eksaetem yu!"
+  },
+  {
+    "id": "IN-0537",
+    "source": "inline",
+    "file": "src/components/HowItWorks.tsx",
+    "key": null,
+    "start": 1408,
+    "end": 1421,
+    "original": "'Soem QR Kod'",
+    "bi": "Soem QR Kod"
+  },
+  {
+    "id": "IN-0538",
+    "source": "inline",
+    "file": "src/components/HowItWorks.tsx",
+    "key": null,
+    "start": 1634,
+    "end": 1707,
+    "original": "'Soem QR kod blong yu long bisnis blong yusim ekslusiv diskount blong yu'",
+    "bi": "Soem QR kod blong yu long bisnis blong yusim ekslusiv diskount blong yu"
+  },
+  {
+    "id": "IN-0539",
+    "source": "inline",
+    "file": "src/components/HowItWorks.tsx",
+    "key": null,
+    "start": 1943,
+    "end": 1960,
+    "original": "'Sevem mo Enjoem'",
+    "bi": "Sevem mo Enjoem"
+  },
+  {
+    "id": "IN-0540",
+    "source": "inline",
+    "file": "src/components/HowItWorks.tsx",
+    "key": null,
+    "start": 2191,
+    "end": 2254,
+    "original": "'Sevem kasem 35% long kakae, tua, aktiviti mo moa long Vanuatu'",
+    "bi": "Sevem kasem 35% long kakae, tua, aktiviti mo moa long Vanuatu"
+  },
+  {
+    "id": "IN-0541",
+    "source": "inline",
+    "file": "src/components/HowItWorks.tsx",
+    "key": null,
+    "start": 2699,
+    "end": 2727,
+    "original": "'Olsem Wanem StikmNek i Wok'",
+    "bi": "Olsem Wanem StikmNek i Wok"
+  },
+  {
+    "id": "IN-0542",
+    "source": "inline",
+    "file": "src/components/HowItWorks.tsx",
+    "key": null,
+    "start": 3029,
+    "end": 3093,
+    "original": "'Fo simpol step blong stat sevem long Vanuatu advencha blong yu'",
+    "bi": "Fo simpol step blong stat sevem long Vanuatu advencha blong yu"
+  },
+  {
+    "id": "IN-0543",
+    "source": "inline",
+    "file": "src/components/HowItWorks.tsx",
+    "key": null,
+    "start": 4689,
+    "end": 4706,
+    "original": "'Stat Sevem Tede'",
+    "bi": "Stat Sevem Tede"
+  },
+  {
+    "id": "IN-0544",
+    "source": "inline",
+    "file": "src/components/ListYourBusinessCta.tsx",
+    "key": null,
+    "start": 2800,
+    "end": 2827,
+    "original": "'Blong bisnis long Vanuatu'",
+    "bi": "Blong bisnis long Vanuatu"
+  },
+  {
+    "id": "IN-0545",
+    "source": "inline",
+    "file": "src/components/ListYourBusinessCta.tsx",
+    "key": null,
+    "start": 2994,
+    "end": 3024,
+    "original": "'Listem bisnis blong yu — fri'",
+    "bi": "Listem bisnis blong yu — fri"
+  },
+  {
+    "id": "IN-0546",
+    "source": "inline",
+    "file": "src/components/ListYourBusinessCta.tsx",
+    "key": null,
+    "start": 3366,
+    "end": 3463,
+    "original": "'Putem ol dil blong yu long ai blong turis we oli planem trip — StikmNek i helpem oli faenem yu.'",
+    "bi": "Putem ol dil blong yu long ai blong turis we oli planem trip — StikmNek i helpem oli faenem yu."
+  },
+  {
+    "id": "IN-0547",
+    "source": "inline",
+    "file": "src/components/ListYourBusinessCta.tsx",
+    "key": null,
+    "start": 10165,
+    "end": 10178,
+    "original": "'Gat akaont?'",
+    "bi": "Gat akaont?"
+  },
+  {
+    "id": "IN-0548",
+    "source": "inline",
+    "file": "src/components/ListYourBusinessCta.tsx",
+    "key": null,
+    "start": 10642,
+    "end": 10651,
+    "original": "'Saen in'",
+    "bi": "Saen in"
+  },
+  {
+    "id": "IN-0549",
+    "source": "inline",
+    "file": "src/components/ListYourBusinessCta.tsx",
+    "key": null,
+    "start": 15108,
+    "end": 15126,
+    "original": "'I stret long fon'",
+    "bi": "I stret long fon"
+  },
+  {
+    "id": "IN-0550",
+    "source": "inline",
+    "file": "src/components/ListYourBusinessCta.tsx",
+    "key": null,
+    "start": 15542,
+    "end": 15556,
+    "original": "'Vanuatu wide'",
+    "bi": "Vanuatu wide"
+  },
+  {
+    "id": "IN-0551",
+    "source": "inline",
+    "file": "src/components/LogoCropDialog.tsx",
+    "key": null,
+    "start": 1331,
+    "end": 1346,
+    "original": "'Adjustem logo'",
+    "bi": "Adjustem logo"
+  },
+  {
+    "id": "IN-0552",
+    "source": "inline",
+    "file": "src/components/LogoCropDialog.tsx",
+    "key": null,
+    "start": 1648,
+    "end": 1694,
+    "original": "'Drag mo zoom — olsem bae i luk long listing.'",
+    "bi": "Drag mo zoom — olsem bae i luk long listing."
+  },
+  {
+    "id": "IN-0553",
+    "source": "inline",
+    "file": "src/components/LogoCropDialog.tsx",
+    "key": null,
+    "start": 1764,
+    "end": 1770,
+    "original": "'Zoom'",
+    "bi": "Zoom"
+  },
+  {
+    "id": "IN-0554",
+    "source": "inline",
+    "file": "src/components/LogoCropDialog.tsx",
+    "key": null,
+    "start": 1847,
+    "end": 1857,
+    "original": "'Kanselem'",
+    "bi": "Kanselem"
+  },
+  {
+    "id": "IN-0555",
+    "source": "inline",
+    "file": "src/components/LogoCropDialog.tsx",
+    "key": null,
+    "start": 1939,
+    "end": 1951,
+    "original": "'Sevem logo'",
+    "bi": "Sevem logo"
+  },
+  {
+    "id": "IN-0556",
+    "source": "inline",
+    "file": "src/components/MyFavoritesList.tsx",
+    "key": null,
+    "start": 1888,
+    "end": 1900,
+    "original": "'we i sevem'",
+    "bi": "we i sevem"
+  },
+  {
+    "id": "IN-0557",
+    "source": "inline",
+    "file": "src/components/MyFavoritesList.tsx",
+    "key": null,
+    "start": 2570,
+    "end": 2589,
+    "original": "'Lukluk ol diskaon'",
+    "bi": "Lukluk ol diskaon"
+  },
+  {
+    "id": "IN-0558",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 9767,
+    "end": 9797,
+    "original": "'Listing i haed long Explore.'",
+    "bi": "Listing i haed long Explore."
+  },
+  {
+    "id": "IN-0559",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 15407,
+    "end": 15427,
+    "original": "'Sabmisen i raetem.'",
+    "bi": "Sabmisen i raetem."
+  },
+  {
+    "id": "IN-0560",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 32143,
+    "end": 32152,
+    "original": "'Apruvum'",
+    "bi": "Apruvum"
+  },
+  {
+    "id": "IN-0561",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 32549,
+    "end": 32561,
+    "original": "'No Apruvum'",
+    "bi": "No Apruvum"
+  },
+  {
+    "id": "IN-0562",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 32951,
+    "end": 32964,
+    "original": "'Stap Lukluk'",
+    "bi": "Stap Lukluk"
+  },
+  {
+    "id": "IN-0563",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 33904,
+    "end": 33913,
+    "original": "'Jas nao'",
+    "bi": "Jas nao"
+  },
+  {
+    "id": "IN-0564",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 34458,
+    "end": 34489,
+    "original": "'Lodem ol sabmisen blong yu...'",
+    "bi": "Lodem ol sabmisen blong yu..."
+  },
+  {
+    "id": "IN-0565",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 35287,
+    "end": 35309,
+    "original": "'Ol Sabmisen Blong Mi'",
+    "bi": "Ol Sabmisen Blong Mi"
+  },
+  {
+    "id": "IN-0566",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 35951,
+    "end": 35993,
+    "original": "'Lukluk status blong ol sabmisen blong yu'",
+    "bi": "Lukluk status blong ol sabmisen blong yu"
+  },
+  {
+    "id": "IN-0567",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 36960,
+    "end": 36969,
+    "original": "'Refresh'",
+    "bi": "Refresh"
+  },
+  {
+    "id": "IN-0568",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 37669,
+    "end": 37678,
+    "original": "'Evriwan'",
+    "bi": "Evriwan"
+  },
+  {
+    "id": "IN-0569",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 38285,
+    "end": 38291,
+    "original": "'Weit'",
+    "bi": "Weit"
+  },
+  {
+    "id": "IN-0570",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 38896,
+    "end": 38905,
+    "original": "'Apruvum'",
+    "bi": "Apruvum"
+  },
+  {
+    "id": "IN-0571",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 39504,
+    "end": 39516,
+    "original": "'No Apruvum'",
+    "bi": "No Apruvum"
+  },
+  {
+    "id": "IN-0572",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 40036,
+    "end": 40087,
+    "original": "'Laef update i stap — status change i soa kwiktaem'",
+    "bi": "Laef update i stap — status change i soa kwiktaem"
+  },
+  {
+    "id": "IN-0573",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 40663,
+    "end": 40684,
+    "original": "'No gat sabmisen yet'",
+    "bi": "No gat sabmisen yet"
+  },
+  {
+    "id": "IN-0574",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 41124,
+    "end": 41171,
+    "original": "'Sabmitem faswan bisnis blong yu blong statem!'",
+    "bi": "Sabmitem faswan bisnis blong yu blong statem!"
+  },
+  {
+    "id": "IN-0575",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 42078,
+    "end": 42109,
+    "original": "'Sabmitem wan business listing'",
+    "bi": "Sabmitem wan business listing"
+  },
+  {
+    "id": "IN-0576",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 43709,
+    "end": 43725,
+    "original": "'Status i jenj!'",
+    "bi": "Status i jenj!"
+  },
+  {
+    "id": "IN-0577",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 46378,
+    "end": 46397,
+    "original": "'Laef long Explore'",
+    "bi": "Laef long Explore"
+  },
+  {
+    "id": "IN-0578",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 48362,
+    "end": 48372,
+    "original": "'Taemlaen'",
+    "bi": "Taemlaen"
+  },
+  {
+    "id": "IN-0579",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 49080,
+    "end": 49090,
+    "original": "'Sabmitem'",
+    "bi": "Sabmitem"
+  },
+  {
+    "id": "IN-0580",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 50157,
+    "end": 50170,
+    "original": "'Stap Lukluk'",
+    "bi": "Stap Lukluk"
+  },
+  {
+    "id": "IN-0581",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 51465,
+    "end": 51481,
+    "original": "'Apruvum & Laef'",
+    "bi": "Apruvum & Laef"
+  },
+  {
+    "id": "IN-0582",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 51592,
+    "end": 51604,
+    "original": "'No Apruvum'",
+    "bi": "No Apruvum"
+  },
+  {
+    "id": "IN-0583",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 53172,
+    "end": 53185,
+    "original": "'Admin Notes'",
+    "bi": "Admin Notes"
+  },
+  {
+    "id": "IN-0584",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 53972,
+    "end": 53982,
+    "original": "'Ol Ditel'",
+    "bi": "Ol Ditel"
+  },
+  {
+    "id": "IN-0585",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 59746,
+    "end": 59765,
+    "original": "'Haed long Explore'",
+    "bi": "Haed long Explore"
+  },
+  {
+    "id": "IN-0586",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 60000,
+    "end": 60017,
+    "original": "'Raetem sabmisen'",
+    "bi": "Raetem sabmisen"
+  },
+  {
+    "id": "IN-0587",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 61459,
+    "end": 61487,
+    "original": "'Editim mo Sabmitem bakegen'",
+    "bi": "Editim mo Sabmitem bakegen"
+  },
+  {
+    "id": "IN-0588",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 62088,
+    "end": 62129,
+    "original": "'Tim blong mifala i lukluk insaed 24 aoa'",
+    "bi": "Tim blong mifala i lukluk insaed 24 aoa"
+  },
+  {
+    "id": "IN-0589",
+    "source": "inline",
+    "file": "src/components/MySubmissions.tsx",
+    "key": null,
+    "start": 62846,
+    "end": 62872,
+    "original": "'Olsem wanem proses i wok'",
+    "bi": "Olsem wanem proses i wok"
+  },
+  {
+    "id": "IN-0590",
+    "source": "inline",
+    "file": "src/components/Navbar.tsx",
+    "key": null,
+    "start": 1695,
+    "end": 1712,
+    "original": "'Dasbod Blong Mi'",
+    "bi": "Dasbod Blong Mi"
+  },
+  {
+    "id": "IN-0591",
+    "source": "inline",
+    "file": "src/components/Navbar.tsx",
+    "key": null,
+    "start": 2145,
+    "end": 2162,
+    "original": "'Bisnis Blong Mi'",
+    "bi": "Bisnis Blong Mi"
+  },
+  {
+    "id": "IN-0592",
+    "source": "inline",
+    "file": "src/components/Navbar.tsx",
+    "key": null,
+    "start": 2598,
+    "end": 2606,
+    "original": "'Halpem'",
+    "bi": "Halpem"
+  },
+  {
+    "id": "IN-0593",
+    "source": "inline",
+    "file": "src/components/Navbar.tsx",
+    "key": null,
+    "start": 13086,
+    "end": 13100,
+    "original": "'Mekem Akaont'",
+    "bi": "Mekem Akaont"
+  },
+  {
+    "id": "IN-0594",
+    "source": "inline",
+    "file": "src/components/NearbyDeals.tsx",
+    "key": null,
+    "start": 1622,
+    "end": 1634,
+    "original": "'Dil Klosap'",
+    "bi": "Dil Klosap"
+  },
+  {
+    "id": "IN-0595",
+    "source": "inline",
+    "file": "src/components/PassCards.tsx",
+    "key": null,
+    "start": 3289,
+    "end": 3300,
+    "original": "'Turis Pas'",
+    "bi": "Turis Pas"
+  },
+  {
+    "id": "IN-0596",
+    "source": "inline",
+    "file": "src/components/PaymentConfirmation.tsx",
+    "key": null,
+    "start": 41586,
+    "end": 41613,
+    "original": "'Komplitim profil blong yu'",
+    "bi": "Komplitim profil blong yu"
+  },
+  {
+    "id": "IN-0597",
+    "source": "inline",
+    "file": "src/components/PaymentConfirmation.tsx",
+    "key": null,
+    "start": 41978,
+    "end": 42042,
+    "original": "'Smol infomesen i helpem mifala blong givim dils mo kontakt yu.'",
+    "bi": "Smol infomesen i helpem mifala blong givim dils mo kontakt yu."
+  },
+  {
+    "id": "IN-0598",
+    "source": "inline",
+    "file": "src/components/PhotoUploader.tsx",
+    "key": null,
+    "start": 20557,
+    "end": 20572,
+    "original": "'Logo i sevem!'",
+    "bi": "Logo i sevem!"
+  },
+  {
+    "id": "IN-0599",
+    "source": "inline",
+    "file": "src/components/PhotoUploader.tsx",
+    "key": null,
+    "start": 23928,
+    "end": 23943,
+    "original": "'Logo i sevem!'",
+    "bi": "Logo i sevem!"
+  },
+  {
+    "id": "IN-0600",
+    "source": "inline",
+    "file": "src/components/PhotoUploader.tsx",
+    "key": null,
+    "start": 39547,
+    "end": 39576,
+    "original": "'Adjustem olsem long listing'",
+    "bi": "Adjustem olsem long listing"
+  },
+  {
+    "id": "IN-0601",
+    "source": "inline",
+    "file": "src/components/PricingDiscountFields.tsx",
+    "key": null,
+    "start": 4008,
+    "end": 4031,
+    "original": "'Praes mo Diskaon (VT)'",
+    "bi": "Praes mo Diskaon (VT)"
+  },
+  {
+    "id": "IN-0602",
+    "source": "inline",
+    "file": "src/components/PricingDiscountFields.tsx",
+    "key": null,
+    "start": 4248,
+    "end": 4265,
+    "original": "'Diskaon Opsonal'",
+    "bi": "Diskaon Opsonal"
+  },
+  {
+    "id": "IN-0603",
+    "source": "inline",
+    "file": "src/components/PricingDiscountFields.tsx",
+    "key": null,
+    "start": 4788,
+    "end": 4891,
+    "original": "'Long tua mo aktiviti, praes i kam long tier tebol daon. Yusum ples ia blong setem diskaon (%) mo det.'",
+    "bi": "Long tua mo aktiviti, praes i kam long tier tebol daon. Yusum ples ia blong setem diskaon (%) mo det."
+  },
+  {
+    "id": "IN-0604",
+    "source": "inline",
+    "file": "src/components/PricingDiscountFields.tsx",
+    "key": null,
+    "start": 5236,
+    "end": 5319,
+    "original": "'Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'",
+    "bi": "Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas."
+  },
+  {
+    "id": "IN-0605",
+    "source": "inline",
+    "file": "src/components/PricingDiscountFields.tsx",
+    "key": null,
+    "start": 5761,
+    "end": 5782,
+    "original": "'Praes blong yu (VT)'",
+    "bi": "Praes blong yu (VT)"
+  },
+  {
+    "id": "IN-0606",
+    "source": "inline",
+    "file": "src/components/PricingDiscountFields.tsx",
+    "key": null,
+    "start": 6865,
+    "end": 6878,
+    "original": "'Diskaon (%)'",
+    "bi": "Diskaon (%)"
+  },
+  {
+    "id": "IN-0607",
+    "source": "inline",
+    "file": "src/components/PricingDiscountFields.tsx",
+    "key": null,
+    "start": 7937,
+    "end": 7954,
+    "original": "'Niu Praes (oto)'",
+    "bi": "Niu Praes (oto)"
+  },
+  {
+    "id": "IN-0608",
+    "source": "inline",
+    "file": "src/components/PricingDiscountFields.tsx",
+    "key": null,
+    "start": 9448,
+    "end": 9465,
+    "original": "'Kastoma bae luk'",
+    "bi": "Kastoma bae luk"
+  },
+  {
+    "id": "IN-0609",
+    "source": "inline",
+    "file": "src/components/PricingDiscountFields.tsx",
+    "key": null,
+    "start": 11318,
+    "end": 11335,
+    "original": "'Kastoma i sevem'",
+    "bi": "Kastoma i sevem"
+  },
+  {
+    "id": "IN-0610",
+    "source": "inline",
+    "file": "src/components/PricingDiscountFields.tsx",
+    "key": null,
+    "start": 12243,
+    "end": 12263,
+    "original": "'Taem blong Diskaon'",
+    "bi": "Taem blong Diskaon"
+  },
+  {
+    "id": "IN-0611",
+    "source": "inline",
+    "file": "src/components/PricingDiscountFields.tsx",
+    "key": null,
+    "start": 16512,
+    "end": 16527,
+    "original": "'Onlaen mo Map'",
+    "bi": "Onlaen mo Map"
+  },
+  {
+    "id": "IN-0612",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 1965,
+    "end": 1994,
+    "original": "'Praes blong wanwan man (VT)'",
+    "bi": "Praes blong wanwan man (VT)"
+  },
+  {
+    "id": "IN-0613",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 2362,
+    "end": 2469,
+    "original": "'Putum nomol praes blong wanwan man. Mifala wokemaot diskaon praes blong yu. Pikinini andanit 6 yia i fri.'",
+    "bi": "Putum nomol praes blong wanwan man. Mifala wokemaot diskaon praes blong yu. Pikinini andanit 6 yia i fri."
+  },
+  {
+    "id": "IN-0614",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 2741,
+    "end": 2802,
+    "original": "'Putum nomol praes, then diskaon pas praes blong wanwan man.'",
+    "bi": "Putum nomol praes, then diskaon pas praes blong wanwan man."
+  },
+  {
+    "id": "IN-0615",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 2893,
+    "end": 2898,
+    "original": "'Nem'",
+    "bi": "Nem"
+  },
+  {
+    "id": "IN-0616",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 3012,
+    "end": 3029,
+    "original": "'ex. Adult (13+)'",
+    "bi": "ex. Adult (13+)"
+  },
+  {
+    "id": "IN-0617",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 3112,
+    "end": 3119,
+    "original": "'Adult'",
+    "bi": "Adult"
+  },
+  {
+    "id": "IN-0618",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 3206,
+    "end": 3216,
+    "original": "'Pikinini'",
+    "bi": "Pikinini"
+  },
+  {
+    "id": "IN-0619",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 3299,
+    "end": 3305,
+    "original": "'Bebi'",
+    "bi": "Bebi"
+  },
+  {
+    "id": "IN-0620",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 3397,
+    "end": 3406,
+    "original": "'opsonal'",
+    "bi": "opsonal"
+  },
+  {
+    "id": "IN-0621",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 3507,
+    "end": 3525,
+    "original": "'Nomol praes (VT)'",
+    "bi": "Nomol praes (VT)"
+  },
+  {
+    "id": "IN-0622",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 3625,
+    "end": 3641,
+    "original": "'Pas praes (VT)'",
+    "bi": "Pas praes (VT)"
+  },
+  {
+    "id": "IN-0623",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 3776,
+    "end": 3808,
+    "original": "'Nomol praes — olgeta grup (VT)'",
+    "bi": "Nomol praes — olgeta grup (VT)"
+  },
+  {
+    "id": "IN-0624",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 3942,
+    "end": 3972,
+    "original": "'Pas praes — olgeta grup (VT)'",
+    "bi": "Pas praes — olgeta grup (VT)"
+  },
+  {
+    "id": "IN-0625",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 4072,
+    "end": 4083,
+    "original": "'Pas praes'",
+    "bi": "Pas praes"
+  },
+  {
+    "id": "IN-0626",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 4184,
+    "end": 4203,
+    "original": "'Nem blong charter'",
+    "bi": "Nem blong charter"
+  },
+  {
+    "id": "IN-0627",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 4349,
+    "end": 4380,
+    "original": "'ex. Private Charter (5 pipol)'",
+    "bi": "ex. Private Charter (5 pipol)"
+  },
+  {
+    "id": "IN-0628",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 4469,
+    "end": 4478,
+    "original": "'Min man'",
+    "bi": "Min man"
+  },
+  {
+    "id": "IN-0629",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 4590,
+    "end": 4609,
+    "original": "'Mak man (opsonal)'",
+    "bi": "Mak man (opsonal)"
+  },
+  {
+    "id": "IN-0630",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 4716,
+    "end": 4734,
+    "original": "'Addem bebi praes'",
+    "bi": "Addem bebi praes"
+  },
+  {
+    "id": "IN-0631",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 4848,
+    "end": 4871,
+    "original": "'Addem praevet charter'",
+    "bi": "Addem praevet charter"
+  },
+  {
+    "id": "IN-0632",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 4956,
+    "end": 4963,
+    "original": "'Kivim'",
+    "bi": "Kivim"
+  },
+  {
+    "id": "IN-0633",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 5061,
+    "end": 5070,
+    "original": "'Sam moa'",
+    "bi": "Sam moa"
+  },
+  {
+    "id": "IN-0634",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 5175,
+    "end": 5191,
+    "original": "'Addem wan lain'",
+    "bi": "Addem wan lain"
+  },
+  {
+    "id": "IN-0635",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 5314,
+    "end": 5340,
+    "original": "'Olgeta grup (flat praes)'",
+    "bi": "Olgeta grup (flat praes)"
+  },
+  {
+    "id": "IN-0636",
+    "source": "inline",
+    "file": "src/components/PricingTiersEditor.tsx",
+    "key": null,
+    "start": 6910,
+    "end": 6927,
+    "original": "'Private Charter'",
+    "bi": "Private Charter"
+  },
+  {
+    "id": "IN-0637",
+    "source": "inline",
+    "file": "src/components/QRCodeDisplay.tsx",
+    "key": null,
+    "start": 12110,
+    "end": 12118,
+    "original": "'Serem…'",
+    "bi": "Serem…"
+  },
+  {
+    "id": "IN-0638",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 4075,
+    "end": 4102,
+    "original": "'Plis jusum wan sta reting'",
+    "bi": "Plis jusum wan sta reting"
+  },
+  {
+    "id": "IN-0639",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 4308,
+    "end": 4359,
+    "original": "'Plis raetem wan komen abaotem eksperiens blong yu'",
+    "bi": "Plis raetem wan komen abaotem eksperiens blong yu"
+  },
+  {
+    "id": "IN-0640",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 4571,
+    "end": 4606,
+    "original": "'Komen i mas gat 10 karakter o moa'",
+    "bi": "Komen i mas gat 10 karakter o moa"
+  },
+  {
+    "id": "IN-0641",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 9805,
+    "end": 9821,
+    "original": "'Tangkiu tumas!'",
+    "bi": "Tangkiu tumas!"
+  },
+  {
+    "id": "IN-0642",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 10065,
+    "end": 10102,
+    "original": "'Supa Sta riviu blong yu i go finis!'",
+    "bi": "Supa Sta riviu blong yu i go finis!"
+  },
+  {
+    "id": "IN-0643",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 10249,
+    "end": 10277,
+    "original": "'Riviu blong yu i go finis.'",
+    "bi": "Riviu blong yu i go finis."
+  },
+  {
+    "id": "IN-0644",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 10729,
+    "end": 10771,
+    "original": "'Saen in blong searem eksperiens blong yu'",
+    "bi": "Saen in blong searem eksperiens blong yu"
+  },
+  {
+    "id": "IN-0645",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 11808,
+    "end": 11825,
+    "original": "'Reting blong yu'",
+    "bi": "Reting blong yu"
+  },
+  {
+    "id": "IN-0646",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 16094,
+    "end": 16115,
+    "original": "'Wanem i Super Star?'",
+    "bi": "Wanem i Super Star?"
+  },
+  {
+    "id": "IN-0647",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 16702,
+    "end": 16816,
+    "original": "'Super Star hem i wan premium 6th sta we i kostem $5. Hem i wan spesel wei blong soem se bisnis i nambawan tumas.'",
+    "bi": "Super Star hem i wan premium 6th sta we i kostem $5. Hem i wan spesel wei blong soem se bisnis i nambawan tumas."
+  },
+  {
+    "id": "IN-0648",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 17326,
+    "end": 17364,
+    "original": "'Supa Sta i joen long riviu blong yu!'",
+    "bi": "Supa Sta i joen long riviu blong yu!"
+  },
+  {
+    "id": "IN-0649",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 17923,
+    "end": 17939,
+    "original": "'Riviu blong yu'",
+    "bi": "Riviu blong yu"
+  },
+  {
+    "id": "IN-0650",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 18341,
+    "end": 18386,
+    "original": "'Searem ditel abaotem eksperiens blong yu...'",
+    "bi": "Searem ditel abaotem eksperiens blong yu..."
+  },
+  {
+    "id": "IN-0651",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 19261,
+    "end": 19282,
+    "original": "'Minimum 10 karakter'",
+    "bi": "Minimum 10 karakter"
+  },
+  {
+    "id": "IN-0652",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 20205,
+    "end": 20216,
+    "original": "'Sendim...'",
+    "bi": "Sendim..."
+  },
+  {
+    "id": "IN-0653",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 22139,
+    "end": 22149,
+    "original": "'Supa Sta'",
+    "bi": "Supa Sta"
+  },
+  {
+    "id": "IN-0654",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 22309,
+    "end": 22332,
+    "original": "'Premium 6th Sta Riviu'",
+    "bi": "Premium 6th Sta Riviu"
+  },
+  {
+    "id": "IN-0655",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 30706,
+    "end": 30722,
+    "original": "'Peim $5.00 sef'",
+    "bi": "Peim $5.00 sef"
+  },
+  {
+    "id": "IN-0656",
+    "source": "inline",
+    "file": "src/components/ReviewForm.tsx",
+    "key": null,
+    "start": 31440,
+    "end": 31451,
+    "original": "'Maet leit'",
+    "bi": "Maet leit"
+  },
+  {
+    "id": "IN-0657",
+    "source": "inline",
+    "file": "src/components/ReviewsSection.tsx",
+    "key": null,
+    "start": 3231,
+    "end": 3286,
+    "original": "'Tru eksperiens from turis we oli sevem wetem StikmNek'",
+    "bi": "Tru eksperiens from turis we oli sevem wetem StikmNek"
+  },
+  {
+    "id": "IN-0658",
+    "source": "inline",
+    "file": "src/components/ReviewsSection.tsx",
+    "key": null,
+    "start": 7174,
+    "end": 7223,
+    "original": "'Searem eksperiens blong yu wetem narafala turis'",
+    "bi": "Searem eksperiens blong yu wetem narafala turis"
+  },
+  {
+    "id": "IN-0659",
+    "source": "inline",
+    "file": "src/components/ReviewsSection.tsx",
+    "key": null,
+    "start": 8056,
+    "end": 8086,
+    "original": "'Jusum wan bisnis blong riviu'",
+    "bi": "Jusum wan bisnis blong riviu"
+  },
+  {
+    "id": "IN-0660",
+    "source": "inline",
+    "file": "src/components/ReviewsSection.tsx",
+    "key": null,
+    "start": 8845,
+    "end": 8866,
+    "original": "'Jusum wan bisnis...'",
+    "bi": "Jusum wan bisnis..."
+  },
+  {
+    "id": "IN-0661",
+    "source": "inline",
+    "file": "src/components/ReviewsSection.tsx",
+    "key": null,
+    "start": 9699,
+    "end": 9726,
+    "original": "'No gat lista blong riviu.'",
+    "bi": "No gat lista blong riviu."
+  },
+  {
+    "id": "IN-0662",
+    "source": "inline",
+    "file": "src/components/ReviewsSection.tsx",
+    "key": null,
+    "start": 12853,
+    "end": 12862,
+    "original": "'Jenisim'",
+    "bi": "Jenisim"
+  },
+  {
+    "id": "IN-0663",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 3442,
+    "end": 3469,
+    "original": "'Komplitim profil blong yu'",
+    "bi": "Komplitim profil blong yu"
+  },
+  {
+    "id": "IN-0664",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 3707,
+    "end": 3770,
+    "original": "'Helpem mifala blong givim dils mo kontakt yu long we yu laik.'",
+    "bi": "Helpem mifala blong givim dils mo kontakt yu long we yu laik."
+  },
+  {
+    "id": "IN-0665",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 3944,
+    "end": 3982,
+    "original": "'Namba blong ol man (13 yia mo antap)'",
+    "bi": "Namba blong ol man (13 yia mo antap)"
+  },
+  {
+    "id": "IN-0666",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 4148,
+    "end": 4177,
+    "original": "'Namba blong pikinini (5–12)'",
+    "bi": "Namba blong pikinini (5–12)"
+  },
+  {
+    "id": "IN-0667",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 4338,
+    "end": 4371,
+    "original": "'Namba blong smol pikinini (0–4)'",
+    "bi": "Namba blong smol pikinini (0–4)"
+  },
+  {
+    "id": "IN-0668",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 4526,
+    "end": 4544,
+    "original": "'We blong kontakt'",
+    "bi": "We blong kontakt"
+  },
+  {
+    "id": "IN-0669",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 4767,
+    "end": 4813,
+    "original": "'Putum detaels blong we yu laik long kontakt.'",
+    "bi": "Putum detaels blong we yu laik long kontakt."
+  },
+  {
+    "id": "IN-0670",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 4909,
+    "end": 4924,
+    "original": "'Imel blong yu'",
+    "bi": "Imel blong yu"
+  },
+  {
+    "id": "IN-0671",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 5036,
+    "end": 5061,
+    "original": "'Namba WhatsApp blong yu'",
+    "bi": "Namba WhatsApp blong yu"
+  },
+  {
+    "id": "IN-0672",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 5177,
+    "end": 5197,
+    "original": "'Fon namba blong yu'",
+    "bi": "Fon namba blong yu"
+  },
+  {
+    "id": "IN-0673",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 5385,
+    "end": 5416,
+    "original": "'We yu stap? (Nem blong resot)'",
+    "bi": "We yu stap? (Nem blong resot)"
+  },
+  {
+    "id": "IN-0674",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 5544,
+    "end": 5553,
+    "original": "'Ful nem'",
+    "bi": "Ful nem"
+  },
+  {
+    "id": "IN-0675",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 5702,
+    "end": 5717,
+    "original": "'Dei blong kam'",
+    "bi": "Dei blong kam"
+  },
+  {
+    "id": "IN-0676",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 5870,
+    "end": 5886,
+    "original": "'Dei blong lego'",
+    "bi": "Dei blong lego"
+  },
+  {
+    "id": "IN-0677",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 5979,
+    "end": 5993,
+    "original": "'Sevem profil'",
+    "bi": "Sevem profil"
+  },
+  {
+    "id": "IN-0678",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 6069,
+    "end": 6077,
+    "original": "'Bihain'",
+    "bi": "Bihain"
+  },
+  {
+    "id": "IN-0679",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 6513,
+    "end": 6534,
+    "original": "'Plis putum ful nem.'",
+    "bi": "Plis putum ful nem."
+  },
+  {
+    "id": "IN-0680",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 7301,
+    "end": 7331,
+    "original": "'Plis selektem dei blong kam.'",
+    "bi": "Plis selektem dei blong kam."
+  },
+  {
+    "id": "IN-0681",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 7532,
+    "end": 7563,
+    "original": "'Plis selektem dei blong lego.'",
+    "bi": "Plis selektem dei blong lego."
+  },
+  {
+    "id": "IN-0682",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 7885,
+    "end": 7941,
+    "original": "'Dei blong lego i mas biaen o semak long dei blong kam.'",
+    "bi": "Dei blong lego i mas biaen o semak long dei blong kam."
+  },
+  {
+    "id": "IN-0683",
+    "source": "inline",
+    "file": "src/components/TouristProfileForm.tsx",
+    "key": null,
+    "start": 8954,
+    "end": 8971,
+    "original": "'Profil i sevem!'",
+    "bi": "Profil i sevem!"
+  },
+  {
+    "id": "IN-0684",
+    "source": "inline",
+    "file": "src/components/WebsiteUrlInput.tsx",
+    "key": null,
+    "start": 1098,
+    "end": 1107,
+    "original": "'Website'",
+    "bi": "Website"
+  },
+  {
+    "id": "IN-0685",
+    "source": "inline",
+    "file": "src/components/WebsiteUrlInput.tsx",
+    "key": null,
+    "start": 2417,
+    "end": 2455,
+    "original": "'Website blong yu — no nid taep https'",
+    "bi": "Website blong yu — no nid taep https"
+  },
+  {
+    "id": "IN-0686",
+    "source": "inline",
+    "file": "src/contexts/AppContext.tsx",
+    "key": null,
+    "start": 66910,
+    "end": 66955,
+    "original": "'Yu no save riviu long bisinis blong yu yet.'",
+    "bi": "Yu no save riviu long bisinis blong yu yet."
+  },
+  {
+    "id": "IN-0687",
+    "source": "inline",
+    "file": "src/contexts/AppContext.tsx",
+    "key": null,
+    "start": 67631,
+    "end": 67690,
+    "original": "'Noka verifyem histori blong visit blong yu. Trai bakagen.'",
+    "bi": "Noka verifyem histori blong visit blong yu. Trai bakagen."
+  },
+  {
+    "id": "IN-0688",
+    "source": "inline",
+    "file": "src/contexts/AppContext.tsx",
+    "key": null,
+    "start": 68301,
+    "end": 68360,
+    "original": "'Noka verifyem histori blong visit blong yu. Trai bakagen.'",
+    "bi": "Noka verifyem histori blong visit blong yu. Trai bakagen."
+  },
+  {
+    "id": "IN-0689",
+    "source": "inline",
+    "file": "src/contexts/AppContext.tsx",
+    "key": null,
+    "start": 69159,
+    "end": 69181,
+    "original": "'Saen in blong riviu.'",
+    "bi": "Saen in blong riviu."
+  },
+  {
+    "id": "IN-0690",
+    "source": "inline",
+    "file": "src/contexts/AppContext.tsx",
+    "key": null,
+    "start": 71511,
+    "end": 71571,
+    "original": "'No gat Super Star kredit. Plis bae wan Super Star festaem.'",
+    "bi": "No gat Super Star kredit. Plis bae wan Super Star festaem."
+  },
+  {
+    "id": "IN-0691",
+    "source": "inline",
+    "file": "src/lib/businessOnboardingValidation.ts",
+    "key": null,
+    "start": 17984,
+    "end": 18011,
+    "original": "'Putem titel blong dil ia.'",
+    "bi": "Putem titel blong dil ia."
+  },
+  {
+    "id": "IN-0692",
+    "source": "inline",
+    "file": "src/lib/businessOnboardingValidation.ts",
+    "key": null,
+    "start": 18764,
+    "end": 18825,
+    "original": "'Putem samting long description — nomo ol framaton long hem.'",
+    "bi": "Putem samting long description — nomo ol framaton long hem."
+  },
+  {
+    "id": "IN-0693",
+    "source": "inline",
+    "file": "src/lib/businessOnboardingValidation.ts",
+    "key": null,
+    "start": 19183,
+    "end": 19228,
+    "original": "'Putem wan foto mo wet bifo uplodem i finis.'",
+    "bi": "Putem wan foto mo wet bifo uplodem i finis."
+  },
+  {
+    "id": "IN-0694",
+    "source": "inline",
+    "file": "src/lib/pricingTiers.ts",
+    "key": null,
+    "start": 1169,
+    "end": 1178,
+    "original": "'Narawan'",
+    "bi": "Narawan"
+  }
+]

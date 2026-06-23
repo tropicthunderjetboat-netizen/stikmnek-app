@@ -7,6 +7,8 @@
     "dev": "vite",
     "db:push": "supabase db push",
     "db:purge-user": "node scripts/purge-auth-user.mjs",
+    "i18n:export": "node scripts/i18n-export.mjs",
+    "i18n:import": "node scripts/i18n-import.mjs",
     "functions:deploy": "supabase functions deploy",
     "functions:deploy:api": "supabase functions deploy --use-api -j 4",
     "functions:list": "supabase functions list",
