@@ -2,18 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { Store, Loader2, AlertCircle, Globe, X } from 'lucide-react';
+import {
+  Store, Loader2, AlertCircle, X, ArrowRight, ArrowLeft, Check,
+  Utensils, Waves, Compass, Car, ShoppingBag, Heart, Home, MessageCircle, Plus,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { categories, type Category } from '@/data/businesses';
 import PhotoUploader, { type UploadedPhoto } from '@/components/PhotoUploader';
 import LocationMapPicker from '@/components/LocationMapPicker';
-import WebsiteUrlInput from '@/components/WebsiteUrlInput';
-import { parseLatLngFromMapUrl, normalizeWebsiteForStorage } from '@/lib/urlHelpers';
+import { parseLatLngFromMapUrl } from '@/lib/urlHelpers';
 import { validateBusinessProfileOnboarding } from '@/lib/businessOnboardingValidation';
 import { checkBusinessOwnerNeedsFirstListing } from '@/lib/businessOwnerListingStatus';
-import OnboardingSteps from '@/components/OnboardingSteps';
 import BusinessCredentialsSettings from '@/components/BusinessCredentialsSettings';
 
 /** Maps `validateBusinessProfileOnboarding` error keys → local `errors` state keys used by this form. */
@@ -27,6 +27,36 @@ const PROFILE_VALIDATION_KEY_TO_FORM: Record<string, string> = {
   address: 'address',
 };
 
+const CATEGORY_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  utensils: Utensils,
+  waves: Waves,
+  compass: Compass,
+  car: Car,
+  'shopping-bag': ShoppingBag,
+  heart: Heart,
+  home: Home,
+};
+
+/** Ordered wizard steps — one simple thing per screen. */
+const STEPS = ['name', 'category', 'owner', 'contact', 'whatsapp', 'location', 'logo', 'review'] as const;
+type StepId = (typeof STEPS)[number];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const tr = (language: string, en: string, fr: string, bi: string) =>
+  language === 'fr' ? fr : language === 'bi' ? bi : en;
+
+/** Shared page chrome. Module-scoped so inputs don't remount (and lose focus) on each render. */
+const PageShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="min-h-screen bg-gradient-to-b from-white to-emerald-50/40 pt-20 pb-16">
+    <div className="max-w-md mx-auto px-4">
+      <div className="bg-white rounded-2xl border border-emerald-100 shadow-lg overflow-hidden">
+        {children}
+      </div>
+    </div>
+  </div>
+);
+
 const CompleteBusinessProfile: React.FC = () => {
   const {
     user,
@@ -38,7 +68,6 @@ const CompleteBusinessProfile: React.FC = () => {
     refreshBusinessOwnerRowStatus,
     userProfileLoadError,
     retryUserProfileFetch,
-    businessOnboardingResume,
   } = useAppContext();
 
   const [businessName, setBusinessName] = useState('');
@@ -51,11 +80,16 @@ const CompleteBusinessProfile: React.FC = () => {
   const [category, setCategory] = useState<Category>('dining');
   const [address, setAddress] = useState('');
   const [mapUrl, setMapUrl] = useState('');
-  const [website, setWebsite] = useState('');
   const [logoPhotos, setLogoPhotos] = useState<UploadedPhoto[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  /** Set after first successful save — unlocks credentials upload + “Continue to hub”. */
+
+  const [step, setStep] = useState(0);
+  /** True once the profile is saved — switches the wizard to the success screen. */
+  const [savedDone, setSavedDone] = useState(false);
+  const [needsFirstListing, setNeedsFirstListing] = useState(true);
+  const [showCreds, setShowCreds] = useState(false);
+  /** Set after first successful save — unlocks credentials upload + “Continue”. */
   const [savedProfileBusinessId, setSavedProfileBusinessId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,7 +142,7 @@ const CompleteBusinessProfile: React.FC = () => {
   }, [userProfile, user]);
 
   /**
-   * Client-side profile validation (on submit only).
+   * Client-side profile validation (final check).
    * Rules live in `@/lib/businessOnboardingValidation` so listing/dashboard flows stay aligned.
    */
   const runProfileValidation = (): boolean => {
@@ -136,13 +170,25 @@ const CompleteBusinessProfile: React.FC = () => {
     return false;
   };
 
-  const handleSubmit = async (ev: React.FormEvent) => {
-    ev.preventDefault();
+  const handleSubmit = async () => {
     if (!user?.id) return;
     if (!runProfileValidation()) {
-      toast.error(
-        language === 'en' ? 'Please fix the errors below.' : language === 'fr' ? 'Corrigez les erreurs ci-dessous.' : 'Fiksem ol erro',
+      // Jump back to the first step with a problem so they can fix it.
+      const firstBad = STEPS.findIndex((s) =>
+        s === 'name'
+          ? !businessName.trim()
+          : s === 'owner'
+            ? !ownerName.trim()
+            : s === 'contact'
+              ? !businessPhone.trim() || !EMAIL_RE.test(businessEmail.trim())
+              : s === 'whatsapp'
+                ? !noWhatsApp && (!whatsappNumber.trim() || !whatsappMarketingOptIn)
+                : s === 'location'
+                  ? !address.trim()
+                  : false,
       );
+      if (firstBad >= 0) setStep(firstBad);
+      toast.error(tr(language, 'Please fix the highlighted field.', 'Corrigez le champ indiqué.', 'Fiksem ol erro'));
       return;
     }
 
@@ -170,7 +216,6 @@ const CompleteBusinessProfile: React.FC = () => {
         tags: [category],
         active: false,
         map_url: mapUrl.trim() || null,
-        website: normalizeWebsiteForStorage(website) ?? null,
       };
       if (parsed) {
         rowPayload.lat = parsed.lat;
@@ -221,13 +266,6 @@ const CompleteBusinessProfile: React.FC = () => {
 
       if (profileErr) {
         console.warn('[CompleteBusinessProfile] Profile update warning:', profileErr);
-        toast.warning(
-          language === 'en'
-            ? 'Business saved; profile sync may finish shortly.'
-            : language === 'fr'
-              ? 'Entreprise enregistrée ; synchronisation du profil en cours.'
-              : 'Bisnis i sevem',
-        );
       }
 
       await refreshUserProfile();
@@ -235,31 +273,9 @@ const CompleteBusinessProfile: React.FC = () => {
       await refreshBusinessOwnerRowStatus();
 
       const needsListing = await checkBusinessOwnerNeedsFirstListing(supabase, user.id);
-      if (needsListing) {
-        toast.success(
-          language === 'en'
-            ? 'Profile saved! Next: submit your deal — photos, prices, and discount.'
-            : language === 'fr'
-              ? 'Profil enregistré ! Étape suivante : soumettez votre offre.'
-              : 'Profail i sevem! Nekis step: submitim deal blong yu.',
-        );
-        continueToBusinessHub();
-        return;
-      }
-
-      toast.success(
-        language === 'en'
-          ? wasUpdate
-            ? 'Profile updated.'
-            : 'Business profile saved!'
-          : language === 'fr'
-            ? wasUpdate
-              ? 'Profil mis à jour.'
-              : 'Profil enregistré !'
-            : wasUpdate
-              ? 'Profail i update.'
-              : 'Bisnis profail i sevem!',
-      );
+      setNeedsFirstListing(needsListing);
+      toast.success(tr(language, 'Profile saved!', 'Profil enregistré !', 'Profail i sevem!'));
+      setSavedDone(true);
     } catch (err: any) {
       console.error('[CompleteBusinessProfile]', err);
       toast.error(err?.message || 'Failed to save business profile');
@@ -274,426 +290,436 @@ const CompleteBusinessProfile: React.FC = () => {
     setCurrentView('home');
   };
 
-  const copy = businessOnboardingResume
-    ? {
-        title:
-          language === 'en'
-            ? 'Resume business profile setup'
-            : language === 'fr'
-              ? 'Reprendre la configuration'
-              : 'Go hed long setapem bisnis',
-        subtitle:
-          language === 'en'
-            ? 'Continue setting up — if you submitted a listing for approval, you still need a business profile row to use the dashboard.'
-            : language === 'fr'
-              ? 'Poursuivez la configuration — même avec une annonce en attente, ce profil est nécessaire pour le tableau de bord.'
-              : 'Go hed — sapos yu bin soema listing, yu mas komplitim profil ia blong yusum dashboard.',
-      }
-    : {
-        title:
-          language === 'en'
-            ? 'Set up your business'
-            : language === 'fr'
-              ? 'Configurez votre entreprise'
-              : 'Setapem bisnis blong yu',
-        subtitle:
-          language === 'en'
-            ? 'Tell us who you are, how to reach you, and (optionally) drop a map pin and logo. When you save, we open your Business Hub on “Submit a listing” so you can add each deal with the same form as the public site — your details copy across automatically.'
-            : language === 'fr'
-              ? 'Indiquez comment vous joindre, et en option une carte et un logo. Après enregistrement, nous ouvrons votre tableau de bord sur « Soumettre une annonce ».'
-              : 'Telemom ol samting, mo optional map mo logo. Afta save bae i openem Business Hub long Submit listing.',
-      };
+  // ─── Per-step gating (light required checks; full validation runs on Save) ───
+  const stepValid = (id: StepId): boolean => {
+    switch (id) {
+      case 'name':
+        return businessName.trim().length > 0;
+      case 'owner':
+        return ownerName.trim().length > 0;
+      case 'contact':
+        return businessPhone.trim().length > 0 && EMAIL_RE.test(businessEmail.trim());
+      case 'whatsapp':
+        return noWhatsApp || (whatsappNumber.trim().length > 0 && whatsappMarketingOptIn);
+      case 'location':
+        return address.trim().length > 0;
+      default:
+        return true;
+    }
+  };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-emerald-50/40 pt-20 pb-16">
-      <div className="max-w-xl mx-auto px-4">
-        <div className="bg-white rounded-2xl border border-emerald-100 shadow-lg overflow-hidden">
-          <div className="relative p-6 sm:p-8 bg-gradient-to-r from-emerald-600 to-teal-700 text-white">
-            <button
-              type="button"
-              onClick={handleExitForNow}
-              className="absolute right-4 top-4 sm:right-6 sm:top-6 flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white ring-1 ring-white/25 transition hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              aria-label={
-                language === 'en'
-                  ? 'Exit and finish later'
-                  : language === 'fr'
-                    ? 'Quitter et terminer plus tard'
-                    : 'Go aot, finisim bihain'
-              }
-              title={
-                language === 'en'
-                  ? 'Exit — you can resume from My dashboard when you are ready'
-                  : language === 'fr'
-                    ? 'Quitter — reprenez depuis Mon tableau de bord quand vous voulez'
-                    : 'Go aot — yu ken go hed long dashboard taem yu redi'
-              }
-            >
-              <X className="h-5 w-5" strokeWidth={2.25} />
-            </button>
-            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-3">
-              <Store className="w-6 h-6" />
-            </div>
-            <h1 className="text-2xl font-extrabold pr-12">{copy.title}</h1>
-            <p className="text-white/80 text-sm mt-1">{copy.subtitle}</p>
+  const stepErrorMessage = (id: StepId): string => {
+    switch (id) {
+      case 'name':
+        return tr(language, 'Please enter your business name.', "Entrez le nom de l'entreprise.", 'Putem nem blong bisnis.');
+      case 'owner':
+        return tr(language, 'Please enter your name.', 'Entrez votre nom.', 'Putem nem blong yu.');
+      case 'contact':
+        return businessPhone.trim().length === 0
+          ? tr(language, 'Please enter a phone number.', 'Entrez un téléphone.', 'Putem fon namba.')
+          : tr(language, 'Please enter a valid email.', 'Entrez un email valide.', 'Putem wan stret email.');
+      case 'whatsapp':
+        return whatsappNumber.trim().length === 0
+          ? tr(language, 'Enter your WhatsApp number, or tick “I don’t use WhatsApp”.', 'Entrez votre WhatsApp ou cochez la case.', 'Putem WhatsApp namba, o tikem box.')
+          : tr(language, 'Please tick the box to receive setup tips.', 'Cochez la case pour recevoir les conseils.', 'Tikem box blong kasem tips.');
+      case 'location':
+        return tr(language, 'Please enter your town or address.', 'Entrez votre ville ou adresse.', 'Putem taon o adres.');
+      default:
+        return '';
+    }
+  };
+
+  const currentId = STEPS[step];
+  const isLast = currentId === 'review';
+
+  const goNext = () => {
+    if (!stepValid(currentId)) {
+      const key =
+        currentId === 'name' ? 'businessName'
+        : currentId === 'owner' ? 'ownerName'
+        : currentId === 'contact' ? (businessPhone.trim() ? 'businessEmail' : 'businessPhone')
+        : currentId === 'whatsapp' ? (whatsappNumber.trim() ? 'whatsappOptIn' : 'whatsappNumber')
+        : currentId === 'location' ? 'address'
+        : '';
+      if (key) setErrors((p) => ({ ...p, [key]: stepErrorMessage(currentId) }));
+      return;
+    }
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  };
+
+  const goBack = () => setStep((s) => Math.max(s - 1, 0));
+
+  const stepTitle = (id: StepId): string => {
+    switch (id) {
+      case 'name':
+        return tr(language, "What's your business called?", 'Quel est le nom de votre entreprise ?', 'Wanem nem blong bisnis blong yu?');
+      case 'category':
+        return tr(language, 'What kind of business is it?', 'Quel type d’entreprise ?', 'Wanem kaen bisnis?');
+      case 'owner':
+        return tr(language, "What's your name?", 'Quel est votre nom ?', 'Wanem nem blong yu?');
+      case 'contact':
+        return tr(language, 'How can customers reach you?', 'Comment vous joindre ?', 'Olsem wanem kastoma i kontaktem yu?');
+      case 'whatsapp':
+        return tr(language, 'Do you use WhatsApp?', 'Utilisez-vous WhatsApp ?', 'Yu yusum WhatsApp?');
+      case 'location':
+        return tr(language, 'Where are you?', 'Où êtes-vous ?', 'Yu stap wea?');
+      case 'logo':
+        return tr(language, 'Add your logo', 'Ajoutez votre logo', 'Putem logo blong yu');
+      case 'review':
+        return tr(language, 'All done — save your profile', 'Terminé — enregistrez', 'I redi — sevem profail');
+      default:
+        return '';
+    }
+  };
+
+  const inputBig = 'h-12 text-base';
+  const errFor = (k: string) => errors[k] && <p className="text-sm text-red-500 mt-2">{errors[k]}</p>;
+
+  const renderStepBody = () => {
+    switch (currentId) {
+      case 'name':
+        return (
+          <div>
+            <Input
+              autoFocus
+              value={businessName}
+              onChange={(e) => { setBusinessName(e.target.value); setErrors((p) => ({ ...p, businessName: '' })); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') goNext(); }}
+              className={inputBig}
+              placeholder={tr(language, 'e.g. Island Adventures', 'ex. Island Adventures', 'eg. Island Adventures')}
+            />
+            {errFor('businessName')}
           </div>
-
-          {userProfileLoadError && (
-            <div
-              role="alert"
-              className="mx-6 sm:mx-8 mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-            >
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" aria-hidden />
-                <p>{userProfileLoadError}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => void retryUserProfileFetch()}
-                className="shrink-0 px-4 py-2 rounded-lg bg-red-700 text-white font-semibold hover:bg-red-800"
-              >
-                {language === 'en' ? 'Try again' : language === 'fr' ? 'Réessayer' : 'Traem gen'}
-              </button>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-4">
-            <div className="mb-6 border-b border-emerald-100/90 pb-6 sm:mb-8 sm:pb-8">
-              <OnboardingSteps
-                currentStep={2}
-                completedSteps={[1]}
-                variant="default"
-                language={language}
-              />
-            </div>
-
+        );
+      case 'category':
+        return (
+          <div className="grid grid-cols-2 gap-3">
+            {categories.map((c) => {
+              const Icon = CATEGORY_ICON[c.icon] || Store;
+              const selected = category === c.key;
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => { setCategory(c.key); setStep((s) => Math.min(s + 1, STEPS.length - 1)); }}
+                  className={`flex flex-col items-center justify-center gap-2 rounded-2xl border-2 p-5 text-center transition ${
+                    selected ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white hover:border-teal-300'
+                  }`}
+                >
+                  <Icon className={`w-7 h-7 ${selected ? 'text-teal-600' : 'text-gray-500'}`} />
+                  <span className="text-sm font-bold text-gray-800">
+                    {language === 'fr' ? c.labelFr : language === 'bi' ? c.labelBi : c.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      case 'owner':
+        return (
+          <div>
+            <Input
+              autoFocus
+              value={ownerName}
+              onChange={(e) => { setOwnerName(e.target.value); setErrors((p) => ({ ...p, ownerName: '' })); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') goNext(); }}
+              className={inputBig}
+              placeholder={tr(language, 'Your full name', 'Votre nom complet', 'Fulnem blong yu')}
+            />
+            {errFor('ownerName')}
+          </div>
+        );
+      case 'contact':
+        return (
+          <div className="space-y-4">
             <div>
-              <Label htmlFor="cbp-business-name">
-                {language === 'en' ? 'Business name' : language === 'fr' ? "Nom de l'entreprise" : 'Nem blong bisnis'}
-              </Label>
+              <p className="text-sm font-semibold text-gray-700 mb-1.5">{tr(language, 'Phone', 'Téléphone', 'Fon')}</p>
               <Input
-                id="cbp-business-name"
-                value={businessName}
-                onChange={(e) => {
-                  setBusinessName(e.target.value);
-                  setErrors((p) => ({ ...p, businessName: '' }));
-                }}
-                className="mt-1.5"
-                placeholder="Island Adventures Co."
-              />
-              {errors.businessName && <p className="text-xs text-red-500 mt-1">{errors.businessName}</p>}
-            </div>
-
-            <div>
-              <Label htmlFor="cbp-owner-name">
-                {language === 'en' ? "Owner's name" : language === 'fr' ? 'Nom du gérant' : 'Nem blong ona'}
-              </Label>
-              <Input
-                id="cbp-owner-name"
-                value={ownerName}
-                onChange={(e) => {
-                  setOwnerName(e.target.value);
-                  setErrors((p) => ({ ...p, ownerName: '' }));
-                }}
-                className="mt-1.5"
-              />
-              {errors.ownerName && <p className="text-xs text-red-500 mt-1">{errors.ownerName}</p>}
-            </div>
-
-            <div>
-              <Label htmlFor="cbp-email">
-                {language === 'en' ? 'Business contact email' : language === 'fr' ? 'Email de contact' : 'Email blong bisnis'}
-              </Label>
-              <Input
-                id="cbp-email"
-                type="email"
-                value={businessEmail}
-                onChange={(e) => {
-                  setBusinessEmail(e.target.value);
-                  setErrors((p) => ({ ...p, businessEmail: '' }));
-                }}
-                className="mt-1.5"
-              />
-              {errors.businessEmail && <p className="text-xs text-red-500 mt-1">{errors.businessEmail}</p>}
-            </div>
-
-            <div>
-              <Label htmlFor="cbp-phone">
-                {language === 'en' ? 'Business phone' : language === 'fr' ? 'Téléphone' : 'Fon blong bisnis'}
-              </Label>
-              <Input
-                id="cbp-phone"
+                autoFocus
                 type="tel"
                 value={businessPhone}
-                onChange={(e) => {
-                  setBusinessPhone(e.target.value);
-                  setErrors((p) => ({ ...p, businessPhone: '' }));
-                }}
-                className="mt-1.5"
+                onChange={(e) => { setBusinessPhone(e.target.value); setErrors((p) => ({ ...p, businessPhone: '' })); }}
+                className={inputBig}
                 placeholder="+678 …"
               />
-              {errors.businessPhone && <p className="text-xs text-red-500 mt-1">{errors.businessPhone}</p>}
+              {errFor('businessPhone')}
             </div>
-
             <div>
-              <Label htmlFor="cbp-no-wa" className="flex items-start gap-3 cursor-pointer font-normal">
-                <input
-                  id="cbp-no-wa"
-                  type="checkbox"
-                  checked={noWhatsApp}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setNoWhatsApp(checked);
-                    if (checked) {
-                      setWhatsappNumber('');
-                      setWhatsappMarketingOptIn(false);
-                    }
-                    setErrors((p) => ({
-                      ...p,
-                      whatsappNumber: '',
-                      whatsappOptIn: '',
-                    }));
-                  }}
-                  className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                />
-                <span className="text-sm text-gray-700 leading-relaxed">
-                  {language === 'en'
-                    ? "I don't use WhatsApp — contact me by phone or email instead."
-                    : language === 'fr'
-                      ? "Je n'utilise pas WhatsApp — contactez-moi par téléphone ou e-mail."
-                      : 'Mi no yusum WhatsApp — kontaktem mi long fon o email.'}
-                </span>
-              </Label>
-            </div>
-
-            {!noWhatsApp && (
-              <>
-                <div>
-                  <Label htmlFor="cbp-wa">
-                    {language === 'en'
-                      ? 'WhatsApp number *'
-                      : language === 'fr'
-                        ? 'Numéro WhatsApp *'
-                        : 'WhatsApp namba *'}
-                  </Label>
-                  <p className="text-xs text-gray-500 mt-1 mb-1.5">
-                    {language === 'en'
-                      ? 'Recommended — we send short setup tips here to help you finish your listing. Include country code (e.g. +678).'
-                      : language === 'fr'
-                        ? 'Recommandé — conseils et rappels pour finaliser votre annonce. Indicatif pays (ex. +678).'
-                        : 'Recommend — mifala bae sendem tips long WhatsApp. Putem country code (ex. +678).'}
-                  </p>
-                  <Input
-                    id="cbp-wa"
-                    type="tel"
-                    value={whatsappNumber}
-                    onChange={(e) => {
-                      setWhatsappNumber(e.target.value);
-                      setErrors((p) => ({ ...p, whatsappNumber: '' }));
-                    }}
-                    className="mt-0"
-                    placeholder="+678 …"
-                    required
-                  />
-                  {errors.whatsappNumber && (
-                    <p className="text-xs text-red-500 mt-1">{errors.whatsappNumber}</p>
-                  )}
-                </div>
-
-                <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={whatsappMarketingOptIn}
-                      onChange={(e) => {
-                        setWhatsappMarketingOptIn(e.target.checked);
-                        setErrors((p) => ({ ...p, whatsappOptIn: '' }));
-                      }}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
-                    />
-                    <span className="text-sm text-gray-700 leading-relaxed">
-                      {language === 'en'
-                        ? 'Yes — send me WhatsApp tips from StikmNek to help set up my listing, upload photos, and get more bookings.'
-                        : language === 'fr'
-                          ? 'Oui — envoyez-moi des conseils WhatsApp de StikmNek pour configurer mon annonce et attirer plus de clients.'
-                          : 'Yes — sendem WhatsApp tips blong StikmNek blong helpim mi setim listing blong mi.'}
-                    </span>
-                  </label>
-                  {errors.whatsappOptIn && (
-                    <p className="text-xs text-red-500 mt-2 ml-7">{errors.whatsappOptIn}</p>
-                  )}
-                </div>
-              </>
-            )}
-
-            {noWhatsApp && (
-              <p className="text-xs text-gray-500 rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
-                {language === 'en'
-                  ? "We'll reach you on your business phone or email with listing help. You won't appear in our WhatsApp outreach list."
-                  : language === 'fr'
-                    ? 'Nous vous contacterons par téléphone ou e-mail. Vous ne serez pas dans notre liste WhatsApp.'
-                    : 'Mifala bae kontaktem yu long fon o email. Yu no go long WhatsApp list.'}
-              </p>
-            )}
-
-            <div>
-              <Label htmlFor="cbp-category">
-                {language === 'en' ? 'Category' : language === 'fr' ? 'Catégorie' : 'Kategori'}
-              </Label>
-              <select
-                id="cbp-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as Category)}
-                className="mt-1.5 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-              >
-                {categories.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {language === 'fr' ? c.labelFr : language === 'bi' ? c.labelBi : c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <Label htmlFor="cbp-address">
-                {language === 'en' ? 'Business address' : language === 'fr' ? 'Adresse' : 'Adres'}
-              </Label>
+              <p className="text-sm font-semibold text-gray-700 mb-1.5">{tr(language, 'Email', 'Email', 'Email')}</p>
               <Input
-                id="cbp-address"
-                value={address}
-                onChange={(e) => {
-                  setAddress(e.target.value);
-                  setErrors((p) => ({ ...p, address: '' }));
-                }}
-                className="mt-1.5"
-                placeholder="Port Vila, Vanuatu"
+                type="email"
+                value={businessEmail}
+                onChange={(e) => { setBusinessEmail(e.target.value); setErrors((p) => ({ ...p, businessEmail: '' })); }}
+                className={inputBig}
+                placeholder="name@example.com"
               />
-              {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
+              {errFor('businessEmail')}
             </div>
-
-            {user?.id && (
-              <div className="space-y-4 rounded-xl border border-violet-100 bg-violet-50/50 p-4">
-                <div className="flex items-center gap-2 text-violet-900 font-semibold text-sm">
-                  <Globe className="w-4 h-4 shrink-0" aria-hidden />
-                  {language === 'en'
-                    ? 'Logo & map (recommended)'
-                    : language === 'fr'
-                      ? 'Logo et carte (recommandé)'
-                      : 'Logo mo map'}
-                </div>
-                <p className="text-xs text-violet-800/90">
-                  {language === 'en'
-                    ? 'Tourists see your logo on the map and in search. Tap the map to set GPS (we store a Google Maps link).'
-                    : 'Les touristes voient votre logo sur la carte. Touchez la carte pour déposer une épingle.'}
-                </p>
-                <PhotoUploader
-                  photos={logoPhotos}
-                  onPhotosChange={setLogoPhotos}
-                  maxPhotos={1}
-                  userId={user.id}
-                  logoCrop
-                  label={language === 'en' ? 'Business logo' : language === 'fr' ? 'Logo' : 'Logo'}
-                  sublabel={
-                    language === 'en'
-                      ? 'Optional — upload, then drag and zoom to fit the square (like a profile photo).'
-                      : language === 'fr'
-                        ? 'Optionnel — téléversez puis ajustez zoom et position.'
-                        : 'Optional — upload mo adjustem long square.'
-                  }
+          </div>
+        );
+      case 'whatsapp':
+        return (
+          <div className="space-y-4">
+            {!noWhatsApp && (
+              <div>
+                <Input
+                  autoFocus
+                  type="tel"
+                  value={whatsappNumber}
+                  onChange={(e) => { setWhatsappNumber(e.target.value); setErrors((p) => ({ ...p, whatsappNumber: '' })); }}
+                  className={inputBig}
+                  placeholder={tr(language, 'WhatsApp number (+678 …)', 'Numéro WhatsApp (+678 …)', 'WhatsApp namba (+678 …)')}
                 />
-                <LocationMapPicker mapUrl={mapUrl} onMapUrlChange={setMapUrl} language={language} />
-                <div>
-                  <Label htmlFor="cbp-website">{language === 'en' ? 'Website' : language === 'fr' ? 'Site web' : 'Website'}</Label>
-                  <div className="mt-1.5">
-                    <WebsiteUrlInput
-                      id="cbp-website"
-                      website={website}
-                      onWebsiteChange={setWebsite}
-                      language={language}
-                    />
-                  </div>
-                </div>
+                {errFor('whatsappNumber')}
+                <label className="mt-3 flex items-start gap-3 cursor-pointer rounded-xl border border-teal-100 bg-teal-50/50 p-3">
+                  <input
+                    type="checkbox"
+                    checked={whatsappMarketingOptIn}
+                    onChange={(e) => { setWhatsappMarketingOptIn(e.target.checked); setErrors((p) => ({ ...p, whatsappOptIn: '' })); }}
+                    className="mt-0.5 h-5 w-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    {tr(language, 'Send me free setup tips on WhatsApp.', 'Envoyez-moi des conseils sur WhatsApp.', 'Sendem fri tips long WhatsApp.')}
+                  </span>
+                </label>
+                {errFor('whatsappOptIn')}
               </div>
             )}
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={submitting}
-                onClick={handleExitForNow}
-                className="w-full sm:w-auto shrink-0 border-emerald-200 text-emerald-800 hover:bg-emerald-50"
-              >
-                {language === 'en'
-                  ? 'Finish later'
-                  : language === 'fr'
-                    ? 'Terminer plus tard'
-                    : 'Finisim bihain'}
-              </Button>
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="w-full sm:min-w-[12rem] sm:flex-1 bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-95"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    {language === 'en' ? 'Saving…' : language === 'fr' ? 'Enregistrement…' : 'Sevem…'}
-                  </>
-                ) : savedProfileBusinessId ? (
-                  language === 'en' ? 'Update profile' : language === 'fr' ? 'Mettre à jour' : 'Update profail'
-                ) : language === 'en' ? (
-                  'Save profile'
-                ) : language === 'fr' ? (
-                  'Enregistrer le profil'
-                ) : (
-                  'Sevem profail'
-                )}
-              </Button>
-            </div>
-            <p className="text-center text-xs text-gray-500">
-              {language === 'en'
-                ? 'You can return anytime — open My Business and we will prompt you to finish setup.'
-                : language === 'fr'
-                  ? 'Revenez quand vous voulez : ouvrez Mon Entreprise pour reprendre la configuration.'
-                  : 'Yu ken kam bak eni taem — openem Bisnis Blong Mi bae i askem yu blong finisim setapem.'}
-            </p>
-          </form>
-
-          {savedProfileBusinessId && user?.id && (
-            <div className="px-6 sm:px-8 pb-6 sm:pb-8 border-t border-emerald-100 space-y-4">
-              <div>
-                <h2 className="text-sm font-bold text-gray-900">
-                  {language === 'en'
-                    ? 'Business credentials (recommended)'
-                    : language === 'fr'
-                      ? 'Justificatifs (recommandé)'
-                      : 'Ol credential blong bisnis'}
-                </h2>
-                <p className="text-xs text-gray-600 mt-1">
-                  {language === 'en'
-                    ? 'Upload your business licence, tourism permit, or other proof. You can add these later in Business Hub → Business Profile, but uploading now speeds up approval.'
-                    : language === 'fr'
-                      ? 'Téléversez votre licence ou permis. Vous pourrez les modifier plus tard dans le tableau de bord.'
-                      : 'Uploadem ol paper blong bisnis. Yu save putum bihain long Business Profile tu.'}
-                </p>
+            <label className="flex items-center gap-3 cursor-pointer text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={noWhatsApp}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setNoWhatsApp(checked);
+                  if (checked) { setWhatsappNumber(''); setWhatsappMarketingOptIn(false); }
+                  setErrors((p) => ({ ...p, whatsappNumber: '', whatsappOptIn: '' }));
+                }}
+                className="h-5 w-5 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              />
+              {tr(language, "I don't use WhatsApp", "Je n'utilise pas WhatsApp", 'Mi no yusum WhatsApp')}
+            </label>
+          </div>
+        );
+      case 'location':
+        return (
+          <div className="space-y-4">
+            <Input
+              autoFocus
+              value={address}
+              onChange={(e) => { setAddress(e.target.value); setErrors((p) => ({ ...p, address: '' })); }}
+              className={inputBig}
+              placeholder={tr(language, 'Town or address (e.g. Port Vila)', 'Ville ou adresse (ex. Port Vila)', 'Taon o adres (eg. Port Vila)')}
+            />
+            {errFor('address')}
+            <LocationMapPicker mapUrl={mapUrl} onMapUrlChange={setMapUrl} language={language} />
+          </div>
+        );
+      case 'logo':
+        return (
+          <PhotoUploader
+            photos={logoPhotos}
+            onPhotosChange={setLogoPhotos}
+            maxPhotos={1}
+            userId={user.id}
+            logoCrop
+            label={tr(language, 'Business logo', 'Logo', 'Logo')}
+            sublabel={tr(language, 'Optional — you can add this later.', 'Optionnel — à ajouter plus tard.', 'Optional — yu save putem bihain.')}
+          />
+        );
+      case 'review': {
+        const rows: { label: string; value: string }[] = [
+          { label: tr(language, 'Business', 'Entreprise', 'Bisnis'), value: businessName },
+          {
+            label: tr(language, 'Type', 'Type', 'Kaen'),
+            value: (() => {
+              const c = categories.find((x) => x.key === category);
+              return c ? (language === 'fr' ? c.labelFr : language === 'bi' ? c.labelBi : c.label) : category;
+            })(),
+          },
+          { label: tr(language, 'Owner', 'Gérant', 'Ona'), value: ownerName },
+          { label: tr(language, 'Phone', 'Téléphone', 'Fon'), value: businessPhone },
+          { label: tr(language, 'Email', 'Email', 'Email'), value: businessEmail },
+          {
+            label: 'WhatsApp',
+            value: noWhatsApp ? tr(language, 'Not used', 'Non utilisé', 'No yusum') : whatsappNumber,
+          },
+          { label: tr(language, 'Location', 'Lieu', 'Ples'), value: address },
+        ];
+        return (
+          <div className="rounded-2xl border border-gray-100 bg-gray-50 divide-y divide-gray-100">
+            {rows.map((r) => (
+              <div key={r.label} className="flex items-center justify-between gap-4 px-4 py-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">{r.label}</span>
+                <span className="text-sm font-medium text-gray-800 text-right truncate">{r.value || '—'}</span>
               </div>
-              <BusinessCredentialsSettings profileBusinessId={savedProfileBusinessId} />
-              <Button
+            ))}
+          </div>
+        );
+      }
+      default:
+        return null;
+    }
+  };
+
+  // ─── Success screen ───
+  if (savedDone) {
+    return (
+      <PageShell>
+        <div className="p-6 sm:p-8 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+            <Check className="h-8 w-8" strokeWidth={3} />
+          </div>
+          <h1 className="text-2xl font-black text-gray-900 mb-2">
+            {tr(language, 'Profile saved!', 'Profil enregistré !', 'Profail i sevem!')}
+          </h1>
+          <p className="text-sm text-gray-600 mb-6">
+            {needsFirstListing
+              ? tr(language, 'Next, add your first deal — photos and a price. It only takes a minute.', 'Ensuite, ajoutez votre première offre.', 'Nekis, putem fastaem deal blong yu.')
+              : tr(language, 'Your details are saved.', 'Vos informations sont enregistrées.', 'Ol samting blong yu i sevem.')}
+          </p>
+
+          {needsFirstListing ? (
+            <Button
+              type="button"
+              onClick={continueToBusinessHub}
+              className="w-full h-12 text-base bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-95"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              {tr(language, 'Add my first deal', 'Ajouter ma première offre', 'Putem fastaem deal')}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={() => setCurrentView('business-dashboard')}
+              className="w-full h-12 text-base bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-95"
+            >
+              {tr(language, 'Go to my dashboard', 'Aller au tableau de bord', 'Go long dashboard')}
+            </Button>
+          )}
+
+          {savedProfileBusinessId && (
+            <div className="mt-5 text-left">
+              <button
                 type="button"
-                onClick={continueToBusinessHub}
-                className="w-full bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-95"
+                onClick={() => setShowCreds((v) => !v)}
+                className="text-sm font-semibold text-teal-700 hover:underline underline-offset-2"
               >
-                {language === 'en'
-                  ? 'Continue to Business Hub — submit a listing'
-                  : language === 'fr'
-                    ? 'Continuer — soumettre une annonce'
-                    : 'Go long Business Hub — submit listing'}
-              </Button>
+                {tr(language, 'Add licence or permit (optional)', 'Ajouter une licence (optionnel)', 'Putem laesens (optional)')}
+              </button>
+              {showCreds && (
+                <div className="mt-3">
+                  <BusinessCredentialsSettings profileBusinessId={savedProfileBusinessId} />
+                </div>
+              )}
             </div>
           )}
         </div>
+      </PageShell>
+    );
+  }
+
+  // ─── Wizard ───
+  const progressPct = Math.round(((step + 1) / STEPS.length) * 100);
+  const isOptionalStep = currentId === 'logo' || currentId === 'location';
+
+  return (
+    <PageShell>
+      {/* Header: progress + exit */}
+      <div className="relative px-6 pt-6 sm:px-8 sm:pt-8">
+        <button
+          type="button"
+          onClick={handleExitForNow}
+          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200"
+          aria-label={tr(language, 'Exit and finish later', 'Quitter', 'Go aot')}
+          title={tr(language, 'Exit — finish later', 'Quitter — plus tard', 'Go aot — bihain')}
+        >
+          <X className="h-5 w-5" />
+        </button>
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white">
+            <Store className="h-4 w-4" />
+          </div>
+          <span className="text-xs font-bold uppercase tracking-wide text-gray-400">
+            {tr(language, 'Step', 'Étape', 'Step')} {step + 1} / {STEPS.length}
+          </span>
+        </div>
+        <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+          <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 transition-all" style={{ width: `${progressPct}%` }} />
+        </div>
       </div>
-    </div>
+
+      {userProfileLoadError && (
+        <div role="alert" className="mx-6 sm:mx-8 mt-6 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900 flex items-center justify-between gap-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" aria-hidden />
+            <p>{userProfileLoadError}</p>
+          </div>
+          <button type="button" onClick={() => void retryUserProfileFetch()} className="shrink-0 px-3 py-1.5 rounded-lg bg-red-700 text-white font-semibold">
+            {tr(language, 'Try again', 'Réessayer', 'Traem gen')}
+          </button>
+        </div>
+      )}
+
+      {/* Body */}
+      <div className="p-6 sm:p-8">
+        <h1 className="text-2xl font-black tracking-tight text-gray-900 mb-1">{stepTitle(currentId)}</h1>
+        {currentId === 'whatsapp' && (
+          <p className="text-sm text-gray-500 mb-5 flex items-center gap-1.5">
+            <MessageCircle className="w-4 h-4 text-teal-500" />
+            {tr(language, 'Customers message you to book.', 'Les clients vous écrivent pour réserver.', 'Kastoma i mesej yu blong bukim.')}
+          </p>
+        )}
+        {currentId !== 'whatsapp' && <div className="mb-5" />}
+
+        {renderStepBody()}
+
+        {/* Footer nav */}
+        <div className="mt-8 flex items-center gap-3">
+          {step > 0 && (
+            <Button type="button" variant="outline" onClick={goBack} className="h-12 px-4 shrink-0 border-gray-200 text-gray-600">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          )}
+
+          {isLast ? (
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="flex-1 h-12 text-base bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-95"
+            >
+              {submitting ? (
+                <><Loader2 className="w-5 h-5 mr-2 animate-spin" />{tr(language, 'Saving…', 'Enregistrement…', 'Sevem…')}</>
+              ) : (
+                <><Check className="w-5 h-5 mr-2" />{tr(language, 'Save profile', 'Enregistrer', 'Sevem profail')}</>
+              )}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={goNext}
+              className="flex-1 h-12 text-base bg-gradient-to-r from-emerald-600 to-teal-700 hover:opacity-95"
+            >
+              {isOptionalStep
+                ? tr(language, 'Continue', 'Continuer', 'Go hed')
+                : tr(language, 'Next', 'Suivant', 'Nekis')}
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+          )}
+        </div>
+
+        {isOptionalStep && (
+          <button
+            type="button"
+            onClick={goNext}
+            className="mt-3 w-full text-center text-sm font-medium text-gray-400 hover:text-gray-600"
+          >
+            {tr(language, 'Skip for now', 'Ignorer', 'Skipim')}
+          </button>
+        )}
+      </div>
+    </PageShell>
   );
 };
 
