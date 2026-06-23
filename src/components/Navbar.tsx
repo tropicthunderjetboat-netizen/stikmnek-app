@@ -12,6 +12,7 @@ import {
 } from '@/lib/heavyChunks';
 
 import { APP_ICON } from '@/lib/brand';
+import LanguageFlag from '@/components/LanguageFlag';
 
 const Navbar: React.FC = () => {
   const {
@@ -63,9 +64,9 @@ const Navbar: React.FC = () => {
   };
 
   const langOptions = [
-    { code: 'en' as const, label: 'EN', flag: '🇬🇧' },
-    { code: 'fr' as const, label: 'FR', flag: '🇫🇷' },
-    { code: 'bi' as const, label: 'BI', flag: '🇻🇺' },
+    { code: 'en' as const, label: 'EN' },
+    { code: 'fr' as const, label: 'FR' },
+    { code: 'bi' as const, label: 'BI' },
   ];
 
   // Role badge for user
@@ -178,13 +179,13 @@ const Navbar: React.FC = () => {
                   onClick={() => setLanguage(opt.code)}
                   aria-pressed={language === opt.code}
                   title={opt.label}
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold transition-all ${
+                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-bold transition-all ${
                     language === opt.code
                       ? 'bg-white text-teal-700 shadow-sm'
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  <span aria-hidden className="text-sm leading-none">{opt.flag}</span>
+                  <LanguageFlag code={opt.code} />
                   {opt.label}
                 </button>
               ))}
@@ -287,7 +288,7 @@ const Navbar: React.FC = () => {
                         : 'text-gray-500 hover:bg-gray-50'
                     }`}
                   >
-                    <span aria-hidden className="text-base leading-none">{opt.flag}</span>
+                    <LanguageFlag code={opt.code} />
                     {opt.label}
                   </button>
                 ))}
