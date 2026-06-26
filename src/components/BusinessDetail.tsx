@@ -513,12 +513,12 @@ const BusinessDetail: React.FC = () => {
         ? 'Schedule & departures'
         : language === 'fr'
           ? 'Horaires & départs'
-          : 'Taem & lego'
+          : 'Taem mo lego'
       : language === 'en'
         ? 'Operating hours'
         : language === 'fr'
           ? 'Heures d’ouverture'
-          : 'Taem wok';
+          : 'Taem blong wok';
   const dealPx = effectiveListingDealPrice(biz);
   const origPx = effectiveListingOriginalPrice(biz);
   const hasActiveDiscount = listingHasActiveDiscount(biz) || Boolean(tierDiscountBadge);
@@ -652,7 +652,7 @@ const BusinessDetail: React.FC = () => {
     }
     try {
       await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
-      toast.success(language === 'en' ? 'Link copied to clipboard!' : language === 'fr' ? 'Lien copié !' : 'Link i kopi finis!');
+      toast.success(language === 'en' ? 'Link copied to clipboard!' : language === 'fr' ? 'Lien copié !' : 'Link i kopi finis long clipboard!');
     } catch {
       toast.info(language === 'en' ? 'Copy this link to share:' : 'Copiez ce lien :', { description: window.location.href, duration: 6000 });
     }
@@ -702,7 +702,7 @@ const BusinessDetail: React.FC = () => {
               ? 'Could not load live listing details.'
               : language === 'fr'
                 ? 'Impossible de charger les détails de l’annonce.'
-                : 'No save lod listing detaels.'}{' '}
+                : 'No save lod live lo  listing detaels.'}{' '}
             <span className="text-red-700">{offeringsFetchError}</span>
           </div>
         )}
@@ -712,7 +712,7 @@ const BusinessDetail: React.FC = () => {
               ? 'No active offers for this business yet.'
               : language === 'fr'
                 ? 'Aucune offre active pour cet établissement pour le moment.'
-                : 'No gat aktiv ofa yet long bisnis ia.'}
+                : 'No gat aktiv ofa long bisnis yet .'}
           </div>
         )}
         {profileOfferings.length > 1 && (
@@ -734,7 +734,7 @@ const BusinessDetail: React.FC = () => {
                   ? 'Choose another listing from this business'
                   : language === 'fr'
                     ? 'Choisir une autre annonce'
-                    : 'Jus wan narafa listing'
+                    : 'Jus wan narafa listing blong binis'
               }
               value={biz.id}
               onChange={(e) => {
@@ -829,7 +829,7 @@ const BusinessDetail: React.FC = () => {
                       ? 'Show less'
                       : language === 'fr'
                         ? 'Afficher moins'
-                        : 'Ridim smol'
+                        : 'soem smol'
                     : language === 'en'
                       ? 'Read more'
                       : language === 'fr'
@@ -861,7 +861,7 @@ const BusinessDetail: React.FC = () => {
                         ? 'Rates by guest type. Use Request booking to estimate totals for your party.'
                         : language === 'fr'
                           ? 'Tarifs selon le type de visiteur. Utilisez « Demander une réservation » pour le total.'
-                          : 'Praes blong wanwan kaen man. Yusum Askem bukin blong lukim totel.'}
+                          : 'Praes blong wanwan kaen man. Yusum rekwes buking blong yu blong faenemaot total blong pati.'}
                     </p>
                   </div>
                 </div>
@@ -876,7 +876,7 @@ const BusinessDetail: React.FC = () => {
                           {language === 'en' ? 'Pax' : language === 'fr' ? 'Pers.' : 'Man'}
                         </th>
                         <th className="px-3 py-2 font-semibold">
-                          {language === 'en' ? 'Standard' : language === 'fr' ? 'Standard' : 'Stanad'}
+                          {language === 'en' ? 'Standard' : language === 'fr' ? 'Standard' : 'Stantat'}
                         </th>
                         <th className="px-3 py-2.5 font-bold text-white bg-gradient-to-r from-teal-600 to-emerald-600 rounded-tl-md">
                           StikmNek
@@ -955,7 +955,7 @@ const BusinessDetail: React.FC = () => {
                   </div>
                   <div className="flex-1">
                     <h3 className="font-bold text-green-900 text-sm">
-                      {language === 'en' ? 'Chat on WhatsApp' : language === 'fr' ? 'Discuter sur WhatsApp' : 'Toktok long WhatsApp'}
+                      {language === 'en' ? 'Chat on WhatsApp' : language === 'fr' ? 'Discuter sur WhatsApp' : 'sentem mesej tarek ko long WhatsApp'}
                     </h3>
                     <p className="text-xs text-green-600">
                       {canUseWhatsAppContact
@@ -963,12 +963,12 @@ const BusinessDetail: React.FC = () => {
                           ? 'Send a message directly to this business'
                           : language === 'fr'
                             ? 'Envoyez un message directement à cette entreprise'
-                            : 'Sendem mesej daerekli long bisnis ia'
+                            : 'Sendem mesej daerekli ko long bisnis ia'
                         : language === 'en'
                           ? 'Available once you have an active StikmNek pass — same as Request booking.'
                           : language === 'fr'
                             ? 'Disponible avec un pass StikmNek actif — comme « Demander une réservation ».'
-                            : 'I save wok sapos yu gat aktiv StikmNek pas — semak Askem bukin.'}
+                            : 'I save wok sapos yu gat aktiv StikmNek pas — semak taem yu rekwes bukin.'}
                     </p>
                   </div>
                 </div>
@@ -1085,7 +1085,7 @@ const BusinessDetail: React.FC = () => {
                       ? 'You cannot review your own listing.'
                       : language === 'fr'
                         ? 'Vous ne pouvez pas noter votre propre annonce.'
-                        : 'Yu no save riviu lista blong yu yet.'}
+                        : 'Yu no save riviu list blong yu yet.'}
                   </p>
                 )}
               </div>
@@ -1215,7 +1215,7 @@ const BusinessDetail: React.FC = () => {
                       {hasActiveDiscount && (
                         <div className="pb-0.5">
                           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
-                            {language === 'en' ? 'Standard' : language === 'fr' ? 'Standard' : 'Stanad'}
+                            {language === 'en' ? 'Standard' : language === 'fr' ? 'Standard' : 'Stantat'}
                           </p>
                           <p className="text-xl text-gray-400 line-through tabular-nums">{formatVT(origPx)}</p>
                         </div>

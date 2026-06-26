@@ -24,12 +24,26 @@ This creates **`i18n/bislama-review.csv`** with one row per phrase:
 
 Open `bislama-review.csv` in **Excel** or **Google Sheets**. Fix the wording in
 the **`bislama`** column only. Use the English and French columns to understand
-the meaning. Then **Save as CSV** (keep the same file name).
+the meaning.
+
+When saving:
+
+- **Excel:** use **File → Save As → "CSV UTF-8 (Comma delimited) (*.csv)"**.
+  (Plain "CSV" also works now, but "CSV UTF-8" keeps special characters like
+  dashes `—`, ellipses `…` and accents perfectly.)
+- **Google Sheets:** **File → Download → Comma-separated values (.csv)**.
 
 > Tip: send this CSV to a fluent Bislama speaker — they only need to read the
 > English column and rewrite the Bislama column.
 
-## 3. Put the text back
+## 3. Check it (optional but recommended)
+
+```bash
+npm run i18n:validate    # confirms the format is correct and counts changes
+npm run i18n:preview     # shows exactly what would change, without writing
+```
+
+## 4. Put the text back
 
 ```bash
 npm run i18n:import

@@ -193,7 +193,7 @@ const ListYourBusinessCta: React.FC = () => {
                         ? 'Already have an account?'
                         : language === 'fr'
                           ? 'Déjà un compte ?'
-                          : 'Gat akaont?'}
+                          : 'Gat akaon?'}
                     </span>{' '}
                     <button
                       type="button"

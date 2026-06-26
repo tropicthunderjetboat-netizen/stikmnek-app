@@ -469,7 +469,7 @@ const Dashboard: React.FC = () => {
                           <div className="flex items-center gap-4 text-sm text-white/80">
                             <span className="flex items-center gap-1">
                               <Calendar className="w-4 h-4" />
-                              {language === 'en' ? 'Expires: ' : language === 'fr' ? 'Expire le : ' : 'Expire: '}
+                              {language === 'en' ? 'Expires: ' : language === 'fr' ? 'Expire le : ' : 'Expae: '}
                               {fmtPassDate(displayPassExpiryLabel ?? null)}
                             </span>
                           </div>
@@ -485,14 +485,14 @@ const Dashboard: React.FC = () => {
                               )}
                               <div className="flex items-center gap-3 text-sm">
                                 <div className="flex-1">
-                                  <p className="text-[10px] text-white/60">{language === 'en' ? 'Valid From' : language === 'fr' ? 'Valide du' : 'Stat'}</p>
+                                  <p className="text-[10px] text-white/60">{language === 'en' ? 'Valid From' : language === 'fr' ? 'Valide du' : 'Stat blong diskaon'}</p>
                                   <p className="font-bold text-white">{fmtPassDate(user.passValidFrom)}</p>
                                 </div>
                                 <div className="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-bold">
                                   {language === 'en' ? 'to' : language === 'fr' ? 'au' : 'go'}
                                 </div>
                                 <div className="flex-1 text-right">
-                                  <p className="text-[10px] text-white/60">{language === 'en' ? 'Valid Until' : language === 'fr' ? 'Valide jusqu\'au' : 'Finis'}</p>
+                                  <p className="text-[10px] text-white/60">{language === 'en' ? 'Valid Until' : language === 'fr' ? 'Valide jusqu\'au' : 'Diskaon valit kasem'}</p>
                                   <p className="font-bold text-white">
                                     {fmtPassDate(
                                       holidayPassUi.showFirstWeekOnly
@@ -557,7 +557,7 @@ const Dashboard: React.FC = () => {
                         onClick={() => setActiveTab('analytics')}
                         className="text-xs text-teal-600 font-semibold hover:text-teal-700 flex items-center gap-1 transition-colors"
                       >
-                        {language === 'en' ? 'Insights' : language === 'fr' ? 'Analyses' : 'Analitiks'}
+                        {language === 'en' ? 'Insights' : language === 'fr' ? 'Analyses' : 'tingting'}
                         <ChevronRight className="w-3 h-3" />
                       </button>
                     )}
@@ -597,7 +597,7 @@ const Dashboard: React.FC = () => {
                     </div>
                   ) : (
                     <div className="p-8 text-center text-gray-400 text-sm">
-                      {language === 'en' ? 'No redemptions yet. Start exploring deals!' : language === 'fr' ? 'Pas encore d\'utilisations. Explorez les offres!' : 'No gat yusim yet. Stat eksploarem dils!'}
+                      {language === 'en' ? 'No redemptions yet. Start exploring deals!' : language === 'fr' ? 'Pas encore d\'utilisations. Explorez les offres!' : 'No usim yet. Stat eksploarem dils!'}
                     </div>
                   )}
                 </div>
@@ -628,11 +628,11 @@ const Dashboard: React.FC = () => {
                           ? 'Checkout uses this headcount (ages 6+) from your profile — update it anytime before you buy a pass.'
                           : language === 'fr'
                             ? 'Le paiement utilise ces voyageurs (6 ans et +) depuis votre profil.'
-                            : 'Checkout i yusim namba long profil blong yu (6+).'}
+                            : 'Checkout i yusum namba long proaeil blong yu (6+).'}
                       </p>
                       <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4 space-y-2 mb-4">
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">{language === 'en' ? 'Adults' : language === 'fr' ? 'Adultes' : 'Adult'}</span>
+                          <span className="text-gray-600">{language === 'en' ? 'Adults' : language === 'fr' ? 'Adultes' : 'Bikman'}</span>
                           <span className="font-bold text-gray-900">{userProfile?.num_adults ?? '—'}</span>
                         </div>
                         <div className="flex justify-between text-sm">
@@ -648,7 +648,7 @@ const Dashboard: React.FC = () => {
                         className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors"
                       >
                         <Pencil className="w-4 h-4" />
-                        {language === 'en' ? 'Edit profile' : language === 'fr' ? 'Modifier le profil' : 'Edit profil'}
+                        {language === 'en' ? 'Edit profile' : language === 'fr' ? 'Modifier le profil' : 'jesem profael'}
                       </button>
                     </div>
                   </div>
@@ -665,7 +665,7 @@ const Dashboard: React.FC = () => {
                         <TrendingUp className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-sm font-bold">{language === 'en' ? 'Your savings' : language === 'fr' ? 'Vos économies' : 'Sevin blong yu'}</p>
+                        <p className="text-sm font-bold">{language === 'en' ? 'Your savings' : language === 'fr' ? 'Vos économies' : 'Seving blong yu'}</p>
                         <p className="text-xs text-white/60">{language === 'en' ? 'Open analytics' : language === 'fr' ? 'Voir les analyses' : 'Openem analitiks'}</p>
                       </div>
                     </div>
@@ -710,7 +710,7 @@ const Dashboard: React.FC = () => {
                     <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center"><Wifi className="w-5 h-5 text-green-600" /></div>
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{language === 'en' ? 'Connected to Database' : language === 'fr' ? 'Connecté à la base de données' : 'Konetim long Database'}</p>
-                      <p className="text-xs text-gray-400">{language === 'en' ? 'Real-time sync active' : language === 'fr' ? 'Synchronisation en temps réel' : 'Riel-taem sink aktiv'}</p>
+                      <p className="text-xs text-gray-400">{language === 'en' ? 'Real-time sync active' : language === 'fr' ? 'Synchronisation en temps réel' : 'Ril-taem sink aktiv'}</p>
                     </div>
                   </div>
                   <p className="text-xs text-gray-400">
@@ -762,7 +762,7 @@ const Dashboard: React.FC = () => {
                         ? 'Insights into your StikmNek activity'
                         : language === 'fr'
                           ? 'Aperçu de votre activité StikmNek'
-                          : 'Lukim wetem yu bin du long StikmNek'}
+                          : 'luk iko insaet  long StikmNek aktiviti'}
                   </p>
                 </div>
               </div>
@@ -841,7 +841,7 @@ const Dashboard: React.FC = () => {
                     ? 'Total Deals Used'
                     : language === 'fr'
                       ? 'Total offres utilisées'
-                      : 'Total deals'}
+                      : 'Total dils'}
                 </p>
               </div>
             </div>
@@ -928,7 +928,7 @@ const Dashboard: React.FC = () => {
                   {(user.passAmountPaidAud ?? 0) > 0 ? (
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <span className="shrink-0 text-gray-600">
-                        {language === 'en' ? 'Pass price paid' : language === 'fr' ? 'Prix du pass' : 'Pem blong pass'}
+                        {language === 'en' ? 'Pass price paid' : language === 'fr' ? 'Prix du pass' : 'Pem pass praes'}
                       </span>
                       <div className="text-right sm:max-w-[60%]">
                         <p className="font-semibold text-gray-900">
@@ -949,12 +949,12 @@ const Dashboard: React.FC = () => {
                         ? 'Pass purchase amount will show here after your next checkout syncs.'
                         : language === 'fr'
                           ? 'Le montant payé pour le pass apparaîtra après le prochain paiement.'
-                          : 'Pem blong pass bae i kam afta checkout i sink.'}
+                          : 'Taem u Pem  pass bae i kam afta checkout i sink.'}
                     </p>
                   )}
                   <div className="flex flex-col gap-2 border-t border-gray-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
                     <span className="font-medium text-gray-700">
-                      {language === 'en' ? 'Deal savings (redemptions)' : language === 'fr' ? 'Économies (offres)' : 'Sevin long deals'}
+                      {language === 'en' ? 'Deal savings (redemptions)' : language === 'fr' ? 'Économies (offres)' : 'Sevin long dils'}
                     </span>
                     <div className="text-right">
                       <span className="block bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-xl font-black text-transparent">
@@ -1013,7 +1013,7 @@ const Dashboard: React.FC = () => {
                             </>
                           )}
                           <span className="mt-1.5 block text-[10px] font-bold uppercase tracking-wide text-emerald-700/90">
-                            {language === 'en' ? 'Ahead of your pass' : language === 'fr' ? 'Au-delà du pass' : 'Antap long pass'}
+                            {language === 'en' ? 'Ahead of your pass' : language === 'fr' ? 'Au-delà du pass' : 'fastaem long pass'}
                           </span>
                         </div>
                       ) : (

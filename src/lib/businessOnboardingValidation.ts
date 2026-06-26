@@ -483,7 +483,7 @@ export function localizedListingSubmitValidationFeedback(
         ? 'Please enter a title for this deal or listing.'
         : language === 'fr'
           ? 'Veuillez indiquer un titre pour cette offre.'
-          : 'Putem titel blong dil ia.';
+          : 'Putem wan foto mo wet bifo uplodem i finis.';
     return {
       fieldErrors: { title: errors.title ?? msg },
       toastMessage: errors.title ?? msg,
@@ -500,7 +500,7 @@ export function localizedListingSubmitValidationFeedback(
         ? 'Please add a description with real detail (not only empty formatting).'
         : language === 'fr'
           ? 'Veuillez ajouter une description avec du contenu réel.'
-          : 'Putem samting long description — nomo ol framaton long hem.';
+          : 'Narawan';
     return { fieldErrors: { description: msg }, toastMessage: msg };
   }
   if (key === 'photos') {

@@ -42,7 +42,7 @@ const CredentialUploader: React.FC<CredentialUploaderProps> = ({
           ? 'File must be under 10 MB'
           : language === 'fr'
             ? 'Fichier max. 10 Mo'
-            : 'Faol i mas 10 MB',
+            : 'Fael i mas 10 MB',
       );
       return;
     }
@@ -110,7 +110,7 @@ const CredentialUploader: React.FC<CredentialUploaderProps> = ({
           ? 'Document uploaded — click Save credentials below'
           : language === 'fr'
             ? 'Document téléchargé — cliquez Enregistrer ci-dessous'
-            : 'Dokumen i upload — klikim Save',
+            : 'Dokumen i aplot — klikim Save',
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Upload failed';
@@ -158,7 +158,7 @@ const CredentialUploader: React.FC<CredentialUploaderProps> = ({
             ? 'Upload PDF or image'
             : language === 'fr'
               ? 'Télécharger PDF ou image'
-              : 'Upload PDF o foto'}
+              : 'aplotem PDF o foto'}
         </button>
       )}
 

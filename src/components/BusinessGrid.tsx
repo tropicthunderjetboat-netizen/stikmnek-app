@@ -281,7 +281,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
           <p className="text-gray-500 max-w-lg mx-auto">
             {language === 'en' ? 'Discover amazing deals from local businesses across Vanuatu' :
              language === 'fr' ? 'Découvrez des offres incroyables des entreprises locales à travers le Vanuatu' :
-             'Faenem nambawan dils from lokal bisnis long Vanuatu'}
+             'Faenem nambawan dils long ol lokal bisnis long Vanuatu'}
           </p>
 
           {dbBusinesses.length > 0 && (
@@ -416,7 +416,7 @@ const BusinessGrid: React.FC<BusinessGridProps> = ({ showFeaturedOnly = false, t
             <p className="text-gray-500 text-lg">
               {language === 'en' ? 'No deals found. Try adjusting your filters.' :
                language === 'fr' ? 'Aucune offre trouvée. Essayez d\'ajuster vos filtres.' :
-               'No gat dil i faenem. Traem narafala sej.'}
+               'No gat faenem any deal. Traem narafala sej.'}
             </p>
             {searchQuery && (
               <p className="text-sm text-gray-400 mt-2">

@@ -1093,14 +1093,14 @@ Enjoy your deals in Vanuatu!
                 ? 'Complete your traveller profile'
                 : language === 'fr'
                   ? 'Complétez votre profil voyageur'
-                  : 'Komplitim profil blong yu'}
+                  : 'Logo i sev!'}
             </DialogTitle>
             <DialogDescription>
               {language === 'en'
                 ? 'A few details help us tailor deals and contact you the way you prefer.'
                 : language === 'fr'
                   ? 'Quelques détails nous aident à personnaliser les offres et à vous joindre comme vous préférez.'
-                  : 'Smol infomesen i helpem mifala blong givim dils mo kontakt yu.'}
+                  : 'Logo i sev!'}
             </DialogDescription>
           </DialogHeader>
           {user?.id && (

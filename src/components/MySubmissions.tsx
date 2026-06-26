@@ -380,7 +380,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
             ? 'Submission removed.'
             : language === 'fr'
               ? 'Soumission supprimée.'
-              : 'Sabmisen i raetem.',
+              : 'Sabmisen i aot',
         );
       } catch (err) {
         console.error('!!! WITHDRAW FAILED !!!', err);
@@ -911,7 +911,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffMins < 1) return language === 'en' ? 'Just now' : language === 'fr' ? 'À l\'instant' : 'Jas nao';
+    if (diffMins < 1) return language === 'en' ? 'Just now' : language === 'fr' ? 'À l\'instant' : 'Jes nao';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
@@ -973,7 +973,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-teal-50 text-teal-700 text-xs font-semibold hover:bg-teal-100 transition-colors"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              {language === 'en' ? 'Refresh' : language === 'fr' ? 'Actualiser' : 'Refresh'}
+              {language === 'en' ? 'Refresh' : language === 'fr' ? 'Actualiser' : 'Refres'}
             </button>
           </div>
         </div>
@@ -1043,7 +1043,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
             ? 'Live updates enabled — status changes appear instantly'
             : language === 'fr'
             ? 'Mises à jour en direct — les changements apparaissent instantanément'
-            : 'Laef update i stap — status change i soa kwiktaem'}
+            : 'Laef update i stap — status change i soem kwiktaem'}
         </p>
       </div>
 
@@ -1064,7 +1064,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
                   ? 'Submit your first business listing to get started!'
                   : language === 'fr'
                   ? 'Soumettez votre première entreprise pour commencer !'
-                  : 'Sabmitem faswan bisnis blong yu blong statem!')
+                  : 'Sabmitem feswan bisnis blong yu blong statem!')
               : (language === 'en' ? 'Try a different filter to see more results.' : 'Essayez un autre filtre.')}
           </p>
           {filter === 'all' && (
@@ -1168,7 +1168,7 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
                     <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                       {submission.listingSource === 'live' && (
                         <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 font-semibold capitalize">
-                          {language === 'en' ? 'Live on Explore' : language === 'fr' ? 'En ligne' : 'Laef long Explore'}
+                          {language === 'en' ? 'Live on Explore' : language === 'fr' ? 'En ligne' : 'Laef long Explora'}
                         </span>
                       )}
                       <span className="px-2 py-0.5 rounded-md bg-gray-100 font-medium capitalize">

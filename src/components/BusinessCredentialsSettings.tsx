@@ -214,7 +214,7 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
           ? 'Credentials saved. Admin will verify documents for leaderboard boost.'
           : language === 'fr'
             ? 'Identifiants enregistrés. Un admin validera vos documents.'
-            : 'Kredensel i sevem. Admin bae verify.',
+            : 'Kredensel i sev. Admin bae verify.',
       );
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Save failed');

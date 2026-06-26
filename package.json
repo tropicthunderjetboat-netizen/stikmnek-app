@@ -8,6 +8,8 @@
     "db:push": "supabase db push",
     "db:purge-user": "node scripts/purge-auth-user.mjs",
     "i18n:export": "node scripts/i18n-export.mjs",
+    "i18n:validate": "node scripts/i18n-validate.mjs",
+    "i18n:preview": "node scripts/i18n-preview.mjs",
     "i18n:import": "node scripts/i18n-import.mjs",
     "functions:deploy": "supabase functions deploy",
     "functions:deploy:api": "supabase functions deploy --use-api -j 4",

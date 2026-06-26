@@ -1749,7 +1749,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ? 'You cannot leave a review for your own business.'
             : language === 'fr'
               ? 'Vous ne pouvez pas laisser un avis sur votre propre établissement.'
-              : 'Yu no save riviu long bisinis blong yu yet.';
+              : 'Noka verifyem histori blong visit blong yu. Trai bakagen.';
         return { ok: false, message: msg };
       }
 
@@ -1771,7 +1771,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               ? 'Could not verify your visit history. Please try again.'
               : language === 'fr'
                 ? 'Impossible de vérifier votre historique de visites. Réessayez.'
-                : 'Noka verifyem histori blong visit blong yu. Trai bakagen.',
+                : 'Saen in blong riviu.',
         };
       }
 
@@ -1794,7 +1794,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               ? 'Could not verify your visit history. Please try again.'
               : language === 'fr'
                 ? 'Impossible de vérifier votre historique de visites. Réessayez.'
-                : 'Noka verifyem histori blong visit blong yu. Trai bakagen.',
+                : 'No gat Super Star kredit. Plis bae wan Super Star festaem.',
         };
       }
 
@@ -1823,7 +1823,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               ? 'Sign in to leave a review.'
               : language === 'fr'
                 ? 'Connectez-vous pour laisser un avis.'
-                : 'Saen in blong riviu.',
+                : 'Putem taetel blong dil ia.',
         };
       }
       const r = await evaluateReviewSubmissionPreflight(businessId, redemptionContext);
@@ -1886,7 +1886,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 ? 'No Super Star credits available. Please purchase a Super Star first.'
                 : language === 'fr'
                   ? 'Aucun crédit Super Star disponible. Veuillez d’abord acheter un Super Star.'
-                  : 'No gat Super Star kredit. Plis bae wan Super Star festaem.';
+                  : 'Putem samting long description — nomo ol framaton long hem.';
             toast.error(msg);
             throw new Error(msg);
           }

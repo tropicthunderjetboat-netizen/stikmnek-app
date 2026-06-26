@@ -67,7 +67,7 @@ const ReviewsSection: React.FC = () => {
           <p className="text-gray-500 max-w-lg mx-auto mb-6">
             {language === 'en' ? 'Real experiences from tourists who saved with StikmNek' :
              language === 'fr' ? 'Expériences réelles de touristes qui ont économisé avec StikmNek' :
-             'Tru eksperiens from turis we oli sevem wetem StikmNek'}
+             'Jusum wan bisnis blong riviu'}
           </p>
           <button
             onClick={handleWriteReview}
@@ -136,7 +136,7 @@ const ReviewsSection: React.FC = () => {
                 <p className="text-sm text-gray-500 mt-0.5">
                   {language === 'en' ? 'Share your experience with other tourists' :
                    language === 'fr' ? 'Partagez votre expérience avec d\'autres touristes' :
-                   'Searem eksperiens blong yu wetem narafala turis'}
+                   'Jusum wan bisnis...'}
                 </p>
               </div>
               <button
@@ -155,7 +155,7 @@ const ReviewsSection: React.FC = () => {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     {language === 'en' ? 'Select a business to review' :
                      language === 'fr' ? 'Sélectionnez une entreprise à évaluer' :
-                     'Jusum wan bisnis blong riviu'}
+                     'No gat list blong riviu. Inklutum blong yu naoia'}
                     <span className="text-red-500 ml-0.5">*</span>
                   </label>
                   <div className="relative">
@@ -167,7 +167,7 @@ const ReviewsSection: React.FC = () => {
                       <span className="text-gray-400">
                         {language === 'en' ? 'Choose a business...' :
                          language === 'fr' ? 'Choisir une entreprise...' :
-                         'Jusum wan bisnis...'}
+                         'Jensem'}
                       </span>
                       <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
                     </button>
@@ -179,7 +179,7 @@ const ReviewsSection: React.FC = () => {
                               ? 'No listings available to review (including your own).'
                               : language === 'fr'
                                 ? 'Aucune annonce à évaluer (y compris la vôtre).'
-                                : 'No gat lista blong riviu.'}
+                                : 'Komplitim profael blong yu'}
                           </p>
                         )}
                         {reviewableBusinesses.map((biz) => {
@@ -238,7 +238,7 @@ const ReviewsSection: React.FC = () => {
                       onClick={() => setSelectedBusinessId('')}
                       className="text-xs text-teal-600 font-semibold hover:underline shrink-0"
                     >
-                      {language === 'en' ? 'Change' : language === 'fr' ? 'Changer' : 'Jenisim'}
+                      {language === 'en' ? 'Change' : language === 'fr' ? 'Changer' : 'Helpem mifala blong givim dils mo kontakt yu long we yu preferem'}
                     </button>
                   </div>
 

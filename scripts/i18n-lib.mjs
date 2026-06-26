@@ -251,6 +251,20 @@ export function writeMap(units) {
   fs.writeFileSync(MAP_FILE, JSON.stringify(map, null, 2) + '\n', 'utf8');
 }
 
+/**
+ * Read a CSV file as text, auto-detecting the encoding so it works whether the
+ * spreadsheet was saved as UTF-8 (Google Sheets / "CSV UTF-8") or Windows-1252
+ * (default Excel "CSV"). Falls back to Windows-1252 only if strict UTF-8 fails.
+ */
+export function readCsvText(file) {
+  const buf = fs.readFileSync(file);
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf);
+  } catch {
+    return new TextDecoder('windows-1252').decode(buf);
+  }
+}
+
 /** Minimal RFC-4180-ish CSV parser (handles quotes, commas, newlines). */
 export function parseCsv(text) {
   const clean = text.replace(/^\uFEFF/, '');

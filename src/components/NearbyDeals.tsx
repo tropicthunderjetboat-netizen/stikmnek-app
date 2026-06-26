@@ -36,7 +36,7 @@ const NearbyDeals: React.FC = () => {
         <div className="bg-gradient-to-r from-teal-600 to-emerald-600 px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2 text-white text-xs font-semibold">
             <Bell className="w-3.5 h-3.5" />
-            {language === 'en' ? 'Nearby Deal' : language === 'fr' ? 'Offre à proximité' : 'Dil Klosap'}
+            {language === 'en' ? 'Nearby Deal' : language === 'fr' ? 'Offre à proximité' : 'Komplitim profael blong yu'}
           </div>
           <button
             onClick={() => { setDismissed(true); setVisible(false); }}

@@ -236,7 +236,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
         ? 'Booking inquiry for'
         : language === 'fr'
           ? 'Demande de réservation pour'
-          : 'Bukin ask long',
+          : 'Bukin askem long',
     intro:
       language === 'en'
         ? 'Visit details and contact fields are pre-filled from your profile — edit if needed. Then use the business contact buttons below.'
@@ -278,7 +278,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
     date: language === 'en' ? 'Visit date' : language === 'fr' ? 'Date de visite' : 'Dei blong visit',
     adults: language === 'en' ? 'Adults' : language === 'fr' ? 'Adultes' : 'Ol man',
     children: language === 'en' ? 'Children' : language === 'fr' ? 'Enfants' : 'Pikinini',
-    standard: language === 'en' ? 'Total standard price' : language === 'fr' ? 'Prix standard total' : 'Stanad praes',
+    standard: language === 'en' ? 'Total standard price' : language === 'fr' ? 'Prix standard total' : 'Staned praes',
     stikmnek: language === 'en' ? 'Total StikmNek price' : language === 'fr' ? 'Prix StikmNek total' : 'StikmNek praes',
     save: language === 'en' ? 'Your savings' : language === 'fr' ? 'Vos économies' : 'Sevin blong yu',
     name: language === 'en' ? 'Your name' : language === 'fr' ? 'Votre nom' : 'Nem blong yu',
@@ -296,7 +296,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
         ? 'Enter at least 1 guest to see pricing.'
         : language === 'fr'
           ? 'Indiquez au moins 1 personne pour voir les prix.'
-          : 'Putum kasem 1 man long lukim praes.',
+          : 'Putum wan price blong 1 man lukim praes.',
   };
 
   const handleSendEmail = async () => {

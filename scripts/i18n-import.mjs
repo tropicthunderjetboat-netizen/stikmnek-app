@@ -11,7 +11,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseCsv, requote, REPO_ROOT, CSV_FILE, MAP_FILE } from './i18n-lib.mjs';
+import { parseCsv, readCsvText, requote, REPO_ROOT, CSV_FILE, MAP_FILE } from './i18n-lib.mjs';
 
 if (!fs.existsSync(CSV_FILE)) {
   console.error(`Missing ${CSV_FILE}. Run  npm run i18n:export  first.`);
@@ -22,7 +22,7 @@ if (!fs.existsSync(MAP_FILE)) {
   process.exit(1);
 }
 
-const rows = parseCsv(fs.readFileSync(CSV_FILE, 'utf8'));
+const rows = parseCsv(readCsvText(CSV_FILE));
 const map = JSON.parse(fs.readFileSync(MAP_FILE, 'utf8'));
 const mapById = new Map(map.map((m) => [m.id, m]));
 

@@ -1471,7 +1471,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 ? 'Optional: upload insurance, permits, or training certificates in Business Profile → My credentials. Verified documents help you rank higher on the leaderboard.'
                 : language === 'fr'
                   ? 'Facultatif : téléchargez assurance, permis ou certificats dans Profil entreprise → Mes accréditations.'
-                  : 'Optional: upload insurance o permit long Business Profile → My credentials.'}
+                  : 'Opsenel: aplotem insurens o permit long bisnis profael — My credentials.'}
             </p>
           )}
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -1564,7 +1564,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             ? 'Please complete this step.'
             : language === 'fr'
               ? 'Veuillez compléter cette étape.'
-              : 'Plis kompletem step ia.',
+              : 'Plis komplitim step ia.',
         );
         return;
       }
@@ -1621,7 +1621,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 ? 'List Your Business for Free'
                 : language === 'fr'
                   ? 'Inscrivez votre entreprise gratuitement'
-                  : 'Listem Bisnis Blong Yu Fri'}
+                  : 'Listim Bisnis Blong Yu fo Fri'}
           </h2>
           <p className="text-gray-500">
             {isEmbeddedEdit
@@ -1639,14 +1639,14 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         {user?.type === 'business' && !isEmbeddedEdit && !guided && (
           <div className="mb-6 rounded-xl border border-teal-100 bg-white p-4 text-left text-sm text-gray-700 shadow-sm">
             <p className="font-semibold text-teal-900 mb-1">
-              {language === 'en' ? 'Simple flow' : language === 'fr' ? 'Parcours simple' : 'Wanwan wok'}
+              {language === 'en' ? 'Simple flow' : language === 'fr' ? 'Parcours simple' : 'Simpol wok'}
             </p>
             <p className="text-gray-600 leading-relaxed">
               {language === 'en'
                 ? 'First complete your business profile (Dashboard → Business Profile) with phone, WhatsApp, and address. Here you add each deal separately — we copy those saved details into this form. Scroll down to optionally upload credentials (insurance, permits). Use a clear title for this deal (not only your company name).'
                 : language === 'fr'
                   ? 'Complétez dabord votre profil entreprise (tableau de bord → Profil entreprise). Ici vous ajoutez chaque offre. Faites défiler pour télécharger des accréditations (facultatif). Donnez un titre clair pour cette offre.'
-                  : 'Fes komplitim profil bisnis long dashboard. Hia yu adem evri dil. Scroll daon blong upload kredensel (optional). Yusum klia titel blong dil ia.'}
+                  : 'Fes komplitim profael bisnis long dashboard. Hia yu adem evri dil. Scroll daon blong upload kredensel (optional). Yusum klia titel blong dil ia.'}
             </p>
           </div>
         )}
@@ -1657,14 +1657,14 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               <Store className="w-6 h-6 text-white" />
             </div>
             <h3 className="text-base font-bold text-gray-900 mb-1">
-              {language === 'en' ? 'Create a Business Account' : language === 'fr' ? 'Créer un compte entreprise' : 'Mekem Bisnis Akaont'}
+              {language === 'en' ? 'Create a Business Account' : language === 'fr' ? 'Créer un compte entreprise' : 'Mekem wan Bisnis Akaon'}
             </h3>
             <p className="text-sm text-gray-500 mb-3">
               {language === 'en'
                 ? 'Sign up as a business owner to list your business and manage your offers.'
                 : language === 'fr'
                 ? 'Inscrivez-vous en tant que propriétaire d\'entreprise pour gérer vos offres.'
-                : 'Saen ap olsem bisnis ona blong listem bisnis blong yu.'}
+                : 'Saen ap olsem bisnis ona blong listim bisnis blong yu.'}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
               <button
@@ -1677,7 +1677,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 onClick={() => { setAuthMode('signin'); setShowAuth(true); }}
                 className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
               >
-                {language === 'en' ? 'Already have an account? Sign In' : language === 'fr' ? 'Déjà un compte? Se connecter' : 'Gat akaont? Saen In'}
+                {language === 'en' ? 'Already have an account? Sign In' : language === 'fr' ? 'Déjà un compte? Se connecter' : 'Yu gat wan akaon? Saen In'}
               </button>
             </div>
           </div>
@@ -1689,7 +1689,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             <div className="flex items-center justify-center gap-2 mb-2">
               <AlertTriangle className="w-5 h-5 text-amber-600" />
               <h3 className="text-base font-bold text-amber-800">
-                {language === 'en' ? 'Business Account Required' : language === 'fr' ? 'Compte entreprise requis' : 'Bisnis Akaont i Nidim'}
+                {language === 'en' ? 'Business Account Required' : language === 'fr' ? 'Compte entreprise requis' : 'Bisnis Akaon i Nidim'}
               </h3>
             </div>
             <p className="text-sm text-amber-700 mb-3">
@@ -1697,7 +1697,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 ? 'You\'re currently signed in as a tourist. To list a business, you\'ll need a business account.'
                 : language === 'fr'
                 ? 'Vous êtes connecté en tant que touriste. Pour inscrire une entreprise, vous avez besoin d\'un compte entreprise.'
-                : 'Yu saen in olsem turis. Blong listem bisnis, yu nidim bisnis akaont.'}
+                : 'Yu saen in olsem wan turis. Blong listim bisnis, yu nidim bisnis akaon.'}
             </p>
             <p className="text-xs text-amber-600">
               {language === 'en'
@@ -1743,7 +1743,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                         ? 'Clear this listing and start over?'
                         : language === 'fr'
                           ? 'Effacer cette annonce et recommencer ?'
-                          : 'Klialem listing ia mo stat bakegen?';
+                          : 'Kliarem listing ia mo stat bakegen?';
                     if (window.confirm(msg)) resetFormAfterSuccess();
                   }}
                   className="text-xs font-semibold text-gray-400 hover:text-red-500 underline underline-offset-2"
@@ -1762,7 +1762,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   ? 'Deal / listing title'
                   : language === 'fr'
                     ? 'Titre de l’offre'
-                    : 'Titel blong dil'}
+                    : 'Taetel blong dil'}
                 <span className="text-red-600 font-semibold" aria-hidden> *</span>
               </label>
               <input
@@ -1884,12 +1884,12 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   ? 'Enter a single per-person price in Vatu (VT) (used if you add no tiers). Discount is optional — businesses offering discounts get featured priority.'
                   : language === 'fr'
                     ? "Entrez un prix unique par personne en Vatu (VT) (utilisé si vous n’ajoutez pas de paliers). La remise est optionnelle — les entreprises offrant des remises sont prioritaires."
-                    : 'Putum wan praes long Vatu (VT) (hem i wok sapos yu no putum tiers). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'
+                    : 'Putum wan praes long Vatu (VT) (hem i wok sapos yu no putum tiers). Diskaon i opsenal — bisnis we i gat diskaon i go feswan.'
                 : language === 'en'
                   ? 'Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.'
                   : language === 'fr'
                     ? 'Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.'
-                    : 'Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'}
+                    : 'Putum praes long Vatu (VT). Diskaon i opsenal — bisnis we i gat diskaon i go feswan.'}
             </p>
 
 
@@ -1926,7 +1926,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                       ? 'Regular price per person in Vatu'
                       : language === 'fr'
                         ? 'Prix normal par personne en Vatu'
-                        : 'Stanad praes long wan man (VT)'}
+                        : 'Stantat praes long wan man (VT)'}
                 </p>
               </div>
 
@@ -2094,7 +2094,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             <div className="flex items-center gap-2 mb-3">
               <Calendar className="w-4 h-4 text-blue-600" />
               <h3 className="text-sm font-bold text-blue-800">
-                {language === 'en' ? 'Discount Validity Period' : language === 'fr' ? 'Période de validité de la remise' : 'Taem blong Diskaon'}
+                {language === 'en' ? 'Discount Validity Period' : language === 'fr' ? 'Période de validité de la remise' : 'Taem blong Diskaon i valit long wan periot'}
               </h3>
             </div>
             <p className="text-sm text-gray-700 mb-3">
@@ -2105,7 +2105,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  {language === 'en' ? 'Discount Valid From *' : language === 'fr' ? 'Valide à partir du *' : 'Stat Dei *'}
+                  {language === 'en' ? 'Discount Valid From *' : language === 'fr' ? 'Valide à partir du *' : 'Diskaon Stat long wanem Dei *'}
                 </label>
                 <input
                   type="date"
@@ -2136,7 +2136,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  {language === 'en' ? 'Discount Valid Until' : language === 'fr' ? 'Valide jusqu\'au' : 'En Dei'}
+                  {language === 'en' ? 'Discount Valid Until' : language === 'fr' ? 'Valide jusqu\'au' : 'En blong valit diskaon long wanem Dei'}
                 </label>
                 <input
                   type="date"
@@ -2232,7 +2232,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
               </svg>
               <h3 className="text-sm font-bold text-green-800">
-                {language === 'en' ? 'WhatsApp Number (Optional)' : language === 'fr' ? 'Numéro WhatsApp (Optionnel)' : 'WhatsApp Namba (Opsonal)'}
+                {language === 'en' ? 'WhatsApp Number (Optional)' : language === 'fr' ? 'Numéro WhatsApp (Optionnel)' : 'WhatsApp Namba (Opsenal)'}
               </h3>
             </div>
             <p className="text-sm text-gray-700 mb-3">
@@ -2336,7 +2336,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   ? 'Optional — company credentials'
                   : language === 'fr'
                     ? 'Facultatif — accréditations'
-                    : 'Optional — kredensel'}
+                    : 'Optional — kampani kredensel'}
               </p>
               <BusinessCredentialsSettings profileBusinessId={credentialsProfileId} />
             </div>
@@ -2348,7 +2348,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                 ? 'Save your business profile in the dashboard first (phone, address, logo). Then you can upload optional credentials (insurance, permits) on this form or under Business Profile.'
                 : language === 'fr'
                   ? 'Enregistrez dabord votre profil entreprise dans le tableau de bord, puis vous pourrez télécharger des accréditations ici.'
-                  : 'Save profail bisnis long dashboard first, bae yu save upload kredensel.'}
+                  : 'Sevem profael bisnis long dashboard fastaem bae yu save aplotem kredensel.'}
             </div>
           )}
 
@@ -2431,7 +2431,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                       ? 'Submit changes for review'
                       : language === 'fr'
                         ? 'Envoyer les modifications'
-                        : 'Submitem senis'
+                        : 'Submitim jenses blong save reviu'
                     : language === 'en'
                       ? 'Submit for Review (Free)'
                       : 'Soumettre pour examen (Gratuit)'}
@@ -2519,7 +2519,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   ? 'I agree to these terms'
                   : language === 'fr'
                     ? "J'accepte ces conditions"
-                    : 'Mi agri long ol taem ia'}
+                    : 'Mi agri long ol tems ia'}
               </button>
               <button
                 type="button"

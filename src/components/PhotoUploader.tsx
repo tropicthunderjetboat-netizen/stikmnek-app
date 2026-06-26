@@ -587,7 +587,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               ? 'Logo saved!'
               : language === 'fr'
                 ? 'Logo enregistré !'
-                : 'Logo i sevem!'
+                : 'Adjustem olsem long listing'
             : `${successful.length} photo${successful.length > 1 ? 's' : ''} uploaded!`,
         );
       }
@@ -682,7 +682,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       if (result) {
         onPhotosChange([result]);
         toast.success(
-          language === 'en' ? 'Logo saved!' : language === 'fr' ? 'Logo enregistré !' : 'Logo i sevem!',
+          language === 'en' ? 'Logo saved!' : language === 'fr' ? 'Logo enregistré !' : 'Praes mo Diskaon (VT)',
         );
       }
     },
@@ -1054,7 +1054,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
             ? 'Adjust how it looks on your listing'
             : language === 'fr'
               ? 'Ajuster l’affichage sur l’annonce'
-              : 'Adjustem olsem long listing'}
+              : 'Diskaon Opsonal'}
         </button>
       )}
 

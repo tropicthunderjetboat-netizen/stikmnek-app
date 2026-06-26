@@ -62,7 +62,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
             ? 'Business profile not found.'
             : language === 'fr'
               ? 'Profil introuvable.'
-              : 'No faenem bisnis profail.',
+              : 'No faenem bisnis profael.',
         );
         return;
       }
@@ -113,7 +113,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
           ? 'Could not load business profile.'
           : language === 'fr'
             ? 'Impossible de charger le profil.'
-            : 'No loadem profail.',
+            : 'No save lodem profael.',
       );
     } finally {
       setLoading(false);
@@ -164,7 +164,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
           ? 'Please fix the errors below.'
           : language === 'fr'
             ? 'Corrigez les erreurs ci-dessous.'
-            : 'Fiksem ol erro.',
+            : 'Fiksim ol erra.',
       );
       return;
     }
@@ -240,7 +240,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
           ? 'Business profile updated. New listings will use these contact details.'
           : language === 'fr'
             ? 'Profil mis � jour. Les nouvelles annonces utiliseront ces coordonn�es.'
-            : 'Profail i apdeit.',
+            : 'Profael i apdeit.',
       );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Save failed';
@@ -263,7 +263,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
       ? 'Business profile'
       : language === 'fr'
         ? 'Profil entreprise'
-        : 'Bisnis profail';
+        : 'Bisnis profael';
 
   const subtitle =
     language === 'en'
@@ -386,7 +386,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
                     ? 'Recommended for guest contact and StikmNek setup tips. Include country code (e.g. +678).'
                     : language === 'fr'
                       ? 'Recommande pour les clients et conseils StikmNek. Indicatif pays (ex. +678).'
-                      : 'Recommend blong guest mo tips. Country code (ex. +678).'}
+                      : 'Recomentem blong guest mo tips. Inklutum kaotri cod (ex. +678).'}
                 </p>
                 <Input
                   type="tel"
@@ -428,7 +428,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
                 ? "We'll use your phone and email for listing help. You won't be on our WhatsApp outreach list."
                 : language === 'fr'
                   ? 'Nous utiliserons votre telephone et e-mail. Pas de liste WhatsApp.'
-                  : 'Mifala bae yusum fon mo email. No long WhatsApp list.'}
+                  : 'Mifala bae yusum fon mo email long taem blong listing elp. No long WhatsApp list.'}
             </p>
           )}
 
@@ -453,7 +453,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
                 ? 'Business hours (office / base)'
                 : language === 'fr'
                   ? 'Heures du commerce (bureau)'
-                  : 'Taem wok blong bisnis'}
+                  : 'Ol binis aoa'}
             </Label>
             <Input
               value={businessHours}
@@ -467,7 +467,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
                 ? 'Used as a fallback and for your company contact. Set tour-specific times on each listing under Edit listing.'
                 : language === 'fr'
                   ? 'Utilis� pour le contact g�n�ral. Les horaires de chaque tour se d�finissent dans Modifier l�annonce.'
-                  : 'Blong kontak blong bisnis. Taem blong wan tour � long Edit listing.'}
+                  : 'Blong kontak blong bisnis. Taem blong wan tour — long jesem listing.'}
             </p>
           </div>
 
@@ -502,7 +502,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
                   ? 'Upload then drag and zoom to fit the square � same idea as a profile photo.'
                   : language === 'fr'
                     ? 'T�l�versez, puis glissez et zoomez pour remplir le carr�.'
-                    : 'Upload, drag mo zoom blong fillum square.'
+                    : 'aplotem, trak mo zoom blong save fitim square. Sem aedia long profael foto'
               }
             />
           </div>
@@ -510,7 +510,7 @@ const BusinessProfileSettings: React.FC<BusinessProfileSettingsProps> = ({
           <div className="flex flex-wrap gap-3 pt-2">
             <Button type="submit" disabled={saving} className="bg-teal-600 hover:bg-teal-700 gap-2">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {language === 'en' ? 'Save profile' : language === 'fr' ? 'Enregistrer' : 'Sevem profail'}
+              {language === 'en' ? 'Save profile' : language === 'fr' ? 'Enregistrer' : 'Sevem profael'}
             </Button>
             <Button type="button" variant="outline" disabled={saving} onClick={() => void loadProfile()}>
               {language === 'en' ? 'Discard changes' : language === 'fr' ? 'Annuler' : 'Discard'}

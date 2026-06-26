@@ -54,60 +54,60 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
         ? 'Price for each guest (VT)'
         : language === 'fr'
           ? 'Prix par visiteur (VT)'
-          : 'Praes blong wanwan man (VT)',
+          : 'Putum nomol praes, then diskaon pas praes blong wanwan man.',
     hint: autoMode
       ? language === 'en'
         ? 'Type your normal price for each guest. We work out the discounted pass price for you. Children under 6 are usually free.'
         : language === 'fr'
           ? 'Saisissez votre prix normal pour chaque visiteur. Nous calculons le prix réduit du pass. Les enfants de moins de 6 ans sont gratuits.'
-          : 'Putum nomol praes blong wanwan man. Mifala wokemaot diskaon praes blong yu. Pikinini andanit 6 yia i fri.'
+          : 'Nem'
       : language === 'en'
         ? 'Type your normal price, then the lower pass price for each guest. Children under 6 are usually free.'
         : language === 'fr'
           ? 'Saisissez votre prix normal puis le prix réduit du pass pour chaque visiteur.'
-          : 'Putum nomol praes, then diskaon pas praes blong wanwan man.',
+          : 'exsampol. Adult (13+)',
     labelField:
-      language === 'en' ? 'Guest name' : language === 'fr' ? 'Libellé' : 'Nem',
+      language === 'en' ? 'Guest name' : language === 'fr' ? 'Libellé' : 'Adult',
     labelPlaceholder:
-      language === 'en' ? 'e.g. Adults (13+)' : language === 'fr' ? 'ex. Adultes (13+)' : 'ex. Adult (13+)',
+      language === 'en' ? 'e.g. Adults (13+)' : language === 'fr' ? 'ex. Adultes (13+)' : 'Pikinini',
     adults:
-      language === 'en' ? 'Adults' : language === 'fr' ? 'Adultes' : 'Adult',
+      language === 'en' ? 'Adults' : language === 'fr' ? 'Adultes' : 'Bebi',
     children:
-      language === 'en' ? 'Children' : language === 'fr' ? 'Enfants' : 'Pikinini',
+      language === 'en' ? 'Children' : language === 'fr' ? 'Enfants' : 'opsonal',
     infants:
-      language === 'en' ? 'Infants' : language === 'fr' ? 'Bébés' : 'Bebi',
+      language === 'en' ? 'Infants' : language === 'fr' ? 'Bébés' : 'Nomol praes (VT)',
     optionalTag:
-      language === 'en' ? 'optional' : language === 'fr' ? 'optionnel' : 'opsonal',
+      language === 'en' ? 'optional' : language === 'fr' ? 'optionnel' : 'Pas praes (VT)',
     orig:
-      language === 'en' ? 'Normal price (VT)' : language === 'fr' ? 'Prix normal (VT)' : 'Nomol praes (VT)',
+      language === 'en' ? 'Normal price (VT)' : language === 'fr' ? 'Prix normal (VT)' : 'Nomol praes — olgeta grup (VT)',
     deal:
-      language === 'en' ? 'Pass price (VT)' : language === 'fr' ? 'Prix du pass (VT)' : 'Pas praes (VT)',
+      language === 'en' ? 'Pass price (VT)' : language === 'fr' ? 'Prix du pass (VT)' : 'Pas praes — olgeta grup (VT)',
     origFlat:
-      language === 'en' ? 'Normal price — whole group (VT)' : language === 'fr' ? 'Prix normal — groupe entier (VT)' : 'Nomol praes — olgeta grup (VT)',
+      language === 'en' ? 'Normal price — whole group (VT)' : language === 'fr' ? 'Prix normal — groupe entier (VT)' : 'Pas praes',
     dealFlat:
-      language === 'en' ? 'Pass price — whole group (VT)' : language === 'fr' ? 'Prix du pass — groupe entier (VT)' : 'Pas praes — olgeta grup (VT)',
+      language === 'en' ? 'Pass price — whole group (VT)' : language === 'fr' ? 'Prix du pass — groupe entier (VT)' : 'Nem blong jata',
     passPriceLabel:
-      language === 'en' ? 'Pass price' : language === 'fr' ? 'Prix du pass' : 'Pas praes',
+      language === 'en' ? 'Pass price' : language === 'fr' ? 'Prix du pass' : 'exsampol. Private jata (5 pipol)',
     charterName:
-      language === 'en' ? 'Charter name' : language === 'fr' ? 'Nom du charter' : 'Nem blong charter',
+      language === 'en' ? 'Charter name' : language === 'fr' ? 'Nom du charter' : 'Min man',
     charterNamePlaceholder:
-      language === 'en' ? 'e.g. Private Charter (up to 5)' : language === 'fr' ? 'ex. Charter privé (jusqu\'à 5)' : 'ex. Private Charter (5 pipol)',
+      language === 'en' ? 'e.g. Private Charter (up to 5)' : language === 'fr' ? 'ex. Charter privé (jusqu\'à 5)' : 'Max man (opsonal)',
     minPax:
-      language === 'en' ? 'Min people' : language === 'fr' ? 'Min pers.' : 'Min man',
+      language === 'en' ? 'Min people' : language === 'fr' ? 'Min pers.' : 'Addem bebi praes',
     maxPax:
-      language === 'en' ? 'Max people (optional)' : language === 'fr' ? 'Max pers. (optionnel)' : 'Mak man (opsonal)',
+      language === 'en' ? 'Max people (optional)' : language === 'fr' ? 'Max pers. (optionnel)' : 'Addem praevet jata',
     addInfant:
-      language === 'en' ? 'Add infant price' : language === 'fr' ? 'Ajouter tarif bébé' : 'Addem bebi praes',
+      language === 'en' ? 'Add infant price' : language === 'fr' ? 'Ajouter tarif bébé' : 'Kivim',
     addCharter:
-      language === 'en' ? 'Add private charter' : language === 'fr' ? 'Ajouter charter privé' : 'Addem praevet charter',
+      language === 'en' ? 'Add private charter' : language === 'fr' ? 'Ajouter charter privé' : 'Sam moa opsen',
     remove:
-      language === 'en' ? 'Remove' : language === 'fr' ? 'Supprimer' : 'Kivim',
+      language === 'en' ? 'Remove' : language === 'fr' ? 'Supprimer' : 'Addem wan laen',
     advanced:
-      language === 'en' ? 'More options' : language === 'fr' ? 'Plus d’options' : 'Sam moa',
+      language === 'en' ? 'More options' : language === 'fr' ? 'Plus d’options' : 'Olgeta grup (flat praes)',
     freeformAdd:
-      language === 'en' ? 'Add price row' : language === 'fr' ? 'Ajouter une ligne' : 'Addem wan lain',
+      language === 'en' ? 'Add price row' : language === 'fr' ? 'Ajouter une ligne' : 'Private jata',
     charterTag:
-      language === 'en' ? 'Whole group (flat rate)' : language === 'fr' ? 'Groupe entier (tarif fixe)' : 'Olgeta grup (flat praes)',
+      language === 'en' ? 'Whole group (flat rate)' : language === 'fr' ? 'Groupe entier (tarif fixe)' : 'Serem',
   };
 
   useEffect(() => {
@@ -151,7 +151,7 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
 
   const addCharterTier = () => {
     const charterRow: PricingTierInput = {
-      label: language === 'en' ? 'Private Charter' : language === 'fr' ? 'Charter privé' : 'Private Charter',
+      label: language === 'en' ? 'Private Charter' : language === 'fr' ? 'Charter privé' : 'Plis jusum wan sta reting',
       min_pax: 1,
       max_pax: 5,
       original_price_vt: 0,

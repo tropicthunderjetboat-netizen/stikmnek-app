@@ -31,7 +31,7 @@ const WebsiteUrlInput: React.FC<WebsiteUrlInputProps> = ({
     <div className={className}>
       <label htmlFor={id} className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1.5">
         <Globe className="w-3 h-3 text-blue-500" />
-        {language === 'en' ? 'Website' : language === 'fr' ? 'Site Web' : 'Website'}
+        {language === 'en' ? 'Website' : language === 'fr' ? 'Site Web' : 'Yu no save riviu long bisinis blong yu yet.'}
       </label>
       <div className="flex rounded-xl border border-gray-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-purple-500">
         <span
@@ -65,7 +65,7 @@ const WebsiteUrlInput: React.FC<WebsiteUrlInputProps> = ({
           ? 'Your website or social page — no need to type https'
           : language === 'fr'
           ? 'Votre site ou page sociale — pas besoin de taper https'
-          : 'Website blong yu — no nid taep https'}
+          : 'Noka verifyem histori blong visit blong yu. Traem bakaken.'}
       </p>
     </div>
   );

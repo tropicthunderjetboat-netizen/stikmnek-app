@@ -858,7 +858,7 @@ const BusinessOwnerDashboard: React.FC = () => {
         ? 'Submit your first deal to go live — add photos, prices, and your discount.'
         : language === 'fr'
           ? 'Soumettez votre première offre pour être visible — photos, prix et réduction.'
-          : 'Submitim fes deal blong yu — foto, praes, mo diskaon.',
+          : 'Submitim fes dil blong yu — atem foto, praes, mo diskaon.',
     );
   }, [ownerDataLoading, businessOwnerNeedsFirstListing, language]);
 
@@ -1619,7 +1619,7 @@ const BusinessOwnerDashboard: React.FC = () => {
       ? [
           {
             key: 'profile' as const,
-            label: language === 'en' ? 'Business Profile' : language === 'fr' ? 'Profil entreprise' : 'Bisnis profail',
+            label: language === 'en' ? 'Business Profile' : language === 'fr' ? 'Profil entreprise' : 'Bisnis profael',
             icon: <Building2 className="w-5 h-5" />,
           },
           {
@@ -1653,13 +1653,13 @@ const BusinessOwnerDashboard: React.FC = () => {
           ? 'You have more than one live deal under this business. Choose which listing to update — no need to open the side menu.'
           : language === 'fr'
             ? 'Plusieurs annonces sont actives. Choisissez celle à modifier — sans passer par le menu.'
-            : 'Yu gat plante live dil. Pikim wan blong apdeit — no nid openem said menu.'
+            : 'Yu gat mo tan one live dil anta long bisnis ia. Jusum wij listing nao save blong apdeit — no nid blong openem saed menu.'
         : context === 'analytics'
           ? language === 'en'
             ? 'Analytics and charts below are for the listing you select here.'
             : language === 'fr'
               ? 'Les statistiques ci-dessous correspondent à l’annonce choisie ici.'
-              : 'Ol namba long daon i blong listing we yu pikim hia.'
+              : 'Ol namba long daon i blong listing we yu jusum ia.'
           : context === 'reviews'
             ? language === 'en'
               ? 'Reviews shown below are for this listing when reviews are linked to a specific deal.'
@@ -1670,7 +1670,7 @@ const BusinessOwnerDashboard: React.FC = () => {
               ? 'Photos below are for this listing’s gallery (each deal can have its own photos).'
               : language === 'fr'
                 ? 'Les photos ci-dessous sont celles de cette annonce (chaque offre peut avoir sa galerie).'
-                : 'Ol foto long daon i blong gallery blong listing ia (evri dil i save gat ol foto blong hem).';
+                : 'Ol foto  daon i blong gallery blong listing ia (evri dil i save gat ol foto blong hem).';
     return (
       <div className="mb-4 rounded-2xl border border-teal-100 bg-white p-4 shadow-sm">
         <label
@@ -2038,7 +2038,7 @@ const BusinessOwnerDashboard: React.FC = () => {
             {/* Description */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {language === 'en' ? 'Description' : language === 'fr' ? 'Description' : 'Description'}
+                {language === 'en' ? 'Description' : language === 'fr' ? 'Description' : 'Diskraepem'}
                 <span className="text-red-600 font-semibold" aria-hidden> *</span>
               </label>
               <div className={submitFieldErrors.description ? 'rounded-xl ring-2 ring-red-100 border border-red-200 overflow-hidden' : ''}>
@@ -2182,7 +2182,7 @@ const BusinessOwnerDashboard: React.FC = () => {
                   ? 'At least one photo or cover image is required. Previous uploads are restored when available.'
                   : language === 'fr'
                     ? 'Au moins une photo ou une image de couverture est requise. Les envois précédents sont restaurés si possible.'
-                    : 'Wan foto o kava i nidim. Ol foto bifo i save kam bake.'}
+                    : 'Atlas u nidim wan foto o kava pikja. Ol foto bifo i save kam bakeken.'}
               </p>
               <div className={submitFieldErrors.photos ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
                 <PhotoUploader
@@ -2385,14 +2385,14 @@ const BusinessOwnerDashboard: React.FC = () => {
               <div className="max-w-3xl mx-auto space-y-4">
                 <BusinessCredentialsSettings profileBusinessId={resolvedProfileBusinessId} />
                 <p className="text-center text-sm text-gray-500">
-                  {language === 'en' ? 'Need to change phone, email, or address?' : language === 'fr' ? 'Modifier téléphone, e-mail ou adresse ?' : 'Wan senisim fon o email?'}
+                  {language === 'en' ? 'Need to change phone, email, or address?' : language === 'fr' ? 'Modifier téléphone, e-mail ou adresse ?' : 'Nid blong jensem fon, emeil mo adres?'}
                   {' '}
                   <button
                     type="button"
                     onClick={() => setActiveTab('profile')}
                     className="font-semibold text-teal-700 hover:text-teal-800 underline-offset-2 hover:underline"
                   >
-                    {language === 'en' ? 'Open Business Profile' : language === 'fr' ? 'Ouvrir le profil entreprise' : 'Openem Bisnis profail'}
+                    {language === 'en' ? 'Open Business Profile' : language === 'fr' ? 'Ouvrir le profil entreprise' : 'Openem Bisnis profael'}
                   </button>
                 </p>
               </div>
@@ -2403,7 +2403,7 @@ const BusinessOwnerDashboard: React.FC = () => {
                   ? 'Save your business profile first, then you can upload credentials here.'
                   : language === 'fr'
                     ? 'Enregistrez d’abord votre profil entreprise.'
-                    : 'Save profail bisnis first.',
+                    : 'Sevem  profail blong bisnis fastaem mo save aplotem kretensel',
               )
             )}
             {activeTab === 'profile' && !resolvedProfileBusinessId && !ownerDataLoading && (
@@ -2412,7 +2412,7 @@ const BusinessOwnerDashboard: React.FC = () => {
                   ? 'Save your business profile first (complete setup), then you can update phone and contact details here.'
                   : language === 'fr'
                     ? 'Complétez d’abord votre profil entreprise.'
-                    : 'Save profail bisnis first.',
+                    : 'Sevem profael blong bisnis fastaem afta u save aptaetem fon mo kontak titels blong yu',
               )
             )}
             {/* Overview tab — pending business OR no businesses at all: show BusinessHomeScreen with 6 action buttons */}

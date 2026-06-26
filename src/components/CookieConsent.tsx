@@ -50,7 +50,7 @@ const CookieConsent: React.FC = () => {
                   ? 'We use cookies and analytics to enhance your experience, provide personalized deals, and analyze traffic. By clicking "Accept", you consent to our use of cookies and Google Analytics tracking in accordance with GDPR.'
                   : language === 'fr'
                   ? 'Nous utilisons des cookies et des analyses pour améliorer votre expérience, fournir des offres personnalisées et analyser le trafic. En cliquant sur "Accepter", vous consentez à notre utilisation des cookies et du suivi Google Analytics conformément au RGPD.'
-                  : 'Mifala i yusim kukis mo analytics blong mekem eksperiens blong yu i moa gud. Taem yu klikim "Akseptim", yu agri long yus blong kukis mo Google Analytics.'}
+                  : 'Mifala i yusim kukis mo analytics blong mekem eksperiens blong yu i moa gud. Taem yu klikim "Akseptem", yu agri long yus blong kukis mo Google Analytics.'}
               </p>
             </div>
           </div>
@@ -65,7 +65,7 @@ const CookieConsent: React.FC = () => {
               onClick={handleAccept}
               className="flex-1 sm:flex-none px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium hover:bg-teal-700 transition-colors"
             >
-              {language === 'en' ? 'Accept' : language === 'fr' ? 'Accepter' : 'Akseptim'}
+              {language === 'en' ? 'Accept' : language === 'fr' ? 'Accepter' : 'Akseptem'}
             </button>
           </div>
         </div>

@@ -130,13 +130,13 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     ...(hasBusinessProfile
       ? [
           {
-            label: language === 'en' ? 'Business Profile' : language === 'fr' ? 'Profil entreprise' : 'Bisnis profail',
+            label: language === 'en' ? 'Business Profile' : language === 'fr' ? 'Profil entreprise' : 'Bisnis profael',
             description:
               language === 'en'
                 ? 'Phone, email, address'
                 : language === 'fr'
                   ? 'Téléphone, e-mail, adresse'
-                  : 'Fon, email, adres',
+                  : 'Fon, emeil, adres',
             icon: <Phone className="w-7 h-7" />,
             gradient: 'from-cyan-500 to-teal-600',
             shadowColor: 'shadow-cyan-200/60',
@@ -150,7 +150,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                 ? 'Licence, insurance, permits'
                 : language === 'fr'
                   ? 'Licence, assurance, permis'
-                  : 'Permit, insurance, sertifikat',
+                  : 'Permit, insurens, sertifiket',
             icon: <ShieldCheck className="w-7 h-7" />,
             gradient: 'from-violet-500 to-indigo-600',
             shadowColor: 'shadow-violet-200/60',

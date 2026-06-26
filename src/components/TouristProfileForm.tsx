@@ -82,76 +82,76 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
         ? 'Complete your traveller profile'
         : language === 'fr'
           ? 'Complétez votre profil voyageur'
-          : 'Komplitim profil blong yu',
+          : 'Namba blong ol man (13 yia mo antap)',
     subtitle:
       language === 'en'
         ? 'Help us tailor deals and reach you the way you prefer.'
         : language === 'fr'
           ? 'Aidez-nous à personnaliser les offres et à vous joindre comme vous préférez.'
-          : 'Helpem mifala blong givim dils mo kontakt yu long we yu laik.',
+          : 'Namba blong pikinini (5–12)',
     adults:
       language === 'en'
         ? 'Number of adults (13 yrs and above)'
         : language === 'fr'
           ? 'Nombre d’adultes (13 ans et plus)'
-          : 'Namba blong ol man (13 yia mo antap)',
+          : 'Namba blong smol pikinini (0–4)',
     children:
       language === 'en'
         ? 'Number of children (5–12 years)'
         : language === 'fr'
           ? 'Nombre d’enfants (5–12 ans)'
-          : 'Namba blong pikinini (5–12)',
+          : 'Wei blong kontakt',
     infants:
       language === 'en'
         ? 'Number of infants (0–4 years)'
         : language === 'fr'
           ? 'Nombre de bébés (0–4 ans)'
-          : 'Namba blong smol pikinini (0–4)',
+          : 'Putum detels blong we yu laikem blong oli save kontaktem u long hem.',
     contact:
       language === 'en'
         ? 'Preferred contact method'
         : language === 'fr'
           ? 'Moyen de contact préféré'
-          : 'We blong kontakt',
+          : 'Imel blong yu',
     contactHint:
       language === 'en'
         ? 'Enter the details for how you prefer to be reached.'
         : language === 'fr'
           ? 'Saisissez les coordonnées pour votre moyen de contact choisi.'
-          : 'Putum detaels blong we yu laik long kontakt.',
+          : 'Namba WhatsApp blong yu',
     emailLabel:
-      language === 'en' ? 'Your email' : language === 'fr' ? 'Votre e-mail' : 'Imel blong yu',
+      language === 'en' ? 'Your email' : language === 'fr' ? 'Votre e-mail' : 'Fon namba blong yu',
     waLabel:
-      language === 'en' ? 'Your WhatsApp number' : language === 'fr' ? 'Votre numéro WhatsApp' : 'Namba WhatsApp blong yu',
+      language === 'en' ? 'Your WhatsApp number' : language === 'fr' ? 'Votre numéro WhatsApp' : 'Wea yu stap? (Nem blong resot)',
     phoneLabel:
-      language === 'en' ? 'Your phone number' : language === 'fr' ? 'Votre numéro de téléphone' : 'Fon namba blong yu',
+      language === 'en' ? 'Your phone number' : language === 'fr' ? 'Votre numéro de téléphone' : 'Ful nem',
     resort:
       language === 'en'
         ? 'Where are you staying? (Resort name)'
         : language === 'fr'
           ? 'Où séjournez-vous ? (nom de l’hôtel/résidence)'
-          : 'We yu stap? (Nem blong resot)',
+          : 'Dei blong kam',
     fullName:
       language === 'en'
         ? 'Full name'
         : language === 'fr'
           ? 'Nom complet'
-          : 'Ful nem',
+          : 'Dei blong lego ples ia',
     arrival:
       language === 'en'
         ? 'Expected arrival date'
         : language === 'fr'
           ? 'Date d’arrivée prévue'
-          : 'Dei blong kam',
+          : 'Sevem profael',
     departure:
       language === 'en'
         ? 'Expected departure date'
         : language === 'fr'
           ? 'Date de départ prévue'
-          : 'Dei blong lego',
+          : 'Biaen',
     submit:
-      language === 'en' ? 'Save profile' : language === 'fr' ? 'Enregistrer' : 'Sevem profil',
-    skip: language === 'en' ? 'Later' : language === 'fr' ? 'Plus tard' : 'Bihain',
+      language === 'en' ? 'Save profile' : language === 'fr' ? 'Enregistrer' : 'Plis putum ful nem.',
+    skip: language === 'en' ? 'Later' : language === 'fr' ? 'Plus tard' : 'Plis selektem dei blong kam.',
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -164,7 +164,7 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
       const nameTrim = fullName.trim();
 
       if (!nameTrim) {
-        toast.error(language === 'en' ? 'Please enter your full name.' : language === 'fr' ? 'Entrez votre nom.' : 'Plis putum ful nem.');
+        toast.error(language === 'en' ? 'Please enter your full name.' : language === 'fr' ? 'Entrez votre nom.' : 'Plis selektem dei blong aot');
         return;
       }
       if (preferredContact === 'email' && !emailTrim) {
@@ -183,11 +183,11 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
       }
 
       if (!expectedArrivalDate) {
-        toast.error(language === 'en' ? 'Please select your arrival date.' : language === 'fr' ? 'Sélectionnez votre date d’arrivée.' : 'Plis selektem dei blong kam.');
+        toast.error(language === 'en' ? 'Please select your arrival date.' : language === 'fr' ? 'Sélectionnez votre date d’arrivée.' : 'Dei blong aot i mas biaen o semak long dei blong kam.');
         return;
       }
       if (!expectedDepartureDate) {
-        toast.error(language === 'en' ? 'Please select your departure date.' : language === 'fr' ? 'Sélectionnez votre date de départ.' : 'Plis selektem dei blong lego.');
+        toast.error(language === 'en' ? 'Please select your departure date.' : language === 'fr' ? 'Sélectionnez votre date de départ.' : 'Profil i sev!');
         return;
       }
       if (expectedDepartureDate < expectedArrivalDate) {
@@ -196,7 +196,7 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
             ? 'Departure date must be on or after your arrival date.'
             : language === 'fr'
               ? 'La date de départ doit être après la date d’arrivée.'
-              : 'Dei blong lego i mas biaen o semak long dei blong kam.',
+              : 'Websaet',
         );
         return;
       }
@@ -224,7 +224,7 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
         .eq('user_id', userId);
 
       if (error) throw error;
-      toast.success(language === 'en' ? 'Profile saved!' : language === 'fr' ? 'Profil enregistré !' : 'Profil i sevem!');
+      toast.success(language === 'en' ? 'Profile saved!' : language === 'fr' ? 'Profil enregistré !' : 'Website blong yu — no nid taep https');
       onSuccess();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to save';

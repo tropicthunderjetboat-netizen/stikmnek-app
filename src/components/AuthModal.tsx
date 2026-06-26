@@ -221,7 +221,7 @@ const AuthModal: React.FC = () => {
                     ? 'Discover deals, buy discount passes, and save money while exploring Vanuatu.'
                     : language === 'fr'
                       ? 'Découvrez des offres, achetez des pass et économisez en explorant le Vanuatu.'
-                      : 'Faenem dils, baem diskount pas, mo sevem mani taem yu eksploarem Vanuatu.'}
+                      : 'Faenem dils, pem diskount pas, mo sevem mani taem yu eksploarem Vanuatu.'}
                 </p>
                 <div className="flex flex-wrap gap-2 mt-3">
                   <span className="px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 text-[11px] font-semibold">Discount Passes</span>
@@ -310,7 +310,7 @@ const AuthModal: React.FC = () => {
                   ? "If an account exists for that email, you will receive a password reset link. Check your spam folder if you don't see it."
                   : language === 'fr'
                     ? "Si un compte existe pour cet email, vous recevrez un lien. Vérifiez vos spams si vous ne le voyez pas."
-                    : 'Sapos gat akaont long email ia, bae yu karem link. Lukim spam folder.'}
+                    : 'Sapos gat wan akaont long email ia, bae yu karem link. Lukim spam folder spos yu no luk email yah.'}
               </p>
               <button
                 type="button"
@@ -466,8 +466,8 @@ const AuthModal: React.FC = () => {
             {authMode === 'signin'
               ? (language === 'en' ? 'Sign In' : language === 'fr' ? 'Se connecter' : 'Saen In')
               : isBizSignup
-                ? (language === 'en' ? 'Create Business Account' : language === 'fr' ? 'Créer un compte entreprise' : 'Mekem Bisnis Akaont')
-                : (language === 'en' ? 'Create Tourist Account' : language === 'fr' ? 'Créer un compte touriste' : 'Mekem Turis Akaont')}
+                ? (language === 'en' ? 'Create Business Account' : language === 'fr' ? 'Créer un compte entreprise' : 'Mekem wan Bisnis Akaont')
+                : (language === 'en' ? 'Create Tourist Account' : language === 'fr' ? 'Créer un compte touriste' : 'Mekem wan Turis Akaont')}
           </button>
 
           <p className="text-center text-sm text-gray-500">
@@ -518,14 +518,14 @@ const AuthModal: React.FC = () => {
             ? 'Sign in or create a StikmNek account'
             : language === 'fr'
               ? 'Connexion ou création de compte StikmNek'
-              : 'Saen in o mekem akaont StikmNek'}
+              : 'Saen in o mekem wan akaont StikmNek'}
         </DialogTitle>
         <DialogDescription className="sr-only">
           {language === 'en'
             ? 'Choose how to sign in or create an account, then enter your email and password.'
             : language === 'fr'
               ? 'Choisissez comment vous connecter ou créer un compte, puis saisissez votre e-mail et votre mot de passe.'
-              : 'Jusum we blong saen in o mekem akaont, afta putum email mo paswod.'}
+              : 'Jusum ao blong saen in o mekem akaont, afta putum email mo paswod.'}
         </DialogDescription>
         {isChooseType
           ? renderChooseType()

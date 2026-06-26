@@ -70,7 +70,7 @@ const PassCards: React.FC<PassCardsProps> = ({ embeddedOnHome = false }) => {
         <div className="text-center mb-6 sm:mb-14">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 border border-teal-100 text-teal-700 text-xs sm:text-sm font-semibold mb-3 sm:mb-4">
             <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            {language === 'en' ? 'Tourist Pass' : language === 'fr' ? 'Pass touriste' : 'Turis Pas'}
+            {language === 'en' ? 'Tourist Pass' : language === 'fr' ? 'Pass touriste' : 'Smol infomesen i helpem mifala blong givim dils mo kontaktem yu.'}
           </div>
           <div className="text-center mb-4 sm:mb-6">
             <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-gray-900 leading-tight">

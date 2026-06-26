@@ -7,17 +7,17 @@ TR-0005,Dashboard,Tableau de bord,Dasbod,table: nav.dashboard
 TR-0006,Admin,Admin,Admin,table: nav.admin
 TR-0007,Sign In,Connexion,Saen In,table: nav.signin
 TR-0008,Sign Out,Déconnexion,Saen Aot,table: nav.signout
-TR-0009,Discover Vanuatu's Best Deals,Découvrez les meilleures offres du Vanuatu,Saen Aot,table: hero.title
+TR-0009,Discover Vanuatu's Best Deals,Découvrez les meilleures offres du Vanuatu,Faenem Bes Dils blong Vanuatu,table: hero.title
 TR-0010,"Unlock exclusive discounts up to 35% on dining, tours, and activities. Join thousands of happy travelers and local businesses.","Profitez de réductions exclusives jusqu'à 35 % sur la restauration, les visites et les activités. Rejoignez des milliers de voyageurs et d'entreprises locales satisfaits.","Openem eksklusiv diskaon kasem 35% long kakae, tua, mo aktiviti. Joinem tausen blong hapi turis mo lokal bisnis.",table: hero.subtitle
-TR-0011,Sign Up & Get Deals,Inscrivez-vous et profitez des offres,Saen Ap & Karem Dils,table: hero.ctaTourist
-TR-0012,List Your Business (Free),Inscrivez votre entreprise (gratuit),Listem Bisnis Blong Yu (Fri),table: hero.ctaBusiness
+TR-0011,Sign Up & Get Deals,Inscrivez-vous et profitez des offres,Saen Ap mo Karem Dils,table: hero.ctaTourist
+TR-0012,List Your Business (Free),Inscrivez votre entreprise (gratuit),List blong Bisnis Blong Yu (Fri),table: hero.ctaBusiness
 TR-0013,Own a business?,Vous avez un commerce ?,Yu gat bisnis?,table: hero.businessOwnersHint
 TR-0014,Get Your Pass,Obtenez votre pass,Karem Pas Blong Yu,table: hero.cta
-TR-0015,Explore Deals,Explorer les offres,Eksploarem Dils,table: hero.explore
+TR-0015,Explore Deals,Explorer les offres,Eksploarem lo Dils,table: hero.explore
 TR-0016,Browse deals,Voir les offres,Lukim ol dils,table: hero.browseDeals
-TR-0017,Welcome back — find your next deal,Bon retour — trouvez votre prochaine offre,Welkam bak — faenem nix dils,table: hero.welcomeBack
-TR-0018,Local Businesses,Entreprises locales,Lokal Bisnis,table: hero.businesses
-TR-0019,Average Savings,Économies moyennes,Averej Sevin,table: hero.savings
+TR-0017,Welcome back — find your next deal,Bon retour — trouvez votre prochaine offre,Welkam bak — faenem nex dils blong yu,table: hero.welcomeBack
+TR-0018,Local Businesses,Entreprises locales,Lokol Bisnis,table: hero.businesses
+TR-0019,Average Savings,Économies moyennes,Averej Sevings,table: hero.savings
 TR-0020,Happy Tourists,Touristes satisfaits,Hapi Turis,table: hero.tourists
 TR-0021,All,Tout,Olgeta,table: cat.all
 TR-0022,Dining,Restauration,Kakae,table: cat.dining
@@ -25,141 +25,141 @@ TR-0023,Activities,Activités,Aktiviti,table: cat.activities
 TR-0024,Tours,Visites,Tua,table: cat.tours
 TR-0025,Transportation,Transport,Transport,table: cat.transportation
 TR-0026,Shopping,Shopping,Soping,table: cat.shopping
-TR-0027,Spa & Wellness,Spa & Bien-être,Spa & Helt,table: cat.spa
+TR-0027,Spa & Wellness,Spa & Bien-être,Spa mo Helt,table: cat.spa
 TR-0028,Accommodation,Hébergement,Ples blong slip,table: cat.accommodation
-TR-0029,Build your Pass,Construisez votre pass,Mekem Pasem,table: pass.title
-TR-0030,Customize your adventure with flexible pricing,Personnalisez votre aventure avec une tarification flexible,Kostomem yor travel long fleksibel pricing,table: pass.subtitle
+TR-0029,Build your Pass,Construisez votre pass,Mekem Pas blo yu,table: pass.title
+TR-0030,Customize your adventure with flexible pricing,Personnalisez votre aventure avec une tarification flexible,mekem gud  travel blong yu wetem ol fleksibol praeses,table: pass.subtitle
 TR-0031,Build your Pass,Construisez votre pass,Mekem Pasem,table: passSelection.title
-TR-0032,Customize your adventure with flexible pricing,Personnalisez votre aventure avec une tarification flexible,Kostomem yor travel long fleksibel pricing,table: passSelection.subtitle
-TR-0033,"Sign up, add how many people are travelling, your travel dates, pay with a credit card, and start saving.","Inscrivez-vous, indiquez le nombre de participants, vos dates de voyage, payez par carte de crédit, et commencez à économiser.","Sign ap, putem hu mas i travelem, dat blong trip, pei wetem kredit kad, mo stat sevem.",table: pass.build_how_desc
+TR-0032,Customize your adventure with flexible pricing,Personnalisez votre aventure avec une tarification flexible,mekem gud  travel blong yu wetem ol fleksibol praeses,table: passSelection.subtitle
+TR-0033,"Sign up, add how many people are travelling, your travel dates, pay with a credit card, and start saving.","Inscrivez-vous, indiquez le nombre de participants, vos dates de voyage, payez par carte de crédit, et commencez à économiser.","Sign ap, putum hu mas travelem, tet blong trip, pem wetem kredit kad, mo statem seving.",table: pass.build_how_desc
 TR-0034,Choose your adventure,Choisissez votre aventure,Jusum adventja blong yu,table: passPricing.page_title
 TR-0035,One pass — premium deals across Vanuatu.,Un pass — offres premium partout au Vanuatu.,Wan pas — premium dils long Vanuatu.,table: passPricing.page_subtitle
 TR-0036,A$__BASE__ 1st guest + A$__GUEST__/extra (6+) · Under 6 free · max __MAX__/pass,__BASE__ $ 1re pers. + __GUEST__ $/supp. (6+) · -6 ans gratuits · max __MAX__/pass,A$__BASE__ fes + A$__GUEST__/narafala (6+) · under 6 fri · mak __MAX__/pas,table: passPricing.pricing_micro
 TR-0037,1 day,1 jour,1 dei,table: passPricing.card_1d_title
-TR-0038,24h access,Accès 24 h,24 owa,table: passPricing.card_1d_hint
+TR-0038,24h access,Accès 24 h,24 aoa akses,table: passPricing.card_1d_hint
 TR-0039,7 days,7 jours,7 dei,table: passPricing.card_7d_title
 TR-0040,Holiday pass,Pass vacances,Holiday pas,table: passPricing.card_7d_hint
-TR-0041,Best value,Meilleur rapport,Bes wolju,table: passPricing.badge_best_value
-TR-0042,35% off,-35%,35% of,table: passPricing.chip_35
+TR-0041,Best value,Meilleur rapport,Bes valiu,table: passPricing.badge_best_value
+TR-0042,35% off,-35 %,karemaot 35% ,table: passPricing.chip_35
 TR-0043,Maps,Cartes,Map,table: passPricing.chip_map
 TR-0044,QR,QR,QR,table: passPricing.chip_qr
-TR-0045,35% Off,-35%,35% Of,table: passPricing.chip_row_35
-TR-0046,Live Map,Carte live,Map laev,table: passPricing.chip_row_map
+TR-0045,35% Off,-35 %,35% Of,table: passPricing.chip_row_35
+TR-0046,Live Map,Carte live,laev Map,table: passPricing.chip_row_map
 TR-0047,Fast QR,QR rapide,QR fas,table: passPricing.chip_row_qr
-TR-0048,"Buy 1 week, get ","Achetez 1 semaine, ","Bae wan wik, ",table: passPricing.holiday_ribbon_prefix
-TR-0049,1 WEEK FREE,LA 2E SEMAINE GRATUITE,1 WIK FREE,table: passPricing.holiday_ribbon_emphasis
-TR-0050,7-Day Holiday Pass,Pass vacances 7 jours,Holiday pas 7 dei,table: passPricing.holiday_ribbon_title
+TR-0048,"Buy 1 week, get ","Achetez 1 semaine, ","pem  wan wik, ",table: passPricing.holiday_ribbon_prefix
+TR-0049,1 WEEK FREE,LA 2E SEMAINE GRATUITE,1 WIK FRI,table: passPricing.holiday_ribbon_emphasis
+TR-0050,7-Day Holiday Pass,Pass vacances 7 jours,Holiday pas blong 7 deis,table: passPricing.holiday_ribbon_title
 TR-0051,"A$__BASE__ first guest (ages 6+), then A$__GUEST__ each additional guest up to __MAX__ per pass. Children under 6 are free.","__BASE__ $ 1re pers. (6 ans et +), puis __GUEST__ $ par invité supplémentaire jusqu’à __MAX__ / pass. Enfants de moins de 6 ans gratuits.","A$__BASE__ fes (6 yia mo antap), mo A$__GUEST__ long evri narafala man kasem __MAX__/pas. Pikinini andanit long 6 yia i fri.",table: passPricing.simple_header
-TR-0052,People (ages 6+),Personnes (6 ans et +),Man (6+),table: passPricing.people_label
-TR-0053,Coverage,Couverture,Kava,table: passPricing.coverage_label
-TR-0054,Max __N__ per pass,Max __N__ par pass,Maksem __N__ long wan pas,table: passPricing.max_per_pass
+TR-0052,People (ages 6+),Personnes (6 ans et +),ol bikinini weh (ages 6 yia  iko antap),table: passPricing.people_label
+TR-0053,Coverage,Couverture,Kavarej,table: passPricing.coverage_label
+TR-0054,Max __N__ per pass,Max __N__ par pass,Max __N__ wan  pas,table: passPricing.max_per_pass
 TR-0055,1 day,1 jour,1 dei,table: passPricing.duration_1d
 TR-0056,7 days,7 jours,7 dei,table: passPricing.duration_7d
 TR-0057,Total,Total,Total,table: passPricing.total_label
-TR-0058,"With __COUNT__ people, you could save A$__SAVE__ on your first day alone!","Avec __COUNT__ personnes, vous pourriez économiser __SAVE__ $ AUD rien que le premier jour !","Wet __COUNT__ man, yu save kasem A$__SAVE__ long fes dei nomo!",table: passPricing.savings_anchor
-TR-0059,"Buy 1 week, get 1 week FREE","Achetez 1 semaine, la 2e semaine est GRATUITE","Bae wan wik, karem narafala wik fri",table: passPricing.holiday_headline
-TR-0060,7-day Holiday Pass + share the app after purchase to unlock your second week of deals.,Pass vacances 7 jours + partagez l’app après l’achat pour débloquer votre 2e semaine d’offres.,Holiday pas 7 dei + share app afta bai blong anlokem wik 2 blong dils.,table: passPricing.holiday_sub
+TR-0058,"With __COUNT__ people, you could save A$__SAVE__ on your first day alone!","Avec __COUNT__ personnes, vous pourriez économiser __SAVE__ $ AUD rien que le premier jour !",Wetem __COUNT__ man i  save sevem  A$__SAVEM__ long fes dei  blong u nomo!,table: passPricing.savings_anchor
+TR-0059,"Buy 1 week, get 1 week FREE","Achetez 1 semaine, la 2e semaine est GRATUITE","pem wan wik, karem narafala wik fri",table: passPricing.holiday_headline
+TR-0060,7-day Holiday Pass + share the app after purchase to unlock your second week of deals.,Pass vacances 7 jours + partagez l’app après l’achat pour débloquer votre 2e semaine d’offres., 7 dei holiday blong  yu + serem app afta bai pem blong anlokem wik 2 blong dils.,table: passPricing.holiday_sub
 TR-0061,Up to 35% off meals & tours,Jusqu’à 35 % sur repas & visites,Kasem 35% of long kakae mo tua,table: passPricing.included_meals
-TR-0062,Interactive map & savings tracker,Carte interactive & suivi des économies,Map we i laev + traeka blong saving,table: passPricing.included_map
-TR-0063,Instant QR redemption,Utilisation QR instantanée,QR i redim stretwe,table: passPricing.included_qr
-TR-0064,Purchase pass,Acheter le pass,Baem pas,table: passPricing.purchase
+TR-0062,Interactive map & savings tracker,Carte interactive & suivi des économies,laev Map + saving tracker blong u,table: passPricing.included_map
+TR-0063,Instant QR redemption,Utilisation QR instantanée,QR i redim stret weh,table: passPricing.included_qr
+TR-0064,Purchase pass,Acheter le pass,Pemm pas,table: passPricing.purchase
 TR-0065,Active pass,Pass actif,Pas i aktiv,table: passPricing.purchase_locked
 TR-0066,+A$15 · 7-day unlock,+15 $ AUD · déblocage 7 j.,+A$15 · 7-dei anlok,table: passPricing.holiday_addon_micro
-TR-0067,Decrease party size,Réduire le nombre de personnes,Lesen namba blong man,table: passPricing.aria_decrease_party
-TR-0068,Increase party size,Augmenter le nombre de personnes,Ap nemba blong man,table: passPricing.aria_increase_party
-TR-0069,2nd Week FREE!,2e semaine OFFERTE !,Wik 2 FREE!,table: passPricing.value_2nd_week_headline
-TR-0070,Secure payment,Paiement sécurisé,Sekua pem,table: passPricing.cta_secure_line
-TR-0071,7-Day Holiday Pass,Pass vacances 7 jours,Holiday pas 7 dei,table: passPricing.card_header_holiday
-TR-0072,Our signature pass for longer stays — best value.,Notre pass signature pour les longs séjours — le meilleur rapport.,Signature pas blong long taem — bes wolju.,table: passPricing.coverage_helper_7d
-TR-0073,Staying a week or more? Choose 7 days — 2nd week free.,Une semaine ou plus ? Choisissez 7 jours — 2e semaine offerte.,Wan wik o moa? Josen 7 dei — wik 2 fri.,table: passPricing.coverage_nudge_7d
-TR-0074,Quick port visit? Day pass still includes full in-app savings.,Escale courte ? Le pass 1 jour garde toutes les économies dans l’app.,Sot taem long po? Wan-dei pas i gat ful saving insaed app.,table: passPricing.port_stay_hint
-TR-0075,1-Day Pass,Pass 1 jour,Pas wan dei,table: passPricing.hero_1d_title
-TR-0076,Full deal access for one calendar day.,Accès aux offres pour un jour calendaire.,Ful akses long dils long wan kalenda dei.,table: passPricing.hero_1d_sub
-TR-0077,Secure checkout,Paiement sécurisé,Sekua pem,table: passPricing.secure_pay_micro
+TR-0067,Decrease party size,Réduire le nombre de personnes,Inkrisim  namba blong man,table: passPricing.aria_decrease_party
+TR-0068,Increase party size,Augmenter le nombre de personnes,Inkrisim namba blong man,table: passPricing.aria_increase_party
+TR-0069,2nd Week FREE!,2e semaine OFFERTE !,Wik 2 FRI!,table: passPricing.value_2nd_week_headline
+TR-0070,Secure payment,Paiement sécurisé,Sekurum pemen,table: passPricing.cta_secure_line
+TR-0071,7-Day Holiday Pass,Pass vacances 7 jours, 7 dei Holidei pas,table: passPricing.card_header_holiday
+TR-0072,Our signature pass for longer stays — best value.,Notre pass signature pour les longs séjours — le meilleur rapport.,Signature pas blong long taem stay — bes valiu.,table: passPricing.coverage_helper_7d
+TR-0073,Staying a week or more? Choose 7 days — 2nd week free.,Une semaine ou plus ? Choisissez 7 jours — 2e semaine offerte.,Stap wan wik o moa? Jusum 7 dei — wik 2 i fri.,table: passPricing.coverage_nudge_7d
+TR-0074,Quick port visit? Day pass still includes full in-app savings.,Escale courte ? Le pass 1 jour garde toutes les économies dans l’app.,Sot taem long port? Wan-dei pas i gat ful saving insaed long app.,table: passPricing.port_stay_hint
+TR-0075,1-Day Pass,Pass 1 jour,Pas blong wan dei,table: passPricing.hero_1d_title
+TR-0076,Full deal access for one calendar day.,Accès aux offres pour un jour calendaire.,Ful akses long dils blong wan kalenda dei.,table: passPricing.hero_1d_sub
+TR-0077,Secure checkout,Paiement sécurisé,Sekurum  jek aot,table: passPricing.secure_pay_micro
 TR-0078,Price breakdown,Détail du prix,Prais brekdaon,table: checkout.breakdown_title
 TR-0079,Base pass (1st person ages 6+),"Pass de base (1re personne, 6 ans et +)",Bes pas (fes man 6+),table: checkout.base_pass_row
 TR-0080,Additional guests (__COUNT__ × A$__FEE__),Invités supplémentaires (__COUNT__ × __FEE__ $ AUD),Narafala man (__COUNT__ × A$__FEE__),table: checkout.extra_guests_row
-TR-0081,Guests 2–6 (__COUNT__ × A$__FEE__),Personnes 2 à 6 (__COUNT__ × __FEE__ $ AUD),Man 2–6 (__COUNT__ × A$__FEE__),table: checkout.extra_guests_2_6_row
+TR-0081,Guests 2–6 (__COUNT__ × A$__FEE__),Personnes 2 à 6 (__COUNT__ × __FEE__ $ AUD),Ol man 2–6 (__COUNT__ × A$__FEE__),table: checkout.extra_guests_2_6_row
 TR-0082,"From 7th guest (__COUNT__ people, slots 7–__P__)","À partir de la 7e personne (__COUNT__ pers., places 7–__P__)","Long 7fala man (__COUNT__ man, slot 7–__P__)",table: checkout.extra_guests_from_7_row
 TR-0083,Whole-trip option (+A$15),Option « tout le séjour » (+15 $ AUD),Opsen long ful trip (+A$15),table: checkout.extension_row
 TR-0084,Total,Total,Total,table: checkout.total_row
-TR-0085,💰 Potential savings: about A$__AMOUNT__+ on meals & tours — this pass can pay for itself.,💰 Économies potentielles : environ __AMOUNT__ $ AUD+ sur repas et visites — ce pass peut se rentabiliser.,💰 Saving we i save: kasem A$__AMOUNT__+ long kakae mo tua — dis pas i save pei bake.,table: checkout.potential_savings
-TR-0086,"With 1 person, you could save over ","Avec 1 personne, vous pourriez économiser plus de ","Wet wan man, yu save kasem ",table: checkout.savings_before_one
-TR-0087,"With __COUNT__ people, you could save over ","Avec __COUNT__ personnes, vous pourriez économiser plus de ","Wet __COUNT__ man, yu save kasem ",table: checkout.savings_before_many
+TR-0085,💰 Potential savings: about A$__AMOUNT__+ on meals & tours — this pass can pay for itself.,💰 Économies potentielles : environ __AMOUNT__ $ AUD+ sur repas et visites — ce pass peut se rentabiliser.,💰 Saving we i save: kasem A$__AMOUNT__+ long kakae mo tua — pas ia u pem blong yu wan.,table: checkout.potential_savings
+TR-0086,"With 1 person, you could save over ","Avec 1 personne, vous pourriez économiser plus de ","Wetem wan man, yu save sevem ova",table: checkout.savings_before_one
+TR-0087,"With __COUNT__ people, you could save over ","Avec __COUNT__ personnes, vous pourriez économiser plus de ","Wetem __COUNT__ man, yu save sevem ",table: checkout.savings_before_many
 TR-0088, on a single meal or tour, sur un repas ou une visite, long wan kakae o wan tua,table: checkout.savings_after_amount
-TR-0089,This pass pays for itself immediately!,Ce pass se rentabilise immédiatement !,Dis pas i pei bake stret!,table: checkout.savings_subline
-TR-0090,From your registration,D’après votre inscription,Long rejistresen,table: checkout.profile_party_title
+TR-0089,This pass pays for itself immediately!,Ce pass se rentabilise immédiatement !,Long kaen pas ia emi pem em wan ariap nmo!,table: checkout.savings_subline
+TR-0090,From your registration,D’après votre inscription,Long rejistresen blong yu,table: checkout.profile_party_title
 TR-0091,"__ADULTS__ adults, __CHILDREN__ children (6+), __INFANTS__ under 6 / infants (free). Paying party for this pass: __PARTY__.","__ADULTS__ adultes, __CHILDREN__ enfants (6+), __INFANTS__ moins de 6 ans / bébés (gratuit). Groupe payant pour ce pass : __PARTY__.","__ADULTS__ bigman, __CHILDREN__ pikinini (6+), __INFANTS__ under 6 / infen (fri). Grup blong pem: __PARTY__.",table: checkout.profile_party_line
 TR-0092,1-day discounts,Réductions 1 jour,Diskaun wan dei,table: checkout.option_day_title
-TR-0093,Short visit — discounts on one calendar day you choose.,Courte visite — réductions sur un jour calendaire au choix.,Sot visit — diskount long wan kalenda dei yu josem.,table: checkout.option_day_desc
+TR-0093,Short visit — discounts on one calendar day you choose.,Courte visite — réductions sur un jour calendaire au choix.,Sot visit — diskount long wan kalenda dei yu jusum.,table: checkout.option_day_desc
 TR-0094,Whole trip (+A$15),Tout le séjour (+15 $ AUD),Ful trip (+A$15),table: checkout.option_extended_title
-TR-0095,Covers longer visits — __CAL__ calendar days of deal access from your start date.,Pour les séjours plus longs — __CAL__ jours calendaires d’accès aux offres à partir de la date de début.,Long visit we i long — __CAL__ kalenda dei blong akses long ol dils long det blong stat.,table: checkout.option_extended_desc
-TR-0096,Recommended for your __NIGHTS__-night stay,Recommandé pour un séjour de __NIGHTS__ nuits,Rekomendem blong __NIGHTS__ naet yu stap,table: checkout.option_extended_badge
+TR-0095,Covers longer visits — __CAL__ calendar days of deal access from your start date.,Pour les séjours plus longs — __CAL__ jours calendaires d’accès aux offres à partir de la date de début.,I kafaremap visit we i longfala — __CAL__ kalenda dei blong akses long ol dils long det blong stat.,table: checkout.option_extended_desc
+TR-0096,Recommended for your __NIGHTS__-night stay,Recommandé pour un séjour de __NIGHTS__ nuits,Rekomendem blong __NIGHTS__ naet weh yu stap,table: checkout.option_extended_badge
 TR-0097,Total,Total,Total,table: checkout.option_total
 TR-0098,"Pick who is covered (ages 6+), choose a 24-hour day pass or 7-day holiday pass, then your start date. Under-6 children travel free with your group.","Choisissez qui est couvert (6 ans +), pass 24 h ou pass vacances 7 jours, puis la date de début. Les moins de 6 ans voyagent gratuitement.","Jusum hu i kava (6+), wan dei pas o 7 dei holiday pas, mo det blong stat. Pikinini under 6 i fri wetem grup.",table: checkout.how_it_works_compact
 TR-0099,Your pass,Votre pass,Pas blong yu,table: checkout.party_summary_label
 TR-0100,Pass for __N__ people (ages 6+),Pass pour __N__ personnes (6 ans et +),Pas blong __N__ man (6+),table: checkout.party_summary_line
-TR-0101,Edit,Modifier,Senis,table: checkout.party_edit
+TR-0101,Edit,Modifier,jensem,table: checkout.party_edit
 TR-0102,Done,Terminé,Finis,table: checkout.party_done
 TR-0103,Choose plan,Choisir le forfait,Jusum plan,table: checkout.plan_pick_title
-TR-0104,24-Hour Day Pass,Pass 24 heures,Pas 24 Awa,table: checkout.plan_day_title
-TR-0105,Great for cruise ships and short stops.,Idéal pour les croisières et les escales courtes.,Bes blong kruz sip mo sot stop.,table: checkout.plan_day_sub
-TR-0106,7-Day Holiday Pass,Pass vacances 7 jours,Holiday Pas 7 Dei,table: checkout.plan_holiday_title
-TR-0107,Best for stayover visitors — 7 calendar days of deal access (+A$15). Share the app after purchase for 7 extra days free (14 days of deals total).,Idéal pour les séjours — 7 jours calendaires d’accès (+15 $ AUD). Partagez l’app après achat pour 7 jours supplémentaires gratuits (14 jours d’offres au total).,Bes blong taem yu stap — 7 kalenda dei akses (+A$15). Serem app afta bai blong 7 dei moa blong free (14 dei long total).,table: checkout.plan_holiday_sub
-TR-0108,Share this app and get 7 extra days FREE!!,Partagez l’application et obtenez 7 jours supplémentaires GRATUITS !!,Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!,table: checkout.share_second_week_unlock
-TR-0109,Share this app and get 7 extra days FREE!!,Partagez l’application et obtenez 7 jours supplémentaires GRATUITS !!,Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!,table: share.holiday_banner_days
-TR-0110,Share this app and get __N__ extra days FREE!!,Partagez l’application et obtenez __N__ jours supplémentaires GRATUITS !!,Sherem olgeta ap ia mo kasem __N__ dei moa BLONG FREE!!,table: share.holiday_banner_days_n
-TR-0111,Share this app — +__PEOPLE__ people FREE & 7 extra days FREE!!,Partagez l’app — +__PEOPLE__ personnes gratuites et 7 jours supplémentaires GRATUITS !!,Sherem ap — +__PEOPLE__ man fri mo 7 dei moa BLONG FREE!!,table: share.holiday_banner_combo
-TR-0112,Share this app and unlock +__PEOPLE__ extra guests FREE!,Partagez l’app et débloquez +__PEOPLE__ invités supplémentaires GRATUITS !,Sherem ap mo anlokem +__PEOPLE__ narafala man fri!,table: share.holiday_banner_people_only
-TR-0113,7 extra days free,7 jours gratuits,7 dei blong free,table: share.holiday_pill_days
+TR-0104,24-Hour Day Pass,Pass 24 heures,Pas blong 24 Awa,table: checkout.plan_day_title
+TR-0105,Great for cruise ships and short stops.,Idéal pour les croisières et les escales courtes.,Bes blong kruz sip mo ol sot stops.,table: checkout.plan_day_sub
+TR-0106,7-Day Holiday Pass,Pass vacances 7 jours,Pas blong 7 dei holidei,table: checkout.plan_holiday_title
+TR-0107,Best for stayover visitors — 7 calendar days of deal access (+A$15). Share the app after purchase for 7 extra days free (14 days of deals total).,Idéal pour les séjours — 7 jours calendaires d’accès (+15 $ AUD). Partagez l’app après achat pour 7 jours supplémentaires gratuits (14 jours d’offres au total).,Bes stay over blong yu(visita) — 7 kalenda dei akses (+A$15). Serem app afta bai blong 7 dei moa blong free (14 dei long total).,table: checkout.plan_holiday_sub
+TR-0108,Share this app and get 7 extra days FREE!!,Partagez l’application et obtenez 7 jours supplémentaires GRATUITS !!,Serem ap ia mo gat extra 7 dei frii!,table: checkout.share_second_week_unlock
+TR-0109,Share this app and get 7 extra days FREE!!,Partagez l’application et obtenez 7 jours supplémentaires GRATUITS !!,Serem ap ia mo gat extra 7 dei frii!,table: share.holiday_banner_days
+TR-0110,Share this app and get __N__ extra days FREE!!,Partagez l’application et obtenez __N__ jours supplémentaires GRATUITS !!,Sherem ap ia mo save karem __N__ extra frii dei!,table: share.holiday_banner_days_n
+TR-0111,Share this app — +__PEOPLE__ people FREE & 7 extra days FREE!!,Partagez l’app — +__PEOPLE__ personnes gratuites et 7 jours supplémentaires GRATUITS !!,Serem ap ia — +__PEOPLE__ol i man fri mo 7 extra dei moa weh i  FRII!!,table: share.holiday_banner_combo
+TR-0112,Share this app and unlock +__PEOPLE__ extra guests FREE!,Partagez l’app et débloquez +__PEOPLE__ invités supplémentaires GRATUITS !,Serem ap mo anlokem +__PEOPLE__ narafala man tu i fri!,table: share.holiday_banner_people_only
+TR-0113,7 extra days free,7 jours gratuits,7 extra dei  free,table: share.holiday_pill_days
 TR-0114,__N__ extra days free,__N__ jours gratuits,__N__ dei blong free,table: share.extra_days_pill_n
-TR-0115,Unlock your bonus week! Share with friends to get 7 extra days free on your Holiday Pass.,Débloquez votre semaine bonus ! Partagez avec des amis pour obtenir 7 jours supplémentaires gratuits sur votre pass vacances.,Anlokem bonus wik! Sherem wetem ol frend blong kasem 7 dei moa blong free long Holiday Pas blong yu.,table: share.holiday_card_subtext
-TR-0116,7+7 Holiday Pass — share the app for 7 extra days FREE!,Pass vacances 7+7 — partagez l’app pour 7 jours supplémentaires GRATUITS !,Holiday pas 7+7 — sherem ap blong 7 dei moa BLONG FREE!,table: share.holiday_cta_header_sub
-TR-0117,Share this app and get 7 extra days FREE!!,Partagez l’application et obtenez 7 jours supplémentaires GRATUITS !!,Sherem olgeta ap ia mo kasem 7 dei moa BLONG FREE!!,table: share.holiday_navigator_body
-TR-0118,You’ve got 7 days of deals — share this app for 7 extra days FREE on your Holiday Pass!,Vous avez 7 jours d’offres — partagez l’app pour 7 jours supplémentaires GRATUITS sur votre pass vacances !,Yu gat 7 dei blong dils — sherem ap ia blong 7 dei moa BLONG FREE long Holiday Pas!,table: share.qr_holiday_prompt
-TR-0119,Share app — 7 extra days FREE,Partager l’app — 7 jours gratuits,Sherem ap — 7 dei blong free,table: share.dashboard_unlock_button
+TR-0115,Unlock your bonus week! Share with friends to get 7 extra days free on your Holiday Pass.,Débloquez votre semaine bonus ! Partagez avec des amis pour obtenir 7 jours supplémentaires gratuits sur votre pass vacances.,Anlokem bonus wik! Serem wetem ol frens blong kasem 7 dei frii Holiday Pas blong yu.,table: share.holiday_card_subtext
+TR-0116,7+7 Holiday Pass — share the app for 7 extra days FREE!,Pass vacances 7+7 — partagez l’app pour 7 jours supplémentaires GRATUITS !,Holidei pas 7+7 — serem ap blong u save kasem 7 extra dei frii,table: share.holiday_cta_header_sub
+TR-0117,Share this app and get 7 extra days FREE!!,Partagez l’application et obtenez 7 jours supplémentaires GRATUITS !!,Serem  ap ia mo kasem extra 7 dei moa i FREE!!,table: share.holiday_navigator_body
+TR-0118,You’ve got 7 days of deals — share this app for 7 extra days FREE on your Holiday Pass!,Vous avez 7 jours d’offres — partagez l’app pour 7 jours supplémentaires GRATUITS sur votre pass vacances !,Yu gat 7 dei blong dils — serem ap ia blong save gat 7 extra dei FREE long Holiday Pas!,table: share.qr_holiday_prompt
+TR-0119,Share app — 7 extra days FREE,Partager l’app — 7 jours gratuits,Serem ap — yu save gat 7 moa dei  free,table: share.dashboard_unlock_button
 TR-0120,7 days included · share for 7 extra days free (14 days total),7 jours inclus · partagez pour 7 jours gratuits en plus (14 j. au total),7 dei i stap insaed · sherem blong 7 dei moa blong free (14 dei),table: share.dashboard_coverage_pill
 TR-0121,First week shown (7 days). Share this app for 7 extra days free!,1re semaine affichée (7 j.). Partagez l’app pour 7 jours gratuits en plus !,Fes wik 7 dei i soem. Sherem ap ia blong 7 dei moa blong free!,table: share.dashboard_week1_validity
 TR-0122,Share app — 7 extra days FREE,Partager l’app — 7 jours gratuits,Sherem ap — 7 dei blong free,table: share.qr_unlock_button
 TR-0123, · Share app for 7 extra days free (14 days total), · Partagez l’app pour 7 jours gratuits en plus (14 j. au total), · Sherem ap blong 7 dei moa blong free (14 dei),table: share.qr_period_bonus_hint
 TR-0124,Your purchase includes a week of deal access. Share below for 7 extra days free (14 days of deals total).,Votre achat inclut une semaine d’accès aux offres. Partagez ci-dessous pour 7 jours supplémentaires gratuits (14 jours d’offres au total).,Bai blong yu i gat wan wik blong dils. Sherem daun blong 7 dei moa blong free (14 dei long total).,table: share.receipt_holiday_subline_pending
 TR-0125,7-day deal access · share for 7 extra days free (14 days total),7 jours d’offres · partagez pour 7 jours gratuits en plus (14 j. au total),7 dei dils · sherem blong 7 dei moa blong free (14 dei),table: share.receipt_header_holiday_pending
-TR-0126,"With __COUNT__ people, you'll save more than the cost of this pass (A$__PASS__) on your very first meal or tour!","Avec __COUNT__ personnes, vous économiserez plus que le prix de ce pass (__PASS__ $ AUD) dès votre premier repas ou tour !","Wet __COUNT__ man, bae yu save moa long kost blong dis pas (A$__PASS__) long fes kakae o tua!",table: checkout.savings_anchor_v2
+TR-0126,"With __COUNT__ people, you'll save more than the cost of this pass (A$__PASS__) on your very first meal or tour!","Avec __COUNT__ personnes, vous économiserez plus que le prix de ce pass (__PASS__ $ AUD) dès votre premier repas ou tour !","Wetem __COUNT__ man, bae yu save moa long kost blong olgeta pas (A$__PASS__) long fes kakae o tua!",table: checkout.savings_anchor_v2
 TR-0127,1 day,1 jour,wan dei,table: checkout.period_badge_one_day
 TR-0128,Your trip: __NIGHTS__ nights,Votre séjour : __NIGHTS__ nuits,Trip blong yu: __NIGHTS__ naet,table: checkout.period_badge_trip_nights
-TR-0129,Whole-trip coverage,Couverture « tout le séjour »,Kava long ful trip,table: checkout.period_badge_extended_generic
+TR-0129,Whole-trip coverage,Couverture « tout le séjour »,Kavaremap ful trip blong yu,table: checkout.period_badge_extended_generic
 TR-0130,__CAL__ calendar days of deal access (inclusive).,__CAL__ jours calendaires d’accès aux offres (inclus).,__CAL__ kalenda dei blong akses long dils (i kaont olgeta).,table: checkout.period_legal_extended
-TR-0131,Same calendar day — discounts on the start date you choose.,Même jour calendaire — réductions le jour de début choisi.,Sem wan kalenda dei — diskount long det blong stat.,table: checkout.end_date_helper_short
-TR-0132,Through this end date (inclusive). Deal access lasts __CAL__ calendar days from your start.,Jusqu’à cette date de fin (inclus). L’accès aux offres dure __CAL__ jours calendaires à partir du début.,Kasem det blong finis (i kaont). Akses long dils i last __CAL__ kalenda dei long stat.,table: checkout.end_date_helper_extended
+TR-0131,Same calendar day — discounts on the start date you choose.,Même jour calendaire — réductions le jour de début choisi.,Sem kalenda dei — diskount long det blong stat.,table: checkout.end_date_helper_short
+TR-0132,Through this end date (inclusive). Deal access lasts __CAL__ calendar days from your start.,Jusqu’à cette date de fin (inclus). L’accès aux offres dure __CAL__ jours calendaires à partir du début.,Kasem det blong finis (i kaont). Akses long dils i last __CAL__  stat long kalenda dei.,table: checkout.end_date_helper_extended
 TR-0133,Pass & group,Pass et groupe,Pas mo grup,table: checkout.section_pass_group
-TR-0134,When discounts apply,Quand les réductions s’appliquent,Taem diskount i ap,table: checkout.section_dates
+TR-0134,When discounts apply,Quand les réductions s’appliquent,Taem diskount i aplae,table: checkout.section_dates
 TR-0135,Pick when deal discounts turn on — the end date is set automatically from your pass type.,Choisissez l’activation des réductions — la fin est calculée selon votre type de pass.,Jusum taem diskount i stat — det blong finis i kam otomatik long taem blong pas.,table: checkout.section_dates_sub
 TR-0136,Your discount window,Votre fenêtre de réductions,Windo blong diskount,table: checkout.discount_window_card_title
 TR-0137,__CAL__-day deal access,__CAL__ j. d’accès aux offres,__CAL__ dei blong akses long dils,table: checkout.period_badge_pass_window
-TR-0138,Your trip is __NIGHTS__ nights — align your start date with when you want to use deals.,Votre séjour : __NIGHTS__ nuits — alignez la date de début avec l’usage des offres.,Trip blong yu __NIGHTS__ naet — josem det blong stat wetem taem yu laik yusum dils.,table: checkout.window_trip_hint
+TR-0138,Your trip is __NIGHTS__ nights — align your start date with when you want to use deals.,Votre séjour : __NIGHTS__ nuits — alignez la date de début avec l’usage des offres.,Trip blong yu emi __NIGHTS__ naet — josem det blong stat wetem taem yu laik yusum dils.,table: checkout.window_trip_hint
 TR-0139,Start,Début,Stat,table: checkout.window_label_start
 TR-0140,End,Fin,Finis,table: checkout.window_label_end
 TR-0141,Unlimited deal redemptions for your chosen coverage window.,Offres illimitées pendant la période choisie.,Ol dils we i no lim long taem yu josem.,table: checkout.order_summary_deals_short
 TR-0142,Deal access runs __CAL__ calendar days from your start date (inclusive).,L’accès aux offres court __CAL__ jours calendaires à partir de la date de début (inclus).,Akses long dils i ran __CAL__ kalenda dei long det blong stat (i kaont olgeta).,table: checkout.order_summary_deals_extended
 TR-0143,Your stay,Votre séjour,Taem yu stap,table: checkout.summary_duration_label
 TR-0144,__CAL__ calendar days of access,__CAL__ jours calendaires d’accès,__CAL__ kalenda dei blong akses,table: checkout.summary_calendar_note
-TR-0145,Buy Now,Acheter,Baem Nao,table: pass.buy
+TR-0145,Buy Now,Acheter,Pem Nao ya,table: pass.buy
 TR-0146,Access all deals,Accès à toutes les offres,Akses olgeta dils,table: pass.feature1
 TR-0147,QR code coupons,Coupons QR code,QR kod kupons,table: pass.feature2
 TR-0148,Map navigation,Navigation carte,Map navigesen,table: pass.feature3
-TR-0149,Know before you buy,À savoir avant d’acheter,Save bifo yu bai,table: pass.know_before_title
-TR-0150,From your profile: {days} days · {party} people toward pass limits (adults & children only; infants not counted).,D’après votre profil : {days} j · {party} personnes pour les limites du pass (adultes et enfants ; bébés non comptés).,Long profil: {days} dei · {party} man long pas (bigman mo pikinini taswe; bebi i no kaont).,table: pass.know_trip_line
-TR-0151,Share Bonus — unlocks extra people and/or discount days after you purchase (via Share the app).,Bonus de partage — débloque des places et/ou des jours de réduction après l’achat (via Partager l’app).,Bonus afta serem — i adem moa pipol mo/oba moa dei diskount afta yu bai (serem app).,table: pass.know_bullet_1
-TR-0152,Each pass card shows its base limits — compare them to your trip length and group size.,Chaque carte indique ses limites de base — comparez-les à la durée du séjour et à la taille du groupe.,Evri kaed i soem base lim — kompem wetem len blong trip mo grup.,table: pass.know_bullet_2
-TR-0153,"After buying, use Share the app on your pass screen to apply Share Bonus.","Après l’achat, utilisez Partager l’app sur l’écran du pass pour activer le bonus.","Afta bai, yusum Serem app long skrin pas blong bonus.",table: pass.know_bullet_3
+TR-0149,Know before you buy,À savoir avant d’acheter,Save bifo yu pem,table: pass.know_before_title
+TR-0150,From your profile: {days} days · {party} people toward pass limits (adults & children only; infants not counted).,D’après votre profil : {days} j · {party} personnes pour les limites du pass (adultes et enfants ; bébés non comptés).,Long profil blong yu: {dei} dei · {party} man long pas (bigman mo pikinini nomo; bebi i no kaont).,table: pass.know_trip_line
+TR-0151,Share Bonus — unlocks extra people and/or discount days after you purchase (via Share the app).,Bonus de partage — débloque des places et/ou des jours de réduction après l’achat (via Partager l’app)., serem Bonus — i adem moa pipol mo/or moa dei diskount afta yu bai (serem app).,table: pass.know_bullet_1
+TR-0152,Each pass card shows its base limits — compare them to your trip length and group size.,Chaque carte indique ses limites de base — comparez-les à la durée du séjour et à la taille du groupe.,Evri kaed i soem base limit blong hem — komperem wetem length blong trip mo grup.,table: pass.know_bullet_2
+TR-0153,"After buying, use Share the app on your pass screen to apply Share Bonus.","Après l’achat, utilisez Partager l’app sur l’écran du pass pour activer le bonus.","Afta pem, yusum Sea app long skrin  blong applaem pas blong bonus.",table: pass.know_bullet_3
 TR-0154,"You choose which days to use discounts; the pass expires on its end date, not when you leave the island.","Vous choisissez les jours d’utilisation ; le pass expire à sa date de fin, pas à votre départ.","Yu josem dei blong yusum diskount; pas i finis long det blong hem, no taem yu liv aelan.",table: pass.know_bullet_4
-TR-0155,"For very large groups or long stays, one pass may not be enough — contact support or consider multiple passes.","Pour les très grands groupes ou longs séjours, un pass peut ne pas suffire — contactez le support ou plusieurs pass.","Long bigfala grup o lon taem, wan pas i no save stret — askem support o tingbaot moa pas.",table: pass.know_support
-TR-0156,"Checkout will use {party} guests (ages 6+) · {duration} — A$15 first, then A$10 each additional guest up to 20; +A$15 for whole-trip (edit before paying).","Paiement : {party} voyageurs (6+) · {duration} — 15 $ 1re pers., puis 10 $ par invité supplémentaire jusqu’à 20 ; +15 $ séjour (modifiable avant paiement).","Checkout: {party} man (6+) · {duration} — A$15 fes, mo A$10 long evri narafala man kasem 20; +A$15 ful trip (yu ken senis bifo pem).",table: passFlow.checkout_preview
+TR-0155,"For very large groups or long stays, one pass may not be enough — contact support or consider multiple passes.","Pour les très grands groupes ou longs séjours, un pass peut ne pas suffire — contactez le support ou plusieurs pass.","Long bigfala grup o long taem stap, wan pas bae i no save inaf — askem support o tingbaot moa pas.",table: pass.know_support
+TR-0156,"Checkout will use {party} guests (ages 6+) · {duration} — A$15 first, then A$10 each additional guest up to 20; +A$15 for whole-trip (edit before paying).","Paiement : {party} voyageurs (6+) · {duration} — 15 $ 1re pers., puis 10 $ par invité supplémentaire jusqu’à 20 ; +15 $ séjour (modifiable avant paiement).","Checkout: {party} man (6+) · {duration} — A$15 fes, mo A$10 long evri narafala man kasem 20; +A$15 ful trip (yu save jensem bifo pem).",table: passFlow.checkout_preview
 TR-0157,1-day,1 jour,wan-dei,table: passFlow.duration_short
 TR-0158,whole-trip,tout le séjour,ful-trip,table: passFlow.duration_extended
 TR-0159,Taking you to checkout…,Redirection vers le paiement…,Go long checkout…,table: passFlow.redirecting
 TR-0160,Your pass,Votre pass,Pas blong yu,table: passFlow.home_skip_title
-TR-0161,Continue to secure checkout. Party size and pass length use your profile — change them anytime before you pay.,Poursuivre vers le paiement sécurisé. Taille du groupe et durée d’après votre profil — modifiables avant paiement.,Go long sef checkout. Grup mo taem i blong profil blong yu — yu ken senis eni taem bifo pem.,table: passFlow.home_skip_desc
+TR-0161,Continue to secure checkout. Party size and pass length use your profile — change them anytime before you pay.,Poursuivre vers le paiement sécurisé. Taille du groupe et durée d’après votre profil — modifiables avant paiement.,Go long sef checkout. Grup mo taem  blong usum profael blong yu — yu save jensem ani taem bifo yu pem,table: passFlow.home_skip_desc
 TR-0162,Continue to checkout,Aller au paiement,Go long checkout,table: passFlow.home_skip_cta
 TR-0163,Full pass details & pricing,Détails et tarifs du pass,Ful infomesen mo praes,table: passFlow.home_passes_info_link
 TR-0164,Featured Deals,Offres en vedette,Fitjad Dils,table: biz.featured
@@ -177,48 +177,48 @@ TR-0175,Write a Review,Écrire un avis,Raetim Wan Riviu,table: review.write
 TR-0176,Submit Review,Soumettre l'avis,Sendim Riviu,table: review.submit
 TR-0177,My Dashboard,Mon tableau de bord,Dasbod Blong Mi,table: dash.title
 TR-0178,My Passes,Mes pass,Pas Blong Mi,table: dash.passes
-TR-0179,Favorites,Favoris,Favrit,table: dash.favorites
-TR-0180,Your saved places,Vos adresses enregistrées,Ples we yu sevem,table: dash.favorites_list_heading
-TR-0181,Browse deals and tap the heart on a listing to save it here.,Parcourez les offres et touchez le cœur sur une annonce pour l’enregistrer ici.,Lukluk long ol diskaon mo tap long hating blong sevem long hia.,table: dash.favorites_list_empty
+TR-0179,Favorites,Favoris,Feverets,table: dash.favorites
+TR-0180,Your saved places,Vos adresses enregistrées,Ples we yu sef,table: dash.favorites_list_heading
+TR-0181,Browse deals and tap the heart on a listing to save it here.,Parcourez les offres et touchez le cœur sur une annonce pour l’enregistrer ici.,Lukluk long ol diskaon mo tap long hat blong sevem long ples ia.,table: dash.favorites_list_empty
 TR-0182,Back to dashboard,Retour au tableau de bord,Go bak long dasbod,table: dash.favorites_back_dashboard
-TR-0183,Redemption History,Historique d'utilisation,Histri blong Yusim,table: dash.history
+TR-0183,Redemption History,Historique d'utilisation,Histri blong Yusum,table: dash.history
 TR-0184,No active pass. Get one to start saving!,Pas de pass actif. Obtenez-en un pour commencer à économiser!,No gat aktiv pas. Karem wan blong stat sevem!,table: dash.nopass
 TR-0185,Pass checkout defaults,Préférences d’achat du pass,Pas checkout difolt,table: dash.pass_prefs_title
-TR-0186,Used when you open checkout (you can still change before paying).,Utilisées à l’ouverture du paiement (modifiable avant de payer).,Yu savem taem yu openem checkout (yu ken senis bifo pem).,table: dash.pass_prefs_sub
+TR-0186,Used when you open checkout (you can still change before paying).,Utilisées à l’ouverture du paiement (modifiable avant de payer).,Yu sevem taem yu openem checkout (yu save jensem befo yu pem).,table: dash.pass_prefs_sub
 TR-0187,Typical group size,Taille du groupe habituel,Grup saes,table: passPrefs.group_label
-TR-0188,No saved default — checkout uses your travel party or 1 guest.,Aucune valeur enregistrée — le paiement utilise votre groupe voyage ou 1 personne.,No gat difolt — checkout i yusum grup blong trabel o 1 gest.,table: passPrefs.group_hint_none
+TR-0188,No saved default — checkout uses your travel party or 1 guest.,Aucune valeur enregistrée — le paiement utilise votre groupe voyage ou 1 personne.,No gat difolt — checkout i yusum grup blong travel o 1 gest.,table: passPrefs.group_hint_none
 TR-0189,Next checkout will start with this group size.,Le prochain paiement commencera avec cette taille de groupe.,Nekis checkout bae stat wetem grup saes ia.,table: passPrefs.group_hint_saved
-TR-0190,Just me (clear saved size),Moi seul (effacer la taille),Mi wan (klearim saes),table: passPrefs.just_me
+TR-0190,Just me (clear saved size),Moi seul (effacer la taille),Mi wan (klearem saes),table: passPrefs.just_me
 TR-0191,{n} people,{n} personnes,{n} pipol,table: passPrefs.people_n
-TR-0192,Preferred pass length,Durée du pass préférée,Taem blong pas,table: passPrefs.duration_label
+TR-0192,Preferred pass length,Durée du pass préférée,Stret taem blong pas,table: passPrefs.duration_label
 TR-0193,24 hours (1 day),24 heures (1 jour),24 ao (wan dei),table: passPrefs.duration_short
 TR-0194,7 days (+ share → 14),7 jours (+ partage → 14),7 dei (+ serem → 14),table: passPrefs.duration_extended
 TR-0195,Save preferences,Enregistrer,Sevem preference,table: passPrefs.save
-TR-0196,Saving…,Enregistrement…,Sevem…,table: passPrefs.saving
-TR-0197,Preferences saved,Préférences enregistrées,Preference i sevem,table: passPrefs.saved
-TR-0198,Could not save preferences,Impossible d’enregistrer,No save preference,table: passPrefs.save_failed
+TR-0196,Saving…,Enregistrement…,Sev ap…,table: passPrefs.saving
+TR-0197,Preferences saved,Préférences enregistrées,Preference ino sev,table: passPrefs.saved
+TR-0198,Could not save preferences,Impossible d’enregistrer,preference ino sev,table: passPrefs.save_failed
 TR-0199,Remember this pass setup?,Mémoriser cette configuration ?,Memorisaem pas setup?,table: passPrefs.post_title
-TR-0200,Save the group size and pass length you just bought as your defaults for next time.,Enregistrer la taille du groupe et la durée achetées comme valeurs par défaut.,Sevem grup mo taem blong pas yu bao olsem difolt blong nekis taem.,table: passPrefs.post_desc
-TR-0201,Save as my defaults,Enregistrer comme défauts,Sevem olsem difolt,table: passPrefs.post_remember
+TR-0200,Save the group size and pass length you just bought as your defaults for next time.,Enregistrer la taille du groupe et la durée achetées comme valeurs par défaut.,Sevem grup mo taem blong pas yu pem olsem difolt blong nekis taem.,table: passPrefs.post_desc
+TR-0201,Save as my defaults,Enregistrer comme défauts,Sevem olsem difolt blong mi,table: passPrefs.post_remember
 TR-0202,Save,Enregistrer,Sevem,table: passPrefs.post_save
-TR-0203,Not now,Pas maintenant,No nau,table: passPrefs.post_skip
+TR-0203,Not now,Pas maintenant,No naoia,table: passPrefs.post_skip
 TR-0204,About StikmNek,À propos de StikmNek,Abaotem StikmNek,table: footer.about
-TR-0205,StikmNek connects tourists with the best local businesses across Vanuatu. Save money while experiencing authentic island culture.,StikmNek connecte les touristes avec les meilleures entreprises locales à travers le Vanuatu. Économisez tout en vivant la culture insulaire authentique.,StikmNek i konetim turis wetem beswan lokal bisnis long Vanuatu. Sevem mani taem yu eksperiens tru aelan kalsa.,table: footer.abouttext
+TR-0205,StikmNek connects tourists with the best local businesses across Vanuatu. Save money while experiencing authentic island culture.,StikmNek connecte les touristes avec les meilleures entreprises locales à travers le Vanuatu. Économisez tout en vivant la culture insulaire authentique.,StikmNek i konetim turis wetem bes lokal bisnis long Vanuatu. Sevem mani taem yu eksperiens tru aelan kalja.,table: footer.abouttext
 TR-0206,What does “StikmNek” mean?,Que signifie « StikmNek » ?,Wanem minim blong “StikmNek”?,table: footer.nameMeaningTitle
-TR-0207,It’s Bislama slang for approaching with confidence and charm to get someone interested — the Vanuatu way of friendly persuasion.,C’est un terme d’argot en bichlamar : approcher avec confiance et charme pour susciter l’intérêt — une persuasion amicale à la manière du Vanuatu.,Hemia Bislama slang: yu go klosap wetem konfiden mo smail blong mekem man i gat intres — frendli persuesen blong Vanuatu.,table: footer.nameMeaningBody
+TR-0207,It’s Bislama slang for approaching with confidence and charm to get someone interested — the Vanuatu way of friendly persuasion.,C’est un terme d’argot en bichlamar : approcher avec confiance et charme pour susciter l’intérêt — une persuasion amicale à la manière du Vanuatu.,Hemia Bislama slang: yu go klosap wetem konfiden mo smael blong mekem man i gat intres — frendli persuesen blong Vanuatu.,table: footer.nameMeaningBody
 TR-0208,Why we built StikmNek,Pourquoi nous avons créé StikmNek,From wanem mifala i mekem StikmNek,table: footer.whyBuiltTitle
 TR-0209,Local businesses wanted tourists but didn’t have websites. Tourists said Vanuatu feels expensive. StikmNek helps businesses get discovered and helps tourists unlock fair local deals — keeping more value with grassroots operators.,Les entreprises locales voulaient plus de touristes sans avoir de site. Les voyageurs disaient que le Vanuatu est cher. StikmNek aide les entreprises à être trouvées et aide les touristes à accéder à des offres locales justes — en soutenant les opérateurs de proximité.,"Ol lokal bisnis i wantem moa turis be oli no gat website. Turis i talem se Vanuatu i expensiv. StikmNek i halpem bisnis blong ol man i faenem, mo i halpem turis blong kasem gudfala lokal dils — sapotem smol bisnis.",table: footer.whyBuiltBody
-TR-0210,100% locally owned · Supporting grassroots businesses,100 % localement détenu · Soutien aux entreprises locales,100% lokal · Sapotem smol bisnis blong Vanuatu,table: footer.local_badge
+TR-0210,100% locally owned · Supporting grassroots businesses,100 % localement détenu · Soutien aux entreprises locales,100% lokol ownem · Sapotem smol bisnis blong Vanuatu,table: footer.local_badge
 TR-0211,Quick Links,Liens rapides,Kwik Link,table: footer.links
 TR-0212,Support,Support,Sapot,table: footer.support
-TR-0213,Legal,Légal,Ligo,table: footer.legal
+TR-0213,Legal,Légal,Ligal,table: footer.legal
 TR-0214,Privacy Policy,Politique de confidentialité,Praevesi Polisi,table: footer.privacy
 TR-0215,Terms of Service,Conditions d'utilisation,Tems blong Sevis,table: footer.terms
 TR-0216,Business partner & listing terms,Partenaires & conditions d’inscription,Bisnis patna mo listem taem,table: footer.business_partner
 TR-0217,GDPR Compliance,Conformité RGPD,GDPR Komplaens,table: footer.gdpr
 TR-0218,Contact Us,Contactez-nous,Kontaktem Mifala,table: footer.contact
 TR-0219,FAQ,FAQ,FAQ,table: footer.faq
-TR-0220,List Your Business,Inscrivez votre entreprise,Listem Bisnis Blong Yu,table: footer.business
+TR-0220,List Your Business,Inscrivez votre entreprise,Listim ol Bisnis Blong Yu,table: footer.business
 TR-0221,© 2026 StikmNek. All rights reserved.,© 2026 StikmNek. Tous droits réservés.,© 2026 StikmNek. Olgeta raets i risevd.,table: footer.copyright
 TR-0222,Sign In,Connexion,Saen In,table: auth.signin
 TR-0223,Sign Up,Inscription,Saen Ap,table: auth.signup
@@ -232,17 +232,17 @@ TR-0230,Loading...,Chargement...,Lodim...,table: general.loading
 TR-0231,Close,Fermer,Klosem,table: general.close
 TR-0232,Back,Retour,Bak,table: general.back
 TR-0233,Save,Sauvegarder,Sevem,table: general.save
-TR-0234,Cancel,Annuler,Kanselim,table: general.cancel
+TR-0234,Cancel,Annuler,Kanselem,table: general.cancel
 TR-0235,OFF,DE RÉDUCTION,OF,table: general.off
 TR-0236,per person,par personne,wan man,table: general.per_person
 IN-0237,"Search by name, tag, or category...","Rechercher par nom, tag ou catégorie...","Sejem bae nem, tag, o kategori...",src/components/AdvancedSearch.tsx
 IN-0238,Show only businesses you can contact directly via WhatsApp,Afficher uniquement les entreprises contactables via WhatsApp,Soem nomo bisnis we yu save kontaktem long WhatsApp,src/components/AdvancedSearch.tsx
-IN-0239,List your business — free,Ajoutez votre entreprise — gratuit,Listem bisnis blong yu — fri,src/components/AppLayout.tsx
+IN-0239,List your business — free,Ajoutez votre entreprise — gratuit,Listim bisnis blong yu — fri,src/components/AppLayout.tsx
 IN-0240,Sign up free,S'inscrire gratuitement,Saen up fri,src/components/AppLayout.tsx
 IN-0241,Already signed up? Sign in,Déjà inscrit ? Se connecter,Gat akaont? Saen in,src/components/AppLayout.tsx
-IN-0242,Try again,Réessayer,Traem gen,src/components/AppLayout.tsx
-IN-0243,Finish your travel profile to unlock passes and the full app.,Terminez votre profil voyage pour débloquer les pass et toute l’application.,Finisem travel profil blong yu blong yusum fulap.,src/components/AppLayout.tsx
-IN-0244,Continue setup,Poursuivre,Go hed,src/components/AppLayout.tsx
+IN-0242,Try again,Réessayer,Traem bakeken,src/components/AppLayout.tsx
+IN-0243,Finish your travel profile to unlock passes and the full app.,Terminez votre profil voyage pour débloquer les pass et toute l’application.,Finisim travel profil blong yu blong save anlokem pas mo yusum ful ap.,src/components/AppLayout.tsx
+IN-0244,Continue setup,Poursuivre,Go hed blong set ap,src/components/AppLayout.tsx
 IN-0245,Check your email for a password reset link.,Consultez votre email pour le lien de réinitialisation.,Lukim email blong yu blong reset link.,src/components/AuthModal.tsx
 IN-0246,Business Sign Up,Inscription Entreprise,Bisnis Saen Ap,src/components/AuthModal.tsx
 IN-0247,Tourist Sign Up,Inscription Touriste,Turis Saen Ap,src/components/AuthModal.tsx
@@ -253,7 +253,7 @@ IN-0251,Create your account to start saving,Créez votre compte pour économiser
 IN-0252,Join StikmNek,Rejoindre StikmNek,Joinim StikmNek,src/components/AuthModal.tsx
 IN-0253,Choose how you want to use StikmNek,Choisissez comment utiliser StikmNek,Jusim olsem wanem yu wantem yusim StikmNek,src/components/AuthModal.tsx
 IN-0254,I'm a Tourist,Je suis Touriste,Mi wan Turis,src/components/AuthModal.tsx
-IN-0255,"Discover deals, buy discount passes, and save money while exploring Vanuatu.","Découvrez des offres, achetez des pass et économisez en explorant le Vanuatu.","Faenem dils, baem diskount pas, mo sevem mani taem yu eksploarem Vanuatu.",src/components/AuthModal.tsx
+IN-0255,"Discover deals, buy discount passes, and save money while exploring Vanuatu.","Découvrez des offres, achetez des pass et économisez en explorant le Vanuatu.","Faenem dils, pem diskount pas, mo sevem mani taem yu eksploarem Vanuatu.",src/components/AuthModal.tsx
 IN-0256,I'm a Business,Je suis une Entreprise,Mi wan Bisnis,src/components/AuthModal.tsx
 IN-0257,"List your business, create offers for tourists, and grow your customer base.","Inscrivez votre entreprise, créez des offres et développez votre clientèle.","Listem bisnis blong yu, mekem ofa blong turis, mo groem kastoma beis.",src/components/AuthModal.tsx
 IN-0258,Already have an account? ,Déjà un compte? ,Gat akaont finis? ,src/components/AuthModal.tsx
@@ -261,21 +261,21 @@ IN-0259,Check Your Email,Vérifiez votre email,Lukim Email Blong Yu,src/componen
 IN-0260,Forgot Password?,Mot de passe oublié ?,Fogetem Paswod?,src/components/AuthModal.tsx
 IN-0261,We sent a reset link to your email,Un lien a été envoyé à votre email,Mifala i sendem link long email blong yu,src/components/AuthModal.tsx
 IN-0262,Enter your email to receive a reset link,Entrez votre email pour recevoir un lien,Putum email blong yu blong karem reset link,src/components/AuthModal.tsx
-IN-0263,"If an account exists for that email, you will receive a password reset link. Check your spam folder if you don't see it.","Si un compte existe pour cet email, vous recevrez un lien. Vérifiez vos spams si vous ne le voyez pas.","Sapos gat akaont long email ia, bae yu karem link. Lukim spam folder.",src/components/AuthModal.tsx
+IN-0263,"If an account exists for that email, you will receive a password reset link. Check your spam folder if you don't see it.","Si un compte existe pour cet email, vous recevrez un lien. Vérifiez vos spams si vous ne le voyez pas.","Sapos gat wan akaont long email ia, bae yu karem link. Lukim spam folder spos yu no luk email yah.",src/components/AuthModal.tsx
 IN-0264,Back to Sign In,Retour à la connexion,Go Bak long Saen In,src/components/AuthModal.tsx
 IN-0265,Send Reset Link,Envoyer le lien,Sendem Reset Link,src/components/AuthModal.tsx
 IN-0266,"After signup, you'll be directed to set up your business profile","Après inscription, vous configurerez votre profil entreprise","Afta saen ap, bae yu go setupem bisnis profael blong yu",src/components/AuthModal.tsx
 IN-0267,Your Name (Contact Person),Votre Nom (Personne de contact),Nem blong yu (Kontak),src/components/AuthModal.tsx
 IN-0268,Forgot Password?,Mot de passe oublié ?,Fogetem Paswod?,src/components/AuthModal.tsx
 IN-0269,Sign In,Se connecter,Saen In,src/components/AuthModal.tsx
-IN-0270,Create Business Account,Créer un compte entreprise,Mekem Bisnis Akaont,src/components/AuthModal.tsx
-IN-0271,Create Tourist Account,Créer un compte touriste,Mekem Turis Akaont,src/components/AuthModal.tsx
+IN-0270,Create Business Account,Créer un compte entreprise,Mekem wan Bisnis Akaont,src/components/AuthModal.tsx
+IN-0271,Create Tourist Account,Créer un compte touriste,Mekem wan Turis Akaont,src/components/AuthModal.tsx
 IN-0272,Don't have an account? ,Pas de compte? ,No gat akaont? ,src/components/AuthModal.tsx
 IN-0273,Already have an account? ,Déjà un compte? ,Gat akaont finis? ,src/components/AuthModal.tsx
 IN-0274,"By continuing, you agree to our Terms of Service and Privacy Policy. Your data is protected under GDPR compliance.","En continuant, vous acceptez nos Conditions d'utilisation et notre Politique de confidentialité.","Taem yu kontiniu, yu agri long Tems blong Sevis mo Praevesi Polisi blong mifala.",src/components/AuthModal.tsx
-IN-0275,Sign in or create a StikmNek account,Connexion ou création de compte StikmNek,Saen in o mekem akaont StikmNek,src/components/AuthModal.tsx
-IN-0276,"Choose how to sign in or create an account, then enter your email and password.","Choisissez comment vous connecter ou créer un compte, puis saisissez votre e-mail et votre mot de passe.","Jusum we blong saen in o mekem akaont, afta putum email mo paswod.",src/components/AuthModal.tsx
-IN-0277,Booking inquiry for,Demande de réservation pour,Bukin ask long,src/components/BookingInquiryModal.tsx
+IN-0275,Sign in or create a StikmNek account,Connexion ou création de compte StikmNek,Saen in o mekem wan akaont StikmNek,src/components/AuthModal.tsx
+IN-0276,"Choose how to sign in or create an account, then enter your email and password.","Choisissez comment vous connecter ou créer un compte, puis saisissez votre e-mail et votre mot de passe.","Jusum ao blong saen in o mekem akaont, afta putum email mo paswod.",src/components/AuthModal.tsx
+IN-0277,Booking inquiry for,Demande de réservation pour,Bukin askem long,src/components/BookingInquiryModal.tsx
 IN-0278,Visit details and contact fields are pre-filled from your profile — edit if needed. Then use the business contact buttons below.,Les informations de visite et de contact sont préremplies depuis votre profil — modifiez si besoin. Utilisez ensuite les boutons du commerce ci-dessous.,Visit mo kontakt i fulap long profil — jenjem sapos yu nidim. Bihain yusum baten blong bisnis.,src/components/BookingInquiryModal.tsx
 IN-0279,Your details,Vos informations,Infomesen blong yu,src/components/BookingInquiryModal.tsx
 IN-0280,"Confirm your name. Email, WhatsApp, and phone are saved on your profile — you can adjust them here for this request.","Confirmez votre nom. E-mail, WhatsApp et téléphone viennent de votre profil — vous pouvez les modifier pour cette demande.","Konfirm nem. Imel, WhatsApp mo fon i kam long profil — jenjem hia long ask ia.",src/components/BookingInquiryModal.tsx
@@ -288,7 +288,7 @@ IN-0286,These actions use the business’s own contact details — not your acco
 IN-0287,Visit date,Date de visite,Dei blong visit,src/components/BookingInquiryModal.tsx
 IN-0288,Adults,Adultes,Ol man,src/components/BookingInquiryModal.tsx
 IN-0289,Children,Enfants,Pikinini,src/components/BookingInquiryModal.tsx
-IN-0290,Total standard price,Prix standard total,Stanad praes,src/components/BookingInquiryModal.tsx
+IN-0290,Total standard price,Prix standard total,Staned praes,src/components/BookingInquiryModal.tsx
 IN-0291,Total StikmNek price,Prix StikmNek total,StikmNek praes,src/components/BookingInquiryModal.tsx
 IN-0292,Your savings,Vos économies,Sevin blong yu,src/components/BookingInquiryModal.tsx
 IN-0293,Your name,Votre nom,Nem blong yu,src/components/BookingInquiryModal.tsx
@@ -296,10 +296,10 @@ IN-0294,Send request by email,Envoyer la demande par e-mail,Send ask long imel,s
 IN-0295,Chat on WhatsApp,Discuter sur WhatsApp,Toktok long WhatsApp,src/components/BookingInquiryModal.tsx
 IN-0296,Call,Appeler,Kolem,src/components/BookingInquiryModal.tsx
 IN-0297,"This listing has no email, WhatsApp, or phone on file. Please try again later.",Aucun moyen de contact n’est renseigné pour cette fiche.,No gat kontakt long lisiting ia.,src/components/BookingInquiryModal.tsx
-IN-0298,Enter at least 1 guest to see pricing.,Indiquez au moins 1 personne pour voir les prix.,Putum kasem 1 man long lukim praes.,src/components/BookingInquiryModal.tsx
+IN-0298,Enter at least 1 guest to see pricing.,Indiquez au moins 1 personne pour voir les prix.,Putum wan price blong 1 man lukim praes.,src/components/BookingInquiryModal.tsx
 IN-0299,Request sent! The business will contact you shortly.,Demande envoyée ! Le commerce vous contactera bientôt.,Rikwes i send! Bisnis bae kontakt yu.,src/components/BookingInquiryModal.tsx
 IN-0300,Get a StikmNek pass to message businesses on WhatsApp and unlock member rates.,Obtenez un pass StikmNek pour contacter les entreprises sur WhatsApp et bénéficier des tarifs membres.,Yu nidim StikmNek pas blong mesej bisnis long WhatsApp mo kasem praes blong membas.,src/components/BusinessCard.tsx
-IN-0301,Credentials saved. Admin will verify documents for leaderboard boost.,Identifiants enregistrés. Un admin validera vos documents.,Kredensel i sevem. Admin bae verify.,src/components/BusinessCredentialsSettings.tsx
+IN-0301,Credentials saved. Admin will verify documents for leaderboard boost.,Identifiants enregistrés. Un admin validera vos documents.,Kredensel i sev. Admin bae verify.,src/components/BusinessCredentialsSettings.tsx
 IN-0302,My credentials,Mes accréditations,Kredensel blong mi,src/components/BusinessCredentialsSettings.tsx
 IN-0303,"Optional — upload insurance, permits, or training certificates. Verified credentials help you rank higher on the leaderboard. Not required for markets or shops without insurance.","Facultatif — téléchargez assurance, permis ou certificats. Les documents vérifiés améliorent votre classement.","Optional — upload insurance, permit o sertifikat. Sapos admin i verify, yu save rank moa high.",src/components/BusinessCredentialsSettings.tsx
 IN-0304,Applies to your whole business — all your listings share these credentials.,Valable pour toute votre entreprise — toutes vos annonces partagent ces documents.,Blong olgeta bisnis — evri listing i yusum semak kredensel.,src/components/BusinessCredentialsSettings.tsx
@@ -309,47 +309,47 @@ IN-0307,My credentials,Accréditations,Kredensel blong mi,src/components/Busines
 IN-0308,"Checked by StikmNek — green tick = verified, red X = not on file","Vérifié par StikmNek — coche verte = validé, X rouge = absent","StikmNek i check — grin tick = verify, red X = no gat",src/components/BusinessCredentialsTile.tsx
 IN-0309,Helps you see what this business has provided for your peace of mind.,Voyez ce que cet établissement a fourni pour votre tranquillité.,Yu save lukim wanem dokumen bisnis ia i gat.,src/components/BusinessCredentialsTile.tsx
 IN-0310,this business,cet établissement,bisnis ia,src/components/BusinessDetail.tsx
-IN-0311,Schedule & departures,Horaires & départs,Taem & lego,src/components/BusinessDetail.tsx
-IN-0312,Operating hours,Heures d’ouverture,Taem wok,src/components/BusinessDetail.tsx
+IN-0311,Schedule & departures,Horaires & départs,Taem mo lego,src/components/BusinessDetail.tsx
+IN-0312,Operating hours,Heures d’ouverture,Taem blong wok,src/components/BusinessDetail.tsx
 IN-0313,You need an active pass to request bookings and get discounts!,Vous avez besoin d’un pass actif pour demander une réservation et bénéficier des réductions !,Yu nidim aktiv pas blong askem bukin mo kasem diskaon!,src/components/BusinessDetail.tsx
 IN-0314,Get a StikmNek pass to message businesses on WhatsApp and unlock member rates.,Obtenez un pass StikmNek pour contacter les entreprises sur WhatsApp et bénéficier des tarifs membres.,Yu nidim StikmNek pas blong mesej bisnis long WhatsApp mo kasem praes blong membas.,src/components/BusinessDetail.tsx
-IN-0315,Link copied to clipboard!,Lien copié !,Link i kopi finis!,src/components/BusinessDetail.tsx
-IN-0316,Could not load live listing details.,Impossible de charger les détails de l’annonce.,No save lod listing detaels.,src/components/BusinessDetail.tsx
-IN-0317,No active offers for this business yet.,Aucune offre active pour cet établissement pour le moment.,No gat aktiv ofa yet long bisnis ia.,src/components/BusinessDetail.tsx
-IN-0318,Choose another listing from this business,Choisir une autre annonce,Jus wan narafa listing,src/components/BusinessDetail.tsx
-IN-0319,Show less,Afficher moins,Ridim smol,src/components/BusinessDetail.tsx
+IN-0315,Link copied to clipboard!,Lien copié !,Link i kopi finis long clipboard!,src/components/BusinessDetail.tsx
+IN-0316,Could not load live listing details.,Impossible de charger les détails de l’annonce.,No save lod live lo  listing detaels.,src/components/BusinessDetail.tsx
+IN-0317,No active offers for this business yet.,Aucune offre active pour cet établissement pour le moment.,No gat aktiv ofa long bisnis yet .,src/components/BusinessDetail.tsx
+IN-0318,Choose another listing from this business,Choisir une autre annonce,Jus wan narafa listing blong binis,src/components/BusinessDetail.tsx
+IN-0319,Show less,Afficher moins,soem smol,src/components/BusinessDetail.tsx
 IN-0320,Read more,Lire la suite,Ridim moa,src/components/BusinessDetail.tsx
 IN-0321,Per-person pricing (VT),Tarifs par personne (VT),Praes long wanwan man (VT),src/components/BusinessDetail.tsx
-IN-0322,Rates by guest type. Use Request booking to estimate totals for your party.,Tarifs selon le type de visiteur. Utilisez « Demander une réservation » pour le total.,Praes blong wanwan kaen man. Yusum Askem bukin blong lukim totel.,src/components/BusinessDetail.tsx
+IN-0322,Rates by guest type. Use Request booking to estimate totals for your party.,Tarifs selon le type de visiteur. Utilisez « Demander une réservation » pour le total.,Praes blong wanwan kaen man. Yusum rekwes buking blong yu blong faenemaot total blong pati.,src/components/BusinessDetail.tsx
 IN-0323,Guest type,Type,Kaen man,src/components/BusinessDetail.tsx
 IN-0324,Pax,Pers.,Man,src/components/BusinessDetail.tsx
-IN-0325,Standard,Standard,Stanad,src/components/BusinessDetail.tsx
+IN-0325,Standard,Standard,Stantat,src/components/BusinessDetail.tsx
 IN-0326,Flat rate,Tarif fixe,Flat praes,src/components/BusinessDetail.tsx
-IN-0327,Chat on WhatsApp,Discuter sur WhatsApp,Toktok long WhatsApp,src/components/BusinessDetail.tsx
-IN-0328,Send a message directly to this business,Envoyez un message directement à cette entreprise,Sendem mesej daerekli long bisnis ia,src/components/BusinessDetail.tsx
-IN-0329,Available once you have an active StikmNek pass — same as Request booking.,Disponible avec un pass StikmNek actif — comme « Demander une réservation ».,I save wok sapos yu gat aktiv StikmNek pas — semak Askem bukin.,src/components/BusinessDetail.tsx
+IN-0327,Chat on WhatsApp,Discuter sur WhatsApp,sentem mesej tarek ko long WhatsApp,src/components/BusinessDetail.tsx
+IN-0328,Send a message directly to this business,Envoyez un message directement à cette entreprise,Sendem mesej daerekli ko long bisnis ia,src/components/BusinessDetail.tsx
+IN-0329,Available once you have an active StikmNek pass — same as Request booking.,Disponible avec un pass StikmNek actif — comme « Demander une réservation ».,I save wok sapos yu gat aktiv StikmNek pas — semak taem yu rekwes bukin.,src/components/BusinessDetail.tsx
 IN-0330,Open WhatsApp,Ouvrir WhatsApp,Openem WhatsApp,src/components/BusinessDetail.tsx
 IN-0331,Opens WhatsApp with a pre-filled message. Available on mobile and desktop.,Ouvre WhatsApp avec un message pré-rempli. Disponible sur mobile et bureau.,Openem WhatsApp wetem mesej we i redi. I wok long fon mo kompyuta.,src/components/BusinessDetail.tsx
 IN-0332,Sign in & get a pass to use WhatsApp,Connectez-vous et obtenez un pass pour WhatsApp,Login mo kasem pas blong yusum WhatsApp,src/components/BusinessDetail.tsx
-IN-0333,You cannot review your own listing.,Vous ne pouvez pas noter votre propre annonce.,Yu no save riviu lista blong yu yet.,src/components/BusinessDetail.tsx
+IN-0333,You cannot review your own listing.,Vous ne pouvez pas noter votre propre annonce.,Yu no save riviu list blong yu yet.,src/components/BusinessDetail.tsx
 IN-0334,Response from business,Réponse de l'établissement,Bisnis i talem,src/components/BusinessDetail.tsx
 IN-0335,No reviews yet. Be the first to share your experience!,Pas encore d'avis. Soyez le premier à partager votre expérience !,No gat riviu yet. Yu faswan blong searem eksperiens blong yu!,src/components/BusinessDetail.tsx
-IN-0336,Standard,Standard,Stanad,src/components/BusinessDetail.tsx
+IN-0336,Standard,Standard,Stantat,src/components/BusinessDetail.tsx
 IN-0337,Your StikmNek member price,Votre tarif membre StikmNek,Praes blong memba StikmNek,src/components/BusinessDetail.tsx
 IN-0338,Request booking,Demander une réservation,Askem bukin,src/components/BusinessDetail.tsx
 IN-0339,Message on WhatsApp,Message sur WhatsApp,Mesej long WhatsApp,src/components/BusinessDetail.tsx
 IN-0340,View on Google Maps,Voir sur Google Maps,Lukim long Google Maps,src/components/BusinessDetail.tsx
-IN-0341,Discover amazing deals from local businesses across Vanuatu,Découvrez des offres incroyables des entreprises locales à travers le Vanuatu,Faenem nambawan dils from lokal bisnis long Vanuatu,src/components/BusinessGrid.tsx
-IN-0342,No deals found. Try adjusting your filters.,Aucune offre trouvée. Essayez d'ajuster vos filtres.,No gat dil i faenem. Traem narafala sej.,src/components/BusinessGrid.tsx
+IN-0341,Discover amazing deals from local businesses across Vanuatu,Découvrez des offres incroyables des entreprises locales à travers le Vanuatu,Faenem nambawan dils long ol lokal bisnis long Vanuatu,src/components/BusinessGrid.tsx
+IN-0342,No deals found. Try adjusting your filters.,Aucune offre trouvée. Essayez d'ajuster vos filtres.,No gat faenem any deal. Traem narafala sej.,src/components/BusinessGrid.tsx
 IN-0343,View All Deals,Voir toutes les offres,Lukim Olgeta Dils,src/components/BusinessGrid.tsx
 IN-0344,Scan a Pass,Scanner un Pass,Skanem wan Pas,src/components/BusinessHomeScreen.tsx
-IN-0345,Scan tourist QR codes to verify and redeem discounts,Scannez les codes QR des touristes,Skanem QR kod blong turis,src/components/BusinessHomeScreen.tsx
+IN-0345,Scan tourist QR codes to verify and redeem discounts,Scannez les codes QR des touristes,Skanem QR kod blong turis blong reviu akaon,src/components/BusinessHomeScreen.tsx
 IN-0346,Edit my Listing,Modifier mon annonce,Editim Listing Blong Mi,src/components/BusinessHomeScreen.tsx
-IN-0347,"Update your business details, photos, and deals",Mettez à jour vos détails,Apdeitim ditel blong bisnis blong yu,src/components/BusinessHomeScreen.tsx
+IN-0347,"Update your business details, photos, and deals",Mettez à jour vos détails,Apdeitem ditel blong bisnis blong yu,src/components/BusinessHomeScreen.tsx
 IN-0348,Credentials,Accréditations,Kredensel,src/components/BusinessHomeScreen.tsx
 IN-0349,"Upload licence, insurance, and permits","Téléversez licence, assurance et permis",Uploadem permit mo insurance,src/components/BusinessHomeScreen.tsx
 IN-0350,Create a New Listing,Créer une annonce,Mekem Niufala Listing,src/components/BusinessHomeScreen.tsx
-IN-0351,Submit a new business listing for approval,Soumettre une nouvelle annonce,Sakem niufala bisnis listing,src/components/BusinessHomeScreen.tsx
+IN-0351,Submit a new business listing for approval,Soumettre une nouvelle annonce,sapmitim niufala bisnis listing blong oli save aprovum ,src/components/BusinessHomeScreen.tsx
 IN-0352,My Reviews,Mes Avis,Riviu Blong Mi,src/components/BusinessHomeScreen.tsx
 IN-0353,Read and respond to customer reviews,Lire et répondre aux avis,Ridim mo ansarem riviu,src/components/BusinessHomeScreen.tsx
 IN-0354,Home,Accueil,Hom,src/components/BusinessHomeScreen.tsx
@@ -357,131 +357,131 @@ IN-0355,Return to the main StikmNek app,Retourner à l'app principale,Go bak lon
 IN-0356,Stats,Statistiques,Stat,src/components/BusinessHomeScreen.tsx
 IN-0357,View your business analytics and performance,Voir vos analyses et performances,Lukim analitiks mo pefomans,src/components/BusinessHomeScreen.tsx
 IN-0358,Welcome back,Bienvenue,Welkam bak,src/components/BusinessHomeScreen.tsx
-IN-0359,Manage your business from here,Gérez votre entreprise ici,Managem bisnis blong yu long hia,src/components/BusinessHomeScreen.tsx
+IN-0359,Manage your business from here,Gérez votre entreprise ici,Managem bisnis blong yu long ples ia,src/components/BusinessHomeScreen.tsx
 IN-0360,Quick Tips,Conseils rapides,Kwik Tips,src/components/BusinessHomeScreen.tsx
 IN-0361,Get the most out of StikmNek,Tirez le meilleur parti de StikmNek,Kasem moa long StikmNek,src/components/BusinessHomeScreen.tsx
 IN-0362,Please read and accept the Business partner & listing terms to continue.,Veuillez lire et accepter les conditions Partenaires commerciaux pour continuer.,Plis ridim mo agri long Business partner & listing terms bifo yu submit.,src/components/BusinessListingForm.tsx
-IN-0363,"Optional: upload insurance, permits, or training certificates in Business Profile → My credentials. Verified documents help you rank higher on the leaderboard.","Facultatif : téléchargez assurance, permis ou certificats dans Profil entreprise → Mes accréditations.",Optional: upload insurance o permit long Business Profile → My credentials.,src/components/BusinessListingForm.tsx
+IN-0363,"Optional: upload insurance, permits, or training certificates in Business Profile → My credentials. Verified documents help you rank higher on the leaderboard.","Facultatif : téléchargez assurance, permis ou certificats dans Profil entreprise → Mes accréditations.",Opsenel: aplotem insurens o permit long bisnis profael — My credentials.,src/components/BusinessListingForm.tsx
 IN-0364,Upload credentials,Télécharger des documents,Upload kredensel,src/components/BusinessListingForm.tsx
 IN-0365,Your deal,Votre offre,Dil blong yu,src/components/BusinessListingForm.tsx
 IN-0366,Price,Prix,Praes,src/components/BusinessListingForm.tsx
 IN-0367,Details,Détails,Ol samting,src/components/BusinessListingForm.tsx
 IN-0368,Photos,Photos,Foto,src/components/BusinessListingForm.tsx
 IN-0369,Finish,Terminer,Finisim,src/components/BusinessListingForm.tsx
-IN-0370,Please complete this step.,Veuillez compléter cette étape.,Plis kompletem step ia.,src/components/BusinessListingForm.tsx
+IN-0370,Please complete this step.,Veuillez compléter cette étape.,Plis komplitim step ia.,src/components/BusinessListingForm.tsx
 IN-0371,Edit your listing,Modifier votre annonce,Senisim listing,src/components/BusinessListingForm.tsx
-IN-0372,List Your Business for Free,Inscrivez votre entreprise gratuitement,Listem Bisnis Blong Yu Fri,src/components/BusinessListingForm.tsx
+IN-0372,List Your Business for Free,Inscrivez votre entreprise gratuitement,Listim Bisnis Blong Yu fo Fri,src/components/BusinessListingForm.tsx
 IN-0373,Join 120+ local businesses reaching thousands of tourists,Rejoignez plus de 120 entreprises locales atteignant des milliers de touristes,Joinem 120+ lokal bisnis we i rijim plante turis,src/components/BusinessListingForm.tsx
-IN-0374,Simple flow,Parcours simple,Wanwan wok,src/components/BusinessListingForm.tsx
-IN-0375,"First complete your business profile (Dashboard → Business Profile) with phone, WhatsApp, and address. Here you add each deal separately — we copy those saved details into this form. Scroll down to optionally upload credentials (insurance, permits). Use a clear title for this deal (not only your company name).",Complétez dabord votre profil entreprise (tableau de bord → Profil entreprise). Ici vous ajoutez chaque offre. Faites défiler pour télécharger des accréditations (facultatif). Donnez un titre clair pour cette offre.,Fes komplitim profil bisnis long dashboard. Hia yu adem evri dil. Scroll daon blong upload kredensel (optional). Yusum klia titel blong dil ia.,src/components/BusinessListingForm.tsx
-IN-0376,Create a Business Account,Créer un compte entreprise,Mekem Bisnis Akaont,src/components/BusinessListingForm.tsx
-IN-0377,Sign up as a business owner to list your business and manage your offers.,Inscrivez-vous en tant que propriétaire d'entreprise pour gérer vos offres.,Saen ap olsem bisnis ona blong listem bisnis blong yu.,src/components/BusinessListingForm.tsx
+IN-0374,Simple flow,Parcours simple,Simpol wok,src/components/BusinessListingForm.tsx
+IN-0375,"First complete your business profile (Dashboard → Business Profile) with phone, WhatsApp, and address. Here you add each deal separately — we copy those saved details into this form. Scroll down to optionally upload credentials (insurance, permits). Use a clear title for this deal (not only your company name).",Complétez dabord votre profil entreprise (tableau de bord → Profil entreprise). Ici vous ajoutez chaque offre. Faites défiler pour télécharger des accréditations (facultatif). Donnez un titre clair pour cette offre.,Fes komplitim profael bisnis long dashboard. Hia yu adem evri dil. Scroll daon blong upload kredensel (optional). Yusum klia titel blong dil ia.,src/components/BusinessListingForm.tsx
+IN-0376,Create a Business Account,Créer un compte entreprise,Mekem wan Bisnis Akaon,src/components/BusinessListingForm.tsx
+IN-0377,Sign up as a business owner to list your business and manage your offers.,Inscrivez-vous en tant que propriétaire d'entreprise pour gérer vos offres.,Saen ap olsem bisnis ona blong listim bisnis blong yu.,src/components/BusinessListingForm.tsx
 IN-0378,Sign Up as Business,S'inscrire en tant qu'entreprise,Saen Ap olsem Bisnis,src/components/BusinessListingForm.tsx
-IN-0379,Already have an account? Sign In,Déjà un compte? Se connecter,Gat akaont? Saen In,src/components/BusinessListingForm.tsx
-IN-0380,Business Account Required,Compte entreprise requis,Bisnis Akaont i Nidim,src/components/BusinessListingForm.tsx
-IN-0381,"You're currently signed in as a tourist. To list a business, you'll need a business account.","Vous êtes connecté en tant que touriste. Pour inscrire une entreprise, vous avez besoin d'un compte entreprise.","Yu saen in olsem turis. Blong listem bisnis, yu nidim bisnis akaont.",src/components/BusinessListingForm.tsx
+IN-0379,Already have an account? Sign In,Déjà un compte? Se connecter,Yu gat wan akaon? Saen In,src/components/BusinessListingForm.tsx
+IN-0380,Business Account Required,Compte entreprise requis,Bisnis Akaon i Nidim,src/components/BusinessListingForm.tsx
+IN-0381,"You're currently signed in as a tourist. To list a business, you'll need a business account.","Vous êtes connecté en tant que touriste. Pour inscrire une entreprise, vous avez besoin d'un compte entreprise.","Yu saen in olsem wan turis. Blong listim bisnis, yu nidim bisnis akaon.",src/components/BusinessListingForm.tsx
 IN-0382,Step,Étape,Step,src/components/BusinessListingForm.tsx
 IN-0383,Saved automatically,Enregistré automatiquement,Sevem otomatik,src/components/BusinessListingForm.tsx
-IN-0384,Clear this listing and start over?,Effacer cette annonce et recommencer ?,Klialem listing ia mo stat bakegen?,src/components/BusinessListingForm.tsx
+IN-0384,Clear this listing and start over?,Effacer cette annonce et recommencer ?,Kliarem listing ia mo stat bakegen?,src/components/BusinessListingForm.tsx
 IN-0385,Start over,Recommencer,Stat bakegen,src/components/BusinessListingForm.tsx
-IN-0386,Deal / listing title,Titre de l’offre,Titel blong dil,src/components/BusinessListingForm.tsx
+IN-0386,Deal / listing title,Titre de l’offre,Taetel blong dil,src/components/BusinessListingForm.tsx
 IN-0387,e.g. Reef Explorer Semi-Sub Tour – Port Vila,ex. Visite semi-submersible – Port-Vila,ex. Semi-sub tua – Port Vila,src/components/BusinessListingForm.tsx
 IN-0388,This is the name tourists see for this deal. Save to update your live listing.,C’est le nom visible pour cette offre. Enregistrez pour mettre à jour.,Nem ia turis bae luk long dil ia. Sevem blong apdetem.,src/components/BusinessListingForm.tsx
 IN-0389,Pricing & Discount (VT),Prix et remise (VT),Praes mo Diskaon (VT),src/components/BusinessListingForm.tsx
-IN-0390,Enter a single per-person price in Vatu (VT) (used if you add no tiers). Discount is optional — businesses offering discounts get featured priority.,Entrez un prix unique par personne en Vatu (VT) (utilisé si vous n’ajoutez pas de paliers). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.,Putum wan praes long Vatu (VT) (hem i wok sapos yu no putum tiers). Diskaon i opsonal — bisnis we i gat diskaon i go fas.,src/components/BusinessListingForm.tsx
-IN-0391,Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.,Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.,Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.,src/components/BusinessListingForm.tsx
+IN-0390,Enter a single per-person price in Vatu (VT) (used if you add no tiers). Discount is optional — businesses offering discounts get featured priority.,Entrez un prix unique par personne en Vatu (VT) (utilisé si vous n’ajoutez pas de paliers). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.,Putum wan praes long Vatu (VT) (hem i wok sapos yu no putum tiers). Diskaon i opsenal — bisnis we i gat diskaon i go feswan.,src/components/BusinessListingForm.tsx
+IN-0391,Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.,Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.,Putum praes long Vatu (VT). Diskaon i opsenal — bisnis we i gat diskaon i go feswan.,src/components/BusinessListingForm.tsx
 IN-0392,Your Price (VT),Votre prix (VT),Praes blong yu (VT),src/components/BusinessListingForm.tsx
-IN-0393,Regular price per person in Vatu,Prix normal par personne en Vatu,Stanad praes long wan man (VT),src/components/BusinessListingForm.tsx
+IN-0393,Regular price per person in Vatu,Prix normal par personne en Vatu,Stantat praes long wan man (VT),src/components/BusinessListingForm.tsx
 IN-0394,Discount (%),Remise (%),Diskaon (%),src/components/BusinessListingForm.tsx
 IN-0395,New Price (auto),Nouveau prix (auto),Niu Praes (oto),src/components/BusinessListingForm.tsx
 IN-0396,Customer will see,Le client verra,Kastoma bae luk,src/components/BusinessListingForm.tsx
 IN-0397,Customer saves,Le client économise,Kastoma i sevem,src/components/BusinessListingForm.tsx
 IN-0398,per person,par personne,long wan man,src/components/BusinessListingForm.tsx
-IN-0399,Discount Validity Period,Période de validité de la remise,Taem blong Diskaon,src/components/BusinessListingForm.tsx
-IN-0400,Discount Valid From *,Valide à partir du *,Stat Dei *,src/components/BusinessListingForm.tsx
+IN-0399,Discount Validity Period,Période de validité de la remise,Taem blong Diskaon i valit long wan periot,src/components/BusinessListingForm.tsx
+IN-0400,Discount Valid From *,Valide à partir du *,Diskaon Stat long wanem Dei *,src/components/BusinessListingForm.tsx
 IN-0401,Listing Duration,Durée de l'inscription,Hamas Taem,src/components/BusinessListingForm.tsx
-IN-0402,Discount Valid Until,Valide jusqu'au,En Dei,src/components/BusinessListingForm.tsx
-IN-0403,WhatsApp Number (Optional),Numéro WhatsApp (Optionnel),WhatsApp Namba (Opsonal),src/components/BusinessListingForm.tsx
+IN-0402,Discount Valid Until,Valide jusqu'au,En blong valit diskaon long wanem Dei,src/components/BusinessListingForm.tsx
+IN-0403,WhatsApp Number (Optional),Numéro WhatsApp (Optionnel),WhatsApp Namba (Opsenal),src/components/BusinessListingForm.tsx
 IN-0404,Add your WhatsApp number so tourists can message you directly. Include country code (e.g. +678).,Ajoutez votre numéro WhatsApp pour que les touristes puissent vous contacter directement.,Addem WhatsApp namba blong yu blong turis i save mesej yu daerekli.,src/components/BusinessListingForm.tsx
 IN-0405,Tourists will be able to open WhatsApp and message you directly from your listing. Your number will be displayed publicly.,Les touristes pourront ouvrir WhatsApp et vous envoyer un message directement depuis votre fiche.,Turis bae save openem WhatsApp mo sendem mesej long yu daerekli.,src/components/BusinessListingForm.tsx
 IN-0406,Online Presence & Map,Présence en ligne et carte,Onlaen mo Map,src/components/BusinessListingForm.tsx
-IN-0407,Optional — company credentials,Facultatif — accréditations,Optional — kredensel,src/components/BusinessListingForm.tsx
-IN-0408,"Save your business profile in the dashboard first (phone, address, logo). Then you can upload optional credentials (insurance, permits) on this form or under Business Profile.","Enregistrez dabord votre profil entreprise dans le tableau de bord, puis vous pourrez télécharger des accréditations ici.","Save profail bisnis long dashboard first, bae yu save upload kredensel.",src/components/BusinessListingForm.tsx
-IN-0409,Submit changes for review,Envoyer les modifications,Submitem senis,src/components/BusinessListingForm.tsx
+IN-0407,Optional — company credentials,Facultatif — accréditations,Optional — kampani kredensel,src/components/BusinessListingForm.tsx
+IN-0408,"Save your business profile in the dashboard first (phone, address, logo). Then you can upload optional credentials (insurance, permits) on this form or under Business Profile.","Enregistrez dabord votre profil entreprise dans le tableau de bord, puis vous pourrez télécharger des accréditations ici.",Sevem profael bisnis long dashboard fastaem bae yu save aplotem kredensel.,src/components/BusinessListingForm.tsx
+IN-0409,Submit changes for review,Envoyer les modifications,Submitim jenses blong save reviu,src/components/BusinessListingForm.tsx
 IN-0410,Next,Suivant,Nekis,src/components/BusinessListingForm.tsx
 IN-0411,Close,Fermer,Klosem,src/components/BusinessListingForm.tsx
-IN-0412,I agree to these terms,J'accepte ces conditions,Mi agri long ol taem ia,src/components/BusinessListingForm.tsx
+IN-0412,I agree to these terms,J'accepte ces conditions,Mi agri long ol tems ia,src/components/BusinessListingForm.tsx
 IN-0413,Close,Fermer,Klosem,src/components/BusinessListingForm.tsx
-IN-0414,"Submit your first deal to go live — add photos, prices, and your discount.","Soumettez votre première offre pour être visible — photos, prix et réduction.","Submitim fes deal blong yu — foto, praes, mo diskaon.",src/components/BusinessOwnerDashboard.tsx
-IN-0415,Business Profile,Profil entreprise,Bisnis profail,src/components/BusinessOwnerDashboard.tsx
+IN-0414,"Submit your first deal to go live — add photos, prices, and your discount.","Soumettez votre première offre pour être visible — photos, prix et réduction.","Submitim fes dil blong yu — atem foto, praes, mo diskaon.",src/components/BusinessOwnerDashboard.tsx
+IN-0415,Business Profile,Profil entreprise,Bisnis profael,src/components/BusinessOwnerDashboard.tsx
 IN-0416,My credentials,Mes accréditations,Kredensel blong mi,src/components/BusinessOwnerDashboard.tsx
-IN-0417,You have more than one live deal under this business. Choose which listing to update — no need to open the side menu.,Plusieurs annonces sont actives. Choisissez celle à modifier — sans passer par le menu.,Yu gat plante live dil. Pikim wan blong apdeit — no nid openem said menu.,src/components/BusinessOwnerDashboard.tsx
-IN-0418,Analytics and charts below are for the listing you select here.,Les statistiques ci-dessous correspondent à l’annonce choisie ici.,Ol namba long daon i blong listing we yu pikim hia.,src/components/BusinessOwnerDashboard.tsx
+IN-0417,You have more than one live deal under this business. Choose which listing to update — no need to open the side menu.,Plusieurs annonces sont actives. Choisissez celle à modifier — sans passer par le menu.,Yu gat mo tan one live dil anta long bisnis ia. Jusum wij listing nao save blong apdeit — no nid blong openem saed menu.,src/components/BusinessOwnerDashboard.tsx
+IN-0418,Analytics and charts below are for the listing you select here.,Les statistiques ci-dessous correspondent à l’annonce choisie ici.,Ol namba long daon i blong listing we yu jusum ia.,src/components/BusinessOwnerDashboard.tsx
 IN-0419,Reviews shown below are for this listing when reviews are linked to a specific deal.,Les avis affichés correspondent à cette annonce lorsqu’ils sont liés à une offre.,Ol riviu long daon i blong listing ia taem oli link long wan dil.,src/components/BusinessOwnerDashboard.tsx
-IN-0420,Photos below are for this listing’s gallery (each deal can have its own photos).,Les photos ci-dessous sont celles de cette annonce (chaque offre peut avoir sa galerie).,Ol foto long daon i blong gallery blong listing ia (evri dil i save gat ol foto blong hem).,src/components/BusinessOwnerDashboard.tsx
+IN-0420,Photos below are for this listing’s gallery (each deal can have its own photos).,Les photos ci-dessous sont celles de cette annonce (chaque offre peut avoir sa galerie).,Ol foto  daon i blong gallery blong listing ia (evri dil i save gat ol foto blong hem).,src/components/BusinessOwnerDashboard.tsx
 IN-0421,Which listing?,Quelle annonce ?,Wan listing?,src/components/BusinessOwnerDashboard.tsx
 IN-0422,Deal / listing title,Titre de l’offre,Titel blong dil,src/components/BusinessOwnerDashboard.tsx
 IN-0423,Category,Catégorie,Kategori,src/components/BusinessOwnerDashboard.tsx
-IN-0424,Description,Description,Description,src/components/BusinessOwnerDashboard.tsx
+IN-0424,Description,Description,Diskraepem,src/components/BusinessOwnerDashboard.tsx
 IN-0425,Business photos,Photos,Foto,src/components/BusinessOwnerDashboard.tsx
-IN-0426,At least one photo or cover image is required. Previous uploads are restored when available.,Au moins une photo ou une image de couverture est requise. Les envois précédents sont restaurés si possible.,Wan foto o kava i nidim. Ol foto bifo i save kam bake.,src/components/BusinessOwnerDashboard.tsx
-IN-0427,"Need to change phone, email, or address?","Modifier téléphone, e-mail ou adresse ?",Wan senisim fon o email?,src/components/BusinessOwnerDashboard.tsx
-IN-0428,Open Business Profile,Ouvrir le profil entreprise,Openem Bisnis profail,src/components/BusinessOwnerDashboard.tsx
-IN-0429,"Save your business profile first, then you can upload credentials here.",Enregistrez d’abord votre profil entreprise.,Save profail bisnis first.,src/components/BusinessOwnerDashboard.tsx
-IN-0430,"Save your business profile first (complete setup), then you can update phone and contact details here.",Complétez d’abord votre profil entreprise.,Save profail bisnis first.,src/components/BusinessOwnerDashboard.tsx
-IN-0431,Business profile not found.,Profil introuvable.,No faenem bisnis profail.,src/components/BusinessProfileSettings.tsx
-IN-0432,Could not load business profile.,Impossible de charger le profil.,No loadem profail.,src/components/BusinessProfileSettings.tsx
-IN-0433,Please fix the errors below.,Corrigez les erreurs ci-dessous.,Fiksem ol erro.,src/components/BusinessProfileSettings.tsx
-IN-0434,Business profile updated. New listings will use these contact details.,Profil mis � jour. Les nouvelles annonces utiliseront ces coordonn�es.,Profail i apdeit.,src/components/BusinessProfileSettings.tsx
-IN-0435,Business profile,Profil entreprise,Bisnis profail,src/components/BusinessProfileSettings.tsx
+IN-0426,At least one photo or cover image is required. Previous uploads are restored when available.,Au moins une photo ou une image de couverture est requise. Les envois précédents sont restaurés si possible.,Atlas u nidim wan foto o kava pikja. Ol foto bifo i save kam bakeken.,src/components/BusinessOwnerDashboard.tsx
+IN-0427,"Need to change phone, email, or address?","Modifier téléphone, e-mail ou adresse ?","Nid blong jensem fon, emeil mo adres?",src/components/BusinessOwnerDashboard.tsx
+IN-0428,Open Business Profile,Ouvrir le profil entreprise,Openem Bisnis profael,src/components/BusinessOwnerDashboard.tsx
+IN-0429,"Save your business profile first, then you can upload credentials here.",Enregistrez d’abord votre profil entreprise.,Sevem  profail blong bisnis fastaem mo save aplotem kretensel,src/components/BusinessOwnerDashboard.tsx
+IN-0430,"Save your business profile first (complete setup), then you can update phone and contact details here.",Complétez d’abord votre profil entreprise.,Sevem profael blong bisnis fastaem afta u save aptaetem fon mo kontak titels blong yu,src/components/BusinessOwnerDashboard.tsx
+IN-0431,Business profile not found.,Profil introuvable.,No faenem bisnis profael.,src/components/BusinessProfileSettings.tsx
+IN-0432,Could not load business profile.,Impossible de charger le profil.,No save lodem profael.,src/components/BusinessProfileSettings.tsx
+IN-0433,Please fix the errors below.,Corrigez les erreurs ci-dessous.,Fiksim ol erra.,src/components/BusinessProfileSettings.tsx
+IN-0434,Business profile updated. New listings will use these contact details.,Profil mis � jour. Les nouvelles annonces utiliseront ces coordonn�es.,Profael i apdeit.,src/components/BusinessProfileSettings.tsx
+IN-0435,Business profile,Profil entreprise,Bisnis profael,src/components/BusinessProfileSettings.tsx
 IN-0436,"Update phone, email, address, and office hours for your whole business. Each tour or deal can still have its own schedule under Edit listing.","Mettez � jour le t�l�phone, l�e-mail, l�adresse et les horaires du commerce. Chaque annonce garde son propre horaire dans Modifier l�annonce.","Apdeit fon, email, adres mo taem blong olgeta bisnis. Evri listing i save gat diffren taem long Edit listing.",src/components/BusinessProfileSettings.tsx
 IN-0437,Business name,Nom du commerce,Nem blong bisnis,src/components/BusinessProfileSettings.tsx
 IN-0438,Contact person,Personne de contact,Man blong kontak,src/components/BusinessProfileSettings.tsx
 IN-0439,Primary category,Cat�gorie principale,Kategori,src/components/BusinessProfileSettings.tsx
 IN-0440,I don't use WhatsApp — contact me by phone or email instead.,Je n'utilise pas WhatsApp — contactez-moi par telephone ou e-mail.,Mi no yusum WhatsApp — kontaktem mi long fon o email.,src/components/BusinessProfileSettings.tsx
 IN-0441,WhatsApp,WhatsApp,WhatsApp,src/components/BusinessProfileSettings.tsx
-IN-0442,Recommended for guest contact and StikmNek setup tips. Include country code (e.g. +678).,Recommande pour les clients et conseils StikmNek. Indicatif pays (ex. +678).,Recommend blong guest mo tips. Country code (ex. +678).,src/components/BusinessProfileSettings.tsx
+IN-0442,Recommended for guest contact and StikmNek setup tips. Include country code (e.g. +678).,Recommande pour les clients et conseils StikmNek. Indicatif pays (ex. +678).,Recomentem blong guest mo tips. Inklutum kaotri cod (ex. +678).,src/components/BusinessProfileSettings.tsx
 IN-0443,"Send me WhatsApp tips from StikmNek (listing help, photo uploads, getting bookings).","Envoyez-moi des conseils WhatsApp de StikmNek (aide annonce, photos, reservations).","Sendem WhatsApp tips blong StikmNek (help long listing, foto, booking).",src/components/BusinessProfileSettings.tsx
-IN-0444,We'll use your phone and email for listing help. You won't be on our WhatsApp outreach list.,Nous utiliserons votre telephone et e-mail. Pas de liste WhatsApp.,Mifala bae yusum fon mo email. No long WhatsApp list.,src/components/BusinessProfileSettings.tsx
-IN-0445,Business hours (office / base),Heures du commerce (bureau),Taem wok blong bisnis,src/components/BusinessProfileSettings.tsx
-IN-0446,Used as a fallback and for your company contact. Set tour-specific times on each listing under Edit listing.,Utilis� pour le contact g�n�ral. Les horaires de chaque tour se d�finissent dans Modifier l�annonce.,Blong kontak blong bisnis. Taem blong wan tour � long Edit listing.,src/components/BusinessProfileSettings.tsx
+IN-0444,We'll use your phone and email for listing help. You won't be on our WhatsApp outreach list.,Nous utiliserons votre telephone et e-mail. Pas de liste WhatsApp.,Mifala bae yusum fon mo email long taem blong listing elp. No long WhatsApp list.,src/components/BusinessProfileSettings.tsx
+IN-0445,Business hours (office / base),Heures du commerce (bureau),Ol binis aoa,src/components/BusinessProfileSettings.tsx
+IN-0446,Used as a fallback and for your company contact. Set tour-specific times on each listing under Edit listing.,Utilis� pour le contact g�n�ral. Les horaires de chaque tour se d�finissent dans Modifier l�annonce.,Blong kontak blong bisnis. Taem blong wan tour — long jesem listing.,src/components/BusinessProfileSettings.tsx
 IN-0447,Logo (optional),Logo (optionnel),Logo,src/components/BusinessProfileSettings.tsx
-IN-0448,Upload then drag and zoom to fit the square � same idea as a profile photo.,"T�l�versez, puis glissez et zoomez pour remplir le carr�.","Upload, drag mo zoom blong fillum square.",src/components/BusinessProfileSettings.tsx
-IN-0449,Save profile,Enregistrer,Sevem profail,src/components/BusinessProfileSettings.tsx
+IN-0448,Upload then drag and zoom to fit the square � same idea as a profile photo.,"T�l�versez, puis glissez et zoomez pour remplir le carr�.","aplotem, trak mo zoom blong save fitim square. Sem aedia long profael foto",src/components/BusinessProfileSettings.tsx
+IN-0449,Save profile,Enregistrer,Sevem profael,src/components/BusinessProfileSettings.tsx
 IN-0450,Discard changes,Annuler,Discard,src/components/BusinessProfileSettings.tsx
 IN-0451,Dining,Restauration,Kakae,src/components/CategoryShowcase.tsx
 IN-0452,Fresh seafood & local cuisine,Fruits de mer frais & cuisine locale,Fres sifud & lokal kakae,src/components/CategoryShowcase.tsx
 IN-0453,Activities,Activités,Aktiviti,src/components/CategoryShowcase.tsx
-IN-0454,"Snorkeling, diving & more","Plongée, kayak & plus","Snokling, daeving & moa",src/components/CategoryShowcase.tsx
+IN-0454,"Snorkeling, diving & more","Plongée, kayak & plus","Snokling, daeva mo moa",src/components/CategoryShowcase.tsx
 IN-0455,Tours,Visites,Tua,src/components/CategoryShowcase.tsx
-IN-0456,Cultural & adventure tours,Visites culturelles & aventure,Kalsa & advencha tua,src/components/CategoryShowcase.tsx
-IN-0457,Transportation,Transport,Transport,src/components/CategoryShowcase.tsx
-IN-0458,"Car hire, airport transfers & taxis","Location, transferts aéroport & taxis","Rent kar, airport transfer mo taxi",src/components/CategoryShowcase.tsx
+IN-0456,Cultural & adventure tours,Visites culturelles & aventure,Kalsa & adfenja tua,src/components/CategoryShowcase.tsx
+IN-0457,Transportation,Transport,Transpot,src/components/CategoryShowcase.tsx
+IN-0458,"Car hire, airport transfers & taxis","Location, transferts aéroport & taxis","Rent kar, airport transfe  mo taxi",src/components/CategoryShowcase.tsx
 IN-0459,Spa & Wellness,Spa & Bien-être,Spa & Helt,src/components/CategoryShowcase.tsx
-IN-0460,Relax & rejuvenate,Détendez-vous & rajeunissez,Rilaks & rifresen,src/components/CategoryShowcase.tsx
+IN-0460,Relax & rejuvenate,Détendez-vous & rajeunissez,Rilaks & rifresem,src/components/CategoryShowcase.tsx
 IN-0461,Accommodation,Hébergement,Ples blong slip,src/components/CategoryShowcase.tsx
 IN-0462,Beachfront stays,Séjours en bord de mer,Bichfron stei,src/components/CategoryShowcase.tsx
 IN-0463,Shopping,Shopping,Soping,src/components/CategoryShowcase.tsx
 IN-0464,Local crafts & souvenirs,Artisanat local & souvenirs,Lokal kraft & suvenia,src/components/CategoryShowcase.tsx
 IN-0465,Explore by Category,Explorer par catégorie,Eksploarem bae Kategori,src/components/CategoryShowcase.tsx
-IN-0466,Find the perfect deal for every type of adventure,Trouvez l'offre parfaite pour chaque type d'aventure,Faenem nambawan dil blong evri kaen advencha,src/components/CategoryShowcase.tsx
+IN-0466,Find the perfect deal for every type of adventure,Trouvez l'offre parfaite pour chaque type d'aventure,Faenem nambawan dil blong evri kaen advenja,src/components/CategoryShowcase.tsx
 IN-0467,active listings,annonces actives,aktiv listing,src/components/CategoryShowcase.tsx
 IN-0468,deal,offre,dil,src/components/CategoryShowcase.tsx
 IN-0469,deals,offres,dils,src/components/CategoryShowcase.tsx
-IN-0470,available,disponible,i stap,src/components/CategoryShowcase.tsx
-IN-0471,Resume your profile,Reprendre votre profil,Go bek long profil blong yu,src/components/CompleteTouristProfile.tsx
-IN-0472,Complete your profile,Complétez votre profil,Komplitim profil blong yu,src/components/CompleteTouristProfile.tsx
-IN-0473,Pick up where you left off — your details are saved as you go.,Reprenez où vous en étiez — vos informations sont enregistrées au fil du remplissage.,Go hed wea yu stap — ol samting i save lelebet.,src/components/CompleteTouristProfile.tsx
-IN-0474,We use this to show how pass limits relate to your group and travel dates.,Nous l’utilisons pour expliquer comment les limites des passes correspondent à votre groupe et à vos dates.,Mifala i yusum blong soem ol lim long pas wetem grup mo det blong trip blong yu.,src/components/CompleteTouristProfile.tsx
-IN-0475,Try again,Réessayer,Traem gen,src/components/CompleteTouristProfile.tsx
-IN-0476,"Next, you’ll go to secure checkout — pass options use your profile (change anytime before paying).","Ensuite, passage au paiement sécurisé — le pass s’appuie sur votre profil (modifiable avant paiement).","Biaen, yu go long checkout — pas i blong profil blong yu (yu ken senis bifo pem).",src/components/CompleteTouristProfile.tsx
+IN-0470,available,disponible,Igat,src/components/CategoryShowcase.tsx
+IN-0471,Resume your profile,Reprendre votre profil,Go bak long profael blong yu,src/components/CompleteTouristProfile.tsx
+IN-0472,Complete your profile,Complétez votre profil,Komplitim profaael blong yu,src/components/CompleteTouristProfile.tsx
+IN-0473,Pick up where you left off — your details are saved as you go.,Reprenez où vous en étiez — vos informations sont enregistrées au fil du remplissage.,Go hed long wea yu stop long hem — ol samting i save sef taem yu muv iko lelebet.,src/components/CompleteTouristProfile.tsx
+IN-0474,We use this to show how pass limits relate to your group and travel dates.,Nous l’utilisons pour expliquer comment les limites des passes correspondent à votre groupe et à vos dates.,Mifala i yusum blong soem ol limit blong pas wetem grup mo det blong trip blong yu.,src/components/CompleteTouristProfile.tsx
+IN-0475,Try again,Réessayer,Traem bakeken,src/components/CompleteTouristProfile.tsx
+IN-0476,"Next, you’ll go to secure checkout — pass options use your profile (change anytime before paying).","Ensuite, passage au paiement sécurisé — le pass s’appuie sur votre profil (modifiable avant paiement).","Biaen, yu go long checkout — pas opsen u mas usum profil blong yu (yu save jensem eni taem bifo pem).",src/components/CompleteTouristProfile.tsx
 IN-0477,We value your privacy,Nous respectons votre vie privée,Mifala i respektem praevesi blong yu,src/components/CookieConsent.tsx
-IN-0478,"We use cookies and analytics to enhance your experience, provide personalized deals, and analyze traffic. By clicking ""Accept"", you consent to our use of cookies and Google Analytics tracking in accordance with GDPR.","Nous utilisons des cookies et des analyses pour améliorer votre expérience, fournir des offres personnalisées et analyser le trafic. En cliquant sur ""Accepter"", vous consentez à notre utilisation des cookies et du suivi Google Analytics conformément au RGPD.","Mifala i yusim kukis mo analytics blong mekem eksperiens blong yu i moa gud. Taem yu klikim ""Akseptim"", yu agri long yus blong kukis mo Google Analytics.",src/components/CookieConsent.tsx
+IN-0478,"We use cookies and analytics to enhance your experience, provide personalized deals, and analyze traffic. By clicking ""Accept"", you consent to our use of cookies and Google Analytics tracking in accordance with GDPR.","Nous utilisons des cookies et des analyses pour améliorer votre expérience, fournir des offres personnalisées et analyser le trafic. En cliquant sur ""Accepter"", vous consentez à notre utilisation des cookies et du suivi Google Analytics conformément au RGPD.","Mifala i yusim kukis mo analytics blong mekem eksperiens blong yu i moa gud. Taem yu klikim ""Akseptem"", yu agri long yus blong kukis mo Google Analytics.",src/components/CookieConsent.tsx
 IN-0479,Decline,Refuser,Refusim,src/components/CookieConsent.tsx
-IN-0480,Accept,Accepter,Akseptim,src/components/CookieConsent.tsx
-IN-0481,File must be under 10 MB,Fichier max. 10 Mo,Faol i mas 10 MB,src/components/CredentialUploader.tsx
-IN-0482,Document uploaded — click Save credentials below,Document téléchargé — cliquez Enregistrer ci-dessous,Dokumen i upload — klikim Save,src/components/CredentialUploader.tsx
-IN-0483,Upload PDF or image,Télécharger PDF ou image,Upload PDF o foto,src/components/CredentialUploader.tsx
+IN-0480,Accept,Accepter,Akseptem,src/components/CookieConsent.tsx
+IN-0481,File must be under 10 MB,Fichier max. 10 Mo,Fael i mas 10 MB,src/components/CredentialUploader.tsx
+IN-0482,Document uploaded — click Save credentials below,Document téléchargé — cliquez Enregistrer ci-dessous,Dokumen i aplot — klikim Save,src/components/CredentialUploader.tsx
+IN-0483,Upload PDF or image,Télécharger PDF ou image,aplotem PDF o foto,src/components/CredentialUploader.tsx
 IN-0484,Dining,Restauration,Kakae,src/components/Dashboard.tsx
 IN-0485,Activities,Activités,Aktiviti,src/components/Dashboard.tsx
 IN-0486,Tours,Visites,Tua,src/components/Dashboard.tsx
@@ -489,39 +489,39 @@ IN-0487,Accommodation,Hébergement,Ples blong slip,src/components/Dashboard.tsx
 IN-0488,Redeemed,Utilisés,Yusim,src/components/Dashboard.tsx
 IN-0489,approx.,env.,rid.,src/components/Dashboard.tsx
 IN-0490,Total saved (redemptions),Total économisé (utilisations),Total sevem (redim),src/components/Dashboard.tsx
-IN-0491,Expires: ,Expire le : ,Expire: ,src/components/Dashboard.tsx
+IN-0491,Expires: ,Expire le : ,Expae: ,src/components/Dashboard.tsx
 IN-0492,Discount Validity Period,Période de validité,Taem blong Diskount,src/components/Dashboard.tsx
-IN-0493,Valid From,Valide du,Stat,src/components/Dashboard.tsx
+IN-0493,Valid From,Valide du,Stat blong diskaon,src/components/Dashboard.tsx
 IN-0494,to,au,go,src/components/Dashboard.tsx
-IN-0495,Valid Until,Valide jusqu'au,Finis,src/components/Dashboard.tsx
+IN-0495,Valid Until,Valide jusqu'au,Diskaon valit kasem,src/components/Dashboard.tsx
 IN-0496,Sharing…,Partage…,Serem…,src/components/Dashboard.tsx
-IN-0497,Insights,Analyses,Analitiks,src/components/Dashboard.tsx
-IN-0498,No redemptions yet. Start exploring deals!,Pas encore d'utilisations. Explorez les offres!,No gat yusim yet. Stat eksploarem dils!,src/components/Dashboard.tsx
+IN-0497,Insights,Analyses,tingting,src/components/Dashboard.tsx
+IN-0498,No redemptions yet. Start exploring deals!,Pas encore d'utilisations. Explorez les offres!,No usim yet. Stat eksploarem dils!,src/components/Dashboard.tsx
 IN-0499,Your travel party,Votre groupe de voyage,Grup blong travel,src/components/Dashboard.tsx
-IN-0500,Checkout uses this headcount (ages 6+) from your profile — update it anytime before you buy a pass.,Le paiement utilise ces voyageurs (6 ans et +) depuis votre profil.,Checkout i yusim namba long profil blong yu (6+).,src/components/Dashboard.tsx
-IN-0501,Adults,Adultes,Adult,src/components/Dashboard.tsx
+IN-0500,Checkout uses this headcount (ages 6+) from your profile — update it anytime before you buy a pass.,Le paiement utilise ces voyageurs (6 ans et +) depuis votre profil.,Checkout i yusum namba long proaeil blong yu (6+).,src/components/Dashboard.tsx
+IN-0501,Adults,Adultes,Bikman,src/components/Dashboard.tsx
 IN-0502,Children (6+),Enfants (6+),Pikinini (6+),src/components/Dashboard.tsx
-IN-0503,Edit profile,Modifier le profil,Edit profil,src/components/Dashboard.tsx
-IN-0504,Your savings,Vos économies,Sevin blong yu,src/components/Dashboard.tsx
+IN-0503,Edit profile,Modifier le profil,jesem profael,src/components/Dashboard.tsx
+IN-0504,Your savings,Vos économies,Seving blong yu,src/components/Dashboard.tsx
 IN-0505,Open analytics,Voir les analyses,Openem analitiks,src/components/Dashboard.tsx
 IN-0506,No favorites yet,Pas encore de favoris,No gat favrit yet,src/components/Dashboard.tsx
 IN-0507,Connected to Database,Connecté à la base de données,Konetim long Database,src/components/Dashboard.tsx
-IN-0508,Real-time sync active,Synchronisation en temps réel,Riel-taem sink aktiv,src/components/Dashboard.tsx
+IN-0508,Real-time sync active,Synchronisation en temps réel,Ril-taem sink aktiv,src/components/Dashboard.tsx
 IN-0509,Your data is securely stored and synced across devices. QR codes work offline too!,Vos données sont stockées en toute sécurité et synchronisées entre les appareils.,Data blong yu i sef mo sink akros olgeta divaes.,src/components/Dashboard.tsx
 IN-0510,Your deal savings are ahead of your pass — keep stacking the wins!,Vos économies dépassent le pass — continuez comme ça !,Sevin i win long pass — go hed!,src/components/Dashboard.tsx
-IN-0511,Insights into your StikmNek activity,Aperçu de votre activité StikmNek,Lukim wetem yu bin du long StikmNek,src/components/Dashboard.tsx
-IN-0512,Total Deals Used,Total offres utilisées,Total deals,src/components/Dashboard.tsx
+IN-0511,Insights into your StikmNek activity,Aperçu de votre activité StikmNek,luk iko insaet  long StikmNek aktiviti,src/components/Dashboard.tsx
+IN-0512,Total Deals Used,Total offres utilisées,Total dils,src/components/Dashboard.tsx
 IN-0513,Every VT here is holiday money back in your pocket — epic work!,Chaque VT compte : bravo pour vos économies !,Ol VT ia i helpem pocket blong yu — gudfala wok!,src/components/Dashboard.tsx
-IN-0514,Pass price paid,Prix du pass,Pem blong pass,src/components/Dashboard.tsx
-IN-0515,Pass purchase amount will show here after your next checkout syncs.,Le montant payé pour le pass apparaîtra après le prochain paiement.,Pem blong pass bae i kam afta checkout i sink.,src/components/Dashboard.tsx
-IN-0516,Deal savings (redemptions),Économies (offres),Sevin long deals,src/components/Dashboard.tsx
+IN-0514,Pass price paid,Prix du pass,Pem pass praes,src/components/Dashboard.tsx
+IN-0515,Pass purchase amount will show here after your next checkout syncs.,Le montant payé pour le pass apparaîtra après le prochain paiement.,Taem u Pem  pass bae i kam afta checkout i sink.,src/components/Dashboard.tsx
+IN-0516,Deal savings (redemptions),Économies (offres),Sevin long dils,src/components/Dashboard.tsx
 IN-0517,Approx. balance (savings − pass in VT),Solde indicatif (économies − pass en VT),Balans rid (sevin − pass long VT),src/components/Dashboard.tsx
-IN-0518,Ahead of your pass,Au-delà du pass,Antap long pass,src/components/Dashboard.tsx
-IN-0519,Business Profile,Profil entreprise,Bisnis profail,src/components/DashboardOverview.tsx
-IN-0520,"Phone, email, address","Téléphone, e-mail, adresse","Fon, email, adres",src/components/DashboardOverview.tsx
+IN-0518,Ahead of your pass,Au-delà du pass,fastaem long pass,src/components/Dashboard.tsx
+IN-0519,Business Profile,Profil entreprise,Bisnis profael,src/components/DashboardOverview.tsx
+IN-0520,"Phone, email, address","Téléphone, e-mail, adresse","Fon, emeil, adres",src/components/DashboardOverview.tsx
 IN-0521,Credentials,Accréditations,Kredensel,src/components/DashboardOverview.tsx
-IN-0522,"Licence, insurance, permits","Licence, assurance, permis","Permit, insurance, sertifikat",src/components/DashboardOverview.tsx
-IN-0523,Card,Carte,Kaed,src/components/DealsPricingCard.tsx
+IN-0522,"Licence, insurance, permits","Licence, assurance, permis","Permit, insurens, sertifiket",src/components/DashboardOverview.tsx
+IN-0523,Card,Carte,Kad,src/components/DealsPricingCard.tsx
 IN-0524,Live Rankings,Classements en direct,Laev Ranking,src/components/FeaturedLeaderboard.tsx
 IN-0525,Featured Deals Leaderboard,Classement des offres vedettes,Lidabod blong Fitjad Dils,src/components/FeaturedLeaderboard.tsx
 IN-0526,"Top deals ranked by rating, reviews, Super Stars, value, and verified credentials. Updated in real-time.","Meilleures offres classées par note, avis, Super Stars et valeur.","Beswan dils i rank bae reting, riviu, Super Stars, mo valu.",src/components/FeaturedLeaderboard.tsx
@@ -539,13 +539,13 @@ IN-0537,Show QR Code,Montrez le QR code,Soem QR Kod,src/components/HowItWorks.ts
 IN-0538,Present your QR code at the business to redeem your exclusive discount,Présentez votre QR code à l'entreprise pour utiliser votre réduction exclusive,Soem QR kod blong yu long bisnis blong yusim ekslusiv diskount blong yu,src/components/HowItWorks.tsx
 IN-0539,Save & Enjoy,Économisez et profitez,Sevem mo Enjoem,src/components/HowItWorks.tsx
 IN-0540,"Save up to 35% on dining, tours, activities and more across Vanuatu","Économisez jusqu'à 35% sur la restauration, les visites, les activités et plus à travers le Vanuatu","Sevem kasem 35% long kakae, tua, aktiviti mo moa long Vanuatu",src/components/HowItWorks.tsx
-IN-0541,How StikmNek Works,Comment fonctionne StikmNek,Olsem Wanem StikmNek i Wok,src/components/HowItWorks.tsx
-IN-0542,Four simple steps to start saving on your Vanuatu adventure,Quatre étapes simples pour commencer à économiser sur votre aventure au Vanuatu,Fo simpol step blong stat sevem long Vanuatu advencha blong yu,src/components/HowItWorks.tsx
+IN-0541,How StikmNek Works,Comment fonctionne StikmNek,Ao nao StikmNek i Wok,src/components/HowItWorks.tsx
+IN-0542,Four simple steps to start saving on your Vanuatu adventure,Quatre étapes simples pour commencer à économiser sur votre aventure au Vanuatu,Fo simpol step blong stat sevem long Vanuatu advenja blong yu,src/components/HowItWorks.tsx
 IN-0543,Start Saving Today,Commencez à économiser aujourd'hui,Stat Sevem Tede,src/components/HowItWorks.tsx
 IN-0544,For Vanuatu businesses,Pour les entreprises au Vanuatu,Blong bisnis long Vanuatu,src/components/ListYourBusinessCta.tsx
 IN-0545,List your business for free,Inscrivez votre entreprise gratuitement,Listem bisnis blong yu — fri,src/components/ListYourBusinessCta.tsx
 IN-0546,Put your deals in front of tourists planning their trip — StikmNek helps them discover you before they arrive.,Mettez vos offres sous les yeux des touristes qui préparent leur séjour — StikmNek les aide à vous découvrir avant leur arrivée.,Putem ol dil blong yu long ai blong turis we oli planem trip — StikmNek i helpem oli faenem yu.,src/components/ListYourBusinessCta.tsx
-IN-0547,Already have an account?,Déjà un compte ?,Gat akaont?,src/components/ListYourBusinessCta.tsx
+IN-0547,Already have an account?,Déjà un compte ?,Gat akaon?,src/components/ListYourBusinessCta.tsx
 IN-0548,Sign in,Se connecter,Saen in,src/components/ListYourBusinessCta.tsx
 IN-0549,Made for mobile,Pensé pour le mobile,I stret long fon,src/components/ListYourBusinessCta.tsx
 IN-0550,Vanuatu wide,Tout le Vanuatu,Vanuatu wide,src/components/ListYourBusinessCta.tsx
@@ -557,25 +557,25 @@ IN-0555,Save logo,Enregistrer,Sevem logo,src/components/LogoCropDialog.tsx
 IN-0556,saved,enregistré(s),we i sevem,src/components/MyFavoritesList.tsx
 IN-0557,Browse deals,Voir les offres,Lukluk ol diskaon,src/components/MyFavoritesList.tsx
 IN-0558,Listing hidden from Explore.,Annonce masquée sur Explore.,Listing i haed long Explore.,src/components/MySubmissions.tsx
-IN-0559,Submission removed.,Soumission supprimée.,Sabmisen i raetem.,src/components/MySubmissions.tsx
+IN-0559,Submission removed.,Soumission supprimée.,Sabmisen i aot,src/components/MySubmissions.tsx
 IN-0560,Approved,Approuvé,Apruvum,src/components/MySubmissions.tsx
 IN-0561,Not Approved,Refusé,No Apruvum,src/components/MySubmissions.tsx
 IN-0562,Under Review,En cours de révision,Stap Lukluk,src/components/MySubmissions.tsx
-IN-0563,Just now,À l'instant,Jas nao,src/components/MySubmissions.tsx
+IN-0563,Just now,À l'instant,Jes nao,src/components/MySubmissions.tsx
 IN-0564,Loading your submissions...,Chargement de vos soumissions...,Lodem ol sabmisen blong yu...,src/components/MySubmissions.tsx
 IN-0565,My Submissions,Mes Soumissions,Ol Sabmisen Blong Mi,src/components/MySubmissions.tsx
 IN-0566,Track the status of all your business listing submissions,Suivez le statut de toutes vos soumissions,Lukluk status blong ol sabmisen blong yu,src/components/MySubmissions.tsx
-IN-0567,Refresh,Actualiser,Refresh,src/components/MySubmissions.tsx
+IN-0567,Refresh,Actualiser,Refres,src/components/MySubmissions.tsx
 IN-0568,Total,Total,Evriwan,src/components/MySubmissions.tsx
 IN-0569,Pending,En attente,Weit,src/components/MySubmissions.tsx
 IN-0570,Approved,Approuvé,Apruvum,src/components/MySubmissions.tsx
 IN-0571,Not Approved,Refusé,No Apruvum,src/components/MySubmissions.tsx
-IN-0572,Live updates enabled — status changes appear instantly,Mises à jour en direct — les changements apparaissent instantanément,Laef update i stap — status change i soa kwiktaem,src/components/MySubmissions.tsx
+IN-0572,Live updates enabled — status changes appear instantly,Mises à jour en direct — les changements apparaissent instantanément,Laef update i stap — status change i soem kwiktaem,src/components/MySubmissions.tsx
 IN-0573,No Submissions Yet,Aucune soumission,No gat sabmisen yet,src/components/MySubmissions.tsx
-IN-0574,Submit your first business listing to get started!,Soumettez votre première entreprise pour commencer !,Sabmitem faswan bisnis blong yu blong statem!,src/components/MySubmissions.tsx
+IN-0574,Submit your first business listing to get started!,Soumettez votre première entreprise pour commencer !,Sabmitem feswan bisnis blong yu blong statem!,src/components/MySubmissions.tsx
 IN-0575,Submit a business listing,Soumettre une fiche commerciale,Sabmitem wan business listing,src/components/MySubmissions.tsx
 IN-0576,Status Updated!,Statut mis à jour !,Status i jenj!,src/components/MySubmissions.tsx
-IN-0577,Live on Explore,En ligne,Laef long Explore,src/components/MySubmissions.tsx
+IN-0577,Live on Explore,En ligne,Laef long Explora,src/components/MySubmissions.tsx
 IN-0578,Status Timeline,Chronologie,Taemlaen,src/components/MySubmissions.tsx
 IN-0579,Submitted,Soumis,Sabmitem,src/components/MySubmissions.tsx
 IN-0580,Under Review,En cours de révision,Stap Lukluk,src/components/MySubmissions.tsx
@@ -590,106 +590,108 @@ IN-0588,Our team typically reviews within 24 hours,Notre équipe examine génér
 IN-0589,How the Review Process Works,Comment fonctionne le processus,Olsem wanem proses i wok,src/components/MySubmissions.tsx
 IN-0590,My Dashboard,Mon Tableau de Bord,Dasbod Blong Mi,src/components/Navbar.tsx
 IN-0591,My Business,Mon Entreprise,Bisnis Blong Mi,src/components/Navbar.tsx
-IN-0592,Help,Aide,Halpem,src/components/Navbar.tsx
-IN-0593,Create Account,Créer un compte,Mekem Akaont,src/components/Navbar.tsx
-IN-0594,Nearby Deal,Offre à proximité,Dil Klosap,src/components/NearbyDeals.tsx
-IN-0595,Tourist Pass,Pass touriste,Turis Pas,src/components/PassCards.tsx
-IN-0596,Complete your traveller profile,Complétez votre profil voyageur,Komplitim profil blong yu,src/components/PaymentConfirmation.tsx
-IN-0597,A few details help us tailor deals and contact you the way you prefer.,Quelques détails nous aident à personnaliser les offres et à vous joindre comme vous préférez.,Smol infomesen i helpem mifala blong givim dils mo kontakt yu.,src/components/PaymentConfirmation.tsx
-IN-0598,Logo saved!,Logo enregistré !,Logo i sevem!,src/components/PhotoUploader.tsx
-IN-0599,Logo saved!,Logo enregistré !,Logo i sevem!,src/components/PhotoUploader.tsx
-IN-0600,Adjust how it looks on your listing,Ajuster l’affichage sur l’annonce,Adjustem olsem long listing,src/components/PhotoUploader.tsx
-IN-0601,Pricing & Discount (VT),Prix et remise (VT),Praes mo Diskaon (VT),src/components/PricingDiscountFields.tsx
-IN-0602,Discount Optional,Remise optionnelle,Diskaon Opsonal,src/components/PricingDiscountFields.tsx
-IN-0603,"For tours & activities, prices come from your tier table below. Use this section to set an optional % discount badge and validity dates.","Pour les visites et activités, les prix viennent du tableau des paliers ci-dessous. Utilisez cette section pour définir une remise (%) et des dates.","Long tua mo aktiviti, praes i kam long tier tebol daon. Yusum ples ia blong setem diskaon (%) mo det.",src/components/PricingDiscountFields.tsx
-IN-0604,Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.,Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.,Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.,src/components/PricingDiscountFields.tsx
-IN-0605,Your Price (VT),Votre prix (VT),Praes blong yu (VT),src/components/PricingDiscountFields.tsx
-IN-0606,Discount (%),Remise (%),Diskaon (%),src/components/PricingDiscountFields.tsx
-IN-0607,New Price (auto),Nouveau prix (auto),Niu Praes (oto),src/components/PricingDiscountFields.tsx
-IN-0608,Customer will see,Le client verra,Kastoma bae luk,src/components/PricingDiscountFields.tsx
-IN-0609,Customer saves,Le client économise,Kastoma i sevem,src/components/PricingDiscountFields.tsx
-IN-0610,Discount Validity Period,Période de validité de la remise,Taem blong Diskaon,src/components/PricingDiscountFields.tsx
-IN-0611,Online Presence & Map,Présence en ligne et carte,Onlaen mo Map,src/components/PricingDiscountFields.tsx
-IN-0612,Price for each guest (VT),Prix par visiteur (VT),Praes blong wanwan man (VT),src/components/PricingTiersEditor.tsx
-IN-0613,Type your normal price for each guest. We work out the discounted pass price for you. Children under 6 are usually free.,Saisissez votre prix normal pour chaque visiteur. Nous calculons le prix réduit du pass. Les enfants de moins de 6 ans sont gratuits.,Putum nomol praes blong wanwan man. Mifala wokemaot diskaon praes blong yu. Pikinini andanit 6 yia i fri.,src/components/PricingTiersEditor.tsx
-IN-0614,"Type your normal price, then the lower pass price for each guest. Children under 6 are usually free.",Saisissez votre prix normal puis le prix réduit du pass pour chaque visiteur.,"Putum nomol praes, then diskaon pas praes blong wanwan man.",src/components/PricingTiersEditor.tsx
-IN-0615,Guest name,Libellé,Nem,src/components/PricingTiersEditor.tsx
-IN-0616,e.g. Adults (13+),ex. Adultes (13+),ex. Adult (13+),src/components/PricingTiersEditor.tsx
-IN-0617,Adults,Adultes,Adult,src/components/PricingTiersEditor.tsx
-IN-0618,Children,Enfants,Pikinini,src/components/PricingTiersEditor.tsx
-IN-0619,Infants,Bébés,Bebi,src/components/PricingTiersEditor.tsx
-IN-0620,optional,optionnel,opsonal,src/components/PricingTiersEditor.tsx
-IN-0621,Normal price (VT),Prix normal (VT),Nomol praes (VT),src/components/PricingTiersEditor.tsx
-IN-0622,Pass price (VT),Prix du pass (VT),Pas praes (VT),src/components/PricingTiersEditor.tsx
-IN-0623,Normal price — whole group (VT),Prix normal — groupe entier (VT),Nomol praes — olgeta grup (VT),src/components/PricingTiersEditor.tsx
-IN-0624,Pass price — whole group (VT),Prix du pass — groupe entier (VT),Pas praes — olgeta grup (VT),src/components/PricingTiersEditor.tsx
-IN-0625,Pass price,Prix du pass,Pas praes,src/components/PricingTiersEditor.tsx
-IN-0626,Charter name,Nom du charter,Nem blong charter,src/components/PricingTiersEditor.tsx
-IN-0627,e.g. Private Charter (up to 5),ex. Charter privé (jusqu'à 5),ex. Private Charter (5 pipol),src/components/PricingTiersEditor.tsx
-IN-0628,Min people,Min pers.,Min man,src/components/PricingTiersEditor.tsx
-IN-0629,Max people (optional),Max pers. (optionnel),Mak man (opsonal),src/components/PricingTiersEditor.tsx
-IN-0630,Add infant price,Ajouter tarif bébé,Addem bebi praes,src/components/PricingTiersEditor.tsx
-IN-0631,Add private charter,Ajouter charter privé,Addem praevet charter,src/components/PricingTiersEditor.tsx
-IN-0632,Remove,Supprimer,Kivim,src/components/PricingTiersEditor.tsx
-IN-0633,More options,Plus d’options,Sam moa,src/components/PricingTiersEditor.tsx
-IN-0634,Add price row,Ajouter une ligne,Addem wan lain,src/components/PricingTiersEditor.tsx
-IN-0635,Whole group (flat rate),Groupe entier (tarif fixe),Olgeta grup (flat praes),src/components/PricingTiersEditor.tsx
-IN-0636,Private Charter,Charter privé,Private Charter,src/components/PricingTiersEditor.tsx
-IN-0637,Sharing…,Partage…,Serem…,src/components/QRCodeDisplay.tsx
-IN-0638,Please select a star rating,Veuillez sélectionner une note,Plis jusum wan sta reting,src/components/ReviewForm.tsx
-IN-0639,Please write a comment about your experience,Veuillez écrire un commentaire sur votre expérience,Plis raetem wan komen abaotem eksperiens blong yu,src/components/ReviewForm.tsx
-IN-0640,Comment must be at least 10 characters,Le commentaire doit contenir au moins 10 caractères,Komen i mas gat 10 karakter o moa,src/components/ReviewForm.tsx
-IN-0641,Thank You!,Merci !,Tangkiu tumas!,src/components/ReviewForm.tsx
-IN-0642,Your Super Star review has been submitted!,Votre avis Super Étoile a été soumis !,Supa Sta riviu blong yu i go finis!,src/components/ReviewForm.tsx
-IN-0643,Your review has been submitted successfully.,Votre avis a été soumis avec succès.,Riviu blong yu i go finis.,src/components/ReviewForm.tsx
-IN-0644,Sign in to share your experience,Connectez-vous pour partager votre expérience,Saen in blong searem eksperiens blong yu,src/components/ReviewForm.tsx
-IN-0645,Your Rating,Votre note,Reting blong yu,src/components/ReviewForm.tsx
-IN-0646,What is a Super Star?,Qu'est-ce qu'une Super Étoile ?,Wanem i Super Star?,src/components/ReviewForm.tsx
-IN-0647,The Super Star is a premium 6th star that costs $5. It's a special way to show exceptional appreciation for a business. Super Stars are displayed prominently on business profiles and help them stand out.,La Super Étoile est une 6ème étoile premium qui coûte 5$. C'est une façon spéciale de montrer une appréciation exceptionnelle.,Super Star hem i wan premium 6th sta we i kostem $5. Hem i wan spesel wei blong soem se bisnis i nambawan tumas.,src/components/ReviewForm.tsx
-IN-0648,Super Star added to your review!,Super Étoile ajoutée !,Supa Sta i joen long riviu blong yu!,src/components/ReviewForm.tsx
-IN-0649,Your Review,Votre avis,Riviu blong yu,src/components/ReviewForm.tsx
-IN-0650,Share details about your experience...,Partagez les détails de votre expérience...,Searem ditel abaotem eksperiens blong yu...,src/components/ReviewForm.tsx
-IN-0651,Minimum 10 characters,Minimum 10 caractères,Minimum 10 karakter,src/components/ReviewForm.tsx
-IN-0652,Submitting...,Envoi...,Sendim...,src/components/ReviewForm.tsx
-IN-0653,Super Star,Super Étoile,Supa Sta,src/components/ReviewForm.tsx
-IN-0654,Premium 6th Star Review,Avis Premium 6ème Étoile,Premium 6th Sta Riviu,src/components/ReviewForm.tsx
-IN-0655,Pay $5.00 Securely,"Payer 5,00$ en toute sécurité",Peim $5.00 sef,src/components/ReviewForm.tsx
-IN-0656,Maybe later,Peut-être plus tard,Maet leit,src/components/ReviewForm.tsx
-IN-0657,Real experiences from tourists who saved with StikmNek,Expériences réelles de touristes qui ont économisé avec StikmNek,Tru eksperiens from turis we oli sevem wetem StikmNek,src/components/ReviewsSection.tsx
-IN-0658,Share your experience with other tourists,Partagez votre expérience avec d'autres touristes,Searem eksperiens blong yu wetem narafala turis,src/components/ReviewsSection.tsx
-IN-0659,Select a business to review,Sélectionnez une entreprise à évaluer,Jusum wan bisnis blong riviu,src/components/ReviewsSection.tsx
-IN-0660,Choose a business...,Choisir une entreprise...,Jusum wan bisnis...,src/components/ReviewsSection.tsx
-IN-0661,No listings available to review (including your own).,Aucune annonce à évaluer (y compris la vôtre).,No gat lista blong riviu.,src/components/ReviewsSection.tsx
-IN-0662,Change,Changer,Jenisim,src/components/ReviewsSection.tsx
-IN-0663,Complete your traveller profile,Complétez votre profil voyageur,Komplitim profil blong yu,src/components/TouristProfileForm.tsx
-IN-0664,Help us tailor deals and reach you the way you prefer.,Aidez-nous à personnaliser les offres et à vous joindre comme vous préférez.,Helpem mifala blong givim dils mo kontakt yu long we yu laik.,src/components/TouristProfileForm.tsx
-IN-0665,Number of adults (13 yrs and above),Nombre d’adultes (13 ans et plus),Namba blong ol man (13 yia mo antap),src/components/TouristProfileForm.tsx
-IN-0666,Number of children (5–12 years),Nombre d’enfants (5–12 ans),Namba blong pikinini (5–12),src/components/TouristProfileForm.tsx
-IN-0667,Number of infants (0–4 years),Nombre de bébés (0–4 ans),Namba blong smol pikinini (0–4),src/components/TouristProfileForm.tsx
-IN-0668,Preferred contact method,Moyen de contact préféré,We blong kontakt,src/components/TouristProfileForm.tsx
-IN-0669,Enter the details for how you prefer to be reached.,Saisissez les coordonnées pour votre moyen de contact choisi.,Putum detaels blong we yu laik long kontakt.,src/components/TouristProfileForm.tsx
-IN-0670,Your email,Votre e-mail,Imel blong yu,src/components/TouristProfileForm.tsx
-IN-0671,Your WhatsApp number,Votre numéro WhatsApp,Namba WhatsApp blong yu,src/components/TouristProfileForm.tsx
-IN-0672,Your phone number,Votre numéro de téléphone,Fon namba blong yu,src/components/TouristProfileForm.tsx
-IN-0673,Where are you staying? (Resort name),Où séjournez-vous ? (nom de l’hôtel/résidence),We yu stap? (Nem blong resot),src/components/TouristProfileForm.tsx
-IN-0674,Full name,Nom complet,Ful nem,src/components/TouristProfileForm.tsx
-IN-0675,Expected arrival date,Date d’arrivée prévue,Dei blong kam,src/components/TouristProfileForm.tsx
-IN-0676,Expected departure date,Date de départ prévue,Dei blong lego,src/components/TouristProfileForm.tsx
-IN-0677,Save profile,Enregistrer,Sevem profil,src/components/TouristProfileForm.tsx
-IN-0678,Later,Plus tard,Bihain,src/components/TouristProfileForm.tsx
-IN-0679,Please enter your full name.,Entrez votre nom.,Plis putum ful nem.,src/components/TouristProfileForm.tsx
-IN-0680,Please select your arrival date.,Sélectionnez votre date d’arrivée.,Plis selektem dei blong kam.,src/components/TouristProfileForm.tsx
-IN-0681,Please select your departure date.,Sélectionnez votre date de départ.,Plis selektem dei blong lego.,src/components/TouristProfileForm.tsx
-IN-0682,Departure date must be on or after your arrival date.,La date de départ doit être après la date d’arrivée.,Dei blong lego i mas biaen o semak long dei blong kam.,src/components/TouristProfileForm.tsx
-IN-0683,Profile saved!,Profil enregistré !,Profil i sevem!,src/components/TouristProfileForm.tsx
-IN-0684,Website,Site Web,Website,src/components/WebsiteUrlInput.tsx
-IN-0685,Your website or social page — no need to type https,Votre site ou page sociale — pas besoin de taper https,Website blong yu — no nid taep https,src/components/WebsiteUrlInput.tsx
-IN-0686,You cannot leave a review for your own business.,Vous ne pouvez pas laisser un avis sur votre propre établissement.,Yu no save riviu long bisinis blong yu yet.,src/contexts/AppContext.tsx
-IN-0687,Could not verify your visit history. Please try again.,Impossible de vérifier votre historique de visites. Réessayez.,Noka verifyem histori blong visit blong yu. Trai bakagen.,src/contexts/AppContext.tsx
-IN-0688,Could not verify your visit history. Please try again.,Impossible de vérifier votre historique de visites. Réessayez.,Noka verifyem histori blong visit blong yu. Trai bakagen.,src/contexts/AppContext.tsx
-IN-0689,Sign in to leave a review.,Connectez-vous pour laisser un avis.,Saen in blong riviu.,src/contexts/AppContext.tsx
-IN-0690,No Super Star credits available. Please purchase a Super Star first.,Aucun crédit Super Star disponible. Veuillez d’abord acheter un Super Star.,No gat Super Star kredit. Plis bae wan Super Star festaem.,src/contexts/AppContext.tsx
-IN-0691,Please enter a title for this deal or listing.,Veuillez indiquer un titre pour cette offre.,Putem titel blong dil ia.,src/lib/businessOnboardingValidation.ts
-IN-0692,Please add a description with real detail (not only empty formatting).,Veuillez ajouter une description avec du contenu réel.,Putem samting long description — nomo ol framaton long hem.,src/lib/businessOnboardingValidation.ts
-IN-0693,Add at least one photo and wait for upload to finish (a valid image URL is required).,Ajoutez au moins une photo et attendez la fin du téléchargement.,Putem wan foto mo wet bifo uplodem i finis.,src/lib/businessOnboardingValidation.ts
-IN-0694,Other,Autre,Narawan,src/lib/pricingTiers.ts
+IN-0592,Help,Aide,Elb,src/components/Navbar.tsx
+IN-0593,Change language,Changer de langue,Mekem Akaon,src/components/Navbar.tsx
+IN-0594,Language,Langue,Dil Klosap,src/components/Navbar.tsx
+IN-0595,Create Account,Créer un compte,Turis Pas,src/components/Navbar.tsx
+IN-0596,Nearby Deal,Offre à proximité,Komplitim profael blong yu,src/components/NearbyDeals.tsx
+IN-0597,Tourist Pass,Pass touriste,Smol infomesen i helpem mifala blong givim dils mo kontaktem yu.,src/components/PassCards.tsx
+IN-0598,Complete your traveller profile,Complétez votre profil voyageur,Logo i sev!,src/components/PaymentConfirmation.tsx
+IN-0599,A few details help us tailor deals and contact you the way you prefer.,Quelques détails nous aident à personnaliser les offres et à vous joindre comme vous préférez.,Logo i sev!,src/components/PaymentConfirmation.tsx
+IN-0600,Logo saved!,Logo enregistré !,Adjustem olsem long listing,src/components/PhotoUploader.tsx
+IN-0601,Logo saved!,Logo enregistré !,Praes mo Diskaon (VT),src/components/PhotoUploader.tsx
+IN-0602,Adjust how it looks on your listing,Ajuster l’affichage sur l’annonce,Diskaon Opsonal,src/components/PhotoUploader.tsx
+IN-0603,Pricing & Discount (VT),Prix et remise (VT),"Long tua mo aktiviti, praes i kam long tier tebol daon. Yusum ples ia blong setem diskaon (%) mo det.",src/components/PricingDiscountFields.tsx
+IN-0604,Discount Optional,Remise optionnelle,Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.,src/components/PricingDiscountFields.tsx
+IN-0605,"For tours & activities, prices come from your tier table below. Use this section to set an optional % discount badge and validity dates.","Pour les visites et activités, les prix viennent du tableau des paliers ci-dessous. Utilisez cette section pour définir une remise (%) et des dates.",Praes blong yu (VT),src/components/PricingDiscountFields.tsx
+IN-0606,Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.,Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.,Diskaon (%),src/components/PricingDiscountFields.tsx
+IN-0607,Your Price (VT),Votre prix (VT),Niu Praes (oto),src/components/PricingDiscountFields.tsx
+IN-0608,Discount (%),Remise (%),Kastoma bae luk,src/components/PricingDiscountFields.tsx
+IN-0609,New Price (auto),Nouveau prix (auto),Kastoma i sevem,src/components/PricingDiscountFields.tsx
+IN-0610,Customer will see,Le client verra,Taem blong Diskaon,src/components/PricingDiscountFields.tsx
+IN-0611,Customer saves,Le client économise,Onlaen mo Map,src/components/PricingDiscountFields.tsx
+IN-0612,Discount Validity Period,Période de validité de la remise,Praes blong wanwan man (VT),src/components/PricingDiscountFields.tsx
+IN-0613,Online Presence & Map,Présence en ligne et carte,Putum nomol praes blong wanwan man. Mifala wokemaot diskaon praes blong yu. Pikinini andanit 6 yia i fri.,src/components/PricingDiscountFields.tsx
+IN-0614,Price for each guest (VT),Prix par visiteur (VT),"Putum nomol praes, then diskaon pas praes blong wanwan man.",src/components/PricingTiersEditor.tsx
+IN-0615,Type your normal price for each guest. We work out the discounted pass price for you. Children under 6 are usually free.,Saisissez votre prix normal pour chaque visiteur. Nous calculons le prix réduit du pass. Les enfants de moins de 6 ans sont gratuits.,Nem,src/components/PricingTiersEditor.tsx
+IN-0616,"Type your normal price, then the lower pass price for each guest. Children under 6 are usually free.",Saisissez votre prix normal puis le prix réduit du pass pour chaque visiteur.,exsampol. Adult (13+),src/components/PricingTiersEditor.tsx
+IN-0617,Guest name,Libellé,Adult,src/components/PricingTiersEditor.tsx
+IN-0618,e.g. Adults (13+),ex. Adultes (13+),Pikinini,src/components/PricingTiersEditor.tsx
+IN-0619,Adults,Adultes,Bebi,src/components/PricingTiersEditor.tsx
+IN-0620,Children,Enfants,opsonal,src/components/PricingTiersEditor.tsx
+IN-0621,Infants,Bébés,Nomol praes (VT),src/components/PricingTiersEditor.tsx
+IN-0622,optional,optionnel,Pas praes (VT),src/components/PricingTiersEditor.tsx
+IN-0623,Normal price (VT),Prix normal (VT),Nomol praes — olgeta grup (VT),src/components/PricingTiersEditor.tsx
+IN-0624,Pass price (VT),Prix du pass (VT),Pas praes — olgeta grup (VT),src/components/PricingTiersEditor.tsx
+IN-0625,Normal price — whole group (VT),Prix normal — groupe entier (VT),Pas praes,src/components/PricingTiersEditor.tsx
+IN-0626,Pass price — whole group (VT),Prix du pass — groupe entier (VT),Nem blong jata,src/components/PricingTiersEditor.tsx
+IN-0627,Pass price,Prix du pass,exsampol. Private jata (5 pipol),src/components/PricingTiersEditor.tsx
+IN-0628,Charter name,Nom du charter,Min man,src/components/PricingTiersEditor.tsx
+IN-0629,e.g. Private Charter (up to 5),ex. Charter privé (jusqu'à 5),Max man (opsonal),src/components/PricingTiersEditor.tsx
+IN-0630,Min people,Min pers.,Addem bebi praes,src/components/PricingTiersEditor.tsx
+IN-0631,Max people (optional),Max pers. (optionnel),Addem praevet jata,src/components/PricingTiersEditor.tsx
+IN-0632,Add infant price,Ajouter tarif bébé,Kivim,src/components/PricingTiersEditor.tsx
+IN-0633,Add private charter,Ajouter charter privé,Sam moa opsen,src/components/PricingTiersEditor.tsx
+IN-0634,Remove,Supprimer,Addem wan laen,src/components/PricingTiersEditor.tsx
+IN-0635,More options,Plus d’options,Olgeta grup (flat praes),src/components/PricingTiersEditor.tsx
+IN-0636,Add price row,Ajouter une ligne,Private jata,src/components/PricingTiersEditor.tsx
+IN-0637,Whole group (flat rate),Groupe entier (tarif fixe),Serem,src/components/PricingTiersEditor.tsx
+IN-0638,Private Charter,Charter privé,Plis jusum wan sta reting,src/components/PricingTiersEditor.tsx
+IN-0639,Sharing…,Partage…,Plis raetem wan komen abaotem eksperiens blong yu,src/components/QRCodeDisplay.tsx
+IN-0640,Please select a star rating,Veuillez sélectionner une note,Komen i mas gat 10 karakta o moa,src/components/ReviewForm.tsx
+IN-0641,Please write a comment about your experience,Veuillez écrire un commentaire sur votre expérience,Tangkiu tumas!,src/components/ReviewForm.tsx
+IN-0642,Comment must be at least 10 characters,Le commentaire doit contenir au moins 10 caractères,Supa Sta riviu blong yu i go finis!,src/components/ReviewForm.tsx
+IN-0643,Thank You!,Merci !,Riviu blong yu i go finis.,src/components/ReviewForm.tsx
+IN-0644,Your Super Star review has been submitted!,Votre avis Super Étoile a été soumis !,Saen in blong serem eksperiens blong yu,src/components/ReviewForm.tsx
+IN-0645,Your review has been submitted successfully.,Votre avis a été soumis avec succès.,Reting blong yu,src/components/ReviewForm.tsx
+IN-0646,Sign in to share your experience,Connectez-vous pour partager votre expérience,Wanem i Super Star?,src/components/ReviewForm.tsx
+IN-0647,Your Rating,Votre note,Super Star hem i wan premium 6th sta we i kostem $5. Hem i wan spesel wei blong soem se bisnis i nambawan tumas.,src/components/ReviewForm.tsx
+IN-0648,What is a Super Star?,Qu'est-ce qu'une Super Étoile ?,Supa Sta i joen long riviu blong yu!,src/components/ReviewForm.tsx
+IN-0649,The Super Star is a premium 6th star that costs $5. It's a special way to show exceptional appreciation for a business. Super Stars are displayed prominently on business profiles and help them stand out.,La Super Étoile est une 6ème étoile premium qui coûte 5$. C'est une façon spéciale de montrer une appréciation exceptionnelle.,Riviu blong yu,src/components/ReviewForm.tsx
+IN-0650,Super Star added to your review!,Super Étoile ajoutée !,Searem ditel abaotem eksperiens blong yu...,src/components/ReviewForm.tsx
+IN-0651,Your Review,Votre avis,Minimum 10 karakta,src/components/ReviewForm.tsx
+IN-0652,Share details about your experience...,Partagez les détails de votre expérience...,Sendem...,src/components/ReviewForm.tsx
+IN-0653,Minimum 10 characters,Minimum 10 caractères,Supa Sta,src/components/ReviewForm.tsx
+IN-0654,Submitting...,Envoi...,Premium 6th Sta Riviu,src/components/ReviewForm.tsx
+IN-0655,Super Star,Super Étoile,Pem $5.00 sef,src/components/ReviewForm.tsx
+IN-0656,Premium 6th Star Review,Avis Premium 6ème Étoile,Maet leit,src/components/ReviewForm.tsx
+IN-0657,Pay $5.00 Securely,"Payer 5,00$ en toute sécurité",Tru eksperiens from turis we oli sevem wetem StikmNek,src/components/ReviewForm.tsx
+IN-0658,Maybe later,Peut-être plus tard,Serem eksperiens blong yu wetem narafala turis,src/components/ReviewForm.tsx
+IN-0659,Real experiences from tourists who saved with StikmNek,Expériences réelles de touristes qui ont économisé avec StikmNek,Jusum wan bisnis blong riviu,src/components/ReviewsSection.tsx
+IN-0660,Share your experience with other tourists,Partagez votre expérience avec d'autres touristes,Jusum wan bisnis...,src/components/ReviewsSection.tsx
+IN-0661,Select a business to review,Sélectionnez une entreprise à évaluer,No gat list blong riviu. Inklutum blong yu naoia,src/components/ReviewsSection.tsx
+IN-0662,Choose a business...,Choisir une entreprise...,Jensem,src/components/ReviewsSection.tsx
+IN-0663,No listings available to review (including your own).,Aucune annonce à évaluer (y compris la vôtre).,Komplitim profael blong yu,src/components/ReviewsSection.tsx
+IN-0664,Change,Changer,Helpem mifala blong givim dils mo kontakt yu long we yu preferem,src/components/ReviewsSection.tsx
+IN-0665,Complete your traveller profile,Complétez votre profil voyageur,Namba blong ol man (13 yia mo antap),src/components/TouristProfileForm.tsx
+IN-0666,Help us tailor deals and reach you the way you prefer.,Aidez-nous à personnaliser les offres et à vous joindre comme vous préférez.,Namba blong pikinini (5–12),src/components/TouristProfileForm.tsx
+IN-0667,Number of adults (13 yrs and above),Nombre d’adultes (13 ans et plus),Namba blong smol pikinini (0–4),src/components/TouristProfileForm.tsx
+IN-0668,Number of children (5–12 years),Nombre d’enfants (5–12 ans),Wei blong kontakt,src/components/TouristProfileForm.tsx
+IN-0669,Number of infants (0–4 years),Nombre de bébés (0–4 ans),Putum detels blong we yu laikem blong oli save kontaktem u long hem.,src/components/TouristProfileForm.tsx
+IN-0670,Preferred contact method,Moyen de contact préféré,Imel blong yu,src/components/TouristProfileForm.tsx
+IN-0671,Enter the details for how you prefer to be reached.,Saisissez les coordonnées pour votre moyen de contact choisi.,Namba WhatsApp blong yu,src/components/TouristProfileForm.tsx
+IN-0672,Your email,Votre e-mail,Fon namba blong yu,src/components/TouristProfileForm.tsx
+IN-0673,Your WhatsApp number,Votre numéro WhatsApp,Wea yu stap? (Nem blong resot),src/components/TouristProfileForm.tsx
+IN-0674,Your phone number,Votre numéro de téléphone,Ful nem,src/components/TouristProfileForm.tsx
+IN-0675,Where are you staying? (Resort name),Où séjournez-vous ? (nom de l’hôtel/résidence),Dei blong kam,src/components/TouristProfileForm.tsx
+IN-0676,Full name,Nom complet,Dei blong lego ples ia,src/components/TouristProfileForm.tsx
+IN-0677,Expected arrival date,Date d’arrivée prévue,Sevem profael,src/components/TouristProfileForm.tsx
+IN-0678,Expected departure date,Date de départ prévue,Biaen,src/components/TouristProfileForm.tsx
+IN-0679,Save profile,Enregistrer,Plis putum ful nem.,src/components/TouristProfileForm.tsx
+IN-0680,Later,Plus tard,Plis selektem dei blong kam.,src/components/TouristProfileForm.tsx
+IN-0681,Please enter your full name.,Entrez votre nom.,Plis selektem dei blong aot,src/components/TouristProfileForm.tsx
+IN-0682,Please select your arrival date.,Sélectionnez votre date d’arrivée.,Dei blong aot i mas biaen o semak long dei blong kam.,src/components/TouristProfileForm.tsx
+IN-0683,Please select your departure date.,Sélectionnez votre date de départ.,Profil i sev!,src/components/TouristProfileForm.tsx
+IN-0684,Departure date must be on or after your arrival date.,La date de départ doit être après la date d’arrivée.,Websaet,src/components/TouristProfileForm.tsx
+IN-0685,Profile saved!,Profil enregistré !,Website blong yu — no nid taep https,src/components/TouristProfileForm.tsx
+IN-0686,Website,Site Web,Yu no save riviu long bisinis blong yu yet.,src/components/WebsiteUrlInput.tsx
+IN-0687,Your website or social page — no need to type https,Votre site ou page sociale — pas besoin de taper https,Noka verifyem histori blong visit blong yu. Traem bakaken.,src/components/WebsiteUrlInput.tsx
+IN-0688,You cannot leave a review for your own business.,Vous ne pouvez pas laisser un avis sur votre propre établissement.,Noka verifyem histori blong visit blong yu. Trai bakagen.,src/contexts/AppContext.tsx
+IN-0689,Could not verify your visit history. Please try again.,Impossible de vérifier votre historique de visites. Réessayez.,Saen in blong riviu.,src/contexts/AppContext.tsx
+IN-0690,Could not verify your visit history. Please try again.,Impossible de vérifier votre historique de visites. Réessayez.,No gat Super Star kredit. Plis bae wan Super Star festaem.,src/contexts/AppContext.tsx
+IN-0691,Sign in to leave a review.,Connectez-vous pour laisser un avis.,Putem taetel blong dil ia.,src/contexts/AppContext.tsx
+IN-0692,No Super Star credits available. Please purchase a Super Star first.,Aucun crédit Super Star disponible. Veuillez d’abord acheter un Super Star.,Putem samting long description — nomo ol framaton long hem.,src/contexts/AppContext.tsx
+IN-0693,Please enter a title for this deal or listing.,Veuillez indiquer un titre pour cette offre.,Putem wan foto mo wet bifo uplodem i finis.,src/lib/businessOnboardingValidation.ts
+IN-0694,Please add a description with real detail (not only empty formatting).,Veuillez ajouter une description avec du contenu réel.,Narawan,src/lib/businessOnboardingValidation.ts
+IN-0695,Add at least one photo and wait for upload to finish (a valid image URL is required).,Ajoutez au moins une photo et attendez la fin du téléchargement.,Putem wan foto mo wet bifo uplodem i finis.,src/lib/businessOnboardingValidation.ts
+IN-0696,Other,Autre,Narawan,src/lib/pricingTiers.ts

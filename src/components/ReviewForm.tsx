@@ -94,12 +94,12 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   const validate = (): boolean => {
     const newErrors: { rating?: string; comment?: string } = {};
     if (rating === 0) {
-      newErrors.rating = language === 'en' ? 'Please select a star rating' : language === 'fr' ? 'Veuillez sélectionner une note' : 'Plis jusum wan sta reting';
+      newErrors.rating = language === 'en' ? 'Please select a star rating' : language === 'fr' ? 'Veuillez sélectionner une note' : 'Komen i mas gat 10 karakta o moa';
     }
     if (!comment.trim()) {
-      newErrors.comment = language === 'en' ? 'Please write a comment about your experience' : language === 'fr' ? 'Veuillez écrire un commentaire sur votre expérience' : 'Plis raetem wan komen abaotem eksperiens blong yu';
+      newErrors.comment = language === 'en' ? 'Please write a comment about your experience' : language === 'fr' ? 'Veuillez écrire un commentaire sur votre expérience' : 'Tangkiu tumas!';
     } else if (comment.trim().length < 10) {
-      newErrors.comment = language === 'en' ? 'Comment must be at least 10 characters' : language === 'fr' ? 'Le commentaire doit contenir au moins 10 caractères' : 'Komen i mas gat 10 karakter o moa';
+      newErrors.comment = language === 'en' ? 'Comment must be at least 10 characters' : language === 'fr' ? 'Le commentaire doit contenir au moins 10 caractères' : 'Supa Sta riviu blong yu i go finis!';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -255,12 +255,12 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       <div className={`${compact ? 'p-4' : 'p-6'} bg-emerald-50 rounded-xl border border-emerald-200 text-center`}>
         <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
         <h4 className="text-lg font-bold text-emerald-800 mb-1">
-          {language === 'en' ? 'Thank You!' : language === 'fr' ? 'Merci !' : 'Tangkiu tumas!'}
+          {language === 'en' ? 'Thank You!' : language === 'fr' ? 'Merci !' : 'Riviu blong yu i go finis.'}
         </h4>
         <p className="text-sm text-emerald-600">
           {lastSubmittedSuperStar
-            ? (language === 'en' ? 'Your Super Star review has been submitted!' : language === 'fr' ? 'Votre avis Super Étoile a été soumis !' : 'Supa Sta riviu blong yu i go finis!')
-            : (language === 'en' ? 'Your review has been submitted successfully.' : language === 'fr' ? 'Votre avis a été soumis avec succès.' : 'Riviu blong yu i go finis.')}
+            ? (language === 'en' ? 'Your Super Star review has been submitted!' : language === 'fr' ? 'Votre avis Super Étoile a été soumis !' : 'Saen in blong serem eksperiens blong yu')
+            : (language === 'en' ? 'Your review has been submitted successfully.' : language === 'fr' ? 'Votre avis a été soumis avec succès.' : 'Reting blong yu')}
         </p>
       </div>
     );
@@ -272,7 +272,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
       <div className={`${compact ? 'p-4' : 'p-6'} bg-gray-50 rounded-xl border border-gray-200 text-center`}>
         <Star className="w-8 h-8 text-amber-400 mx-auto mb-3" />
         <p className="text-sm text-gray-600 mb-3">
-          {language === 'en' ? 'Sign in to share your experience' : language === 'fr' ? 'Connectez-vous pour partager votre expérience' : 'Saen in blong searem eksperiens blong yu'}
+          {language === 'en' ? 'Sign in to share your experience' : language === 'fr' ? 'Connectez-vous pour partager votre expérience' : 'Wanem i Super Star?'}
         </p>
         <button
           onClick={() => { setShowAuth(true); setAuthMode('signin'); }}
@@ -298,7 +298,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
         {/* Star Rating Selector */}
         <div className="mb-4">
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            {language === 'en' ? 'Your Rating' : language === 'fr' ? 'Votre note' : 'Reting blong yu'}
+            {language === 'en' ? 'Your Rating' : language === 'fr' ? 'Votre note' : 'Super Star hem i wan premium 6th sta we i kostem $5. Hem i wan spesel wei blong soem se bisnis i nambawan tumas.'}
             <span className="text-red-500 ml-0.5">*</span>
           </label>
           <div className="flex items-center gap-1 flex-wrap">
@@ -378,14 +378,14 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
                 <Sparkles className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-semibold text-purple-800 mb-1">
-                    {language === 'en' ? 'What is a Super Star?' : language === 'fr' ? "Qu'est-ce qu'une Super Étoile ?" : 'Wanem i Super Star?'}
+                    {language === 'en' ? 'What is a Super Star?' : language === 'fr' ? "Qu'est-ce qu'une Super Étoile ?" : 'Supa Sta i joen long riviu blong yu!'}
                   </p>
                   <p className="text-purple-700 text-xs leading-relaxed">
                     {language === 'en'
                       ? "The Super Star is a premium 6th star that costs $5. It's a special way to show exceptional appreciation for a business. Super Stars are displayed prominently on business profiles and help them stand out."
                       : language === 'fr'
                       ? "La Super Étoile est une 6ème étoile premium qui coûte 5$. C'est une façon spéciale de montrer une appréciation exceptionnelle."
-                      : 'Super Star hem i wan premium 6th sta we i kostem $5. Hem i wan spesel wei blong soem se bisnis i nambawan tumas.'}
+                      : 'Riviu blong yu'}
                   </p>
                 </div>
               </div>
@@ -396,7 +396,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
             <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-50 border border-purple-200">
               <Sparkles className="w-4 h-4 text-purple-500" />
               <span className="text-sm font-semibold text-purple-700">
-                {language === 'en' ? 'Super Star added to your review!' : language === 'fr' ? 'Super Étoile ajoutée !' : 'Supa Sta i joen long riviu blong yu!'}
+                {language === 'en' ? 'Super Star added to your review!' : language === 'fr' ? 'Super Étoile ajoutée !' : 'Searem ditel abaotem eksperiens blong yu...'}
               </span>
             </div>
           )}
@@ -412,13 +412,13 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
         {/* Comment Field */}
         <div className="mb-4">
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            {language === 'en' ? 'Your Review' : language === 'fr' ? 'Votre avis' : 'Riviu blong yu'}
+            {language === 'en' ? 'Your Review' : language === 'fr' ? 'Votre avis' : 'Minimum 10 karakta'}
             <span className="text-red-500 ml-0.5">*</span>
           </label>
           <textarea
             value={comment}
             onChange={(e) => { setComment(e.target.value); setErrors((prev) => ({ ...prev, comment: undefined })); }}
-            placeholder={language === 'en' ? 'Share details about your experience...' : language === 'fr' ? 'Partagez les détails de votre expérience...' : 'Searem ditel abaotem eksperiens blong yu...'}
+            placeholder={language === 'en' ? 'Share details about your experience...' : language === 'fr' ? 'Partagez les détails de votre expérience...' : 'Sendem...'}
             className={`w-full p-3 rounded-xl border text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none transition-colors ${
               errors.comment ? 'border-red-300 bg-red-50/50' : 'border-gray-200 bg-white'
             }`}
@@ -433,7 +433,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
               </div>
             ) : (
               <span className="text-xs text-gray-400">
-                {language === 'en' ? 'Minimum 10 characters' : language === 'fr' ? 'Minimum 10 caractères' : 'Minimum 10 karakter'}
+                {language === 'en' ? 'Minimum 10 characters' : language === 'fr' ? 'Minimum 10 caractères' : 'Supa Sta'}
               </span>
             )}
             <span className={`text-xs ${comment.length > 900 ? 'text-amber-500' : 'text-gray-400'}`}>
@@ -452,7 +452,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
             {submitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                {language === 'en' ? 'Submitting...' : language === 'fr' ? 'Envoi...' : 'Sendim...'}
+                {language === 'en' ? 'Submitting...' : language === 'fr' ? 'Envoi...' : 'Premium 6th Sta Riviu'}
               </>
             ) : (
               <>
@@ -485,8 +485,8 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold">{language === 'en' ? 'Super Star' : language === 'fr' ? 'Super Étoile' : 'Supa Sta'}</h3>
-                  <p className="text-sm text-white/80">{language === 'en' ? 'Premium 6th Star Review' : language === 'fr' ? 'Avis Premium 6ème Étoile' : 'Premium 6th Sta Riviu'}</p>
+                  <h3 className="text-xl font-bold">{language === 'en' ? 'Super Star' : language === 'fr' ? 'Super Étoile' : 'Pem $5.00 sef'}</h3>
+                  <p className="text-sm text-white/80">{language === 'en' ? 'Premium 6th Star Review' : language === 'fr' ? 'Avis Premium 6ème Étoile' : 'Maet leit'}</p>
                 </div>
               </div>
               <button onClick={() => setShowSuperStarModal(false)} disabled={superStarProcessing} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
@@ -632,7 +632,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
                     className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-base transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                   >
                     <Lock className="w-4 h-4" />
-                    {language === 'en' ? 'Pay $5.00 Securely' : language === 'fr' ? 'Payer 5,00$ en toute sécurité' : 'Peim $5.00 sef'}
+                    {language === 'en' ? 'Pay $5.00 Securely' : language === 'fr' ? 'Payer 5,00$ en toute sécurité' : 'Tru eksperiens from turis we oli sevem wetem StikmNek'}
                   </button>
 
                   <p className="text-[11px] text-center text-gray-400 mt-2">
@@ -644,7 +644,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
                     disabled={superStarProcessing}
                     className="w-full mt-3 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
                   >
-                    {language === 'en' ? 'Maybe later' : language === 'fr' ? 'Peut-être plus tard' : 'Maet leit'}
+                    {language === 'en' ? 'Maybe later' : language === 'fr' ? 'Peut-être plus tard' : 'Serem eksperiens blong yu wetem narafala turis'}
                   </button>
                 </>
               )}

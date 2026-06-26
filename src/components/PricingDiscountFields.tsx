@@ -103,10 +103,10 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
         <div className="flex items-center gap-2 mb-1">
           <Tag className="w-4 h-4 text-teal-600" />
           <h3 className="text-sm font-bold text-teal-800">
-            {language === 'en' ? 'Pricing & Discount (VT)' : language === 'fr' ? 'Prix et remise (VT)' : 'Praes mo Diskaon (VT)'}
+            {language === 'en' ? 'Pricing & Discount (VT)' : language === 'fr' ? 'Prix et remise (VT)' : 'Long tua mo aktiviti, praes i kam long tier tebol daon. Yusum ples ia blong setem diskaon (%) mo det.'}
           </h3>
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-100 text-teal-700 font-medium">
-            {language === 'en' ? 'Discount Optional' : language === 'fr' ? 'Remise optionnelle' : 'Diskaon Opsonal'}
+            {language === 'en' ? 'Discount Optional' : language === 'fr' ? 'Remise optionnelle' : 'Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'}
           </span>
         </div>
         <p className="text-xs text-gray-500 mb-4">
@@ -115,12 +115,12 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
               ? 'For tours & activities, prices come from your tier table below. Use this section to set an optional % discount badge and validity dates.'
               : language === 'fr'
                 ? 'Pour les visites et activités, les prix viennent du tableau des paliers ci-dessous. Utilisez cette section pour définir une remise (%) et des dates.'
-                : 'Long tua mo aktiviti, praes i kam long tier tebol daon. Yusum ples ia blong setem diskaon (%) mo det.'
+                : 'Praes blong yu (VT)'
             : language === 'en'
               ? 'Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.'
               : language === 'fr'
                 ? 'Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.'
-                : 'Putum praes long Vatu (VT). Diskaon i opsonal — bisnis we i gat diskaon i go fas.'}
+                : 'Diskaon (%)'}
         </p>
 
 
@@ -129,7 +129,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
           {mode !== 'tiered' && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                {language === 'en' ? 'Your Price (VT)' : language === 'fr' ? 'Votre prix (VT)' : 'Praes blong yu (VT)'}
+                {language === 'en' ? 'Your Price (VT)' : language === 'fr' ? 'Votre prix (VT)' : 'Niu Praes (oto)'}
               </label>
 
               <div className="relative">
@@ -153,7 +153,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
           {/* Discount Percentage */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              {language === 'en' ? 'Discount (%)' : language === 'fr' ? 'Remise (%)' : 'Diskaon (%)'}
+              {language === 'en' ? 'Discount (%)' : language === 'fr' ? 'Remise (%)' : 'Kastoma bae luk'}
             </label>
 
             <div className="relative">
@@ -177,7 +177,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
           {mode !== 'tiered' && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                {language === 'en' ? 'New Price (auto)' : language === 'fr' ? 'Nouveau prix (auto)' : 'Niu Praes (oto)'}
+                {language === 'en' ? 'New Price (auto)' : language === 'fr' ? 'Nouveau prix (auto)' : 'Kastoma i sevem'}
               </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">VT</span>
@@ -205,7 +205,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
             <div className="flex items-center gap-1.5 mb-3">
               <Tag className="w-3.5 h-3.5 text-teal-600" />
               <span className="text-xs font-semibold text-teal-700 uppercase tracking-wide">
-                {language === 'en' ? 'Customer will see' : language === 'fr' ? 'Le client verra' : 'Kastoma bae luk'}
+                {language === 'en' ? 'Customer will see' : language === 'fr' ? 'Le client verra' : 'Taem blong Diskaon'}
               </span>
             </div>
 
@@ -246,7 +246,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
             {/* Savings summary */}
             <div className="flex items-center justify-between pt-3 border-t border-teal-100">
               <span className="text-xs text-gray-500">
-                {language === 'en' ? 'Customer saves' : language === 'fr' ? 'Le client économise' : 'Kastoma i sevem'}
+                {language === 'en' ? 'Customer saves' : language === 'fr' ? 'Le client économise' : 'Onlaen mo Map'}
               </span>
               <span className="text-sm font-bold text-emerald-600">
                 {formatVT(parseFloat(originalPrice) - parseFloat(calculatedDealPrice))}{' '}
@@ -265,7 +265,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
           <div className="flex items-center gap-2 mb-3">
             <Calendar className="w-4 h-4 text-blue-600" />
             <h3 className="text-sm font-bold text-blue-800">
-              {language === 'en' ? 'Discount Validity Period' : language === 'fr' ? 'Période de validité de la remise' : 'Taem blong Diskaon'}
+              {language === 'en' ? 'Discount Validity Period' : language === 'fr' ? 'Période de validité de la remise' : 'Praes blong wanwan man (VT)'}
             </h3>
           </div>
           <p className="text-xs text-gray-500 mb-3">
@@ -348,7 +348,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
           <div className="flex items-center gap-2 mb-3">
             <Globe className="w-4 h-4 text-purple-600" />
             <h3 className="text-sm font-bold text-purple-800">
-              {language === 'en' ? 'Online Presence & Map' : language === 'fr' ? 'Présence en ligne et carte' : 'Onlaen mo Map'}
+              {language === 'en' ? 'Online Presence & Map' : language === 'fr' ? 'Présence en ligne et carte' : 'Putum nomol praes blong wanwan man. Mifala wokemaot diskaon praes blong yu. Pikinini andanit 6 yia i fri.'}
             </h3>
           </div>
           <p className="text-xs text-gray-500 mb-3">

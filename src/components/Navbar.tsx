@@ -53,7 +53,7 @@ const Navbar: React.FC = () => {
   }
 
   // Help link for everyone
-  navItems.push({ key: 'help', view: 'help', icon: <HelpCircle className="w-4 h-4" />, label: language === 'en' ? 'Help' : language === 'fr' ? 'Aide' : 'Halpem' });
+  navItems.push({ key: 'help', view: 'help', icon: <HelpCircle className="w-4 h-4" />, label: language === 'en' ? 'Help' : language === 'fr' ? 'Aide' : 'Elb' });
 
   const goToPassesOrCheckout = (view: string) => {
     if (view === 'passes' && shouldOpenCheckoutInsteadOfPassesPage(user)) {
@@ -171,7 +171,7 @@ const Navbar: React.FC = () => {
             <div
               className="flex items-center gap-0.5 bg-gray-100 rounded-full p-1 shadow-sm ring-1 ring-gray-200/70"
               role="group"
-              aria-label={language === 'en' ? 'Change language' : language === 'fr' ? 'Changer de langue' : 'Jenisim lanwis'}
+              aria-label={language === 'en' ? 'Change language' : language === 'fr' ? 'Changer de langue' : 'Mekem Akaon'}
             >
               {langOptions.map(opt => (
                 <button
@@ -274,7 +274,7 @@ const Navbar: React.FC = () => {
             ))}
             <div className="pt-2 border-t border-gray-100 mt-2">
               <p className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                {language === 'en' ? 'Language' : language === 'fr' ? 'Langue' : 'Lanwis'}
+                {language === 'en' ? 'Language' : language === 'fr' ? 'Langue' : 'Dil Klosap'}
               </p>
               <div className="flex items-center gap-1">
                 {langOptions.map(opt => (
@@ -306,7 +306,7 @@ const Navbar: React.FC = () => {
                   onClick={() => { setShowAuth(true); setAuthMode('signup'); toggleSidebar(); }}
                   className="w-full px-4 py-2.5 rounded-lg border border-teal-200 text-teal-700 text-sm font-medium hover:bg-teal-50"
                 >
-                  {language === 'en' ? 'Create Account' : language === 'fr' ? 'Créer un compte' : 'Mekem Akaont'}
+                  {language === 'en' ? 'Create Account' : language === 'fr' ? 'Créer un compte' : 'Turis Pas'}
                 </button>
               </div>
             )}

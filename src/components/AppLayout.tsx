@@ -93,7 +93,7 @@ function BusinessListingSignupGate({ isSignedIn }: { isSignedIn: boolean }) {
     language === 'fr'
       ? 'Ajoutez votre entreprise — gratuit'
       : language === 'bi'
-        ? 'Listem bisnis blong yu — fri'
+        ? 'Listim bisnis blong yu — fri'
         : 'List your business — free';
 
   const signUpLabel =
@@ -505,7 +505,7 @@ const AppLayout: React.FC = () => {
               onClick={() => void retryUserProfileFetch()}
               className="shrink-0 px-4 py-2 rounded-lg bg-red-700 text-white text-sm font-semibold hover:bg-red-800 transition-colors"
             >
-              {language === 'en' ? 'Try again' : language === 'fr' ? 'Réessayer' : 'Traem gen'}
+              {language === 'en' ? 'Try again' : language === 'fr' ? 'Réessayer' : 'Traem bakeken'}
             </button>
           </div>
         </div>
@@ -518,14 +518,14 @@ const AppLayout: React.FC = () => {
               ? 'Finish your travel profile to unlock passes and the full app.'
               : language === 'fr'
                 ? 'Terminez votre profil voyage pour débloquer les pass et toute l’application.'
-                : 'Finisem travel profil blong yu blong yusum fulap.'}{' '}
+                : 'Finisim travel profil blong yu blong save anlokem pas mo yusum ful ap.'}{' '}
           </span>
           <button
             type="button"
             onClick={() => setCurrentView('complete-profile')}
             className="font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-800"
           >
-            {language === 'en' ? 'Continue setup' : language === 'fr' ? 'Poursuivre' : 'Go hed'}
+            {language === 'en' ? 'Continue setup' : language === 'fr' ? 'Poursuivre' : 'Go hed blong set ap'}
           </button>
         </div>
       )}

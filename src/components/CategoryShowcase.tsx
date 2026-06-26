@@ -27,28 +27,28 @@ const CategoryShowcase: React.FC = () => {
     {
       key: 'activities',
       label: language === 'en' ? 'Activities' : language === 'fr' ? 'Activités' : 'Aktiviti',
-      desc: language === 'en' ? 'Snorkeling, diving & more' : language === 'fr' ? 'Plongée, kayak & plus' : 'Snokling, daeving & moa',
+      desc: language === 'en' ? 'Snorkeling, diving & more' : language === 'fr' ? 'Plongée, kayak & plus' : 'Snokling, daeva mo moa',
       image: 'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1770856938935_27ebc816.png',
       gradient: 'from-cyan-600/80 to-blue-600/80',
     },
     {
       key: 'tours',
       label: language === 'en' ? 'Tours' : language === 'fr' ? 'Visites' : 'Tua',
-      desc: language === 'en' ? 'Cultural & adventure tours' : language === 'fr' ? 'Visites culturelles & aventure' : 'Kalsa & advencha tua',
+      desc: language === 'en' ? 'Cultural & adventure tours' : language === 'fr' ? 'Visites culturelles & aventure' : 'Kalsa & adfenja tua',
       image: 'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1770856976443_5ee434da.png',
       gradient: 'from-purple-600/80 to-violet-600/80',
     },
     {
       key: 'transportation',
-      label: language === 'en' ? 'Transportation' : language === 'fr' ? 'Transport' : 'Transport',
-      desc: language === 'en' ? 'Car hire, airport transfers & taxis' : language === 'fr' ? 'Location, transferts aéroport & taxis' : 'Rent kar, airport transfer mo taxi',
+      label: language === 'en' ? 'Transportation' : language === 'fr' ? 'Transport' : 'Transpot',
+      desc: language === 'en' ? 'Car hire, airport transfers & taxis' : language === 'fr' ? 'Location, transferts aéroport & taxis' : 'Rent kar, airport transfe  mo taxi',
       image: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=800&q=80',
       gradient: 'from-blue-600/80 to-indigo-600/80',
     },
     {
       key: 'spa',
       label: language === 'en' ? 'Spa & Wellness' : language === 'fr' ? 'Spa & Bien-être' : 'Spa & Helt',
-      desc: language === 'en' ? 'Relax & rejuvenate' : language === 'fr' ? 'Détendez-vous & rajeunissez' : 'Rilaks & rifresen',
+      desc: language === 'en' ? 'Relax & rejuvenate' : language === 'fr' ? 'Détendez-vous & rajeunissez' : 'Rilaks & rifresem',
       image: 'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1770857000182_f55ad882.jpg',
       gradient: 'from-emerald-600/80 to-teal-600/80',
     },
@@ -87,7 +87,7 @@ const CategoryShowcase: React.FC = () => {
           <p className="text-gray-500 max-w-lg mx-auto">
             {language === 'en' ? 'Find the perfect deal for every type of adventure' :
              language === 'fr' ? 'Trouvez l\'offre parfaite pour chaque type d\'aventure' :
-             'Faenem nambawan dil blong evri kaen advencha'}
+             'Faenem nambawan dil blong evri kaen advenja'}
           </p>
           {/* Live data indicator + total count */}
           <div className="flex items-center justify-center gap-3 mt-3">
@@ -136,7 +136,7 @@ const CategoryShowcase: React.FC = () => {
                       : (language === 'en' ? 'deals' : language === 'fr' ? 'offres' : 'dils')
                     }
                     {' '}
-                    {language === 'en' ? 'available' : language === 'fr' ? 'disponible' : 'i stap'}
+                    {language === 'en' ? 'available' : language === 'fr' ? 'disponible' : 'Igat'}
                   </p>
                 </div>
               </button>

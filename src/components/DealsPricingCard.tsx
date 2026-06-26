@@ -251,7 +251,7 @@ export default function DealsPricingCard({
           </span>
           <span className="inline-flex items-center gap-1 opacity-90">
             <CreditCard className="h-3 w-3 shrink-0 text-slate-500" aria-hidden />
-            {language === 'en' ? 'Card' : language === 'fr' ? 'Carte' : 'Kaed'}
+            {language === 'en' ? 'Card' : language === 'fr' ? 'Carte' : 'Kad'}
           </span>
           <span className="inline-flex items-center gap-0.5 opacity-90">
             <Lock className="h-2.5 w-2.5 shrink-0" aria-hidden />

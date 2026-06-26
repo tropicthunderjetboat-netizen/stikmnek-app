@@ -36,7 +36,7 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
     {
       key: 'scan',
       label: language === 'en' ? 'Scan a Pass' : language === 'fr' ? 'Scanner un Pass' : 'Skanem wan Pas',
-      description: language === 'en' ? 'Scan tourist QR codes to verify and redeem discounts' : language === 'fr' ? 'Scannez les codes QR des touristes' : 'Skanem QR kod blong turis',
+      description: language === 'en' ? 'Scan tourist QR codes to verify and redeem discounts' : language === 'fr' ? 'Scannez les codes QR des touristes' : 'Skanem QR kod blong turis blong reviu akaon',
       icon: <ScanLine className="w-7 h-7" />,
       gradient: 'from-teal-500 to-emerald-600',
       shadow: 'shadow-teal-200/60',
@@ -49,7 +49,7 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
     {
       key: 'edit',
       label: language === 'en' ? 'Edit my Listing' : language === 'fr' ? 'Modifier mon annonce' : 'Editim Listing Blong Mi',
-      description: language === 'en' ? 'Update your business details, photos, and deals' : language === 'fr' ? 'Mettez à jour vos détails' : 'Apdeitim ditel blong bisnis blong yu',
+      description: language === 'en' ? 'Update your business details, photos, and deals' : language === 'fr' ? 'Mettez à jour vos détails' : 'Apdeitem ditel blong bisnis blong yu',
       icon: <Edit3 className="w-7 h-7" />,
       gradient: 'from-blue-500 to-indigo-600',
       shadow: 'shadow-blue-200/60',
@@ -84,7 +84,7 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
     {
       key: 'create',
       label: language === 'en' ? 'Create a New Listing' : language === 'fr' ? 'Créer une annonce' : 'Mekem Niufala Listing',
-      description: language === 'en' ? 'Submit a new business listing for approval' : language === 'fr' ? 'Soumettre une nouvelle annonce' : 'Sakem niufala bisnis listing',
+      description: language === 'en' ? 'Submit a new business listing for approval' : language === 'fr' ? 'Soumettre une nouvelle annonce' : 'sapmitim niufala bisnis listing blong oli save aprovum ',
       icon: <Plus className="w-7 h-7" />,
       gradient: 'from-purple-500 to-violet-600',
       shadow: 'shadow-purple-200/60',
@@ -152,7 +152,7 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
                 {user?.name ? `, ${user.name.split(' ')[0]}` : ''}!
               </h1>
               <p className="text-white/70 text-sm mt-0.5">
-                {language === 'en' ? 'Manage your business from here' : language === 'fr' ? 'Gérez votre entreprise ici' : 'Managem bisnis blong yu long hia'}
+                {language === 'en' ? 'Manage your business from here' : language === 'fr' ? 'Gérez votre entreprise ici' : 'Managem bisnis blong yu long ples ia'}
               </p>
             </div>
           </div>

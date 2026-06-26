@@ -31,12 +31,12 @@ const CompleteTouristProfile: React.FC = () => {
                   ? 'Resume your profile'
                   : language === 'fr'
                     ? 'Reprendre votre profil'
-                    : 'Go bek long profil blong yu'
+                    : 'Go bak long profael blong yu'
                 : language === 'en'
                   ? 'Complete your profile'
                   : language === 'fr'
                     ? 'Complétez votre profil'
-                    : 'Komplitim profil blong yu'}
+                    : 'Komplitim profaael blong yu'}
             </h1>
             <p className="text-white/80 text-sm mt-1">
               {touristOnboardingResume
@@ -44,12 +44,12 @@ const CompleteTouristProfile: React.FC = () => {
                   ? 'Pick up where you left off — your details are saved as you go.'
                   : language === 'fr'
                     ? 'Reprenez où vous en étiez — vos informations sont enregistrées au fil du remplissage.'
-                    : 'Go hed wea yu stap — ol samting i save lelebet.'
+                    : 'Go hed long wea yu stop long hem — ol samting i save sef taem yu muv iko lelebet.'
                 : language === 'en'
                   ? 'We use this to show how pass limits relate to your group and travel dates.'
                   : language === 'fr'
                     ? 'Nous l’utilisons pour expliquer comment les limites des passes correspondent à votre groupe et à vos dates.'
-                    : 'Mifala i yusum blong soem ol lim long pas wetem grup mo det blong trip blong yu.'}
+                    : 'Mifala i yusum blong soem ol limit blong pas wetem grup mo det blong trip blong yu.'}
             </p>
           </div>
 
@@ -68,7 +68,7 @@ const CompleteTouristProfile: React.FC = () => {
                   onClick={() => void retryUserProfileFetch()}
                   className="shrink-0 px-4 py-2 rounded-lg bg-red-700 text-white font-semibold hover:bg-red-800"
                 >
-                  {language === 'en' ? 'Try again' : language === 'fr' ? 'Réessayer' : 'Traem gen'}
+                  {language === 'en' ? 'Try again' : language === 'fr' ? 'Réessayer' : 'Traem bakeken'}
                 </button>
               </div>
             )}
@@ -92,7 +92,7 @@ const CompleteTouristProfile: React.FC = () => {
                   ? 'Next, you’ll go to secure checkout — pass options use your profile (change anytime before paying).'
                   : language === 'fr'
                     ? 'Ensuite, passage au paiement sécurisé — le pass s’appuie sur votre profil (modifiable avant paiement).'
-                    : 'Biaen, yu go long checkout — pas i blong profil blong yu (yu ken senis bifo pem).'}
+                    : 'Biaen, yu go long checkout — pas opsen u mas usum profil blong yu (yu save jensem eni taem bifo pem).'}
               </p>
             </div>
           </div>

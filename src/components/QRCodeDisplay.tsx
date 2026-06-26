@@ -328,7 +328,7 @@ const QRCodeDisplay: React.FC = () => {
                 {shareBusy ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    {language === 'fr' ? 'Partage…' : language === 'bi' ? 'Serem…' : 'Sharing…'}
+                    {language === 'fr' ? 'Partage…' : language === 'bi' ? 'Plis raetem wan komen abaotem eksperiens blong yu' : 'Sharing…'}
                   </>
                 ) : (
                   <>
