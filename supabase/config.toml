@@ -11,6 +11,11 @@ project_id = "hbaflbmfptobyfqbudrt"
 [functions.manage-business]
 verify_jwt = false
 
+# Public: logged-out users request a password reset. Handler sends the recovery
+# link via Resend (Supabase native SMTP is failing with HTTP 500).
+[functions.request-password-reset]
+verify_jwt = false
+
 [functions.upload-photo]
 verify_jwt = false
 

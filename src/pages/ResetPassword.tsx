@@ -23,9 +23,31 @@ const ResetPassword: React.FC = () => {
     let cancelled = false;
     let resolved = false;
 
+    // #region agent log
+    try {
+      const _pick = (p: URLSearchParams) => ({
+        hasAccessToken: p.has('access_token'),
+        hasRefreshToken: p.has('refresh_token'),
+        hasCode: p.has('code'),
+        type: p.get('type'),
+        error: p.get('error'),
+        errorCode: p.get('error_code'),
+        errorDescription: p.get('error_description'),
+      });
+      const _h = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+      const _s = new URLSearchParams(window.location.search || '');
+      fetch('http://127.0.0.1:7607/ingest/08ca587e-0a1d-4571-8adc-bbc01b0f0e0b', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'e04eda' }, body: JSON.stringify({ sessionId: 'e04eda', runId: 'initial', hypothesisId: 'A,B,C,F', location: 'ResetPassword.tsx:landing', message: 'reset-password page landed', data: { host: window.location.host, pathname: window.location.pathname, hashKeys: _pick(_h), searchKeys: _pick(_s) }, timestamp: Date.now() }) }).catch(() => {});
+    } catch { /* ignore */ }
+    // #endregion
+
     const resolve = (ready: boolean) => {
       if (cancelled || resolved) return;
       resolved = true;
+      // #region agent log
+      try {
+        fetch('http://127.0.0.1:7607/ingest/08ca587e-0a1d-4571-8adc-bbc01b0f0e0b', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'e04eda' }, body: JSON.stringify({ sessionId: 'e04eda', runId: 'initial', hypothesisId: 'A', location: 'ResetPassword.tsx:resolve', message: 'session detection resolved', data: { sessionReady: ready }, timestamp: Date.now() }) }).catch(() => {});
+      } catch { /* ignore */ }
+      // #endregion
       setSessionReady(ready);
     };
 
@@ -85,6 +107,11 @@ const ResetPassword: React.FC = () => {
     setSubmitting(true);
     try {
       const { error: updateError } = await supabase.auth.updateUser({ password });
+      // #region agent log
+      try {
+        fetch('http://127.0.0.1:7607/ingest/08ca587e-0a1d-4571-8adc-bbc01b0f0e0b', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'e04eda' }, body: JSON.stringify({ sessionId: 'e04eda', runId: 'initial', hypothesisId: 'E', location: 'ResetPassword.tsx:updateUser', message: 'updateUser result', data: { ok: !updateError, error: updateError?.message ?? null }, timestamp: Date.now() }) }).catch(() => {});
+      } catch { /* ignore */ }
+      // #endregion
       if (updateError) throw updateError;
       setDone(true);
       toast.success('Password updated. You can now sign in with your new password.');
