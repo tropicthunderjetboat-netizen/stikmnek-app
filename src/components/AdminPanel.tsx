@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { businesses as hardcodedBusinesses, Business, CATEGORY_SELECT_KEYS, categoryLabelForKey } from '@/data/businesses';
+import { businesses as hardcodedBusinesses, Business, CATEGORY_SELECT_KEYS, categoryLabelForKey, listingDiscountExpired } from '@/data/businesses';
+import DealReactivateControl from '@/components/DealReactivateControl';
 
 import { FunctionsFetchError } from '@supabase/supabase-js';
 import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
@@ -1880,8 +1881,10 @@ const AdminPanel: React.FC = () => {
                         <div className="border-t border-gray-100 bg-gray-50/60 divide-y divide-gray-100">
                           {group.deals.map((biz) => {
                             const isFromDb = dbBusinesses.some((db) => db.id === biz.id);
+                            const dealExpired = listingDiscountExpired(biz);
                             return (
-                              <div key={biz.id} className="flex items-center gap-3 px-4 py-3 pl-12">
+                              <div key={biz.id} className="px-4 py-3 pl-12">
+                                <div className="flex items-center gap-3">
                                 {biz.image ? (
                                   <img src={biz.image} alt={biz.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
                                 ) : (
@@ -1897,6 +1900,9 @@ const AdminPanel: React.FC = () => {
                                       <span className="text-[11px] font-bold text-orange-600">{biz.discount}</span>
                                     )}
                                     <span className="text-[11px] text-gray-400">{biz.rating} ★ ({biz.reviewCount})</span>
+                                    {dealExpired && (
+                                      <span className="px-1.5 py-0.5 rounded bg-red-100 text-[10px] font-bold text-red-700 uppercase">Expired</span>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
@@ -1937,6 +1943,22 @@ const AdminPanel: React.FC = () => {
                                     </span>
                                   )}
                                 </div>
+                                </div>
+                                {dealExpired && isFromDb && (
+                                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                    <p className="text-xs font-semibold text-amber-800 flex items-center gap-1.5">
+                                      <AlertCircle className="w-3.5 h-3.5" />
+                                      Expired — hidden from tourists. Reset the date to turn it back on.
+                                    </p>
+                                    <DealReactivateControl
+                                      compact
+                                      businessId={group.profileId}
+                                      offeringId={biz.id}
+                                      currentValidUntil={biz.discountValidUntil}
+                                      onReactivated={() => void handleRefreshBusinesses()}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             );
                           })}

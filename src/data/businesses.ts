@@ -190,11 +190,24 @@ export function effectiveListingDescriptionPlain(b: Business): string {
 }
 
 /**
+ * A listing's discount has lapsed: today's UTC calendar date is strictly after
+ * `discountValidUntil` (date-only, YYYY-MM-DD). Listings without an end date never expire.
+ * Used to hide expired deals from tourists while owners/admins can still reactivate them.
+ */
+export function listingDiscountExpired(b: Pick<Business, 'discountValidUntil'>): boolean {
+  const until = String(b.discountValidUntil ?? '').slice(0, 10);
+  if (!until) return false;
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  return until < todayUtc;
+}
+
+/**
  * Canonical pipeline for tourist UI: offerings from `loadBusinesses` (`Business.id` = offering id).
  * Use everywhere (Hero, categories, map, search, deals grid, leaderboard) so counts and cards match.
+ * Expired deals (past `discountValidUntil`) are hidden here until an owner/admin reactivates them.
  */
 export function touristFacingOfferings(db: Business[]): Business[] {
-  return db.filter((b) => b.active !== false);
+  return db.filter((b) => b.active !== false && !listingDiscountExpired(b));
 }
 
 /** Non-empty WhatsApp on listing (camelCase from mapper or snake_case passthrough). */

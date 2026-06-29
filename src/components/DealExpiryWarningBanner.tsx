@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   AlertTriangle, Clock, Calendar, Tag, ArrowRight,
-  RefreshCw, X, ChevronDown, ChevronUp, Loader2, Store
+  RefreshCw, X, ChevronDown, ChevronUp, Loader2, Store, EyeOff
 } from 'lucide-react';
+import DealReactivateControl from './DealReactivateControl';
 
 interface ExpiringDeal {
   id: string;
+  businessId: string;
   name: string;
   discount: string;
   original_price: number;
@@ -15,6 +17,7 @@ interface ExpiringDeal {
   category: string;
   image: string;
   daysRemaining: number;
+  expired: boolean;
 }
 
 interface DealExpiryWarningBannerProps {
@@ -73,16 +76,17 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
         return;
       }
 
+      // Include already-expired deals (no lower bound) so owners can reactivate them —
+      // expired deals are hidden from tourists until turned back on.
       const { data, error } = await supabase
         .from('business_offerings')
         .select(`
-          id, title, discount, original_price, deal_price, discount_valid_until, image,
+          id, business_id, title, discount, original_price, deal_price, discount_valid_until, image,
           businesses!inner ( owner_id, category, name )
         `)
         .in('business_id', profileIds)
         .not('discount_valid_until', 'is', null)
-        .lte('discount_valid_until', sevenDaysFromNow.toISOString().split('T')[0])
-        .gte('discount_valid_until', now.toISOString().split('T')[0]);
+        .lte('discount_valid_until', sevenDaysFromNow.toISOString().split('T')[0]);
 
       if (error) {
         console.error('[DealExpiryWarning] Query error:', error);
@@ -91,8 +95,10 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
       }
 
       if (data && data.length > 0) {
+        const todayStr = now.toISOString().split('T')[0];
         const deals: ExpiringDeal[] = data.map((row: Record<string, unknown>) => {
           const b = row.businesses as Record<string, unknown> | undefined;
+          const untilStr = String(row.discount_valid_until).slice(0, 10);
           const expiryDate = new Date(String(row.discount_valid_until) + 'T23:59:59');
           const diffMs = expiryDate.getTime() - now.getTime();
           const daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
@@ -102,6 +108,7 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
 
           return {
             id: String(row.id),
+            businessId: String(row.business_id ?? ''),
             name: displayName,
             discount: String(row.discount ?? ''),
             original_price: Number(row.original_price) || 0,
@@ -110,6 +117,7 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
             category: String(b?.category ?? ''),
             image: String(row.image ?? ''),
             daysRemaining,
+            expired: untilStr < todayStr,
           };
         });
 
@@ -143,7 +151,8 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
   };
 
   const handleDismissAll = () => {
-    const allIds = new Set(expiringDeals.map(d => d.id));
+    // Only dismiss soon-to-expire deals; expired ones stay visible until reactivated.
+    const allIds = new Set(expiringDeals.filter(d => !d.expired).map(d => d.id));
     setDismissed(allIds);
     try {
       localStorage.setItem('deal-expiry-dismissed', JSON.stringify({
@@ -155,13 +164,15 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
 
   // Filter out dismissed deals
   const visibleDeals = expiringDeals.filter(d => !dismissed.has(d.id));
+  const expiredDeals = visibleDeals.filter(d => d.expired);
+  const soonDeals = visibleDeals.filter(d => !d.expired);
 
   // Don't render if loading or no visible deals
   if (loading) return null;
   if (visibleDeals.length === 0) return null;
 
-  const urgentDeals = visibleDeals.filter(d => d.daysRemaining <= 1);
-  const warningDeals = visibleDeals.filter(d => d.daysRemaining > 1);
+  const urgentDeals = soonDeals.filter(d => d.daysRemaining <= 1);
+  const warningDeals = soonDeals.filter(d => d.daysRemaining > 1);
   const hasUrgent = urgentDeals.length > 0;
 
   const formatExpiryDate = (dateStr: string) => {
@@ -182,7 +193,73 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
 
   return (
     <div className="mb-6 space-y-3">
+      {/* ── Expired (hidden) deals — need reactivation ── */}
+      {expiredDeals.length > 0 && (
+        <div className="rounded-2xl border border-gray-300 bg-gradient-to-r from-gray-50 to-slate-50 shadow-lg shadow-gray-100/50 overflow-hidden">
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200">
+            <div className="w-11 h-11 rounded-xl bg-gray-200 flex items-center justify-center flex-shrink-0 shadow-inner">
+              <EyeOff className="w-6 h-6 text-gray-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-gray-800 flex items-center gap-2">
+                Expired Deals — Hidden from Tourists
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-200 text-gray-700">
+                  {expiredDeals.length} deal{expiredDeals.length > 1 ? 's' : ''}
+                </span>
+              </h3>
+              <p className="text-xs mt-0.5 text-gray-500">
+                These deals are off and no longer shown. Set a new expiry date and turn them back on.
+              </p>
+            </div>
+          </div>
+          <div className="px-5 py-4 space-y-3">
+            {expiredDeals.map(deal => (
+              <div
+                key={deal.id}
+                className="rounded-xl border border-gray-200 bg-white p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+              >
+                {deal.image ? (
+                  <img src={deal.image} alt={deal.name} className="w-12 h-12 rounded-lg object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                    <Store className="w-6 h-6 text-gray-300" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="text-sm font-bold text-gray-900 truncate">{deal.name}</h4>
+                    {deal.category && (
+                      <span className="px-1.5 py-0.5 rounded-md bg-gray-100 text-[10px] text-gray-500 font-medium capitalize">
+                        {deal.category}
+                      </span>
+                    )}
+                    <span className="px-1.5 py-0.5 rounded-md bg-red-100 text-[10px] text-red-700 font-bold uppercase">
+                      Expired
+                    </span>
+                  </div>
+                  {deal.discount && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600 mt-1">
+                      <Tag className="w-3 h-3 text-gray-400" />
+                      {deal.discount}
+                    </span>
+                  )}
+                </div>
+                <div className="sm:max-w-xs w-full">
+                  <DealReactivateControl
+                    businessId={deal.businessId}
+                    offeringId={deal.id}
+                    currentValidUntil={deal.discount_valid_until}
+                    onReactivated={() => fetchExpiringDeals()}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Header Bar */}
+      {soonDeals.length > 0 && (
       <div
         className={`rounded-2xl border overflow-hidden transition-all ${
           hasUrgent
@@ -213,7 +290,7 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
                     ? 'bg-red-200 text-red-800 animate-pulse'
                     : 'bg-amber-200 text-amber-800'
                 }`}>
-                  {visibleDeals.length} deal{visibleDeals.length > 1 ? 's' : ''}
+                  {soonDeals.length} deal{soonDeals.length > 1 ? 's' : ''}
                 </span>
               </h3>
               <p className={`text-xs mt-0.5 ${hasUrgent ? 'text-red-600' : 'text-amber-600'}`}>
@@ -239,7 +316,7 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
             >
               <RefreshCw className="w-4 h-4" />
             </button>
-            {visibleDeals.length > 1 && (
+            {soonDeals.length > 1 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -293,6 +370,7 @@ const DealExpiryWarningBanner: React.FC<DealExpiryWarningBannerProps> = ({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

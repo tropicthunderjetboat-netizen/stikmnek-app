@@ -2880,6 +2880,67 @@ Deno.serve(async (req) => {
       return jsonResponse(req, { success: true });
     }
 
+    // ─── REACTIVATE_OFFERING ───
+    // Turn an expired (hidden) deal back on by resetting its expiry to a future date.
+    // Owner- or admin-authorized. Applies directly to the live offering (no pending review):
+    // the listing was already approved — only its discount window lapsed.
+    if (action === 'reactivate_offering') {
+      const businessId = String(body.businessId ?? '').trim();
+      const offeringId = String(body.offeringId ?? '').trim();
+      const until = String(body.discountValidUntil ?? body.discount_valid_until ?? '').slice(0, 10);
+
+      if (!businessId) return errorResponse(req, 'Missing businessId');
+
+      const denied = await assertAdminOrOwner(supabase, businessId, authUser, req);
+      if (denied) return denied;
+
+      const today = new Date().toISOString().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(until) || until <= today) {
+        return errorResponse(req, 'Provide a future expiry date (YYYY-MM-DD)');
+      }
+
+      // Resolve the target offering: the specific id (must belong to this business)
+      // or fall back to the business's primary (oldest) offering.
+      let oid = '';
+      if (offeringId) {
+        const { data: own, error: ownErr } = await supabase
+          .from('business_offerings')
+          .select('id')
+          .eq('id', offeringId)
+          .eq('business_id', businessId)
+          .maybeSingle();
+        if (ownErr) return errorResponse(req, ownErr.message, 500);
+        if (own?.id) oid = String(own.id);
+      }
+      if (!oid) {
+        const { data: rows, error: selErr } = await supabase
+          .from('business_offerings')
+          .select('id')
+          .eq('business_id', businessId)
+          .order('created_at', { ascending: true })
+          .limit(1);
+        if (selErr) return errorResponse(req, selErr.message, 500);
+        oid = rows?.[0]?.id ? String(rows[0].id) : '';
+      }
+      if (!oid) return errorResponse(req, 'No offering found for this business', 404);
+
+      const { error: offErr } = await supabase
+        .from('business_offerings')
+        .update({ discount_valid_until: until, active: true, updated_at: new Date().toISOString() })
+        .eq('id', oid)
+        .eq('business_id', businessId);
+      if (offErr) return errorResponse(req, offErr.message, 500);
+
+      // Ensure the parent business is active too, so it surfaces in the public view.
+      const { error: bizErr } = await supabase
+        .from('businesses')
+        .update({ active: true })
+        .eq('id', businessId);
+      if (bizErr) return errorResponse(req, bizErr.message, 500);
+
+      return jsonResponse(req, { success: true, offeringId: oid, discountValidUntil: until });
+    }
+
     // ─── RESPOND_TO_REVIEW ───
     if (action === 'respond_to_review') {
       const reviewId = body.reviewId;
