@@ -45,6 +45,24 @@
     
     <!-- PWA Manifest — KEPT so homescreen icon still works, but SW is killed -->
     <link rel="manifest" href="/manifest.json" />
+
+    <!-- Capture Chrome's install event as early as possible. It fires once, very early —
+         the React InstallPrompt component mounts too late to catch it, so we stash it on
+         window here and notify the app. Matches getStoredInstallPrompt() in pwaInstall.ts. -->
+    <script>
+      (function () {
+        window.__stikmnekDeferredInstall = window.__stikmnekDeferredInstall || null;
+        window.addEventListener('beforeinstallprompt', function (e) {
+          e.preventDefault();
+          window.__stikmnekDeferredInstall = e;
+          try { window.dispatchEvent(new Event('stikmnek-install-available')); } catch (err) {}
+        });
+        window.addEventListener('appinstalled', function () {
+          window.__stikmnekDeferredInstall = null;
+          try { localStorage.setItem('stikmnek-install-done', 'true'); } catch (err) {}
+        });
+      })();
+    </script>
     
     <!-- iOS PWA Support -->
     <meta name="apple-mobile-web-app-capable" content="yes" />

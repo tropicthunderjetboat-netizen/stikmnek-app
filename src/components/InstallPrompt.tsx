@@ -55,6 +55,7 @@ const InstallPrompt: React.FC = () => {
       if (!wasDismissed()) setShowBanner(true);
     };
 
+    // Event captured by the early inline script in index.html before React mounted.
     const stored = getStoredInstallPrompt();
     if (stored) reveal(stored);
 
@@ -63,6 +64,13 @@ const InstallPrompt: React.FC = () => {
       reveal(e as BeforeInstallPromptEvent);
     };
     window.addEventListener('beforeinstallprompt', handler);
+
+    // Fired by the early inline capture when the install event arrives after mount.
+    const availableHandler = () => {
+      const ev = getStoredInstallPrompt();
+      if (ev) reveal(ev);
+    };
+    window.addEventListener('stikmnek-install-available', availableHandler);
 
     const installedHandler = () => {
       try { localStorage.setItem(INSTALLED_KEY, 'true'); } catch { /* ignore */ }
@@ -74,6 +82,7 @@ const InstallPrompt: React.FC = () => {
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('stikmnek-install-available', availableHandler);
       window.removeEventListener('appinstalled', installedHandler);
     };
   }, []);
