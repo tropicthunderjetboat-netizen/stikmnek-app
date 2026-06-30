@@ -52,30 +52,6 @@ export async function registerPwaServiceWorker(): Promise<ServiceWorkerRegistrat
   }
 }
 
-/** Wait briefly for the browser to fire beforeinstallprompt after SW registration. */
-export function waitForInstallPrompt(timeoutMs = 2500): Promise<BeforeInstallPromptEvent | null> {
-  const stored = getStoredInstallPrompt();
-  if (stored) return Promise.resolve(stored);
-
-  return new Promise((resolve) => {
-    const timer = window.setTimeout(() => {
-      window.removeEventListener('beforeinstallprompt', handler);
-      resolve(null);
-    }, timeoutMs);
-
-    const handler = (e: Event) => {
-      e.preventDefault();
-      window.clearTimeout(timer);
-      window.removeEventListener('beforeinstallprompt', handler);
-      const ev = e as BeforeInstallPromptEvent;
-      storeInstallPrompt(ev);
-      resolve(ev);
-    };
-
-    window.addEventListener('beforeinstallprompt', handler);
-  });
-}
-
 export async function triggerPwaInstall(
   deferred: BeforeInstallPromptEvent | null,
 ): Promise<'accepted' | 'dismissed' | 'unavailable'> {

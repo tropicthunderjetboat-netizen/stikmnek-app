@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, X } from 'lucide-react';
+import { Download, X, Share, MoreVertical } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { APP_ICON } from '@/lib/brand';
 import {
   type BeforeInstallPromptEvent,
   getStoredInstallPrompt,
+  isIosDevice,
   isStandaloneDisplay,
   registerPwaServiceWorker,
   storeInstallPrompt,
@@ -32,43 +33,50 @@ function wasDismissed(): boolean {
   }
 }
 
+/** Phone-class device — the only place a home-screen install makes sense to push. */
+function isMobileDevice(): boolean {
+  return /Android|iPhone|iPad|iPod/i.test(window.navigator.userAgent) || isIosDevice();
+}
+
 /**
- * Minimal one-tap install prompt. The banner only appears when the browser can
- * actually install in one tap (it captured a `beforeinstallprompt` event — i.e.
- * Android Chrome / desktop Chromium). Tap Save → native install. Once saved (or
- * dismissed) it never shows again.
+ * Deterministic install prompt. On phones it always shows a single button:
+ *  - If the browser supports one-tap install (Android Chrome captured a
+ *    `beforeinstallprompt`), tapping it installs instantly.
+ *  - Otherwise it expands a short, correct instruction for that platform so the
+ *    user is never left at a dead end.
+ * Once the app is saved (opens standalone) or dismissed, it never shows again.
  */
 const InstallPrompt: React.FC = () => {
   const { showAuth } = useAppContext();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showBanner, setShowBanner] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
-    if (alreadyHandled()) return;
+    if (alreadyHandled() || wasDismissed()) return;
+    if (!isMobileDevice() && !getStoredInstallPrompt()) return;
 
     void registerPwaServiceWorker();
+    setShowBanner(true);
 
-    const reveal = (ev: BeforeInstallPromptEvent) => {
+    const capture = (ev: BeforeInstallPromptEvent) => {
       storeInstallPrompt(ev);
       setDeferredPrompt(ev);
-      if (!wasDismissed()) setShowBanner(true);
     };
 
-    // Event captured by the early inline script in index.html before React mounted.
     const stored = getStoredInstallPrompt();
-    if (stored) reveal(stored);
+    if (stored) capture(stored);
 
-    const handler = (e: Event) => {
+    const promptHandler = (e: Event) => {
       e.preventDefault();
-      reveal(e as BeforeInstallPromptEvent);
+      capture(e as BeforeInstallPromptEvent);
     };
-    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('beforeinstallprompt', promptHandler);
 
-    // Fired by the early inline capture when the install event arrives after mount.
     const availableHandler = () => {
       const ev = getStoredInstallPrompt();
-      if (ev) reveal(ev);
+      if (ev) capture(ev);
     };
     window.addEventListener('stikmnek-install-available', availableHandler);
 
@@ -81,23 +89,31 @@ const InstallPrompt: React.FC = () => {
     window.addEventListener('appinstalled', installedHandler);
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('beforeinstallprompt', promptHandler);
       window.removeEventListener('stikmnek-install-available', availableHandler);
       window.removeEventListener('appinstalled', installedHandler);
     };
   }, []);
 
-  const handleSave = useCallback(async () => {
+  const handlePrimary = useCallback(async () => {
+    const prompt = deferredPrompt ?? getStoredInstallPrompt();
+    if (!prompt) {
+      // No native one-tap on this browser — show the manual steps instead.
+      setShowHelp((v) => !v);
+      return;
+    }
     setInstalling(true);
     try {
-      const outcome = await triggerPwaInstall(deferredPrompt ?? getStoredInstallPrompt());
+      const outcome = await triggerPwaInstall(prompt);
       if (outcome === 'accepted') {
         try { localStorage.setItem(INSTALLED_KEY, 'true'); } catch { /* ignore */ }
         setShowBanner(false);
         setDeferredPrompt(null);
         storeInstallPrompt(null);
+      } else if (outcome === 'unavailable') {
+        setShowHelp(true);
       }
-      // 'dismissed' (cancelled the native dialog) → leave the banner so they can retry.
+      // 'dismissed' → user cancelled the native dialog; leave the banner to retry.
     } finally {
       setInstalling(false);
     }
@@ -108,7 +124,9 @@ const InstallPrompt: React.FC = () => {
     setShowBanner(false);
   }, []);
 
-  if (showAuth || !showBanner || !deferredPrompt) return null;
+  if (showAuth || !showBanner) return null;
+
+  const ios = isIosDevice();
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[95] animate-in slide-in-from-bottom duration-500">
@@ -127,13 +145,13 @@ const InstallPrompt: React.FC = () => {
             </div>
 
             <div className="flex-1 min-w-0">
-              <p className="text-sm sm:text-base font-bold text-gray-900">Save StikmNek to your phone</p>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">One tap — quick access to deals, no app store needed.</p>
+              <p className="text-sm sm:text-base font-bold text-gray-900">Add StikmNek to your phone</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5 truncate">Quick access to deals — no app store needed.</p>
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
-                onClick={() => void handleSave()}
+                onClick={() => void handlePrimary()}
                 disabled={installing}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-sm font-bold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200/50 disabled:opacity-60"
               >
@@ -142,7 +160,7 @@ const InstallPrompt: React.FC = () => {
                 ) : (
                   <Download className="w-4 h-4" />
                 )}
-                <span>{installing ? 'Saving...' : 'Save'}</span>
+                <span>{installing ? 'Adding...' : 'Add'}</span>
               </button>
               <button
                 onClick={handleDismiss}
@@ -153,6 +171,30 @@ const InstallPrompt: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {showHelp && (
+            <div className="mt-3 rounded-xl bg-gray-50 border border-gray-200 px-4 py-3">
+              {ios ? (
+                <p className="text-sm text-gray-700 flex items-center gap-2 flex-wrap">
+                  <span>Tap the</span>
+                  <Share className="w-4 h-4 text-teal-600 inline" />
+                  <span className="font-semibold">Share</span>
+                  <span>button below, then choose</span>
+                  <span className="font-semibold">&ldquo;Add to Home Screen&rdquo;</span>.
+                </p>
+              ) : (
+                <p className="text-sm text-gray-700 flex items-center gap-2 flex-wrap">
+                  <span>Tap the</span>
+                  <MoreVertical className="w-4 h-4 text-teal-600 inline" />
+                  <span className="font-semibold">menu</span>
+                  <span>(top right), then choose</span>
+                  <span className="font-semibold">&ldquo;Add to Home screen&rdquo;</span>
+                  <span>or</span>
+                  <span className="font-semibold">&ldquo;Install app&rdquo;</span>.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
