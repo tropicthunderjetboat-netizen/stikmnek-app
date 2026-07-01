@@ -120,9 +120,9 @@ const ForBusinessLanding: React.FC = () => {
             </h1>
             <p className="text-teal-100/85 text-base sm:text-lg leading-relaxed mb-8">
               StikmNek is Vanuatu&apos;s tourist deals app — and it costs you nothing to join. You choose your
-              offer, set your discount, and decide when it&apos;s live. Tourists buy one pass to unlock deals
-              across the island, including yours. You only honour a discount when they arrive and redeem — and
-              you can track every one in your dashboard.
+              offer, set your discount, and decide when it&apos;s live. Each tourist buys one pass for their trip
+              — that lets them use deals at every business on StikmNek, including yours. Your discount only
+              applies when they visit you and you scan their pass — and you can track every one in your dashboard.
             </p>
 
             <div className="flex flex-wrap justify-center gap-2 mb-8">
