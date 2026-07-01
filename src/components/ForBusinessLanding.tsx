@@ -6,10 +6,9 @@ import {
   BadgeCheck,
   BarChart3,
   Gift,
-  QrCode,
   Sparkles,
   Store,
-  TrendingUp,
+  Ticket,
   X,
   Check,
 } from 'lucide-react';
@@ -42,15 +41,15 @@ const ForBusinessLanding: React.FC = () => {
   };
 
   const ctaLabel =
-    user?.type === 'business' || user?.type === 'admin' ? 'Add my deal now' : 'List my business — free';
+    user?.type === 'business' || user?.type === 'admin' ? 'Add my deal now' : 'List my business';
 
   return (
     <>
       <Helmet prioritizeSeoTags>
-        <title>List Your Business Free | StikmNek Vanuatu</title>
+        <title>Join StikmNek | Vanuatu Business Deals</title>
         <meta
           name="description"
-          content="StikmNek is free for Vanuatu businesses. Tourists pay for the pass — you only give a discount when they redeem. Track every redemption in your dashboard."
+          content="Join StikmNek at zero cost. You control your deal and discount. Tourists buy one pass for access to deals across Vanuatu — you only honour a discount when they redeem at your door."
         />
         <link rel="canonical" href="https://www.stikmnek.com/for-business" />
       </Helmet>
@@ -72,20 +71,21 @@ const ForBusinessLanding: React.FC = () => {
               For Vanuatu businesses
             </p>
             <h1 className="text-3xl sm:text-4xl font-black leading-[1.08] tracking-tight mb-4">
-              Free to list.
-              <span className="block text-emerald-300 mt-1">You only win when tourists walk in.</span>
+              Your deal. Your discount.
+              <span className="block text-emerald-300 mt-1">You're in complete control.</span>
             </h1>
             <p className="text-teal-100/85 text-base sm:text-lg leading-relaxed mb-8">
-              StikmNek puts your deal in front of <strong className="text-white">paying tourists</strong> — not
-              another map in the bin. No upfront advertising fee. You set the discount; we send you customers who
-              already bought a pass.
+              StikmNek is Vanuatu&apos;s tourist deals app — and it costs you nothing to join. You choose your
+              offer, set your discount, and decide when it&apos;s live. Tourists buy one pass to unlock deals
+              across the island, including yours. You only honour a discount when they arrive and redeem — and
+              you can track every one in your dashboard.
             </p>
 
             <div className="flex flex-wrap justify-center gap-2 mb-8">
               {[
-                { Icon: Gift, t: '$0 to list' },
+                { Icon: Gift, t: 'No listing fee' },
+                { Icon: Store, t: 'You set the deal' },
                 { Icon: BarChart3, t: 'Track redemptions' },
-                { Icon: QrCode, t: 'Scan & verify passes' },
               ].map(({ Icon, t }) => (
                 <span
                   key={t}
@@ -147,11 +147,11 @@ const ForBusinessLanding: React.FC = () => {
                 <ul className="space-y-2 text-sm text-emerald-50/95">
                   <li className="flex gap-2">
                     <Check className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" aria-hidden />
-                    <strong className="text-white">Free</strong> to list your business & deal
+                    <strong className="text-white">Zero cost</strong> to join — you control your deal & discount
                   </li>
                   <li className="flex gap-2">
                     <Check className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" aria-hidden />
-                    Discount only when a <strong className="text-white">paying tourist</strong> redeems
+                    Discount only when a tourist <strong className="text-white">redeems at your door</strong>
                   </li>
                   <li className="flex gap-2">
                     <Check className="w-4 h-4 shrink-0 text-emerald-400 mt-0.5" aria-hidden />
@@ -174,13 +174,13 @@ const ForBusinessLanding: React.FC = () => {
               {[
                 {
                   n: '1',
-                  title: 'Create your free business account',
-                  body: 'Sign up on your phone — no payment, no contract.',
+                  title: 'Create your business account',
+                  body: 'Sign up on your phone — no payment, no contract, no catch.',
                 },
                 {
                   n: '2',
                   title: 'Add photos, your deal & discount',
-                  body: 'Set what tourists get when they show their StikmNek pass.',
+                  body: 'You choose the offer — change it anytime from your dashboard.',
                 },
                 {
                   n: '3',
@@ -219,7 +219,11 @@ const ForBusinessLanding: React.FC = () => {
             </div>
             <div className="grid grid-cols-3 gap-3 text-center">
               {[
-                { Icon: TrendingUp, label: 'Tourists pay us', sub: 'You list free' },
+                {
+                  Icon: Ticket,
+                  label: 'One pass per tourist',
+                  sub: 'Unlocks every deal on StikmNek',
+                },
                 { Icon: BadgeCheck, label: 'Verified passes', sub: 'No fake vouchers' },
                 { Icon: BarChart3, label: 'Real data', sub: 'Every redemption' },
               ].map(({ Icon, label, sub }) => (
@@ -231,7 +235,7 @@ const ForBusinessLanding: React.FC = () => {
               ))}
             </div>
             <p className="mt-8 text-sm text-teal-200/70">
-              Got this link on WhatsApp? Reply to the person who sent it — they can help you get set up.
+              Questions? Get in touch with whoever shared this link — they can walk you through setup.
             </p>
           </div>
         </section>
