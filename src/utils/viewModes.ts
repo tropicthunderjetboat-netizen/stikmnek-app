@@ -17,6 +17,7 @@ export const VIEW_MODES = [
   'faq',
   'business-guide',
   'business-new',
+  'business-join',
   'complete-profile',
   'complete-business-profile',
 ] as const;
@@ -39,6 +40,7 @@ export const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/map': 'map',
   '/passes': 'passes',
   '/business/new': 'business-new',
+  '/for-business': 'business-join',
   '/hub': 'business-dashboard',
   '/help': 'help',
   '/faq': 'faq',

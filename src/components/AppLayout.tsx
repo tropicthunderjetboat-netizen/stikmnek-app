@@ -25,6 +25,7 @@ import PassCards from './PassCards';
 import PassesEntryGate from './PassesEntryGate';
 import ReviewsSection from './ReviewsSection';
 import ListYourBusinessCta from './ListYourBusinessCta';
+import ForBusinessLanding from './ForBusinessLanding';
 import Footer from './Footer';
 import AuthModal from './AuthModal';
 import CookieConsent from './CookieConsent';
@@ -59,6 +60,7 @@ const TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
   'help',
   'faq',
   'business-guide',
+  'business-join',
 ];
 
 /**
@@ -74,6 +76,7 @@ const BUSINESS_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
   'help',
   'faq',
   'business-guide',
+  'business-join',
 ];
 
 function legalSlugFromPath(pathname: string): string | null {
@@ -451,6 +454,8 @@ const AppLayout: React.FC = () => {
         return <HelpCenter initialSection="business-guide" />;
       case 'business-new':
         return <BusinessListingFormInLayout padded />;
+      case 'business-join':
+        return <ForBusinessLanding />;
       case 'home':
       default:
         return <HomePage />;
@@ -466,6 +471,7 @@ const AppLayout: React.FC = () => {
     currentView === 'checkout' ||
     currentView === 'payment-confirmation' ||
     currentView === 'business-dashboard' ||
+    currentView === 'business-join' ||
     currentView === 'complete-profile' ||
     currentView === 'complete-business-profile';
 
