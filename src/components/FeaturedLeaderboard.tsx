@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import type { Business } from '@/data/businesses';
 import {
@@ -14,6 +15,7 @@ import { formatVT } from '@/lib/utils';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
 import { toast } from 'sonner';
 import { computeLeaderboardScore } from '@/lib/leaderboardScore';
+import { dealPathForBusiness } from '@/lib/dealUrl';
 
 interface ScoredBusiness {
   business: Business;
@@ -23,6 +25,7 @@ interface ScoredBusiness {
 }
 
 const FeaturedLeaderboard: React.FC = () => {
+  const navigate = useNavigate();
   const { language, dbBusinesses, dbReviews, redemptions, setSelectedBusiness, setCurrentView } = useAppContext();
   const [showAll, setShowAll] = useState(false);
   const [showScoring, setShowScoring] = useState(false);
@@ -57,6 +60,7 @@ const FeaturedLeaderboard: React.FC = () => {
   const handleViewDeal = (biz: Business) => {
     setSelectedBusiness(biz);
     setCurrentView('business-detail');
+    navigate(dealPathForBusiness(biz));
   };
 
   const getRankIcon = (rank: number) => {

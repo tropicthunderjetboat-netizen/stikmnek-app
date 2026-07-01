@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { isViewMode, type ViewMode } from '@/utils/viewModes';
 import { supabase } from '@/lib/supabase';
 import { Bell, X, Check, CheckCheck, Ticket, Heart, Star, TrendingUp, Gift, Users, AlertCircle, Clock, ChevronRight } from 'lucide-react';
+import { dealPathForBusiness } from '@/lib/dealUrl';
 
 interface Notification {
   id: string;
@@ -33,6 +35,7 @@ function notificationFromRow(row: Record<string, unknown>): Notification {
 }
 
 const NotificationCenter: React.FC = () => {
+  const navigate = useNavigate();
   const { user, setCurrentView, setSelectedBusiness, dbBusinesses } = useAppContext();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
@@ -120,7 +123,12 @@ const NotificationCenter: React.FC = () => {
         const biz = dbBusinesses.find(
           (b) => b.id === bid || b.profileBusinessId === bid,
         );
-        if (biz) setSelectedBusiness(biz);
+        if (biz) {
+          setSelectedBusiness(biz);
+          if (n.link_view === 'business-detail') {
+            navigate(dealPathForBusiness(biz));
+          }
+        }
       }
       setCurrentView(n.link_view);
     }

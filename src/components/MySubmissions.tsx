@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase, SUPABASE_URL, getEdgeAuthHeaders } from '@/lib/supabase';
@@ -17,6 +18,7 @@ import {
 } from '@/lib/businessDescriptionHtml';
 import { PROSE_CLASSES } from '@/lib/prose';
 import { mapJoinedOfferingToBusiness } from '@/lib/businessOfferingMap';
+import { dealPathForBusiness } from '@/lib/dealUrl';
 
 export interface Submission {
   id: string;
@@ -176,6 +178,7 @@ function mapDbRowToBusiness(row: Record<string, unknown>): Business {
 }
 
 const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
+  const navigate = useNavigate();
   const { user, language, setCurrentView, setSelectedBusiness, dbBusinesses, refreshBusinesses } =
     useAppContext();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -636,8 +639,9 @@ const MySubmissions: React.FC<MySubmissionsProps> = ({ onNewStatusChange }) => {
 
       setSelectedBusiness(biz);
       setCurrentView('business-detail');
+      navigate(dealPathForBusiness(biz));
     },
-    [user, dbBusinesses, language, setSelectedBusiness, setCurrentView],
+    [user, dbBusinesses, language, navigate, setSelectedBusiness, setCurrentView],
   );
 
   // Load pending rows + active live offerings (Explore) into one list

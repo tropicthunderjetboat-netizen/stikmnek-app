@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses } from '@/data/businesses';
 import { Bell, X, MapPin, ChevronRight } from 'lucide-react';
+import { dealPathForBusiness } from '@/lib/dealUrl';
 
 const NearbyDeals: React.FC = () => {
+  const navigate = useNavigate();
   const { language, setSelectedBusiness, setCurrentView, user } = useAppContext();
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -50,6 +53,7 @@ const NearbyDeals: React.FC = () => {
           onClick={() => {
             setSelectedBusiness(deal);
             setCurrentView('business-detail');
+            navigate(dealPathForBusiness(deal));
             setDismissed(true);
             setVisible(false);
           }}

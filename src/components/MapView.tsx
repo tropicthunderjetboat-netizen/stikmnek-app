@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import {
@@ -18,6 +19,7 @@ import {
 import { formatDistance, estimateWalkingTime, estimateDrivingTime } from '@/hooks/useGeolocation';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { isListingFavorited } from '@/lib/favoritesUi';
+import { dealPathForBusiness } from '@/lib/dealUrl';
 import { effectiveBusinessCoords } from '@/lib/urlHelpers';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
@@ -254,6 +256,7 @@ type TileLayerKey = keyof typeof tileLayers;
 
 // ─── Main MapView Component ───
 const MapView: React.FC = () => {
+  const navigate = useNavigate();
   const {
     language, setSelectedBusiness, setCurrentView, dbBusinesses,
     userLocation, locationLoading, locationError, requestUserLocation, getDistanceTo,
@@ -318,6 +321,7 @@ const MapView: React.FC = () => {
   const handleViewDeal = (biz: Business) => {
     setSelectedBusiness(biz);
     setCurrentView('business-detail');
+    navigate(dealPathForBusiness(biz));
   };
 
   const handleLocateMe = () => {

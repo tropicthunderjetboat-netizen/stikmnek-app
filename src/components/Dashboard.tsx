@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { getPassDisplayTitle } from '@/data/pricing';
 import type { PassProductId } from '@/data/passCatalog';
@@ -7,6 +8,7 @@ import { businesses as localBusinesses } from '@/data/businesses';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { businessesMatchingFavoriteKeys } from '@/lib/favoritesUi';
+import { dealPathForBusiness } from '@/lib/dealUrl';
 import { partyCountsFromTouristProfile, computeRedemptionSavingsForListing } from '@/lib/redemptionSavings';
 import { APPROX_VTU_PER_AUD, approximateAudFromVatu, approximateVatuFromAud } from '@/lib/passValueDisplay';
 import type { Business } from '@/data/businesses';
@@ -35,6 +37,7 @@ function resolveListingForRedemption(
 }
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const {
     language, user, userProfile, favorites, redemptions, setSelectedBusiness, setCurrentView, dbBusinesses,
     refreshRedemptions, purchasePass, refreshUserPass,
@@ -571,7 +574,7 @@ const Dashboard: React.FC = () => {
                         if (!biz) return null;
                         return (
                           <div key={`${r.businessId}-${r.date}-${i}`} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                            onClick={() => { setSelectedBusiness(biz); setCurrentView('business-detail'); }}>
+                            onClick={() => { setSelectedBusiness(biz); setCurrentView('business-detail'); navigate(dealPathForBusiness(biz)); }}>
                             <img src={biz.image} alt={biz.name} className="w-12 h-12 rounded-xl object-cover" />
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold text-sm text-gray-900 truncate">{biz.name}</p>
@@ -687,7 +690,7 @@ const Dashboard: React.FC = () => {
                     <div className="divide-y divide-gray-100">
                       {favBizs.map(biz => (
                         <div key={biz.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors cursor-pointer"
-                          onClick={() => { setSelectedBusiness(biz); setCurrentView('business-detail'); }}>
+                          onClick={() => { setSelectedBusiness(biz); setCurrentView('business-detail'); navigate(dealPathForBusiness(biz)); }}>
                           <img src={biz.image} alt={biz.name} className="w-10 h-10 rounded-lg object-cover" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-gray-900 truncate">{biz.name}</p>
@@ -1120,7 +1123,7 @@ const Dashboard: React.FC = () => {
                       <div
                         key={item.business.id}
                         className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                        onClick={() => { setSelectedBusiness(item.business!); setCurrentView('business-detail'); }}
+                        onClick={() => { setSelectedBusiness(item.business!); setCurrentView('business-detail'); navigate(dealPathForBusiness(item.business!)); }}
                       >
                         <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-700 text-sm font-bold">
                           {i + 1}

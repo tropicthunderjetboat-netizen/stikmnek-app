@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAppContext } from '@/contexts/AppContext';
-import { absoluteDealUrl } from '@/lib/dealUrl';
+import { absoluteDealUrl, dealPathForBusiness } from '@/lib/dealUrl';
 import { t } from '@/data/translations';
 import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, MessageSquarePlus, Sparkles, ExternalLink, Store, Layers, Globe } from 'lucide-react';
 import { toast } from 'sonner';
@@ -739,7 +739,11 @@ const BusinessDetail: React.FC = () => {
               value={biz.id}
               onChange={(e) => {
                 const next = profileOfferings.find((o) => o.id === e.target.value);
-                if (next) setSelectedBusiness(next);
+                if (!next) return;
+                setSelectedBusiness(next);
+                // Keep the shareable deal URL in sync so route resolution doesn't snap back
+                // to the previously-selected listing on the next render.
+                navigate(dealPathForBusiness(next));
               }}
               className="w-full sm:max-w-md rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-900 shadow-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/30"
             >

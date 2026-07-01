@@ -1,11 +1,14 @@
 import React, { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Heart, ChevronRight, MapPin } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { businesses as localBusinesses } from '@/data/businesses';
 import { t } from '@/data/translations';
 import { businessesMatchingFavoriteKeys } from '@/lib/favoritesUi';
+import { dealPathForBusiness } from '@/lib/dealUrl';
 
 const MyFavoritesList: React.FC = () => {
+  const navigate = useNavigate();
   const {
     language,
     favorites,
@@ -68,6 +71,7 @@ const MyFavoritesList: React.FC = () => {
                   onClick={() => {
                     setSelectedBusiness(biz);
                     setCurrentView('business-detail');
+                    navigate(dealPathForBusiness(biz));
                   }}
                   className="w-full flex items-center gap-4 p-4 text-left hover:bg-teal-50/50 transition-colors"
                 >
