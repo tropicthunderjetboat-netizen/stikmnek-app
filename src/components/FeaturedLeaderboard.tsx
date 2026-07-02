@@ -6,6 +6,7 @@ import {
   effectiveListingDealPrice,
   effectiveListingOriginalPrice,
   listingHasActiveDiscount,
+  listingOfferBadgeText,
   customerFacingListPrice,
   touristFacingOfferings,
 } from '@/data/businesses';
@@ -174,12 +175,7 @@ const FeaturedLeaderboard: React.FC = () => {
             const oOrig = effectiveListingOriginalPrice(business);
             const oDeal = effectiveListingDealPrice(business);
             const hasDisc = listingHasActiveDiscount(business);
-            const lbDiscountBadge =
-              hasDisc && String(business.discount ?? '').trim()
-                ? String(business.discount).trim()
-                : hasDisc && oOrig > 0
-                  ? `${Math.round((1 - oDeal / oOrig) * 100)}% OFF`
-                  : null;
+            const lbDiscountBadge = listingOfferBadgeText(business);
             const superStarCount = dbReviews.filter((r: any) =>
               r.business_id === profileBusinessIdFor(business) &&
               r.has_super_star &&

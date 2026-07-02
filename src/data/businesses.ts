@@ -174,6 +174,28 @@ export function listingHasActiveDiscount(b: Business): boolean {
   return tiers.some((t) => t.original_price_vt > 0 && t.deal_price_vt > 0 && t.deal_price_vt < t.original_price_vt);
 }
 
+/** A text offer exists even when there is no numeric price discount (e.g. "Free dessert"). */
+export function listingHasNonPriceOffer(b: Business): boolean {
+  const label = String(b.discount ?? '').trim();
+  if (!label) return false;
+  return !listingHasActiveDiscount(b);
+}
+
+/** Offer badge to show on cards/details: price discount or free add-on text. */
+export function listingOfferBadgeText(b: Business): string | null {
+  const label = String(b.discount ?? '').trim();
+  if (listingHasActiveDiscount(b) && label) return label;
+  if (listingHasActiveDiscount(b)) {
+    const deal = effectiveListingDealPrice(b);
+    const orig = effectiveListingOriginalPrice(b);
+    if (orig > 0 && deal > 0 && deal < orig) {
+      return `${Math.round((1 - deal / orig) * 100)}% OFF`;
+    }
+  }
+  if (listingHasNonPriceOffer(b) && label) return label;
+  return null;
+}
+
 /** Headline price for cards and detail (discounted price, or list price when no deal). */
 export function customerFacingListPrice(b: Business): number {
   const deal = effectiveListingDealPrice(b);

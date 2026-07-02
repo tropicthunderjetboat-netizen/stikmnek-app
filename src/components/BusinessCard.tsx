@@ -7,6 +7,7 @@ import {
   effectiveListingDealPrice,
   effectiveListingOriginalPrice,
   listingHasActiveDiscount,
+  listingOfferBadgeText,
   customerFacingListPrice,
   primaryEmbeddedOffering,
 } from '@/data/businesses';
@@ -68,13 +69,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
   const hasDiscount = listingHasActiveDiscount(business);
   const displayPrice = customerFacingListPrice(business);
   const savings = hasDiscount ? Math.max(0, originalPrice - dealPrice) : 0;
-  const discountLabel = String(business.discount ?? '').trim();
-  const discountBadgeText =
-    hasDiscount && discountLabel
-      ? discountLabel
-      : hasDiscount && originalPrice > 0 && dealPrice < originalPrice
-        ? `${Math.round((1 - dealPrice / originalPrice) * 100)}% OFF`
-        : null;
+  const discountBadgeText = listingOfferBadgeText(business);
   const cardImage =
     (business.image && business.image.trim()) ||
     String(embed?.banner_url || embed?.image || '').trim() ||

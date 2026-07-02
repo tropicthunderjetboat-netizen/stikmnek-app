@@ -284,6 +284,15 @@ function deriveDiscountPercentFromBusiness(b: Business): string {
   return '';
 }
 
+function deriveOfferTypeFromBusiness(b: Business): 'price_discount' | 'free_add_on' {
+  const label = String(b.discount || '').trim();
+  if (!label) return 'price_discount';
+  const orig = Number(b.originalPrice) || 0;
+  const deal = Number(b.dealPrice) || 0;
+  if (orig > 0 && deal > 0 && deal < orig) return 'price_discount';
+  return 'free_add_on';
+}
+
 type EditBaseline = {
   description: string;
   hours: string;
@@ -547,6 +556,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
     const defaults = {
       name: '', category: 'dining', description: '', discount: '',
       originalPrice: '', discountPercent: '', dealPrice: '',
+      offerType: 'price_discount' as 'price_discount' | 'free_add_on',
       address: '', phone: '', email: '', hours: '',
       whatsappNumber: '',
       mapUrl: '', website: '',
@@ -705,6 +715,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
       originalPrice: origStr,
       discountPercent: pct,
       dealPrice: dealStr,
+      offerType: deriveOfferTypeFromBusiness(b),
       address: b.location || '',
       phone: b.phone || '',
       email: (b.contactEmail || '').trim() || user?.email || '',
@@ -762,6 +773,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
   }, [form.discountPercent]);
 
   const calculatedDealPrice = useMemo(() => {
+    if (form.offerType === 'free_add_on') return '';
     const orig = parseFloat(form.originalPrice);
     const pct = parseFloat(form.discountPercent);
     if (!isNaN(orig) && orig > 0 && !isNaN(pct) && pct > 0 && pct < 100) {
@@ -771,6 +783,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
   }, [form.originalPrice, form.discountPercent]);
 
   const calculatedDiscountLabel = useMemo(() => {
+    if (form.offerType === 'free_add_on') return '';
     const pct = parseFloat(form.discountPercent);
     if (!isNaN(pct) && pct > 0 && pct < 100) {
       return `${Math.round(pct)}% OFF`;
@@ -792,6 +805,14 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
 
   // Sync calculated values into form state for submission (also for tours/activities so cards get deal + badge text).
   useEffect(() => {
+    if (form.offerType === 'free_add_on') {
+      setForm(prev => ({
+        ...prev,
+        discountPercent: '',
+        dealPrice: prev.originalPrice || '',
+      }));
+      return;
+    }
     if (calculatedDealPrice && calculatedDiscountLabel) {
       setForm(prev => ({
         ...prev,
@@ -805,7 +826,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
         discount: '',
       }));
     }
-  }, [calculatedDealPrice, calculatedDiscountLabel, form.category, embeddedEdit]);
+  }, [calculatedDealPrice, calculatedDiscountLabel, form.category, embeddedEdit, form.offerType]);
 
   useEffect(() => {
     if (embeddedEdit) return;
@@ -886,6 +907,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
     setForm({
       name: '', category: 'dining', description: '', discount: '',
       originalPrice: '', discountPercent: '', dealPrice: '',
+      offerType: 'price_discount',
       address: '', phone: '', email: '', hours: '',
       whatsappNumber: '',
       mapUrl: '', website: '',
@@ -973,6 +995,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
             originalPrice: form.originalPrice,
             dealPrice: form.dealPrice,
             discountPercent: form.discountPercent,
+            offerType: form.offerType,
+            discountLabel: form.discount,
           },
       pricingTiers: categoryUsesTieredPricing(form.category) ? pricingTiers : null,
     });
@@ -1019,6 +1043,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
       let aoDealNumeric = form.dealPrice ? Number(form.dealPrice) : 0;
       const aoPct = parseFloat(String(form.discountPercent).replace(/,/g, ''));
       if (
+        form.offerType !== 'free_add_on' &&
         (!Number.isFinite(aoDealNumeric) || aoDealNumeric <= 0) &&
         aoOriginalPrice > 0 &&
         Number.isFinite(aoPct) &&
@@ -1027,7 +1052,12 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
       ) {
         aoDealNumeric = aoOriginalPrice * (1 - aoPct / 100);
       }
-      const aoDealPrice = Number.isFinite(aoDealNumeric) && aoDealNumeric > 0 ? aoDealNumeric : aoOriginalPrice;
+      const aoDealPrice =
+        form.offerType === 'free_add_on'
+          ? aoOriginalPrice
+          : Number.isFinite(aoDealNumeric) && aoDealNumeric > 0
+            ? aoDealNumeric
+            : aoOriginalPrice;
       let aoDiscount = String(form.discount || '').trim();
       if (!aoDiscount && Number.isFinite(aoPct) && aoPct > 0 && aoPct < 100) {
         aoDiscount = `${Math.round(aoPct)}% OFF`;
@@ -1287,6 +1317,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
       let finalDealNumeric = form.dealPrice ? Number(form.dealPrice) : 0;
       const pctSubmit = parseFloat(String(form.discountPercent).replace(/,/g, ''));
       if (
+        form.offerType !== 'free_add_on' &&
         (!Number.isFinite(finalDealNumeric) || finalDealNumeric <= 0) &&
         finalOriginalPrice > 0 &&
         Number.isFinite(pctSubmit) &&
@@ -1296,7 +1327,11 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
         finalDealNumeric = finalOriginalPrice * (1 - pctSubmit / 100);
       }
       const finalDealPrice =
-        Number.isFinite(finalDealNumeric) && finalDealNumeric > 0 ? finalDealNumeric : finalOriginalPrice;
+        form.offerType === 'free_add_on'
+          ? finalOriginalPrice
+          : Number.isFinite(finalDealNumeric) && finalDealNumeric > 0
+            ? finalDealNumeric
+            : finalOriginalPrice;
       let discountStr = String(form.discount || '').trim();
       if (!discountStr && Number.isFinite(pctSubmit) && pctSubmit > 0 && pctSubmit < 100) {
         discountStr = `${Math.round(pctSubmit)}% OFF`;
@@ -1589,6 +1624,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
             originalPrice: form.originalPrice,
             dealPrice: form.dealPrice,
             discountPercent: form.discountPercent,
+            offerType: form.offerType,
+            discountLabel: form.discount,
           },
       pricingTiers: categoryUsesTieredPricing(form.category) ? pricingTiers : null,
     });
@@ -1917,29 +1954,87 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
             <div className="flex items-center gap-2 mb-1">
               <Tag className="w-4 h-4 text-teal-600" />
               <h3 className="text-sm font-bold text-teal-800">
-                {language === 'en' ? 'Pricing & Discount (VT)' : language === 'fr' ? 'Prix et remise (VT)' : 'Praes mo Diskaon (VT)'}
+                {language === 'en' ? 'Your tourist offer (VT)' : language === 'fr' ? 'Votre offre touristique (VT)' : 'Ofa blong yu long ol turis (VT)'}
               </h3>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-100 text-teal-700 font-medium">
-                {language === 'en' ? 'Discount Optional' : 'Remise optionnelle'}
+                {language === 'en' ? 'Simple setup' : language === 'fr' ? 'Configuration simple' : 'Isi blong setemap'}
               </span>
             </div>
             <p className="text-sm text-gray-700 mb-4">
               {categoryUsesTieredPricing(form.category)
                 ? language === 'en'
-                  ? 'Enter a single per-person price in Vatu (VT) (used if you add no tiers). Discount is optional — businesses offering discounts get featured priority.'
+                  ? 'Set your normal price in Vatu (VT), then choose what tourists get — a lower price or a free extra. If you add no tiers, this single price is used.'
                   : language === 'fr'
-                    ? "Entrez un prix unique par personne en Vatu (VT) (utilisé si vous n’ajoutez pas de paliers). La remise est optionnelle — les entreprises offrant des remises sont prioritaires."
-                    : 'Putum wan praes long Vatu (VT) (hem i wok sapos yu no putum tiers). Diskaon i opsenal — bisnis we i gat diskaon i go feswan.'
+                    ? "Indiquez votre prix normal en Vatu (VT), puis choisissez ce que les touristes reçoivent : un prix réduit ou un bonus gratuit."
+                    : 'Putum nomol praes blong yu long VT, biaen jusum wanem turis bae kasem: wan daon praes o wan fri ad-on.'
                 : language === 'en'
-                  ? 'Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.'
+                  ? 'Enter your normal price in Vatu (VT), then choose the offer tourists get.'
                   : language === 'fr'
-                    ? 'Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.'
-                    : 'Putum praes long Vatu (VT). Diskaon i opsenal — bisnis we i gat diskaon i go feswan.'}
+                    ? 'Entrez votre prix normal en Vatu (VT), puis choisissez l’offre pour les touristes.'
+                    : 'Putum nomol praes blong yu long VT, biaen jusum ofa blong ol turis.'}
             </p>
+
+            {!categoryUsesTieredPricing(form.category) && (
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-gray-600 mb-2">
+                  {language === 'en' ? 'Offer type' : language === 'fr' ? "Type d'offre" : 'Kaen ofa'}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                      setForm((prev) => ({
+                        ...prev,
+                        offerType: 'price_discount',
+                        discount: prev.discountPercent ? prev.discount : prev.discount,
+                      }));
+                    }}
+                    className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                      form.offerType === 'price_discount'
+                        ? 'border-teal-500 bg-white ring-2 ring-teal-200'
+                        : 'border-gray-200 bg-white hover:border-teal-200'
+                    }`}
+                  >
+                    <p className="text-sm font-bold text-gray-900">
+                      {language === 'en' ? 'Lower price for tourists' : language === 'fr' ? 'Prix réduit pour les touristes' : 'Daon praes blong ol turis'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {language === 'en' ? 'Example: 10% off, 20% off' : 'Exemple : 10% de réduction'}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                      setForm((prev) => ({
+                        ...prev,
+                        offerType: 'free_add_on',
+                        discountPercent: '',
+                        dealPrice: prev.originalPrice || '',
+                        discount: prev.discount && !/%\s*OFF/i.test(prev.discount) ? prev.discount : '',
+                      }));
+                    }}
+                    className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                      form.offerType === 'free_add_on'
+                        ? 'border-teal-500 bg-white ring-2 ring-teal-200'
+                        : 'border-gray-200 bg-white hover:border-teal-200'
+                    }`}
+                  >
+                    <p className="text-sm font-bold text-gray-900">
+                      {language === 'en' ? 'Free extra / special offer' : language === 'fr' ? 'Bonus gratuit / offre spéciale' : 'Fri extra / spesel ofa'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {language === 'en' ? 'Example: free dessert, free pickup' : 'Exemple : dessert offert, transfert offert'}
+                    </p>
+                  </button>
+                </div>
+              </div>
+            )}
 
 
             {/* Price + Discount + New Price row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <div className={`grid grid-cols-1 ${form.offerType === 'free_add_on' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-3 items-end`}>
               {/* Original Price */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -1975,37 +2070,67 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                 </p>
               </div>
 
-              {/* Discount Percentage */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  {language === 'en' ? 'Discount (%)' : language === 'fr' ? 'Remise (%)' : 'Diskaon (%)'}
+              {form.offerType === 'price_discount' ? (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    {language === 'en' ? 'Tourist discount (%)' : language === 'fr' ? 'Remise touriste (%)' : 'Diskaon blong turis (%)'}
 
-                </label>
-                <div className="relative">
-                  <Percent className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  </label>
+                  <div className="relative">
+                    <Percent className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                    <input
+                      type="number"
+                      min="1"
+                      max="99"
+                      step="1"
+                      value={form.discountPercent}
+                      onChange={(e) => {
+                        setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                        setForm((prev) => ({ ...prev, discountPercent: e.target.value }));
+                      }}
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                      placeholder="20"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    {language === 'en' ? 'How much less tourists pay' : 'Combien les touristes paient en moins'}
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    {language === 'en' ? 'What tourists get' : language === 'fr' ? 'Ce que les touristes reçoivent' : 'Wanem turis bae kasem'}
+                  </label>
                   <input
-                    type="number"
-                    min="1"
-                    max="99"
-                    step="1"
-                    value={form.discountPercent}
+                    type="text"
+                    value={form.discount}
                     onChange={(e) => {
                       setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
-                      setForm((prev) => ({ ...prev, discountPercent: e.target.value }));
+                      setForm((prev) => ({ ...prev, discount: e.target.value }));
                     }}
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
-                    placeholder="20"
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                    placeholder="Free dessert with 2 mains"
                   />
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    {language === 'en' ? 'Example: Free dessert with 2 mains' : 'Exemple : Dessert offert pour 2 plats'}
+                  </p>
                 </div>
-                <p className="text-xs text-gray-600 mt-0.5">
-                  {language === 'en' ? 'Percentage off for pass holders' : 'Pourcentage de réduction'}
-                </p>
-              </div>
+              )}
 
               {/* Auto-Calculated New Price */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  {language === 'en' ? 'New Price (auto)' : language === 'fr' ? 'Nouveau prix (auto)' : 'Niu Praes (oto)'}
+                  {form.offerType === 'free_add_on'
+                    ? language === 'en'
+                      ? 'Price shown in app'
+                      : language === 'fr'
+                        ? "Prix affiché dans l'app"
+                        : 'Praes long app'
+                    : language === 'en'
+                      ? 'New Price (auto)'
+                      : language === 'fr'
+                        ? 'Nouveau prix (auto)'
+                        : 'Niu Praes (oto)'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">VT</span>
@@ -2025,13 +2150,50 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                   />
                 </div>
                 <p className="text-xs text-gray-600 mt-0.5">
-                  {language === 'en' ? 'Calculated from price & discount' : 'Calculé automatiquement'}
+                  {form.offerType === 'free_add_on'
+                    ? language === 'en'
+                      ? 'Same price, plus the free add-on offer'
+                      : language === 'fr'
+                        ? "Même prix, avec l'offre gratuite en plus"
+                        : 'Sem praes wetem fri ad-on'
+                    : language === 'en'
+                      ? 'Calculated from price & discount'
+                      : 'Calculé automatiquement'}
                 </p>
               </div>
             </div>
 
             {/* ─── Live Price Breakdown Preview ─── */}
-            {displayAutoDealPrice && form.originalPrice && (
+            {form.offerType === 'free_add_on' && form.originalPrice && form.discount && (
+              <div className="mt-4 p-4 rounded-xl bg-white border border-teal-200 shadow-sm">
+                <div className="flex items-center gap-1.5 mb-3">
+                  <Tag className="w-3.5 h-3.5 text-teal-600" />
+                  <span className="text-xs font-semibold text-teal-700 uppercase tracking-wide">
+                    {language === 'en' ? 'Customer will see' : language === 'fr' ? 'Le client verra' : 'Kastoma bae luk'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 mb-3">
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] text-gray-400 mb-0.5">
+                      {language === 'en' ? 'Price' : 'Prix'}
+                    </span>
+                    <span className="text-2xl font-extrabold text-gray-900">
+                      {formatVT(parseFloat(form.originalPrice))}
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] text-gray-400 mb-0.5">
+                      {language === 'en' ? 'Offer' : 'Offre'}
+                    </span>
+                    <span className="px-3 py-1 rounded-lg bg-orange-100 text-orange-700 text-sm font-bold text-center">
+                      {form.discount}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            {form.offerType !== 'free_add_on' && displayAutoDealPrice && form.originalPrice && (
               <div className="mt-4 p-4 rounded-xl bg-white border border-teal-200 shadow-sm">
                 <div className="flex items-center gap-1.5 mb-3">
                   <Tag className="w-3.5 h-3.5 text-teal-600" />

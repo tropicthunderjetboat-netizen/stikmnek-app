@@ -37,6 +37,7 @@ import {
   effectiveListingDealPrice,
   effectiveListingOriginalPrice,
   listingHasActiveDiscount,
+  listingOfferBadgeText,
   customerFacingListPrice,
   primaryEmbeddedOffering,
   primaryOfferingDescriptionHtml,
@@ -523,14 +524,7 @@ const BusinessDetail: React.FC = () => {
   const origPx = effectiveListingOriginalPrice(biz);
   const hasActiveDiscount = listingHasActiveDiscount(biz) || Boolean(tierDiscountBadge);
   const displayListPx = customerFacingListPrice(biz);
-  const detailDiscountBadge =
-    hasActiveDiscount && String(biz.discount ?? '').trim()
-      ? String(biz.discount).trim()
-      : tierDiscountBadge
-        ? tierDiscountBadge
-      : hasActiveDiscount && origPx > 0
-        ? `${Math.round((1 - dealPx / origPx) * 100)}% OFF`
-        : null;
+  const detailDiscountBadge = tierDiscountBadge || listingOfferBadgeText(biz);
   const isListingOwner = Boolean(user?.id && biz.ownerId && user.id === biz.ownerId);
   const isFav = isListingFavorited(favorites, biz);
   /** Same rule as booking: only pass holders get WhatsApp (avoids discount leakage). */

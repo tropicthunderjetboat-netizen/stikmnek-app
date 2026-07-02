@@ -7,6 +7,7 @@ import {
   touristFacingOfferings,
   effectiveListingOriginalPrice,
   listingHasActiveDiscount,
+  listingOfferBadgeText,
   customerFacingListPrice,
 } from '@/data/businesses';
 import { formatVT } from '@/lib/utils';
@@ -591,6 +592,7 @@ const MapView: React.FC = () => {
             const displayPrice = customerFacingListPrice(selectedMapBiz);
             const originalPrice = effectiveListingOriginalPrice(selectedMapBiz);
             const hasDiscount = listingHasActiveDiscount(selectedMapBiz);
+            const offerBadge = listingOfferBadgeText(selectedMapBiz);
             return (
             <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-auto sm:right-4 sm:w-96 max-h-[55vh] sm:max-h-none overflow-y-auto bg-white rounded-xl shadow-2xl border border-gray-100 overflow-x-hidden z-[1000]">
               <div className="relative">
@@ -617,9 +619,11 @@ const MapView: React.FC = () => {
                 >
                   <Heart className={`w-4 h-4 ${isSelectedFav ? 'fill-current' : ''}`} />
                 </button>
-                <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold">
-                  {selectedMapBiz.discount}
-                </div>
+                {offerBadge && (
+                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-gradient-to-r from-orange-500 to-amber-500 text-white text-xs font-bold">
+                    {offerBadge}
+                  </div>
+                )}
                 {userLocation && (() => {
                   const dist = getDistanceTo(selectedMapBiz.lat, selectedMapBiz.lng);
                   return dist !== null ? (

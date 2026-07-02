@@ -20,6 +20,7 @@ import {
   effectiveListingDealPrice,
   effectiveListingOriginalPrice,
   listingHasActiveDiscount,
+  listingOfferBadgeText,
 } from '@/data/businesses';
 
 
@@ -364,10 +365,9 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               )}
 
               <div className="flex flex-wrap items-center gap-3 mt-4">
-                {listingHasActiveDiscount(selectedBusiness) && (
+                {listingOfferBadgeText(selectedBusiness) && (
                   <span className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 text-orange-700 text-sm font-bold">
-                    {selectedBusiness.discount?.trim() ||
-                      `${Math.round((1 - effectiveListingDealPrice(selectedBusiness) / effectiveListingOriginalPrice(selectedBusiness)) * 100)}% OFF`}
+                    {listingOfferBadgeText(selectedBusiness)}
                   </span>
                 )}
                 <span className="text-sm text-gray-500">

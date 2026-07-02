@@ -66,6 +66,10 @@ export type FlatListingPricingInput = {
   dealPrice: number | string;
   /** When set and non-empty, discount path: % must be 1–99 and deal &lt; original. */
   discountPercent?: string | null;
+  /** Optional offer type for flat listings. */
+  offerType?: 'price_discount' | 'free_add_on';
+  /** Badge/offer text shown to tourists (e.g. "Free dessert"). */
+  discountLabel?: string | null;
 };
 
 export type ListingSubmissionOnboardingInput = {
@@ -240,9 +244,18 @@ export function validateFlatListingPricing(input: FlatListingPricingInput): Fiel
   const dealRaw = Number(String(input.dealPrice ?? '').replace(/,/g, ''));
   const pctRaw = (input.discountPercent ?? '').trim();
   const hasDiscount = Boolean(pctRaw);
+  const offerType = input.offerType === 'free_add_on' ? 'free_add_on' : 'price_discount';
+  const discountLabel = (input.discountLabel ?? '').trim();
 
   if (!Number.isFinite(orig) || orig <= 0) {
     return 'Enter your standard price in VT (must be greater than 0).';
+  }
+
+  if (offerType === 'free_add_on') {
+    if (!discountLabel) {
+      return 'Enter the free add-on or special offer tourists get (e.g. Free dessert with 2 mains).';
+    }
+    return null;
   }
 
   if (hasDiscount) {
