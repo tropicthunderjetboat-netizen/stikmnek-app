@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import type { Business } from '@/data/businesses';
@@ -29,6 +29,7 @@ const FeaturedLeaderboard: React.FC = () => {
   const { language, dbBusinesses, dbReviews, redemptions, setSelectedBusiness, setCurrentView } = useAppContext();
   const [showAll, setShowAll] = useState(false);
   const [showScoring, setShowScoring] = useState(false);
+  const sectionRef = useRef<HTMLElement | null>(null);
 
   const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
@@ -63,6 +64,12 @@ const FeaturedLeaderboard: React.FC = () => {
     navigate(dealPathForBusiness(biz));
   };
 
+  const handleBrowseAllDeals = () => {
+    setCurrentView('deals');
+    navigate('/deals');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const getRankIcon = (rank: number) => {
     if (rank === 1) return <Crown className="w-5 h-5 text-amber-500" />;
     if (rank === 2) return <Trophy className="w-5 h-5 text-gray-400" />;
@@ -84,8 +91,19 @@ const FeaturedLeaderboard: React.FC = () => {
     return 'text-gray-500';
   };
 
+  const handleToggleShowAll = () => {
+    if (showAll) {
+      setShowAll(false);
+      requestAnimationFrame(() => {
+        sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      return;
+    }
+    setShowAll(true);
+  };
+
   return (
-    <section className="py-16 bg-gradient-to-b from-gray-50 to-white">
+    <section ref={sectionRef} className="py-16 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-10">
@@ -317,7 +335,7 @@ const FeaturedLeaderboard: React.FC = () => {
         <div className="text-center mt-8 flex items-center justify-center gap-4">
           {leaderboard.length > 6 && (
             <button
-              onClick={() => setShowAll(!showAll)}
+              onClick={handleToggleShowAll}
               className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white border-2 border-gray-200 text-gray-700 font-bold text-sm hover:border-teal-300 hover:text-teal-700 transition-all"
             >
               {showAll ? (
@@ -334,7 +352,7 @@ const FeaturedLeaderboard: React.FC = () => {
             </button>
           )}
           <button
-            onClick={() => setCurrentView('deals')}
+            onClick={handleBrowseAllDeals}
             className="flex items-center gap-2 px-6 py-3 rounded-xl bg-teal-600 text-white font-bold text-sm hover:bg-teal-700 transition-all shadow-md shadow-teal-200"
           >
             {language === 'en' ? 'Browse All Deals' : language === 'fr' ? 'Voir toutes les offres' : 'Lukim Olgeta Dils'}

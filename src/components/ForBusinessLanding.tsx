@@ -20,6 +20,7 @@ import { APP_ICON } from '@/lib/brand';
 import { touristFacingOfferings } from '@/data/businesses';
 import { t } from '@/data/translations';
 import LanguageFlag from '@/components/LanguageFlag';
+import { CONCIERGE_CAPTURE_MESSAGE, outreachWhatsAppUrl } from '@/data/contact';
 
 const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-5 h-5' }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -58,7 +59,9 @@ const ForBusinessLanding: React.FC = () => {
   };
 
   const ctaLabel =
-    user?.type === 'business' || user?.type === 'admin' ? 'Add my deal now' : 'List my business';
+    user?.type === 'business' || user?.type === 'admin' ? 'Add my deal now' : 'Set up online yourself';
+
+  const conciergeWaUrl = outreachWhatsAppUrl(CONCIERGE_CAPTURE_MESSAGE);
 
   const benefits = [
     { Icon: Gift, title: 'No listing fee', body: 'Join at zero cost — no advertising invoice, no contract.' },
@@ -144,7 +147,7 @@ const ForBusinessLanding: React.FC = () => {
             <button
               type="button"
               onClick={onJoin}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-black text-lg shadow-xl shadow-orange-900/40 hover:brightness-105 active:scale-[0.98] transition-all"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-2xl bg-white/10 border border-white/25 text-white font-bold text-base hover:bg-white/15 active:scale-[0.98] transition-all"
             >
               {ctaLabel}
               <ArrowRight className="w-5 h-5" aria-hidden />
@@ -161,6 +164,75 @@ const ForBusinessLanding: React.FC = () => {
                 Already have an account? Sign in
               </button>
             )}
+          </div>
+        </section>
+
+        {/* Two ways to join */}
+        <section className="px-4 pb-10 sm:px-6">
+          <div className="max-w-lg mx-auto space-y-4">
+            <h2 className="text-center text-lg font-black">Two ways to join</h2>
+
+            <div className="rounded-2xl border-2 border-green-400/40 bg-gradient-to-br from-green-950/50 to-emerald-950/40 p-5 sm:p-6 ring-1 ring-green-400/20">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="rounded-full bg-green-500 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white">
+                  Easiest
+                </span>
+                <p className="text-sm font-bold text-green-100">We set it up for you</p>
+              </div>
+              <p className="text-sm text-green-50/90 leading-relaxed mb-4">
+                No signup. No password. No long form. Just send <strong className="text-white">5 things on WhatsApp</strong>{' '}
+                and we create your listing. If you&apos;re not sure what deal to offer, simple examples are
+                <strong className="text-white"> 10% off</strong>, <strong className="text-white">20% off</strong>,
+                <strong className="text-white"> free drink with a meal</strong>, or <strong className="text-white">kids free</strong>.
+              </p>
+              <ol className="space-y-2 text-sm text-green-50/95 mb-5">
+                {[
+                  'Business name',
+                  'Your deal for tourists (example: 20% off food)',
+                  'Your location',
+                  'Your phone or WhatsApp number',
+                  '3 photos',
+                ].map((item, i) => (
+                  <li key={item} className="flex gap-2.5">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green-500/30 text-xs font-black text-green-100">
+                      {i + 1}
+                    </span>
+                    {item}
+                  </li>
+                ))}
+              </ol>
+              {conciergeWaUrl ? (
+                <a
+                  href={conciergeWaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-green-500 text-white font-black text-base shadow-lg shadow-green-900/30 hover:bg-green-400 transition-colors"
+                >
+                  <WhatsAppIcon className="w-5 h-5" />
+                  Message us on WhatsApp
+                </a>
+              ) : (
+                <p className="text-sm text-green-100/80 text-center">
+                  Reply on WhatsApp to whoever sent you this link — send the 5 things above and they&apos;ll set you up.
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-white/15 bg-white/5 p-5 sm:p-6">
+              <p className="text-sm font-bold text-white mb-2">Set up yourself online</p>
+              <p className="text-sm text-teal-100/75 leading-relaxed mb-4">
+                If you&apos;re comfortable on your phone and have data, you can create your listing directly — takes about
+                5 minutes.
+              </p>
+              <button
+                type="button"
+                onClick={onJoin}
+                className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-base shadow-lg shadow-orange-900/30"
+              >
+                {ctaLabel}
+                <ArrowRight className="w-5 h-5" aria-hidden />
+              </button>
+            </div>
           </div>
         </section>
 
