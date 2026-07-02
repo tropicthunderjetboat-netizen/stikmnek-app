@@ -356,6 +356,8 @@ const PaymentCheckout: React.FC = () => {
   const prevCartPartySizeRef = useRef<number | null>(null);
   /** One-time merge of demographics + trip length into cart when profile loads (reduces re-typing). */
   const profileCheckoutSyncedRef = useRef(false);
+  /** After the user edits party size or pass duration, do not overwrite from profile sync. */
+  const checkoutTouchedRef = useRef(false);
 
   /**
    * Stable idempotency key for pass purchase retries (same cart pass type).
@@ -400,26 +402,43 @@ const PaymentCheckout: React.FC = () => {
     };
   }, [startDate, partySize, cart?.partySize, isExtended]);
 
+  /** Keep PayPal createOrder in sync immediately — useEffect alone can lag one frame behind UI. */
+  const syncPaySessionRef = (
+    patch: Partial<{
+      startDate: string;
+      partySize: number;
+      cartPartySize: number | undefined;
+      isExtended: boolean;
+    }>,
+  ) => {
+    paySessionRef.current = { ...paySessionRef.current, ...patch };
+  };
+
   const handlePartySizeChange = (value: number) => {
     if (!cart) return;
+    checkoutTouchedRef.current = true;
     if (value > MAX_PARTY_SIZE) {
       setShowGroupSizeWarning(true);
       setPartySize(MAX_PARTY_SIZE);
       setCart({ ...cart, partySize: MAX_PARTY_SIZE, isExtended: cart.isExtended });
+      syncPaySessionRef({ partySize: MAX_PARTY_SIZE, cartPartySize: MAX_PARTY_SIZE });
     } else {
       setShowGroupSizeWarning(false);
       setPartySize(value);
       setCart({ ...cart, partySize: value, isExtended: cart.isExtended });
+      syncPaySessionRef({ partySize: value, cartPartySize: value });
     }
   };
 
   const handleDurationChange = (nextExtended: boolean) => {
+    checkoutTouchedRef.current = true;
     setIsExtended(nextExtended);
+    syncPaySessionRef({ isExtended: nextExtended });
     if (cart) setCart({ ...cart, partySize, isExtended: nextExtended });
   };
 
   useEffect(() => {
-    if (!cart || !userProfile || profileCheckoutSyncedRef.current) return;
+    if (!cart || !userProfile || profileCheckoutSyncedRef.current || checkoutTouchedRef.current) return;
 
     let nextParty = cart.partySize;
     let nextExtended = cart.isExtended;
@@ -450,6 +469,11 @@ const PaymentCheckout: React.FC = () => {
     setPartySize(nextParty);
     setIsExtended(nextExtended);
     setCart({ ...cart, partySize: nextParty, isExtended: nextExtended });
+    syncPaySessionRef({
+      partySize: nextParty,
+      cartPartySize: nextParty,
+      isExtended: nextExtended,
+    });
   }, [cart, userProfile, setCart]);
 
   useEffect(() => {
@@ -654,6 +678,7 @@ const PaymentCheckout: React.FC = () => {
             if (!token) throw new Error('SESSION_EXPIRED');
 
             const { payStartDate, partyForPay, isExtended: ext } = resolvePayContextFromRef();
+            const expectedAud = calculatePassPrice(partyForPay, ext);
 
             const { data, error } = await supabase.functions.invoke('create-checkout', {
               body: {
@@ -685,15 +710,29 @@ const PaymentCheckout: React.FC = () => {
               console.error('[PaymentCheckout] create-checkout error', getInvokeStatus(error), body, error);
               throw new Error(serverError);
             }
-            const orderId =
-              (data as Record<string, unknown> | null)?.orderId ??
-              (data as Record<string, unknown> | null)?.order_id;
-            if (!(data as Record<string, unknown> | null)?.success || !orderId) {
+            const payload = data as Record<string, unknown> | null;
+            const orderId = payload?.orderId ?? payload?.order_id;
+            if (!payload?.success || !orderId) {
               const msg =
-                typeof (data as Record<string, unknown> | null)?.error === 'string'
-                  ? String((data as Record<string, unknown>).error)
+                typeof payload?.error === 'string'
+                  ? String(payload.error)
                   : 'Could not start payment';
               throw new Error(msg);
+            }
+            const serverAmount = Number(payload?.amount);
+            if (
+              Number.isFinite(serverAmount) &&
+              Math.abs(serverAmount - expectedAud) > 0.02
+            ) {
+              console.error('[PaymentCheckout] create-checkout amount mismatch', {
+                expectedAud,
+                serverAmount,
+                partyForPay,
+                isExtended: ext,
+              });
+              throw new Error(
+                `Payment amount mismatch (expected A$${expectedAud.toFixed(2)}, PayPal order A$${serverAmount.toFixed(2)}). Tap “Change dates”, confirm group size and 7-day pass, then pay again.`,
+              );
             }
             return String(orderId);
           },
@@ -856,6 +895,10 @@ const PaymentCheckout: React.FC = () => {
     paypalClientId,
     step,
     passLabel,
+    partySize,
+    isExtended,
+    startDate,
+    priceAud,
     refreshUserPass,
     setCart,
     setCurrentView,
@@ -1350,7 +1393,9 @@ const PaymentCheckout: React.FC = () => {
                             max={maxStartDate}
                             onChange={(e) => {
                               startDateTouchedRef.current = true;
-                              setStartDate(e.target.value);
+                              const next = e.target.value;
+                              setStartDate(next);
+                              syncPaySessionRef({ startDate: next });
                             }}
                             className="w-full px-4 py-3.5 rounded-xl border-2 border-teal-100 bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer hover:border-teal-300"
                           />
