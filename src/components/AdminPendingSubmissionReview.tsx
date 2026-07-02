@@ -25,6 +25,7 @@ import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 import LazyBusinessDescriptionEditor from './LazyBusinessDescriptionEditor';
 import PricingDiscountFields from './PricingDiscountFields';
 import PricingTiersEditor from './PricingTiersEditor';
+import AdminBusinessCredentials from './AdminBusinessCredentials';
 
 export type AdminPendingBusiness = {
   id: string;
@@ -46,6 +47,8 @@ export type AdminPendingBusiness = {
   pricing_tiers?: unknown;
   discount_valid_from?: string;
   discount_valid_until?: string;
+  business_id?: string | null;
+  updated_at?: string;
 };
 
 type Draft = {
@@ -293,6 +296,20 @@ const AdminPendingSubmissionReview: React.FC<Props> = ({ biz, language, onSaved 
           </div>
         )}
       </div>
+
+      {biz.business_id && (
+        <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-4">
+          <p className="text-sm font-bold text-amber-900 mb-3">Company credentials</p>
+          <p className="text-xs text-amber-800/90 mb-3">
+            Credentials belong to the business profile, not this pending row. Review and verify
+            before or after approval.
+          </p>
+          <AdminBusinessCredentials
+            businessId={String(biz.business_id)}
+            businessName={biz.name}
+          />
+        </div>
+      )}
 
       {canEdit && (
         <div className="rounded-xl border border-indigo-200 overflow-hidden">

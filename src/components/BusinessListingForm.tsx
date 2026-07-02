@@ -1584,8 +1584,12 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
   }
 
   const isEmbeddedEdit = Boolean(embeddedEdit);
+  /** Credentials attach to the company profile — never the admin's own profile during onboard. */
   const credentialsProfileId =
-    embeddedEdit?.profileBusinessId?.trim() || ownerProfileBusinessId || null;
+    embeddedEdit?.profileBusinessId?.trim() ||
+    adminAddListing?.profileBusinessId?.trim() ||
+    (adminOnboard ? null : ownerProfileBusinessId) ||
+    null;
   const discountValidFromMin =
     isEmbeddedEdit &&
     savedDiscountValidFromRef.current &&
@@ -2545,7 +2549,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                     ? 'Facultatif — accréditations'
                     : 'Optional — kampani kredensel'}
               </p>
-              <BusinessCredentialsSettings profileBusinessId={credentialsProfileId} />
+              <BusinessCredentialsSettings
+                profileBusinessId={credentialsProfileId}
+                persistOnUpload={isAdminCreate}
+              />
             </div>
           )}
 

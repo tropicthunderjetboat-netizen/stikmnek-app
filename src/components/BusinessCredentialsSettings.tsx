@@ -17,6 +17,8 @@ import { toast } from 'sonner';
 
 type BusinessCredentialsSettingsProps = {
   profileBusinessId: string;
+  /** When true, each upload/remove is saved immediately (admin onboarding / add listing). */
+  persistOnUpload?: boolean;
 };
 
 type DocState = {
@@ -40,6 +42,7 @@ const VERIFIED_KEYS: Record<CredentialKey, keyof BusinessCredentialsRow> = {
 
 const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = ({
   profileBusinessId,
+  persistOnUpload = false,
 }) => {
   const { user, language, refreshBusinesses } = useAppContext();
   const [loading, setLoading] = useState(true);
@@ -65,10 +68,13 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
         .eq('business_id', pid)
         .maybeSingle();
 
-      let row: BusinessCredentialsRow | null = directErr
-        ? null
-        : ((directRow ?? null) as BusinessCredentialsRow | null);
-      if (directErr) {
+      let row: BusinessCredentialsRow | null = null;
+      if (!directErr && directRow) {
+        row = directRow as BusinessCredentialsRow;
+      } else {
+        if (directErr) {
+          console.warn('[BusinessCredentialsSettings] direct select:', directErr.message);
+        }
         const { data, error } = await supabase.functions.invoke('manage-business', {
           headers: await getEdgeAuthHeaders(),
           body: {
@@ -117,6 +123,83 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
     void loadCredentials();
   }, [loadCredentials]);
 
+  const persistCredentialsPatch = useCallback(
+    async (patch: Record<string, unknown>, quiet = false) => {
+      if (!user?.id || Object.keys(patch).length === 0) return;
+      const pid = await resolveCredentialsBusinessId(supabase, profileBusinessId);
+      if (!pid) return;
+
+      const row: Record<string, unknown> = {
+        business_id: pid,
+        updated_at: new Date().toISOString(),
+        ...patch,
+      };
+      const resetVerified = (pathKey: string, flagKey: string, atKey: string, byKey: string) => {
+        if (patch[pathKey]) {
+          row[flagKey] = false;
+          row[atKey] = null;
+          row[byKey] = null;
+        }
+      };
+      resetVerified(
+        'tourism_permit_path',
+        'verified_tourism_permit',
+        'verified_tourism_permit_at',
+        'verified_tourism_permit_by',
+      );
+      resetVerified(
+        'liability_insurance_path',
+        'verified_liability_insurance',
+        'verified_liability_insurance_at',
+        'verified_liability_insurance_by',
+      );
+      resetVerified(
+        'association_credentials_path',
+        'verified_association_credentials',
+        'verified_association_credentials_at',
+        'verified_association_credentials_by',
+      );
+      if (patch.first_aid_certificate_path) {
+        row.verified_first_aid = false;
+        row.verified_first_aid_at = null;
+        row.verified_first_aid_by = null;
+      }
+
+      const { error: directErr } = await supabase
+        .from('business_credentials')
+        .upsert(row, { onConflict: 'business_id' });
+
+      if (directErr) {
+        const { data, error } = await supabase.functions.invoke('manage-business', {
+          headers: await getEdgeAuthHeaders(),
+          body: {
+            action: 'upsert_business_credentials',
+            businessId: pid,
+            credentials: patch,
+          },
+        });
+        if (error) throw new Error(await edgeFunctionErrorMessage(data, error));
+        if (data?.error) throw new Error(String(data.error));
+        if (data?.success === false) {
+          throw new Error(String(data.error || 'Save failed'));
+        }
+      }
+
+      await refreshBusinesses?.();
+      await loadCredentials();
+      if (!quiet) {
+        toast.success(
+          language === 'en'
+            ? 'Credentials saved. Admin will verify documents for leaderboard boost.'
+            : language === 'fr'
+              ? 'Identifiants enregistrés. Un admin validera vos documents.'
+              : 'Kredensel i sev. Admin bae verify.',
+        );
+      }
+    },
+    [profileBusinessId, user?.id, refreshBusinesses, loadCredentials, language],
+  );
+
   const handleSave = async () => {
     if (!user?.id) return;
     setSaving(true);
@@ -138,84 +221,12 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
         patch.first_aid_completed_at = firstAidDate || null;
       }
 
-      const pid = await resolveCredentialsBusinessId(supabase, profileBusinessId);
-      let saveOk = false;
-      if (Object.keys(patch).length > 0) {
-        const row: Record<string, unknown> = {
-          business_id: pid,
-          updated_at: new Date().toISOString(),
-          ...patch,
-        };
-        const resetVerified = (pathKey: string, flagKey: string, atKey: string, byKey: string) => {
-          if (patch[pathKey]) {
-            row[flagKey] = false;
-            row[atKey] = null;
-            row[byKey] = null;
-          }
-        };
-        resetVerified(
-          'tourism_permit_path',
-          'verified_tourism_permit',
-          'verified_tourism_permit_at',
-          'verified_tourism_permit_by',
-        );
-        resetVerified(
-          'liability_insurance_path',
-          'verified_liability_insurance',
-          'verified_liability_insurance_at',
-          'verified_liability_insurance_by',
-        );
-        resetVerified(
-          'association_credentials_path',
-          'verified_association_credentials',
-          'verified_association_credentials_at',
-          'verified_association_credentials_by',
-        );
-        if (patch.first_aid_certificate_path) {
-          row.verified_first_aid = false;
-          row.verified_first_aid_at = null;
-          row.verified_first_aid_by = null;
-        }
-
-        const { error: directErr } = await supabase
-          .from('business_credentials')
-          .upsert(row, { onConflict: 'business_id' });
-
-        if (!directErr) {
-          saveOk = true;
-        } else {
-          console.warn('[BusinessCredentialsSettings] direct upsert failed, trying edge:', directErr.message);
-          const { data, error } = await supabase.functions.invoke('manage-business', {
-            headers: await getEdgeAuthHeaders(),
-            body: {
-              action: 'upsert_business_credentials',
-              businessId: pid,
-              credentials: patch,
-            },
-          });
-          if (error) {
-            throw new Error(await edgeFunctionErrorMessage(data, error));
-          }
-          if (data?.error) throw new Error(String(data.error));
-          if (data?.success === false) {
-            throw new Error(String(data.error || 'Save failed'));
-          }
-          saveOk = true;
-        }
-      } else {
-        saveOk = true;
+      if (Object.keys(patch).length === 0) {
+        toast.info(language === 'en' ? 'No credential changes to save.' : 'Aucune modification.');
+        return;
       }
-      if (!saveOk) throw new Error('Save failed');
 
-      await refreshBusinesses?.();
-      await loadCredentials();
-      toast.success(
-        language === 'en'
-          ? 'Credentials saved. Admin will verify documents for leaderboard boost.'
-          : language === 'fr'
-            ? 'Identifiants enregistrés. Un admin validera vos documents.'
-            : 'Kredensel i sev. Admin bae verify.',
-      );
+      await persistCredentialsPatch(patch);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Save failed');
     } finally {
@@ -259,10 +270,16 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
           <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
           <p className="text-xs text-teal-800/90 mt-2 font-medium">
             {language === 'en'
-              ? 'Applies to your whole business — all your listings share these credentials.'
+              ? persistOnUpload
+                ? 'Applies to this company — documents save automatically when you upload.'
+                : 'Applies to your whole business — all your listings share these credentials.'
               : language === 'fr'
-                ? 'Valable pour toute votre entreprise — toutes vos annonces partagent ces documents.'
-                : 'Blong olgeta bisnis — evri listing i yusum semak kredensel.'}
+                ? persistOnUpload
+                  ? 'Documents enregistrés automatiquement à chaque téléchargement.'
+                  : 'Valable pour toute votre entreprise — toutes vos annonces partagent ces documents.'
+                : persistOnUpload
+                  ? 'Dokumen i save otomatik taem yu upload.'
+                  : 'Blong olgeta bisnis — evri listing i yusum semak kredensel.'}
           </p>
         </div>
       </div>
@@ -293,6 +310,16 @@ const BusinessCredentialsSettings: React.FC<BusinessCredentialsSettingsProps> = 
                   ...prev,
                   [def.key]: { upload, verified: false },
                 }));
+                if (persistOnUpload) {
+                  const pathKey = PATH_KEYS[def.key];
+                  const urlKey = String(pathKey).replace('_path', '_url');
+                  const patch: Record<string, unknown> = upload
+                    ? { [pathKey]: upload.filePath, [urlKey]: upload.filePath }
+                    : { [pathKey]: null, [urlKey]: null };
+                  void persistCredentialsPatch(patch, true).catch((err: unknown) => {
+                    toast.error(err instanceof Error ? err.message : 'Could not save credential');
+                  });
+                }
               }}
             />
             {docs[def.key].upload && (

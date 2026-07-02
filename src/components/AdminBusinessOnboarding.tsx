@@ -288,7 +288,10 @@ const AdminBusinessOnboarding: React.FC = () => {
         {/* Credentials uploader (same component owners use; admin is authorized). */}
         {result.businessId && (
           <div className="mt-6">
-            <BusinessCredentialsSettings profileBusinessId={result.businessId} />
+            <BusinessCredentialsSettings
+              profileBusinessId={result.businessId}
+              persistOnUpload
+            />
           </div>
         )}
 
