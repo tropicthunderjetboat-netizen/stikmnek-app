@@ -40,7 +40,7 @@ import AdminWhatsAppContacts, {
   fetchBusinessWhatsAppContactsForAdmin,
 } from '@/components/AdminWhatsAppContacts';
 import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
-import type { EmbeddedListingEdit } from '@/components/BusinessListingForm';
+import type { EmbeddedListingEdit, AdminAddListingContext } from '@/components/BusinessListingForm';
 
 const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
 
@@ -207,6 +207,8 @@ const AdminPanel: React.FC = () => {
   const [editOfferingId, setEditOfferingId] = useState<string | null>(null);
   const [adminFullEdit, setAdminFullEdit] = useState<EmbeddedListingEdit | null>(null);
   const [adminFullEditLoading, setAdminFullEditLoading] = useState(false);
+  const [adminAddListing, setAdminAddListing] = useState<AdminAddListingContext | null>(null);
+  const [adminAddListingLoading, setAdminAddListingLoading] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '', category: '', description: '', discount: '',
@@ -817,11 +819,48 @@ const AdminPanel: React.FC = () => {
           toast.success('Listing updated.');
         },
       });
+      setAdminAddListing(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Could not open editor');
     } finally {
       setAdminFullEditLoading(false);
+    }
+  };
+
+  const openAdminAddListing = async (profileId: string, profileName: string) => {
+    if (!profileId) return;
+    setAdminAddListingLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('businesses')
+        .select('id, owner_id, name, contact_email, email, phone, location')
+        .eq('id', profileId)
+        .maybeSingle();
+      if (error || !data?.owner_id) {
+        toast.error('Could not load business profile for adding a listing.');
+        return;
+      }
+      const row = data as Record<string, unknown>;
+      setAdminFullEdit(null);
+      setAdminAddListing({
+        profileBusinessId: profileId,
+        ownerId: String(row.owner_id),
+        profileName: profileName || String(row.name ?? 'Business'),
+        ownerEmail: String(row.contact_email ?? row.email ?? ''),
+        profilePhone: String(row.phone ?? ''),
+        profileLocation: String(row.location ?? ''),
+        onCreated: async () => {
+          setAdminAddListing(null);
+          await refreshBusinesses();
+          setExpandedProfiles((prev) => new Set([...prev, profileId]));
+        },
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Could not open add listing form');
+    } finally {
+      setAdminAddListingLoading(false);
     }
   };
 
@@ -1695,10 +1734,41 @@ const AdminPanel: React.FC = () => {
           </div>
         )}
 
-        {adminFullEditLoading && (
+        {adminAddListing && (
+          <div className="mb-8 rounded-2xl border-2 border-emerald-200 bg-white shadow-sm overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-emerald-100 bg-emerald-50">
+              <div>
+                <h3 className="text-sm font-bold text-emerald-900">
+                  Add listing to {adminAddListing.profileName}
+                </h3>
+                <p className="text-xs text-emerald-800 mt-0.5">
+                  Creates a new live deal on this business profile. Same form as onboarding — goes live immediately.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminAddListing(null)}
+                className="px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-800 text-xs font-semibold hover:bg-emerald-100"
+              >
+                Cancel
+              </button>
+            </div>
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-8 w-8 text-emerald-500 animate-spin" aria-hidden />
+                </div>
+              }
+            >
+              <BusinessListingForm adminAddListing={adminAddListing} />
+            </Suspense>
+          </div>
+        )}
+
+        {(adminFullEditLoading || adminAddListingLoading) && (
           <div className="mb-6 flex items-center justify-center gap-2 py-8 text-sm text-teal-700">
             <Loader2 className="w-5 h-5 animate-spin" />
-            Opening full listing editor…
+            {adminAddListingLoading ? 'Opening add listing form…' : 'Opening full listing editor…'}
           </div>
         )}
 
@@ -1837,6 +1907,19 @@ const AdminPanel: React.FC = () => {
                         {!sampleProfile && (
                           <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                             <button
+                              onClick={() => void openAdminAddListing(group.profileId, group.profileName)}
+                              disabled={adminAddListingLoading}
+                              className="px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 text-xs font-semibold hover:bg-teal-100 transition-colors flex items-center gap-1 disabled:opacity-50"
+                              title="Add a new deal/listing to this business"
+                            >
+                              {adminAddListingLoading ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Plus className="w-3.5 h-3.5" />
+                              )}
+                              Add listing
+                            </button>
+                            <button
                               onClick={() => void openProfileEdit(group.profileId, group.profileName)}
                               disabled={profileEditLoading && profileEditId === group.profileId}
                               className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition-colors flex items-center gap-1 disabled:opacity-50"
@@ -1962,6 +2045,23 @@ const AdminPanel: React.FC = () => {
                               </div>
                             );
                           })}
+                          {!sampleProfile && (
+                            <div className="px-4 py-3 pl-12 border-t border-gray-100">
+                              <button
+                                type="button"
+                                onClick={() => void openAdminAddListing(group.profileId, group.profileName)}
+                                disabled={adminAddListingLoading}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-teal-200 bg-white text-teal-700 text-sm font-semibold hover:bg-teal-50 hover:border-teal-300 transition-colors disabled:opacity-50"
+                              >
+                                {adminAddListingLoading ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Plus className="w-4 h-4" />
+                                )}
+                                Add another listing
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

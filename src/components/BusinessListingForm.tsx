@@ -244,9 +244,25 @@ export type AdminOnboardContext = {
   }) => void;
 };
 
+/** Admin adds another live deal to an existing business profile. */
+export type AdminAddListingContext = {
+  profileBusinessId: string;
+  ownerId: string;
+  profileName: string;
+  ownerEmail?: string;
+  profilePhone?: string;
+  profileLocation?: string;
+  onCreated: (result: {
+    businessId: string;
+    offeringId: string;
+    listingUrl: string;
+  }) => void;
+};
+
 type BusinessListingFormProps = {
   embeddedEdit?: EmbeddedListingEdit | null;
   adminOnboard?: AdminOnboardContext | null;
+  adminAddListing?: AdminAddListingContext | null;
 };
 
 function asCategoryKey(raw: string): Category {
@@ -479,7 +495,11 @@ function clearListingDraft(): void {
   }
 }
 
-const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit = null, adminOnboard = null }) => {
+const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
+  embeddedEdit = null,
+  adminOnboard = null,
+  adminAddListing = null,
+}) => {
   const {
     language,
     user,
@@ -490,7 +510,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
     setAuthMode,
   } = useAppContext();
   /** Only the public new-listing wizard autosaves a draft (not edit / admin onboarding). */
-  const isDraftScope = !embeddedEdit && !adminOnboard;
+  const isAdminCreate = Boolean(adminOnboard || adminAddListing);
+  const isDraftScope = !embeddedEdit && !isAdminCreate;
   const [initialDraft] = useState<ListingDraft | null>(() => (isDraftScope ? loadListingDraft() : null));
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -515,13 +536,13 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
 
   // Guided mode: bring the new step's question to the top on each change (mobile-friendly).
   useEffect(() => {
-    if (embeddedEdit || adminOnboard) return;
+    if (embeddedEdit || isAdminCreate) return;
     if (!wizardMountedRef.current) {
       wizardMountedRef.current = true;
       return;
     }
     wizardFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [step, embeddedEdit, adminOnboard]);
+  }, [step, embeddedEdit, isAdminCreate]);
   const [form, setForm] = useState(() => {
     const defaults = {
       name: '', category: 'dining', description: '', discount: '',
@@ -843,9 +864,17 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
 
   // Admin "create on behalf": default the public contact email to the new owner's login email.
   useEffect(() => {
-    if (!adminOnboard) return;
-    setForm((prev) => (prev.email.trim() ? prev : { ...prev, email: adminOnboard.ownerEmail }));
-  }, [adminOnboard]);
+    if (!adminOnboard && !adminAddListing) return;
+    const email = adminOnboard?.ownerEmail || adminAddListing?.ownerEmail || '';
+    const phone = adminAddListing?.profilePhone || '';
+    const address = adminAddListing?.profileLocation || '';
+    setForm((prev) => ({
+      ...prev,
+      email: prev.email.trim() ? prev.email : email,
+      phone: prev.phone.trim() ? prev.phone : phone,
+      address: prev.address.trim() ? prev.address : address,
+    }));
+  }, [adminOnboard, adminAddListing]);
 
   // Auto-calculate end date
   const selectedDuration = DURATION_OPTIONS.find(d => d.value === form.listingDuration);
@@ -915,7 +944,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       return;
     }
 
-    if (!embeddedEdit && !adminOnboard && !agreedPartnerTerms) {
+    if (!embeddedEdit && !isAdminCreate && !agreedPartnerTerms) {
       toast.error(
         language === 'en'
           ? 'Please read and accept the Business partner & listing terms to continue.'
@@ -956,7 +985,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       );
       setFieldErrors(nextErrors);
       // Guided mode: jump to the first step that has a problem so the error is visible.
-      if (!embeddedEdit && !adminOnboard) {
+      if (!embeddedEdit && !isAdminCreate) {
         const firstBadStep = WIZARD_STEP_KEYS.findIndex((keys) =>
           keys.some((k) => (nextErrors as Record<string, unknown>)[k]),
         );
@@ -972,8 +1001,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
       tiersPayload = data ?? null;
     }
 
-    // ─── Admin "create on behalf": create a LIVE listing for the new owner, then email them. ───
-    if (adminOnboard) {
+    // ─── Admin "create on behalf": create a LIVE listing for the owner (new or existing profile). ───
+    if (adminOnboard || adminAddListing) {
+      const adminCtx = adminOnboard ?? adminAddListing!;
       const aoMainImage = photos.length > 0 ? String(photos[0].url || '').trim() : '';
       const aoPendingUploads = photos.filter((p) => !isPersistedPhotoUrl(String(p.url || ''))).length;
       if (aoPendingUploads > 0) {
@@ -1016,8 +1046,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           headers: await getEdgeAuthHeaders(),
           body: {
             action: 'admin_create_listing_for_owner',
-            targetOwnerId: adminOnboard.ownerId,
-            ownerName: adminOnboard.ownerName,
+            targetOwnerId: adminCtx.ownerId,
+            ownerName: adminOnboard?.ownerName ?? adminAddListing?.profileName ?? '',
+            existingBusinessId: adminAddListing?.profileBusinessId ?? undefined,
             name: form.name,
             title: form.name,
             category: form.category,
@@ -1025,9 +1056,9 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
             discount: aoDiscount,
             originalPrice: aoOriginalPrice,
             dealPrice: aoDealPrice,
-            location: form.address || 'Port Vila, Vanuatu',
-            phone: form.phone,
-            email: form.email || adminOnboard.ownerEmail,
+            location: form.address || adminAddListing?.profileLocation || 'Port Vila, Vanuatu',
+            phone: form.phone || adminAddListing?.profilePhone || '',
+            email: form.email || adminOnboard?.ownerEmail || adminAddListing?.ownerEmail || '',
             hours: form.hours,
             whatsappNumber: form.whatsappNumber || null,
             image: aoMainImage,
@@ -1047,16 +1078,30 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
         }
         const emailInfo = (payload?.email as { sent?: boolean; error?: string } | undefined) ?? {};
         toast.success(
-          language === 'en' ? 'Business account and listing created.' : 'Compte et annonce créés.',
+          adminAddListing
+            ? language === 'en'
+              ? 'New listing added to business.'
+              : 'Nouvelle annonce ajoutée.'
+            : language === 'en'
+              ? 'Business account and listing created.'
+              : 'Compte et annonce créés.',
         );
-        adminOnboard.onCreated({
-          businessId: String(payload?.businessId ?? ''),
-          offeringId: String(payload?.offeringId ?? ''),
-          listingUrl: String(payload?.listingUrl ?? ''),
-          emailSent: Boolean(emailInfo.sent),
-          emailError: emailInfo.error,
-          passwordLinkGenerated: Boolean(payload?.passwordLinkGenerated),
-        });
+        if (adminOnboard) {
+          adminOnboard.onCreated({
+            businessId: String(payload?.businessId ?? ''),
+            offeringId: String(payload?.offeringId ?? ''),
+            listingUrl: String(payload?.listingUrl ?? ''),
+            emailSent: Boolean(emailInfo.sent),
+            emailError: emailInfo.error,
+            passwordLinkGenerated: Boolean(payload?.passwordLinkGenerated),
+          });
+        } else if (adminAddListing) {
+          adminAddListing.onCreated({
+            businessId: String(payload?.businessId ?? ''),
+            offeringId: String(payload?.offeringId ?? ''),
+            listingUrl: String(payload?.listingUrl ?? ''),
+          });
+        }
       } catch (err: unknown) {
         void formatListingSubmitCatchError(err, language).then((msg) => toast.error(msg));
       } finally {
@@ -1517,7 +1562,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
 
   // ─── Guided wizard (first-deal / new-listing path) ───
   // Full form stays for dashboard editing and admin onboarding.
-  const guided = !isEmbeddedEdit && !adminOnboard;
+  const guided = !isEmbeddedEdit && !isAdminCreate;
 
   const wizardTitles = [
     language === 'en' ? 'Your deal' : language === 'fr' ? 'Votre offre' : 'Dil blong yu',
@@ -2355,7 +2400,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           </div>)}
           {(!guided || step === 4) && (
           <div className="space-y-5">
-          {!isEmbeddedEdit && !adminOnboard && (
+          {!isEmbeddedEdit && !isAdminCreate && (
             <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
@@ -2411,7 +2456,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
           {/* Submit */}
           <button
             type="submit"
-            disabled={submitting || (!isEmbeddedEdit && !adminOnboard && !agreedPartnerTerms)}
+            disabled={submitting || (!isEmbeddedEdit && !isAdminCreate && !agreedPartnerTerms)}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold text-sm hover:from-teal-700 hover:to-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
             {submitting ? (
@@ -2426,7 +2471,11 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
                   ? language === 'en'
                     ? 'Create business & send email'
                     : 'Créer l’entreprise & envoyer l’email'
-                  : isEmbeddedEdit
+                  : adminAddListing
+                    ? language === 'en'
+                      ? 'Add listing (live)'
+                      : 'Ajouter l’annonce (en direct)'
+                    : isEmbeddedEdit
                     ? language === 'en'
                       ? 'Submit changes for review'
                       : language === 'fr'
@@ -2444,7 +2493,11 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({ embeddedEdit 
               ? language === 'en'
                 ? 'Creates a live listing for the owner and emails them to set a password and review it.'
                 : 'Crée une annonce en direct et envoie un email au propriétaire.'
-              : isEmbeddedEdit
+              : adminAddListing
+                ? language === 'en'
+                  ? `Adds a new live deal to ${adminAddListing.profileName}. Goes live immediately — no approval needed.`
+                  : `Ajoute une nouvelle offre en direct à ${adminAddListing.profileName}.`
+                : isEmbeddedEdit
                 ? language === 'en'
                   ? 'Edits are reviewed before they appear on the public site.'
                   : 'Les modifications sont vérifiées avant publication.'

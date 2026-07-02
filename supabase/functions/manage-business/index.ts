@@ -1887,6 +1887,10 @@ Deno.serve(async (req) => {
       const targetOwnerId = String(body.targetOwnerId ?? body.ownerId ?? '').trim();
       if (!targetOwnerId) return errorResponse(req, 'Missing targetOwnerId', 400, { reason: 'missing_owner' });
 
+      const existingBusinessId = String(
+        body.existingBusinessId ?? body.existing_business_id ?? body.businessId ?? '',
+      ).trim();
+
       // Confirm the target is a real auth user before creating data for them.
       try {
         const { data: tgt, error: tgtErr } = await supabase.auth.admin.getUserById(targetOwnerId);
@@ -1897,10 +1901,10 @@ Deno.serve(async (req) => {
         return errorResponse(req, 'Could not verify target owner', 500, { reason: 'owner_lookup_failed' });
       }
 
-      const businessName = String(body.name ?? '').trim();
+      const dealTitle = String(body.title ?? body.name ?? '').trim();
       const category = normalizeListingTabCategory(body.category) ?? 'dining';
-      if (!businessName) {
-        return errorResponse(req, 'Business name is required', 400, { reason: 'missing_business_name' });
+      if (!dealTitle) {
+        return errorResponse(req, 'Listing title is required', 400, { reason: 'missing_listing_title' });
       }
 
       const originalPrice = Number(body.originalPrice) || 0;
@@ -1927,43 +1931,63 @@ Deno.serve(async (req) => {
       const website = body.website ?? null;
       const whatsapp = body.whatsappNumber ?? body.whatsapp_number ?? null;
 
-      // Master business profile.
-      const { data: newBiz, error: bizErr } = await supabase
-        .from('businesses')
-        .insert({
-          owner_id: targetOwnerId,
-          name: businessName,
-          category,
-          location: String(body.location ?? '').trim() || 'Port Vila, Vanuatu',
-          phone: String(body.phone ?? '').trim(),
-          hours: String(body.hours ?? '').trim(),
-          map_url: mapUrl,
-          website,
-          whatsapp_number: whatsapp,
-          tags: tagArray,
-          email: contactEmail || null,
-          contact_email: contactEmail || null,
-          business_email: contactEmail || null,
-          active: true,
-          is_verified: true,
-          description: '',
-          description_fr: '',
-          description_bi: '',
-          image: '',
-          discount: '',
-          original_price: 0,
-          deal_price: 0,
-          pricing_tiers: null,
-          updated_at: nowIso,
-        })
-        .select('id')
-        .single();
-      if (bizErr || !newBiz?.id) {
-        return errorResponse(req, 'Could not create business profile: ' + (bizErr?.message || 'unknown'), 500, {
-          reason: 'business_insert_failed',
-        });
+      let liveBusinessId: string;
+
+      if (existingBusinessId) {
+        const { data: prof, error: profErr } = await supabase
+          .from('businesses')
+          .select('id, owner_id')
+          .eq('id', existingBusinessId)
+          .maybeSingle();
+        if (profErr || !prof?.id) {
+          return errorResponse(req, 'Business profile not found', 404, { reason: 'profile_not_found' });
+        }
+        if (String(prof.owner_id) !== targetOwnerId) {
+          return errorResponse(req, 'Business profile does not belong to this owner', 403, {
+            reason: 'owner_mismatch',
+          });
+        }
+        liveBusinessId = String(prof.id);
+      } else {
+        const businessName = dealTitle;
+        // Master business profile (first listing for a new owner).
+        const { data: newBiz, error: bizErr } = await supabase
+          .from('businesses')
+          .insert({
+            owner_id: targetOwnerId,
+            name: businessName,
+            category,
+            location: String(body.location ?? '').trim() || 'Port Vila, Vanuatu',
+            phone: String(body.phone ?? '').trim(),
+            hours: String(body.hours ?? '').trim(),
+            map_url: mapUrl,
+            website,
+            whatsapp_number: whatsapp,
+            tags: tagArray,
+            email: contactEmail || null,
+            contact_email: contactEmail || null,
+            business_email: contactEmail || null,
+            active: true,
+            is_verified: true,
+            description: '',
+            description_fr: '',
+            description_bi: '',
+            image: '',
+            discount: '',
+            original_price: 0,
+            deal_price: 0,
+            pricing_tiers: null,
+            updated_at: nowIso,
+          })
+          .select('id')
+          .single();
+        if (bizErr || !newBiz?.id) {
+          return errorResponse(req, 'Could not create business profile: ' + (bizErr?.message || 'unknown'), 500, {
+            reason: 'business_insert_failed',
+          });
+        }
+        liveBusinessId = String(newBiz.id);
       }
-      const liveBusinessId = String(newBiz.id);
 
       // Live deal.
       const vDesc = trimPendingDescription(body.description);
@@ -1972,7 +1996,7 @@ Deno.serve(async (req) => {
         .from('business_offerings')
         .insert({
           business_id: liveBusinessId,
-          title: String(body.title ?? '').trim() || businessName,
+          title: dealTitle,
           description: vDesc,
           description_fr: vDesc,
           description_bi: vDesc,
@@ -1995,10 +2019,12 @@ Deno.serve(async (req) => {
         .select('id')
         .single();
       if (offErr || !newOff?.id) {
-        // Best-effort: remove the orphan profile row so a retry doesn't duplicate.
-        try {
-          await supabase.from('businesses').delete().eq('id', liveBusinessId);
-        } catch (_e) { /* ignore */ }
+        // Best-effort: remove the orphan profile row so a retry doesn't duplicate (new profile only).
+        if (!existingBusinessId) {
+          try {
+            await supabase.from('businesses').delete().eq('id', liveBusinessId);
+          } catch (_e) { /* ignore */ }
+        }
         return errorResponse(req, 'Could not create the deal: ' + (offErr?.message || 'unknown'), 500, {
           reason: 'offering_insert_failed',
         });
@@ -2027,21 +2053,21 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Password-set link + welcome email (best-effort).
+      // Password-set link + welcome email (best-effort; skip for additional listings on existing profiles).
       const listingUrl = `${getAppBaseUrl()}/?business=${offeringId}`;
       let onboardingEmail: { sent: boolean; skipped?: boolean; error?: string } = {
         sent: false,
         skipped: true,
-        error: 'No owner email',
+        error: existingBusinessId ? 'Additional listing — no onboarding email' : 'No owner email',
       };
       let setPasswordUrl: string | null = null;
-      if (ownerLoginEmail) {
+      if (!existingBusinessId && ownerLoginEmail) {
         setPasswordUrl = await generateSetPasswordUrl(supabase, ownerLoginEmail);
         if (setPasswordUrl) {
           onboardingEmail = await sendBusinessOnboardingEmail({
             toEmail: ownerLoginEmail,
-            ownerName: ownerName || businessName,
-            businessName,
+            ownerName: ownerName || dealTitle,
+            businessName: dealTitle,
             loginEmail: ownerLoginEmail,
             listingUrl,
             setPasswordUrl,
@@ -2050,7 +2076,7 @@ Deno.serve(async (req) => {
           onboardingEmail = { sent: false, skipped: false, error: 'Could not generate password link' };
         }
       }
-      if (!onboardingEmail.sent) {
+      if (!existingBusinessId && !onboardingEmail.sent) {
         console.warn(
           '[manage-business] admin_create_listing_for_owner onboarding email not sent:',
           onboardingEmail.skipped ? 'skipped' : onboardingEmail.error ?? 'unknown',
