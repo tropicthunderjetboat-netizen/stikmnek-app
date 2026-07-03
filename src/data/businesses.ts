@@ -310,6 +310,26 @@ export const businesses: Business[] = [
   { id: 'b16', name: 'Coconut Palms Wellness', category: 'spa', description: 'Traditional Melanesian healing combined with modern wellness.', descriptionFr: 'Guérison mélanésienne traditionnelle combinée au bien-être moderne.', descriptionBi: 'Tradisonal Melanesian hilin kombaenem wetem modern welnes.', image: 'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1770857004548_0b22487d.jpg', rating: 4.6, reviewCount: 112, discount: '20% OFF', originalPrice: 7500, dealPrice: 6000, location: 'Vila Bay', lat: -17.7480, lng: 168.3080, hours: '6:00 AM - 8:00 PM', phone: '+678 37890', tags: ['yoga', 'wellness', 'meditation'], featured: false },
 ];
 
+/** Default seed/demo listings (b1–b16). Kept on the public site as filler; hidden from admin/staff tools. */
+export const SEED_BUSINESS_IDS = new Set(businesses.map((b) => b.id));
+
+export function isSeedBusiness(
+  row: { id?: string | null; profileBusinessId?: string | null } | null | undefined,
+): boolean {
+  if (!row) return false;
+  const id = String(row.id ?? '').trim();
+  const profileId = String(row.profileBusinessId ?? '').trim();
+  return (
+    (id.length > 0 && SEED_BUSINESS_IDS.has(id)) ||
+    (profileId.length > 0 && SEED_BUSINESS_IDS.has(profileId))
+  );
+}
+
+/** Partner listings only — excludes seed filler rows (for admin/staff dashboards). */
+export function partnerBusinessesFrom(rows: Business[]): Business[] {
+  return rows.filter((b) => !isSeedBusiness(b));
+}
+
 
 export const sampleReviews: Review[] = [
   { id: 'r1', businessId: 'b1', userName: 'Sarah M.', rating: 5, comment: 'Absolutely incredible seafood! The coconut crab was the best I\'ve ever had.', date: '2026-02-01', avatar: 'SM' },

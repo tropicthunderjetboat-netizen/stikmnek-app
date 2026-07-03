@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { businesses as hardcodedBusinesses, Business, CATEGORY_SELECT_KEYS, categoryLabelForKey, listingDiscountExpired } from '@/data/businesses';
+import { Business, CATEGORY_SELECT_KEYS, categoryLabelForKey, listingDiscountExpired, partnerBusinessesFrom } from '@/data/businesses';
 import DealReactivateControl from '@/components/DealReactivateControl';
 
 import { FunctionsFetchError } from '@supabase/supabase-js';
@@ -654,7 +654,7 @@ const AdminPanel: React.FC = () => {
 
   const handleDeleteBusiness = async (listingId: string) => {
     const biz = allBusinesses.find(b => b.id === listingId);
-    const isFromDb = dbBusinesses.some(db => db.id === listingId);
+    const isFromDb = adminBusinesses.some(db => db.id === listingId);
     if (!isFromDb) { toast.error('Sample businesses cannot be deleted.'); setConfirmDeleteId(null); return; }
     if (!biz) { setConfirmDeleteId(null); return; }
     /** `public.businesses.id` — master profile; `listingId` is `business_offerings.id` (grid row). */
@@ -663,7 +663,7 @@ const AdminPanel: React.FC = () => {
     setDeletingId(listingId);
     try {
       const delHeaders = await getEdgeAuthHeaders();
-      const dealsOnProfile = dbBusinesses.filter((b) => profileBusinessIdFor(b) === profileId).length;
+      const dealsOnProfile = adminBusinesses.filter((b) => profileBusinessIdFor(b) === profileId).length;
       const body = purgeEntire
         ? {
           action: 'admin_delete_business',
@@ -740,7 +740,7 @@ const AdminPanel: React.FC = () => {
     try {
       const headers = ['Name', 'Category', 'Description', 'Discount', 'Original Price', 'Deal Price', 'Location', 'Phone', 'Hours', 'Rating', 'Reviews', 'Source'];
       const rows = allBusinesses.map(b => {
-        const isFromDb = dbBusinesses.some(db => db.id === b.id);
+        const isFromDb = adminBusinesses.some(db => db.id === b.id);
         return [`"${(b.name||'').replace(/"/g,'""')}"`,b.category,`"${plainTextFromHtml(b.description||'').replace(/"/g,'""')}"`,b.discount||'',String(b.originalPrice||0),String(b.dealPrice||0),`"${(b.location||'').replace(/"/g,'""')}"`,b.phone||'',`"${(b.hours||'').replace(/"/g,'""')}"`,String(b.rating||0),String(b.reviewCount||0),isFromDb?'Database':'Sample'].join(',');
       });
       const csv = [headers.join(','), ...rows].join('\n');
@@ -798,7 +798,7 @@ const AdminPanel: React.FC = () => {
   const openAdminFullEdit = async (bizId: string) => {
     const biz = allBusinesses.find((b) => b.id === bizId);
     if (!biz) return;
-    const isFromDb = dbBusinesses.some((db) => db.id === bizId);
+    const isFromDb = adminBusinesses.some((db) => db.id === bizId);
     if (!isFromDb) {
       toast.error('Sample businesses cannot be edited.');
       return;
@@ -889,7 +889,7 @@ const AdminPanel: React.FC = () => {
   const openEditModal = (bizId: string) => {
     const biz = allBusinesses.find(b => b.id === bizId);
     if (!biz) return;
-    const isFromDb = dbBusinesses.some(db => db.id === bizId);
+    const isFromDb = adminBusinesses.some(db => db.id === bizId);
     if (!isFromDb) { toast.error('Sample businesses cannot be edited.'); return; }
     // Reverse-calculate discount percent from original and deal price
     let pct = '';
@@ -1439,12 +1439,13 @@ const AdminPanel: React.FC = () => {
   const pendingCount = pendingOnlyCount;
 
 
-  // Merge hardcoded businesses with DB businesses (DB takes priority, deduplicate by id)
-  const allBusinesses = (() => {
-    const dbIds = new Set(dbBusinesses.map(b => b.id));
-    const fromHardcoded = hardcodedBusinesses.filter(b => !dbIds.has(b.id));
-    return [...dbBusinesses, ...fromHardcoded];
-  })();
+  // Admin/staff: real partner listings only (no b1–b16 seed filler from DB or hardcoded fallback).
+  const adminBusinesses = useMemo(
+    () => partnerBusinessesFrom(dbBusinesses),
+    [dbBusinesses],
+  );
+
+  const allBusinesses = adminBusinesses;
 
   const filteredBiz = allBusinesses.filter(b => {
     const q = searchBiz.toLowerCase();
@@ -1474,7 +1475,7 @@ const AdminPanel: React.FC = () => {
   };
 
   const businessProfileGroups = useMemo<BusinessProfileGroup[]>(() => {
-    const dbIds = new Set(dbBusinesses.map((b) => b.id));
+    const dbIds = new Set(adminBusinesses.map((b) => b.id));
     const map = new Map<string, BusinessProfileGroup>();
     for (const biz of filteredBiz) {
       const profileId = profileBusinessIdFor(biz);
@@ -1508,7 +1509,7 @@ const AdminPanel: React.FC = () => {
     return Array.from(map.values()).sort((a, b) =>
       a.profileName.localeCompare(b.profileName),
     );
-  }, [filteredBiz, dbBusinesses]);
+  }, [filteredBiz, adminBusinesses]);
 
   const toggleProfileExpanded = useCallback((profileId: string) => {
     setExpandedProfiles((prev) => {
@@ -1805,7 +1806,7 @@ const AdminPanel: React.FC = () => {
           <Suspense fallback={<AdminTabFallback />}>
             <AdminPurchaseOverview
               totalBusinesses={allBusinesses.length}
-              dbBusinessCount={dbBusinesses.length}
+              dbBusinessCount={adminBusinesses.length}
             />
           </Suspense>
         )}
@@ -1841,7 +1842,7 @@ const AdminPanel: React.FC = () => {
               </div>
             </div>
 
-            {loadingBusinesses && dbBusinesses.length === 0 ? (
+            {loadingBusinesses && adminBusinesses.length === 0 ? (
               <div className="bg-white rounded-xl p-12 shadow-sm border border-gray-100 text-center">
                 <Loader2 className="w-8 h-8 text-teal-600 animate-spin mx-auto mb-4" />
                 <p className="text-gray-500">Loading businesses from database...</p>
@@ -1994,7 +1995,7 @@ const AdminPanel: React.FC = () => {
                       {expanded && (
                         <div className="border-t border-gray-100 bg-gray-50/60 divide-y divide-gray-100">
                           {group.deals.map((biz) => {
-                            const isFromDb = dbBusinesses.some((db) => db.id === biz.id);
+                            const isFromDb = adminBusinesses.some((db) => db.id === biz.id);
                             const dealExpired = listingDiscountExpired(biz);
                             return (
                               <div key={biz.id} className="px-4 py-3 pl-12">
@@ -3390,7 +3391,7 @@ const AdminPanel: React.FC = () => {
         {previewBusinessId && (() => {
           const biz = allBusinesses.find(b => b.id === previewBusinessId);
           if (!biz) return null;
-          const isFromDb = dbBusinesses.some(db => db.id === biz.id);
+          const isFromDb = adminBusinesses.some(db => db.id === biz.id);
           return (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
               <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setPreviewBusinessId(null)} />
