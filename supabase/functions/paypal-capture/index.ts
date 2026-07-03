@@ -13,8 +13,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
 import {
-  calculatePassPriceAud,
-  clampPartySize,
   dynamicPassInclusiveDays,
   parsePartySizeAndExtended,
   validUntilOffsetDays,
@@ -49,53 +47,17 @@ function calendarDaysBetweenValidRange(validFrom: string, validUntil: string): n
   return Math.max(1, diff);
 }
 
-/** Same logic as `_shared/parsePassPartyWithProfileFallback.ts` — inlined so deploy bundlers always resolve deps. */
-type SupabaseProfileClient = {
-  from: (table: string) => {
-    select: (cols: string) => {
-      eq: (col: string, val: string) => { maybeSingle: () => Promise<{ data: unknown; error: { message?: string } | null }> };
-    };
-  };
-};
-
-async function parsePassPartyWithProfileFallback(
-  body: Record<string, unknown>,
-  supabase: SupabaseProfileClient,
-  userId: string,
-): Promise<{ partySize: number; isExtended: boolean } | null> {
-  const direct = parsePartySizeAndExtended(body);
-  if (direct) return direct;
-
-  const { data: prof, error } = await supabase
-    .from('user_profiles')
-    .select('num_adults, num_children, party_size')
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  if (error) {
-    console.warn('[paypal-capture] user_profiles read failed:', error.message);
+/** Inlined — must match `src/data/pricing.ts` (guests 7–20 at A$10 each). */
+function passPriceAud(partySize: number, isExtended: boolean): number {
+  const p = Math.min(20, Math.max(1, Math.floor(Number(partySize)) || 1));
+  let headcountAud = 15;
+  if (p >= 2) {
+    headcountAud += Math.min(p - 1, 5) * 10;
   }
-
-  const row = prof as Record<string, unknown> | null | undefined;
-  const adults = Math.max(0, Math.floor(Number(row?.num_adults ?? 0)));
-  const children = Math.max(0, Math.floor(Number(row?.num_children ?? 0)));
-  const combined = adults + children;
-
-  const merged: Record<string, unknown> = { ...body };
-
-  if (combined > 0) {
-    merged.partySize = clampPartySize(combined);
-    console.warn('[paypal-capture] filled partySize from num_adults+num_children', { userId, combined });
-    return parsePartySizeAndExtended(merged);
+  if (p >= 7) {
+    headcountAud += 10 + (p - 7) * 10;
   }
-
-  if (row != null && row.party_size != null && row.party_size !== '') {
-    merged.partySize = clampPartySize(Number(row.party_size));
-    console.warn('[paypal-capture] filled partySize from party_size column', { userId });
-    return parsePartySizeAndExtended(merged);
-  }
-
-  return null;
+  return headcountAud + (isExtended ? 15 : 0);
 }
 
 async function sendReceiptEmail(params: {
@@ -246,13 +208,10 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const paypalOrderId = body?.paypalOrderId ?? body?.orderId;
-    const startDate = body?.startDate ?? body?.start_date;
-    const parsed = await parsePassPartyWithProfileFallback(
-      (body && typeof body === 'object' ? body : {}) as Record<string, unknown>,
-      supabase,
-      user.id,
-    );
+    const bodyObj = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+    const paypalOrderId = bodyObj.paypalOrderId ?? bodyObj.orderId;
+    const startDate = bodyObj.startDate ?? bodyObj.start_date;
+    const parsed = parsePartySizeAndExtended(bodyObj);
 
     if (!paypalOrderId) {
       return errorResponse('Missing paypalOrderId', 400);
@@ -264,7 +223,7 @@ Deno.serve(async (req) => {
     if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
       return errorResponse('Missing or invalid startDate (YYYY-MM-DD)', 400);
     }
-    const expectedAmount = calculatePassPriceAud(partySize, isExtended);
+    const expectedAmount = passPriceAud(partySize, isExtended);
 
     const orderIdStr = String(paypalOrderId);
     const { data: existingPass, error: existingErr } = await supabase

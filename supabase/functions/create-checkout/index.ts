@@ -9,8 +9,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
-import { calculatePassPriceAud } from '../_shared/pricingDynamic.ts';
-import { parsePassPartyWithProfileFallback } from '../_shared/parsePassPartyWithProfileFallback.ts';
+import { parsePartySizeAndExtended } from '../_shared/pricingDynamic.ts';
 
 async function getPayPalAccessToken(sandbox: boolean): Promise<string> {
   const clientId = Deno.env.get('PAYPAL_CLIENT_ID');
@@ -35,6 +34,27 @@ async function getPayPalAccessToken(sandbox: boolean): Promise<string> {
   return data.access_token;
 }
 
+/**
+ * Pass price in AUD — MUST match `src/data/pricing.ts` / `_shared/pricingDynamic.ts`.
+ * Inlined here so deploy bundles cannot silently ship an old capped-at-6-guests formula.
+ */
+function passPriceAud(partySize: number, isExtended: boolean): number {
+  const p = Math.min(20, Math.max(1, Math.floor(Number(partySize)) || 1));
+  let headcountAud = 15;
+  if (p >= 2) {
+    headcountAud += Math.min(p - 1, 5) * 10;
+  }
+  if (p >= 7) {
+    headcountAud += 10 + (p - 7) * 10;
+  }
+  return headcountAud + (isExtended ? 15 : 0);
+}
+
+/** Checkout must send explicit party + duration — never infer from profile (UI is source of truth). */
+function parseCheckoutParty(body: Record<string, unknown>): { partySize: number; isExtended: boolean } | null {
+  return parsePartySizeAndExtended(body);
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getSafeCorsHeaders(req);
   const jsonResponse = (data: object, status = 200) =>
@@ -50,9 +70,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // When "Verify JWT" is ON in Supabase, the gateway may not forward the Authorization header,
-    // so the function gets no token and returns 401. Set Verify JWT to OFF for this function;
-    // we still validate the token below with getUser().
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return errorResponse('Missing Authorization header', 401);
@@ -74,38 +91,52 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const startDate = body?.startDate ?? body?.start_date;
-    const returnUrl = body?.returnUrl ?? body?.return_url;
-    const cancelUrl = body?.cancelUrl ?? body?.cancel_url;
-    const parsed = await parsePassPartyWithProfileFallback(
-      (body && typeof body === 'object' ? body : {}) as Record<string, unknown>,
-      supabase,
-      user.id,
-    );
+    const bodyObj = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
+    const startDate = bodyObj.startDate ?? bodyObj.start_date;
+    const returnUrl = bodyObj.returnUrl ?? bodyObj.return_url;
+    const cancelUrl = bodyObj.cancelUrl ?? bodyObj.cancel_url;
 
+    const parsed = parseCheckoutParty(bodyObj);
     if (!startDate) {
       return errorResponse('Missing startDate', 400);
     }
     if (!parsed) {
-      return errorResponse('Missing or invalid partySize (1-20) or isExtended', 400);
+      console.error('[create-checkout] missing partySize in body', {
+        userId: user.id,
+        keys: Object.keys(bodyObj),
+        partySize: bodyObj.partySize,
+        party_size: bodyObj.party_size,
+      });
+      return errorResponse(
+        'Missing or invalid partySize (1–20). Go back, confirm how many people (ages 6+), then try again.',
+        400,
+      );
     }
+
     const { partySize, isExtended } = parsed;
     const passTypeDb: DbPassType = 'dynamic';
-    const amount = calculatePassPriceAud(partySize, isExtended);
+    const amount = passPriceAud(partySize, isExtended);
 
-    const clientExpected = Number(body?.expectedAmountAud ?? body?.expected_amount_aud);
+    const clientExpected = Number(bodyObj.expectedAmountAud ?? bodyObj.expected_amount_aud);
     if (Number.isFinite(clientExpected) && Math.abs(clientExpected - amount) > 0.02) {
-      console.error('[create-checkout] client expectedAmountAud mismatch', {
+      console.error('[create-checkout] client/server total mismatch', {
         clientExpected,
         serverAmount: amount,
         partySize,
         isExtended,
+        partyReceived: bodyObj.partySize ?? bodyObj.party_size,
         userId: user.id,
       });
       return errorResponse(
-        `Checkout total changed (expected A$${clientExpected.toFixed(2)}, server A$${amount.toFixed(2)}). Refresh and try again.`,
+        `Checkout total mismatch (expected A$${clientExpected.toFixed(2)}, calculated A$${amount.toFixed(2)} for ${partySize} guests). Go back, confirm group size and pass type, then try again.`,
         409,
-        { expectedAmount: amount, clientExpected, partySize, isExtended },
+        {
+          expectedAmount: amount,
+          clientExpected,
+          partySize,
+          isExtended,
+          partyReceived: bodyObj.partySize ?? bodyObj.party_size,
+        },
       );
     }
 
@@ -135,6 +166,14 @@ Deno.serve(async (req) => {
         cancel_url: cancelUrl || undefined,
       },
     };
+
+    console.log('[create-checkout] creating order', {
+      userId: user.id,
+      partySize,
+      isExtended,
+      amount,
+      startDate,
+    });
 
     const orderRes = await fetch(`${base}/v2/checkout/orders`, {
       method: 'POST',

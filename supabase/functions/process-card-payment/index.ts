@@ -11,16 +11,28 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
 import {
-  calculatePassPriceAud,
   dynamicPassInclusiveDays,
+  parsePartySizeAndExtended,
   validUntilOffsetDays,
 } from '../_shared/pricingDynamic.ts';
-import { parsePassPartyWithProfileFallback } from '../_shared/parsePassPartyWithProfileFallback.ts';
 import { transactionalPassProductNameEn } from '../_shared/passDisplay.ts';
 import { notifyAdminsOfPassPurchase } from '../_shared/purchaseNotify.ts';
 
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
+
+/** Inlined — must match `src/data/pricing.ts` (guests 7–20 at A$10 each). */
+function passPriceAud(partySize: number, isExtended: boolean): number {
+  const p = Math.min(20, Math.max(1, Math.floor(Number(partySize)) || 1));
+  let headcountAud = 15;
+  if (p >= 2) {
+    headcountAud += Math.min(p - 1, 5) * 10;
+  }
+  if (p >= 7) {
+    headcountAud += 10 + (p - 7) * 10;
+  }
+  return headcountAud + (isExtended ? 15 : 0);
+}
 
 /** Decode JWT `iss` without verifying signature (diagnostics only). */
 function decodeJwtIssUnverified(token: string): string | null {
@@ -276,7 +288,7 @@ Deno.serve(async (req) => {
       }
 
       const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
-      const parsed = await parsePassPartyWithProfileFallback(b, supabase, authUser.id);
+      const parsed = parsePartySizeAndExtended(b);
       if (!parsed) {
         const partyReceived = b.partySize ?? b.party_size ?? null;
         const safeKeys =
@@ -295,7 +307,7 @@ Deno.serve(async (req) => {
         });
       }
       const { partySize, isExtended } = parsed;
-      const amount = calculatePassPriceAud(partySize, isExtended);
+      const amount = passPriceAud(partySize, isExtended);
       const passTypeDb: DbPassType = 'dynamic';
 
       let grantSecondWeek = false;
