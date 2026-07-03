@@ -392,15 +392,8 @@ const PaymentCheckout: React.FC = () => {
     partySize,
     cartPartySize: cart?.partySize,
     isExtended,
+    priceAud: 0,
   });
-  useEffect(() => {
-    paySessionRef.current = {
-      startDate,
-      partySize,
-      cartPartySize: cart?.partySize,
-      isExtended,
-    };
-  }, [startDate, partySize, cart?.partySize, isExtended]);
 
   /** Keep PayPal createOrder in sync immediately — useEffect alone can lag one frame behind UI. */
   const syncPaySessionRef = (
@@ -409,6 +402,7 @@ const PaymentCheckout: React.FC = () => {
       partySize: number;
       cartPartySize: number | undefined;
       isExtended: boolean;
+      priceAud: number;
     }>,
   ) => {
     paySessionRef.current = { ...paySessionRef.current, ...patch };
@@ -478,6 +472,7 @@ const PaymentCheckout: React.FC = () => {
 
   useEffect(() => {
     if (!cart) return;
+    if (checkoutTouchedRef.current) return;
     const raw = Number(cart.partySize);
     const clamped = clampPartySize(Number.isFinite(raw) ? raw : 1);
     const prev = prevCartPartySizeRef.current;
@@ -485,6 +480,11 @@ const PaymentCheckout: React.FC = () => {
 
     setPartySize(clamped);
     setIsExtended(cart.isExtended);
+    syncPaySessionRef({
+      partySize: clamped,
+      cartPartySize: cart.partySize,
+      isExtended: cart.isExtended,
+    });
 
     if (raw > MAX_PARTY_SIZE) {
       setShowGroupSizeWarning(true);
@@ -500,6 +500,17 @@ const PaymentCheckout: React.FC = () => {
   const priceAud = useMemo(() => calculatePassPrice(partySize, isExtended), [partySize, isExtended]);
   const priceShortOption = useMemo(() => calculatePassPrice(partySize, false), [partySize]);
   const priceExtendedOption = useMemo(() => calculatePassPrice(partySize, true), [partySize]);
+
+  /** Sync payment ref during render so PayPal createOrder never reads stale pre-effect values. */
+  paySessionRef.current = {
+    startDate,
+    partySize,
+    cartPartySize: cart?.partySize,
+    isExtended,
+    priceAud,
+  };
+
+  const paypalMountKey = `${partySize}-${isExtended ? '7d' : '1d'}-${startDate}-${priceAud.toFixed(2)}`;
 
   const profilePartyCount = useMemo(() => {
     const a = userProfile?.num_adults ?? 0;
@@ -619,7 +630,8 @@ const PaymentCheckout: React.FC = () => {
   }
 
   function resolvePayContextFromRef() {
-    const { startDate: sd, partySize: ps, cartPartySize, isExtended: ext } = paySessionRef.current;
+    const { startDate: sd, partySize: ps, cartPartySize, isExtended: ext, priceAud: uiPriceAud } =
+      paySessionRef.current;
     const minPay = earliestPassStartDateIso();
     const maxPay = latestPassStartDateUtc();
     const payStartDate = sd < minPay ? minPay : sd > maxPay ? maxPay : sd;
@@ -627,7 +639,9 @@ const PaymentCheckout: React.FC = () => {
     const fromCart = cartPartySize != null ? Number(cartPartySize) : NaN;
     const rawPartyCount = Number.isFinite(fromState) ? fromState : Number.isFinite(fromCart) ? fromCart : 1;
     const partyForPay = clampPartySize(Math.floor(rawPartyCount) || 1);
-    return { payStartDate, partyForPay, isExtended: Boolean(ext) };
+    const extended = Boolean(ext);
+    const expectedAud = calculatePassPrice(partyForPay, extended);
+    return { payStartDate, partyForPay, isExtended: extended, expectedAud, uiPriceAud };
   }
 
   useEffect(() => {
@@ -639,6 +653,7 @@ const PaymentCheckout: React.FC = () => {
     }
 
     let cancelled = false;
+    let buttonsInstance: { close?: () => void } | null = null;
 
     (async () => {
       setPaypalButtonsSdkError(null);
@@ -666,6 +681,13 @@ const PaymentCheckout: React.FC = () => {
         const returnUrl = `${origin}/passes`;
         const cancelUrl = `${origin}/passes`;
 
+        const capturedPricing = {
+          partySize,
+          isExtended,
+          startDate,
+          priceAud,
+        };
+
         const buttonConfig: Record<string, unknown> = {
           style: {
             layout: 'vertical',
@@ -677,8 +699,27 @@ const PaymentCheckout: React.FC = () => {
             const token = await ensureFreshSession();
             if (!token) throw new Error('SESSION_EXPIRED');
 
-            const { payStartDate, partyForPay, isExtended: ext } = resolvePayContextFromRef();
+            const ctx = resolvePayContextFromRef();
+            const partyForPay = clampPartySize(capturedPricing.partySize);
+            const ext = capturedPricing.isExtended;
+            const payStartDate =
+              capturedPricing.startDate < earliestPassStartDateIso()
+                ? earliestPassStartDateIso()
+                : capturedPricing.startDate > latestPassStartDateUtc()
+                  ? latestPassStartDateUtc()
+                  : capturedPricing.startDate;
             const expectedAud = calculatePassPrice(partyForPay, ext);
+
+            if (
+              partyForPay !== ctx.partyForPay ||
+              ext !== ctx.isExtended ||
+              Math.abs(expectedAud - capturedPricing.priceAud) > 0.02
+            ) {
+              console.warn('[PaymentCheckout] PayPal pricing realigned from checkout UI', {
+                captured: capturedPricing,
+                ref: ctx,
+              });
+            }
 
             const { data, error } = await supabase.functions.invoke('create-checkout', {
               body: {
@@ -688,6 +729,7 @@ const PaymentCheckout: React.FC = () => {
                 party_size: partyForPay,
                 isExtended: ext,
                 is_extended: ext,
+                expectedAmountAud: expectedAud,
                 returnUrl,
                 return_url: returnUrl,
                 cancelUrl,
@@ -748,7 +790,14 @@ const PaymentCheckout: React.FC = () => {
               const token = await ensureFreshSession();
               if (!token) throw new Error('SESSION_EXPIRED');
 
-              const { payStartDate, partyForPay, isExtended: ext } = resolvePayContextFromRef();
+              const payStartDate =
+                capturedPricing.startDate < earliestPassStartDateIso()
+                  ? earliestPassStartDateIso()
+                  : capturedPricing.startDate > latestPassStartDateUtc()
+                    ? latestPassStartDateUtc()
+                    : capturedPricing.startDate;
+              const partyForPay = clampPartySize(capturedPricing.partySize);
+              const ext = capturedPricing.isExtended;
               let referralCode: string | null = null;
               try {
                 referralCode = localStorage.getItem('stikmnek-referral-code');
@@ -866,6 +915,7 @@ const PaymentCheckout: React.FC = () => {
         };
 
         const buttons = paypal.Buttons(buttonConfig);
+        buttonsInstance = buttons;
         if (!buttons.isEligible()) {
           throw new Error(
             'PayPal Smart Buttons are not available for this account or region. Contact PayPal support or check your live app credentials.',
@@ -888,6 +938,11 @@ const PaymentCheckout: React.FC = () => {
 
     return () => {
       cancelled = true;
+      try {
+        buttonsInstance?.close?.();
+      } catch {
+        /* ignore */
+      }
       if (paypalButtonContainerRef.current) paypalButtonContainerRef.current.innerHTML = '';
     };
   }, [
@@ -899,6 +954,7 @@ const PaymentCheckout: React.FC = () => {
     isExtended,
     startDate,
     priceAud,
+    paypalMountKey,
     refreshUserPass,
     setCart,
     setCurrentView,
@@ -1487,7 +1543,15 @@ const PaymentCheckout: React.FC = () => {
                 </div>
 
                 <button
-                  onClick={() => setStep('payment')}
+                  onClick={() => {
+                    syncPaySessionRef({
+                      startDate,
+                      partySize,
+                      cartPartySize: cart?.partySize,
+                      isExtended,
+                    });
+                    setStep('payment');
+                  }}
                   className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200 flex items-center justify-center gap-2"
                 >
                   Continue to Payment
@@ -1593,7 +1657,7 @@ const PaymentCheckout: React.FC = () => {
                           <span className="text-sm font-medium">Loading PayPal…</span>
                         </div>
                       )}
-                      <div ref={paypalButtonContainerRef} className="min-h-[48px] max-w-md" />
+                      <div ref={paypalButtonContainerRef} key={paypalMountKey} className="min-h-[48px] max-w-md" />
                       <p className="text-xs text-gray-500">
                         Total due: <strong>A${priceAud.toFixed(2)} AUD</strong> — charged when you complete payment in PayPal.
                       </p>
@@ -1750,24 +1814,6 @@ const PaymentCheckout: React.FC = () => {
                     </div>
                   </div>
                 </div>
-
-                {partySize >= 1 && (
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-600 p-4 rounded-r-lg mb-6 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl shrink-0" aria-hidden>
-                        💰
-                      </span>
-                      <div>
-                        <p className="text-base sm:text-lg font-semibold text-gray-900 leading-snug">
-                          {t('checkout.savings_anchor_v2', checkoutLang)
-                            .replace('__COUNT__', String(partySize))
-                            .replace('__PASS__', priceAud.toFixed(0))}
-                        </p>
-                        <p className="text-sm text-gray-700 mt-1">{t('checkout.savings_subline', checkoutLang)}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {!paypalSmartEnabled && (
                 <button

@@ -93,6 +93,22 @@ Deno.serve(async (req) => {
     const passTypeDb: DbPassType = 'dynamic';
     const amount = calculatePassPriceAud(partySize, isExtended);
 
+    const clientExpected = Number(body?.expectedAmountAud ?? body?.expected_amount_aud);
+    if (Number.isFinite(clientExpected) && Math.abs(clientExpected - amount) > 0.02) {
+      console.error('[create-checkout] client expectedAmountAud mismatch', {
+        clientExpected,
+        serverAmount: amount,
+        partySize,
+        isExtended,
+        userId: user.id,
+      });
+      return errorResponse(
+        `Checkout total changed (expected A$${clientExpected.toFixed(2)}, server A$${amount.toFixed(2)}). Refresh and try again.`,
+        409,
+        { expectedAmount: amount, clientExpected, partySize, isExtended },
+      );
+    }
+
     const mode = (Deno.env.get('PAYPAL_MODE') ?? Deno.env.get('PAYPAL_SANDBOX') ?? 'sandbox').toString().toLowerCase();
     const sandbox = mode !== 'live' && mode !== 'production' && mode !== 'false';
     const base = sandbox ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
