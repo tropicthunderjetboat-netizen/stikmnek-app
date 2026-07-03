@@ -23,5 +23,8 @@ CREATE INDEX IF NOT EXISTS idx_paypal_pending_orders_status
 
 ALTER TABLE public.paypal_pending_orders ENABLE ROW LEVEL SECURITY;
 
+-- Edge Functions use service_role; RLS is bypassed but GRANT is still required (Supabase Data API).
+GRANT ALL ON public.paypal_pending_orders TO service_role;
+
 COMMENT ON TABLE public.paypal_pending_orders IS
   'PayPal checkout orders; Edge Functions use service role. Capture verifies user_id matches JWT.';

@@ -4,7 +4,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { t } from '@/data/translations';
-import { getPayPalClientId, loadPayPalButtonsSdk, type PayPalButtonsInstance } from '@/lib/paypalSdk';
+import { getPayPalClientId, loadPayPalButtonsSdk, renderGuestCardFirstButtons, type PayPalSdkNamespace } from '@/lib/paypalSdk';
 
 interface ReviewFormProps {
   businessId: string;
@@ -135,21 +135,12 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
         await loadPayPalButtonsSdk(paypalClientId);
         if (cancelled) return;
 
-        const paypalNs = window as unknown as {
-          paypal?: { Buttons: (cfg: Record<string, unknown>) => PayPalButtonsInstance };
-        };
-        const paypal = paypalNs.paypal;
+        const paypal = (window as unknown as { paypal?: PayPalSdkNamespace }).paypal;
         if (!paypal?.Buttons) {
           throw new Error('PayPal Buttons not available');
         }
 
-        const token = await ensureFreshSession();
-        if (!token) {
-          throw new Error('Session expired. Please sign in again.');
-        }
-
-        const buttons = paypal.Buttons({
-          style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'pay' },
+        const buttonConfig: Record<string, unknown> = {
           createOrder: async () => {
             const freshToken = await ensureFreshSession();
             if (!freshToken) throw new Error('Session expired. Please sign in again.');
@@ -218,12 +209,17 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           onCancel: () => {
             toast.info('Payment cancelled');
           },
-        });
+        };
+
+        const token = await ensureFreshSession();
+        if (!token) {
+          throw new Error('Session expired. Please sign in again.');
+        }
 
         const el = paypalContainerRef.current;
         if (!el || cancelled) return;
         el.innerHTML = '';
-        await buttons.render(el);
+        await renderGuestCardFirstButtons(paypal, buttonConfig, el);
         if (!cancelled) setPaypalButtonsReady(true);
       } catch (err: unknown) {
         if (cancelled) return;

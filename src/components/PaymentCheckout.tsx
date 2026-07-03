@@ -23,6 +23,7 @@ import {
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
 import CheckoutPricingSummary from '@/components/CheckoutPricingSummary';
+import { loadPayPalButtonsSdk, renderGuestCardFirstButtons, type PayPalSdkNamespace } from '@/lib/paypalSdk';
 import { t } from '@/data/translations';
 import type { Language } from '@/data/translations';
 
@@ -149,54 +150,6 @@ function isPaymentInvokeTransportFailure(error: unknown): boolean {
 /** Shown when `functions.invoke` never completes (DNS, TLS, ad blocker, wrong Supabase URL, etc.). */
 const PAYMENT_TRANSPORT_FAILURE_HINT =
   'We could not reach the payment service (the request never completed). This is usually not your card being declined. Try: refresh and pay again, switch networks, disable ad blockers or strict privacy extensions for this site, or use a private window. If it keeps happening, confirm the app is built with the correct Supabase project URL and that the payment Edge Functions you use are deployed (PayPal checkout: **create-checkout** and **paypal-capture**; legacy card form: **process-card-payment**) — see Supabase Dashboard → Edge Functions → Logs.';
-
-/** Load PayPal JS SDK with Smart Buttons (standard checkout — works where Expanded Card Fields do not). */
-function loadPayPalButtonsSdk(clientId: string): Promise<void> {
-  const winButtons = () => (window as unknown as { paypal?: { Buttons?: unknown } }).paypal?.Buttons;
-
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector('script[data-stikmnek-paypal-sdk]') as HTMLScriptElement | null;
-    if (existing && !existing.src.includes('components=buttons')) {
-      existing.remove();
-      try {
-        delete (window as unknown as { paypal?: unknown }).paypal;
-      } catch {
-        /* ignore */
-      }
-    }
-
-    if (winButtons()) {
-      resolve();
-      return;
-    }
-
-    const markReady = () => {
-      if (winButtons()) resolve();
-      else reject(new Error('PayPal SDK loaded but Buttons is not available'));
-    };
-
-    const existingReload = document.querySelector('script[data-stikmnek-paypal-sdk]') as HTMLScriptElement | null;
-    if (existingReload) {
-      if (winButtons()) {
-        resolve();
-        return;
-      }
-      existingReload.addEventListener('load', markReady);
-      existingReload.addEventListener('error', () => reject(new Error('PayPal SDK failed to load')));
-      return;
-    }
-
-    const s = document.createElement('script');
-    s.src =
-      `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}` +
-      '&currency=AUD&intent=capture&components=buttons';
-    s.async = true;
-    s.dataset.stikmnekPaypalSdk = '1';
-    s.onload = () => markReady();
-    s.onerror = () => reject(new Error('PayPal SDK failed to load'));
-    document.head.appendChild(s);
-  });
-}
 
 // ═══ CARD FORMATTING HELPERS ═══
 function formatCardNumber(value: string): string {
@@ -669,10 +622,7 @@ const PaymentCheckout: React.FC = () => {
           render: (selector: HTMLElement | string) => Promise<void>;
         };
 
-        const paypalNs = window as unknown as {
-          paypal?: { Buttons: (cfg: Record<string, unknown>) => ButtonsInstance };
-        };
-        const paypal = paypalNs.paypal;
+        const paypal = (window as unknown as { paypal?: PayPalSdkNamespace }).paypal;
         if (!paypal?.Buttons) {
           throw new Error('PayPal SDK did not expose Buttons');
         }
@@ -689,12 +639,6 @@ const PaymentCheckout: React.FC = () => {
         };
 
         const buttonConfig: Record<string, unknown> = {
-          style: {
-            layout: 'vertical',
-            shape: 'rect',
-            label: 'pay',
-            color: 'gold',
-          },
           createOrder: async () => {
             const token = await ensureFreshSession();
             if (!token) throw new Error('SESSION_EXPIRED');
@@ -914,18 +858,10 @@ const PaymentCheckout: React.FC = () => {
           },
         };
 
-        const buttons = paypal.Buttons(buttonConfig);
-        buttonsInstance = buttons;
-        if (!buttons.isEligible()) {
-          throw new Error(
-            'PayPal Smart Buttons are not available for this account or region. Contact PayPal support or check your live app credentials.',
-          );
-        }
-
         const el = paypalButtonContainerRef.current;
         if (!el) throw new Error('PayPal button container not ready');
-
-        await buttons.render(el);
+        el.innerHTML = '';
+        await renderGuestCardFirstButtons(paypal, buttonConfig, el);
         if (!cancelled) setPaypalButtonsReady(true);
       } catch (e: unknown) {
         if (cancelled) return;
@@ -1631,11 +1567,11 @@ const PaymentCheckout: React.FC = () => {
                       </div>
                       <div>
                         <p className="font-bold text-gray-900 text-sm">
-                          {paypalSmartEnabled ? 'Pay with PayPal' : 'Credit or Debit Card'}
+                          {paypalSmartEnabled ? 'Pay with debit or credit card' : 'Credit or Debit Card'}
                         </p>
                         <p className="text-xs text-gray-500">
                           {paypalSmartEnabled
-                            ? 'Use your PayPal account or card in PayPal’s secure window — then you return to StikmNek.'
+                            ? 'No PayPal account needed — pay by card in PayPal’s secure window, then return to StikmNek.'
                             : 'Pay securely on StikmNek — no redirect'}
                         </p>
                       </div>
@@ -1838,7 +1774,7 @@ const PaymentCheckout: React.FC = () => {
 
                 <p className="text-xs text-center text-gray-400">
                   {paypalSmartEnabled
-                    ? 'You may complete payment in a PayPal window. Your pass activates after payment succeeds.'
+                    ? 'Pay by debit or credit card in the secure window. Your pass activates after payment succeeds.'
                     : 'Card is processed securely. You stay on StikmNek — no redirect.'}
                 </p>
               </div>

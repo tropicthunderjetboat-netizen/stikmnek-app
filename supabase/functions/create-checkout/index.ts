@@ -122,7 +122,8 @@ Deno.serve(async (req) => {
       ],
       application_context: {
         brand_name: 'StikmNek',
-        landing_page: 'LOGIN',
+        // NO_PREFERENCE allows guest debit/credit card (no PayPal account). LOGIN forced wallet sign-in.
+        landing_page: 'NO_PREFERENCE',
         user_action: 'PAY_NOW',
         return_url: returnUrl || undefined,
         cancel_url: cancelUrl || undefined,
