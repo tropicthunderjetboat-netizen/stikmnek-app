@@ -1682,7 +1682,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
           <div className="mb-6 rounded-xl border border-teal-200 bg-gradient-to-r from-teal-50 to-emerald-50 p-4 flex gap-3">
             <Info className="w-5 h-5 text-teal-600 shrink-0 mt-0.5" aria-hidden />
             <p className="text-sm text-teal-900">
-              {user?.type === 'admin'
+              {user?.type === 'admin' || user?.type === 'staff'
                 ? language === 'en'
                   ? 'Admin editor: changes save live on the public listing (including Adults / Children pricing tiers and photos).'
                   : 'Éditeur admin : les modifications sont publiées en direct.'

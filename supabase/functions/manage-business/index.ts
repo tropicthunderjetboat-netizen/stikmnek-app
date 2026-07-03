@@ -16,6 +16,12 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
+import {
+  isFullAdminUser,
+  isStaffOrAdminUser,
+  isStaffUser,
+  STAFF_ALLOWED_ACTIONS,
+} from '../_shared/adminRoles.ts';
 import { getResendApiKey, sendResendEmail } from '../_shared/resend.ts';
 import { purgePublicDataForAuthUser } from './purge-user.ts';
 
@@ -244,26 +250,44 @@ async function getAuthUser(
   return { user };
 }
 
-// Keep in sync with frontend admin allowlist (AppContext.tsx) for build mode.
-const ADMIN_EMAILS = ['admin@stikmnek.com', 'testadmin@example.com', 'stikmnek@gmail.com'];
-
+/** Full admin only (destructive / sensitive actions). */
 async function isAdminUser(supabase: SupabaseServiceClient, userId: string, email?: string): Promise<boolean> {
-  if (email && ADMIN_EMAILS.includes(email.toLowerCase())) return true;
-  const { data } = await supabase
-    .from('user_profiles')
-    .select('role, user_type')
-    .eq('user_id', userId)
-    .maybeSingle();
-  return Boolean(data && (data.role === 'admin' || (data as any).user_type === 'admin'));
+  return isFullAdminUser(supabase, userId, email);
 }
 
-/** Returns a 403 Response if the user is not an admin; otherwise null. */
+/** Onboarding staff or full admin. */
+async function isAdminOrStaffUser(
+  supabase: SupabaseServiceClient,
+  userId: string,
+  email?: string,
+): Promise<boolean> {
+  return isStaffOrAdminUser(supabase, userId, email);
+}
+
+/** Returns a 403 Response if the user is not a full admin; otherwise null. */
 async function assertAdmin(
   supabase: SupabaseServiceClient,
   authUser: { id: string; email?: string },
   req: Request,
 ): Promise<Response | null> {
   if (!(await isAdminUser(supabase, authUser.id, authUser.email))) {
+    return unauthorizedResponse(req);
+  }
+  return null;
+}
+
+/** Staff (limited) or full admin for onboard / businesses / approvals actions. */
+async function assertAdminOrStaff(
+  supabase: SupabaseServiceClient,
+  authUser: { id: string; email?: string },
+  req: Request,
+  action: string,
+): Promise<Response | null> {
+  if (await isAdminUser(supabase, authUser.id, authUser.email)) return null;
+  if (!(await isStaffUser(supabase, authUser.id, authUser.email))) {
+    return unauthorizedResponse(req);
+  }
+  if (!STAFF_ALLOWED_ACTIONS.has(action)) {
     return unauthorizedResponse(req);
   }
   return null;
@@ -287,14 +311,14 @@ async function requireOwner(
   return null;
 }
 
-/** Admin may act on any business; non-admins must own the business row. */
+/** Admin/staff may act on any business; non-admins must own the business row. */
 async function assertAdminOrOwner(
   supabase: SupabaseServiceClient,
   businessId: string,
   authUser: { id: string; email?: string },
   req: Request,
 ): Promise<Response | null> {
-  if (await isAdminUser(supabase, authUser.id, authUser.email)) return null;
+  if (await isAdminOrStaffUser(supabase, authUser.id, authUser.email)) return null;
   return requireOwner(supabase, businessId, authUser.id, req);
 }
 
@@ -1167,7 +1191,7 @@ Deno.serve(async (req) => {
     // ─── DIAGNOSE_BUSINESS_PHOTOS ─── (admin only)
     // Provides a safe, non-destructive schema compatibility report for `business_photos`.
     if (action === 'diagnose_business_photos') {
-      const denied = await assertAdmin(supabase, authUser, req);
+      const denied = await assertAdminOrStaff(supabase, authUser, req, action);
       if (denied) return denied;
 
       const report: Record<string, unknown> = {
@@ -1607,7 +1631,7 @@ Deno.serve(async (req) => {
 
     // ─── GET_PENDING ───
     if (action === 'get_pending') {
-      if (await isAdminUser(supabase, authUser.id)) {
+      if (await isAdminOrStaffUser(supabase, authUser.id, authUser.email)) {
         const { data, error } = await supabase
           .from('pending_businesses')
           .select('*')
@@ -1733,7 +1757,7 @@ Deno.serve(async (req) => {
       const userId = authUser.id;
       const businessId = body.businessId;
 
-      if (await isAdminUser(supabase, userId)) {
+      if (await isAdminOrStaffUser(supabase, userId, authUser.email)) {
         const { data, error } = await supabase
           .from('pending_edits')
           .select('*')
@@ -1767,7 +1791,7 @@ Deno.serve(async (req) => {
 
     // ─── ADMIN_CREATE_BUSINESS ───
     if (action === 'admin_create_business') {
-      const denied = await assertAdmin(supabase, authUser, req);
+      const denied = await assertAdminOrStaff(supabase, authUser, req, action);
       if (denied) return denied;
 
       const targetOwnerId =
@@ -1809,7 +1833,7 @@ Deno.serve(async (req) => {
     // Step 1 of admin onboarding: create the owner's login + business-role profile only.
     // The listing is created next via admin_create_listing_for_owner (uses the normal listing form).
     if (action === 'admin_create_business_user') {
-      const denied = await assertAdmin(supabase, authUser, req);
+      const denied = await assertAdminOrStaff(supabase, authUser, req, action);
       if (denied) return denied;
 
       const email = String(body.email ?? '').trim().toLowerCase();
@@ -1881,7 +1905,7 @@ Deno.serve(async (req) => {
     // (created via admin_create_business_user), attach photos, then email the owner to set their
     // own password and review the listing. Body mirrors the normal `submit_business` payload.
     if (action === 'admin_create_listing_for_owner') {
-      const denied = await assertAdmin(supabase, authUser, req);
+      const denied = await assertAdminOrStaff(supabase, authUser, req, action);
       if (denied) return denied;
 
       const targetOwnerId = String(body.targetOwnerId ?? body.ownerId ?? '').trim();
@@ -2096,7 +2120,7 @@ Deno.serve(async (req) => {
 
     // ─── REVIEW_BUSINESS ───
     if (action === 'review_business') {
-      const denied = await assertAdmin(supabase, authUser, req);
+      const denied = await assertAdminOrStaff(supabase, authUser, req, action);
       if (denied) return denied;
 
       const pendingId = body.businessId; // pending_businesses.id
@@ -2408,7 +2432,7 @@ Deno.serve(async (req) => {
     // creating a new business_offerings row (or overwrote the primary one). This repairs by
     // inserting a fresh offering row and relinking photos, then deletes the stuck pending row.
     if (action === 'repair_approved_submission') {
-      const denied = await assertAdmin(supabase, authUser, req);
+      const denied = await assertAdminOrStaff(supabase, authUser, req, action);
       if (denied) return denied;
 
       const pendingId = body.pendingId ?? body.pending_id ?? body.businessId;
@@ -2695,7 +2719,7 @@ Deno.serve(async (req) => {
       if (denied) return denied;
 
       let ownerIdForGallery = authUser.id;
-      if (await isAdminUser(supabase, authUser.id)) {
+      if (await isAdminOrStaffUser(supabase, authUser.id, authUser.email)) {
         const { data: bizRow, error: bizErr } = await supabase
           .from('businesses')
           .select('owner_id')
@@ -2758,7 +2782,7 @@ Deno.serve(async (req) => {
       if (denied) return denied;
 
       let ownerIdForEdit = userId;
-      if (await isAdminUser(supabase, userId)) {
+      if (await isAdminOrStaffUser(supabase, userId, authUser.email)) {
         const { data: bizRow, error: bizErr } = await supabase
           .from('businesses')
           .select('owner_id')
@@ -2824,7 +2848,7 @@ Deno.serve(async (req) => {
 
     // ─── REVIEW_EDIT ───
     if (action === 'review_edit') {
-      const denied = await assertAdmin(supabase, authUser, req);
+      const denied = await assertAdminOrStaff(supabase, authUser, req, action);
       if (denied) return denied;
 
       const editId = body.editId;
@@ -3084,7 +3108,7 @@ Deno.serve(async (req) => {
 
     // ─── GET_ALL_PHOTOS ─── (admin only)
     if (action === 'get_all_photos') {
-      const denied = await assertAdmin(supabase, authUser, req);
+      const denied = await assertAdminOrStaff(supabase, authUser, req, action);
       if (denied) return denied;
 
       const { data, error } = await supabase
@@ -3101,7 +3125,7 @@ Deno.serve(async (req) => {
       const photoId = body.photoId;
       if (!photoId) return errorResponse(req, 'Missing photoId');
 
-      const denied = await assertAdmin(supabase, authUser, req);
+      const denied = await assertAdminOrStaff(supabase, authUser, req, action);
       if (denied) return denied;
 
       const status = action === 'approve_photo' ? 'approved' : 'rejected';
@@ -3355,7 +3379,7 @@ Deno.serve(async (req) => {
 
     // ─── ADMIN_VERIFY_CREDENTIAL ───
     if (action === 'admin_verify_credential') {
-      const denied = await assertAdmin(supabase, authUser, req);
+      const denied = await assertAdminOrStaff(supabase, authUser, req, action);
       if (denied) return denied;
 
       let businessId = String(body.businessId ?? '').trim();

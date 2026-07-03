@@ -41,6 +41,12 @@ import AdminWhatsAppContacts, {
 } from '@/components/AdminWhatsAppContacts';
 import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
 import type { EmbeddedListingEdit, AdminAddListingContext } from '@/components/BusinessListingForm';
+import {
+  type AdminTab,
+  adminTabsFor,
+  defaultAdminTab,
+  canUseDestructiveAdminActions,
+} from '@/lib/adminRoles';
 
 const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
 
@@ -143,9 +149,24 @@ interface PendingEdit {
 
 
 const AdminPanel: React.FC = () => {
-  const { language, user, refreshBusinesses, dbBusinesses } = useAppContext();
+  const { language, user, userProfile, refreshBusinesses, dbBusinesses } = useAppContext();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'businesses' | 'approvals' | 'reviews' | 'users' | 'onboard' | 'passes' | 'emails' | 'reports'>('overview');
+  const appRole = userProfile?.role || user?.type || 'tourist';
+  const visibleTabs = useMemo(
+    () => adminTabsFor(appRole, user?.email),
+    [appRole, user?.email],
+  );
+  const allowDestructive = canUseDestructiveAdminActions(appRole, user?.email);
+
+  const [activeTab, setActiveTab] = useState<AdminTab>(() =>
+    defaultAdminTab(appRole, user?.email),
+  );
+
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.includes(activeTab)) {
+      setActiveTab(defaultAdminTab(appRole, user?.email));
+    }
+  }, [activeTab, visibleTabs, appRole, user?.email]);
 
   // Review moderation (admin-only)
   const [adminReviews, setAdminReviews] = useState<any[]>([]);
@@ -1506,9 +1527,17 @@ const AdminPanel: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Admin Dashboard</h1>
+            <h1 className="text-2xl font-extrabold text-gray-900">
+              {user?.type === 'staff' ? 'Staff dashboard' : 'Admin Dashboard'}
+            </h1>
             <p className="text-gray-500 text-sm">
-              {language === 'en' ? 'Manage businesses, analytics, and reports' : 'Gérer les entreprises, analyses et rapports'}
+              {user?.type === 'staff'
+                ? (language === 'en'
+                  ? 'Onboard businesses, manage listings, and review submissions'
+                  : 'Intégrer des entreprises, gérer les annonces et examiner les soumissions')
+                : (language === 'en'
+                  ? 'Manage businesses, analytics, and reports'
+                  : 'Gérer les entreprises, analyses et rapports')}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -1527,7 +1556,7 @@ const AdminPanel: React.FC = () => {
         {/* Tabs */}
         {/* Tabs */}
         <div className="flex items-center gap-1 bg-white rounded-xl p-1 shadow-sm border border-gray-100 mb-8 w-fit overflow-x-auto">
-          {(['overview', 'businesses', 'approvals', 'reviews', 'users', 'onboard', 'passes', 'emails', 'reports'] as const).map(tab => (
+          {visibleTabs.map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1943,6 +1972,7 @@ const AdminPanel: React.FC = () => {
                               <ShieldCheck className="w-3.5 h-3.5" />
                               Credentials
                             </button>
+                            {allowDestructive && (
                             <button
                               onClick={() => {
                                 setDeleteEntireBusinessProfile(true);
@@ -1955,6 +1985,7 @@ const AdminPanel: React.FC = () => {
                               <Trash2 className="w-3.5 h-3.5" />
                               Delete business
                             </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -2004,7 +2035,7 @@ const AdminPanel: React.FC = () => {
                                   >
                                     <Eye className="w-3.5 h-3.5" />
                                   </button>
-                                  {isFromDb ? (
+                                  {isFromDb && allowDestructive ? (
                                     <button
                                       onClick={() => {
                                         setDeleteEntireBusinessProfile(false);
@@ -2020,7 +2051,7 @@ const AdminPanel: React.FC = () => {
                                         <Trash2 className="w-3.5 h-3.5" />
                                       )}
                                     </button>
-                                  ) : (
+                                  ) : isFromDb ? null : (
                                     <span className="px-3 py-1 rounded-lg bg-gray-50 text-gray-300 text-xs font-semibold cursor-not-allowed flex items-center gap-1" title="Sample listings cannot be deleted">
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </span>
@@ -2264,6 +2295,7 @@ const AdminPanel: React.FC = () => {
                             }`}>
                               {biz.status}
                             </span>
+                            {allowDestructive && (
                             <button
                               type="button"
                               onClick={() => void handleDeletePendingSubmission(biz.id)}
@@ -2278,6 +2310,7 @@ const AdminPanel: React.FC = () => {
                               )}
                               Remove
                             </button>
+                            )}
                           </div>
                         </div>
 

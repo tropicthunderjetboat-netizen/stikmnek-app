@@ -237,7 +237,7 @@ export async function directProfileInsert(params: {
   userId: string;
   name: string;
   email: string;
-  userType: 'tourist' | 'business' | 'admin';
+  userType: 'tourist' | 'business' | 'admin' | 'staff';
 }): Promise<{ success: boolean; profile?: any; error?: string }> {
   try {
     console.log('[directProfileInsert] START for:', params.email, 'userType:', params.userType);
@@ -256,20 +256,20 @@ export async function directProfileInsert(params: {
     if (existing) {
       console.log('[directProfileInsert] Profile already exists — checking if new columns need updating');
 
-      // NEVER downgrade admin — admins may be set via SQL/Dashboard, not signup metadata
+      // NEVER downgrade admin/staff — elevated roles may be set via SQL/Dashboard
       const existingRole = (existing.role || existing.user_type || '').toLowerCase();
-      if (existingRole === 'admin') {
-        console.log('[directProfileInsert] Preserving existing admin role');
+      if (existingRole === 'admin' || existingRole === 'staff') {
+        console.log('[directProfileInsert] Preserving existing elevated role:', existingRole);
         return { success: true, profile: existing };
       }
 
       // If the trigger created the row but didn't populate name/full_name/user_type, update them.
-      // Overwrite role/user_type when they don't match signup choice (but never downgrade admin).
+      // Overwrite role/user_type when they don't match signup choice (but never downgrade admin/staff).
       const needsUpdate =
         !existing.name ||
         !existing.full_name ||
         !existing.user_type ||
-        (existing.role !== params.userType && existingRole !== 'admin');
+        (existing.role !== params.userType && existingRole !== 'admin' && existingRole !== 'staff');
 
       if (needsUpdate) {
         console.log('[directProfileInsert] Updating profile — userType:', params.userType);

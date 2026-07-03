@@ -2,6 +2,7 @@ import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
+import { isAdminPanelUser } from '@/lib/adminRoles';
 import { Menu, X, User, MapPin, Tag, LayoutDashboard, Shield, Ticket, Store, Plane, Briefcase, HelpCircle } from 'lucide-react';
 import {
   loadAdminPanel,
@@ -27,7 +28,7 @@ const Navbar: React.FC = () => {
     { key: 'home', view: 'home', icon: <Tag className="w-4 h-4" />, label: t('nav.home', language) },
   ];
 
-  if (!user || user.type === 'tourist' || user.type === 'admin') {
+  if (!user || user.type === 'tourist' || isAdminPanelUser(user.type)) {
     // Tourist navigation items
     navItems.push(
       { key: 'deals', view: 'deals', icon: <Ticket className="w-4 h-4" />, label: t('nav.deals', language) },
@@ -46,9 +47,15 @@ const Navbar: React.FC = () => {
         { key: 'deals', view: 'deals', icon: <Ticket className="w-4 h-4" />, label: t('nav.deals', language) },
         { key: 'business-dashboard', view: 'business-dashboard', icon: <Store className="w-4 h-4" />, label: language === 'en' ? 'My Business' : language === 'fr' ? 'Mon Entreprise' : 'Bisnis Blong Mi' },
       );
-    } else if (user.type === 'admin') {
-      // Admin: only Admin panel (no My Dashboard or Business Hub)
-      navItems.push({ key: 'admin', view: 'admin', icon: <Shield className="w-4 h-4" />, label: t('nav.admin', language) });
+    } else if (isAdminPanelUser(user.type)) {
+      navItems.push({
+        key: 'admin',
+        view: 'admin',
+        icon: <Shield className="w-4 h-4" />,
+        label: user.type === 'staff'
+          ? (language === 'en' ? 'Staff' : language === 'fr' ? 'Équipe' : 'Staf')
+          : t('nav.admin', language),
+      });
     }
   }
 
@@ -85,6 +92,14 @@ const Navbar: React.FC = () => {
         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 uppercase flex items-center gap-0.5">
           <Shield className="w-2.5 h-2.5" />
           Admin
+        </span>
+      );
+    }
+    if (user.type === 'staff') {
+      return (
+        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 uppercase flex items-center gap-0.5">
+          <Shield className="w-2.5 h-2.5" />
+          Staff
         </span>
       );
     }
@@ -195,7 +210,7 @@ const Navbar: React.FC = () => {
             {user ? (
               <div className="hidden sm:flex items-center gap-2">
                 <button
-                  onClick={() => setCurrentView(user.type === 'admin' ? 'admin' : user.type === 'business' ? 'business-dashboard' : 'dashboard')}
+                  onClick={() => setCurrentView(isAdminPanelUser(user.type) ? 'admin' : user.type === 'business' ? 'business-dashboard' : 'dashboard')}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
                 >
                   {user.avatarUrl ? (

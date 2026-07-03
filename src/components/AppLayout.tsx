@@ -2,6 +2,7 @@ import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Store, ArrowRight } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAppContext, isTouristProfileCompleteForGate } from '@/contexts/AppContext';
+import { canAccessAdminPanel } from '@/lib/adminRoles';
 import {
   dealSlugFromPathname,
   isRoutableAppPath,
@@ -315,8 +316,8 @@ const AppLayout: React.FC = () => {
       return;
     }
 
-    // Only admins can access admin panel
-    if (currentView === 'admin' && role !== 'admin') {
+    // Only admins and onboarding staff can access admin panel
+    if (currentView === 'admin' && !canAccessAdminPanel(role, user.email)) {
       if (!userProfile) return;
       setCurrentView('home');
       return;

@@ -21,14 +21,18 @@ import { passProductIdFromDb } from '@/data/passCatalog';
 import { clampPartySize, MAX_PARTY_SIZE } from '@/data/pricing';
 import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
 import { checkBusinessOwnerNeedsFirstListing } from '@/lib/businessOwnerListingStatus';
+import {
+  type AppRole,
+  isListedAdminEmail,
+  isListedStaffEmail,
+} from '@/lib/adminRoles';
 
 export type { ViewMode };
 export type { PassProductId } from '@/data/passCatalog';
 
 // ═══════════════════════════════════════════════════════════════
-// ADMIN EMAILS: These always get 'admin' role regardless of DB
+// Admin/staff email lists live in `src/lib/adminRoles.ts`
 // ═══════════════════════════════════════════════════════════════
-const ADMIN_EMAILS = ['admin@stikmnek.com', 'testadmin@example.com', 'stikmnek@gmail.com'];
 
 /** Active pass on the user; null if none. Canonical product id (not legacy DB strings). */
 export type PassType = PassProductId | null;
@@ -47,7 +51,7 @@ export interface UserProfile {
   full_name: string | null;
   user_type: string | null;
   // Original columns (still populated for backwards compat)
-  role: 'tourist' | 'business' | 'admin';
+  role: AppRole;
   display_name: string;
   email: string;
   phone: string;
@@ -91,7 +95,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  type: 'tourist' | 'business' | 'admin';
+  type: AppRole;
   pass: PassType;
   passId: string | null;
   passExpiry: string | null;
@@ -413,13 +417,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const businessesLoadGenRef = useRef(0);
 
   // ═══ ROLE PERSISTENCE GUARDS ═══
-  const lastDbResolvedRoleRef = useRef<'tourist' | 'business' | 'admin' | null>(null);
+  const lastDbResolvedRoleRef = useRef<AppRole | null>(null);
   /** Same userId: reuse one in-flight resolve to avoid stacked getSession + profile selects. */
   const resolveRoleInflightRef = useRef(
     new Map<
       string,
       Promise<{
-        role: 'tourist' | 'business' | 'admin';
+        role: AppRole;
         profile: UserProfile | null;
         fromDb: boolean;
         profileRowFetchOk: boolean;
@@ -697,9 +701,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // The user added a `user_type` column. We read that first.
   // Fall back to the original `role` column for older rows.
   // ═══════════════════════════════════════════════════════════
-  const extractRole = (profile: any): 'tourist' | 'business' | 'admin' => {
+  const extractRole = (profile: any): AppRole => {
     const raw = profile.user_type || profile.role;
-    if (raw === 'admin' || raw === 'business' || raw === 'tourist') return raw;
+    if (raw === 'admin' || raw === 'staff' || raw === 'business' || raw === 'tourist') return raw;
     return 'tourist';
   };
 
@@ -729,7 +733,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email: string,
       metadata?: Record<string, any>,
     ): Promise<{
-      role: 'tourist' | 'business' | 'admin';
+      role: AppRole;
       profile: UserProfile | null;
       fromDb: boolean;
       profileRowFetchOk: boolean;
@@ -742,7 +746,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const promise = (async () => {
-        const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+        const isAdmin = isListedAdminEmail(email);
+        const isStaffListed = isListedStaffEmail(email);
 
         let profile: UserProfile | null = null;
         let dbQuerySucceeded = false;
@@ -797,7 +802,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.warn('[resolveRole] Exception:', (err as Error)?.message);
         }
 
-        let finalRole: 'tourist' | 'business' | 'admin';
+        let finalRole: AppRole;
         let resolvedFromDb = false;
 
         if (isAdmin) {
@@ -811,6 +816,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               .then(() => {})
               .catch((e) => console.warn('[resolveRole] Admin update failed:', e?.message));
             profile = { ...profile, role: 'admin', user_type: 'admin' };
+          }
+        } else if (isStaffListed) {
+          finalRole = 'staff';
+          resolvedFromDb = true;
+          if (profile && extractRole(profile) !== 'staff') {
+            supabase
+              .from('user_profiles')
+              .update({ role: 'staff', user_type: 'staff', updated_at: new Date().toISOString() })
+              .eq('user_id', userId)
+              .then(() => {})
+              .catch((e) => console.warn('[resolveRole] Staff update failed:', e?.message));
+            profile = { ...profile, role: 'staff', user_type: 'staff' };
           }
         } else if (profile) {
           let dbRole = extractRole(profile);
@@ -833,8 +850,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           resolvedFromDb = true;
         } else if (!dbQuerySucceeded && lastDbResolvedRoleRef.current) {
           finalRole = lastDbResolvedRoleRef.current;
-        } else if (metadata?.user_type && ['tourist', 'business', 'admin'].includes(metadata.user_type)) {
-          finalRole = metadata.user_type as 'tourist' | 'business' | 'admin';
+        } else if (metadata?.user_type && ['tourist', 'business', 'admin', 'staff'].includes(metadata.user_type)) {
+          finalRole = metadata.user_type as AppRole;
         } else {
           finalRole = 'tourist';
         }
@@ -870,7 +887,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   const buildUser = useCallback((
     authUser: any,
-    role: 'tourist' | 'business' | 'admin',
+    role: AppRole,
     profile?: UserProfile | null
   ): User => {
     const meta = authUser.user_metadata || {};
@@ -900,9 +917,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // Redirect user to the correct view based on role
-  const redirectForRole = useCallback((role: 'tourist' | 'business' | 'admin') => {
+  const redirectForRole = useCallback((role: AppRole) => {
     if (role === 'admin') {
       toast.success('Welcome back, Admin!');
+      setCurrentView('admin');
+    } else if (role === 'staff') {
+      toast.success('Welcome back!');
       setCurrentView('admin');
     } else if (role === 'business') {
       toast.success('Welcome! Set up your business profile to continue.');
@@ -982,7 +1002,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      let role: 'tourist' | 'business' | 'admin';
+      let role: AppRole;
       let profile: UserProfile | null;
       let profileRowFetchOk = false;
       try {
@@ -992,7 +1012,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         profileRowFetchOk = result.profileRowFetchOk;
       } catch (resolveErr) {
         console.warn('[handleAuthenticatedUser] resolveRole failed:', (resolveErr as Error)?.message);
-        role = ADMIN_EMAILS.includes((authUser.email || '').toLowerCase()) ? 'admin' : 'tourist';
+        role = isListedAdminEmail(authUser.email || '')
+          ? 'admin'
+          : isListedStaffEmail(authUser.email || '')
+            ? 'staff'
+            : 'tourist';
         profile = null;
         profileRowFetchOk = false;
       }
@@ -1009,7 +1033,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               userId: authUser.id,
               name: fallbackName,
               email: authUser.email || '',
-              userType: fallbackType as 'tourist' | 'business' | 'admin',
+              userType: fallbackType as AppRole,
             }),
             new Promise<{ success: boolean; profile?: any; error?: string }>((resolve) =>
               setTimeout(() => resolve({ success: false, error: 'directProfileInsert timeout' }), 8000)
@@ -1032,8 +1056,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const profileReady = !!profile;
       const profileBannerMessage =
         'Failed to load your profile. Please check your connection and try again, or contact support if this continues.';
-      const isListedAdmin = ADMIN_EMAILS.includes((authUser.email || '').toLowerCase());
-      if (!profileReady && !profileRowFetchOk && !isListedAdmin) {
+      const isListedAdmin = isListedAdminEmail(authUser.email || '');
+      const isListedStaff = isListedStaffEmail(authUser.email || '');
+      if (!profileReady && !profileRowFetchOk && !isListedAdmin && !isListedStaff) {
         if (profileBannerTimerRef.current) {
           clearTimeout(profileBannerTimerRef.current);
           profileBannerTimerRef.current = null;
@@ -1075,10 +1100,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // (it reads like a failed login even though the session is valid).
       setUserProfileLoadError(null);
       const meta = authUser.user_metadata || {};
-      let fallbackRole: 'tourist' | 'business' | 'admin';
-      
-      if (ADMIN_EMAILS.includes((authUser.email || '').toLowerCase())) {
+      let fallbackRole: AppRole;
+
+      if (isListedAdminEmail(authUser.email || '')) {
         fallbackRole = 'admin';
+      } else if (isListedStaffEmail(authUser.email || '')) {
+        fallbackRole = 'staff';
       } else if (lastDbResolvedRoleRef.current) {
         fallbackRole = lastDbResolvedRoleRef.current;
       } else if (meta.user_type === 'business') {
@@ -1430,8 +1457,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // ─── Step 2: Ensure profile has all columns populated ───
-    const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
-    const effectiveType = isAdmin ? 'admin' : type;
+    const isAdmin = isListedAdminEmail(email);
+    const isStaff = isListedStaffEmail(email);
+    const effectiveType = isAdmin ? 'admin' : isStaff ? 'staff' : type;
 
     if (hasSession) {
       // We have a session (JWT), so we can write to the DB via RLS
@@ -1439,7 +1467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userId: authUser.id,
         name: name,
         email: email,
-        userType: effectiveType as 'tourist' | 'business' | 'admin',
+        userType: effectiveType as AppRole,
       });
 
       if (result.success) {
