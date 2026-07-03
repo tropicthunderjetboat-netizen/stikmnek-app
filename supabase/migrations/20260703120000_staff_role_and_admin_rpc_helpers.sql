@@ -126,6 +126,9 @@ BEGIN
 END;
 $func$;
 
+-- Return-type may differ from an earlier deployed version; drop before recreate.
+DROP FUNCTION IF EXISTS public.get_incomplete_business_profiles_for_admin();
+
 CREATE OR REPLACE FUNCTION public.get_incomplete_business_profiles_for_admin()
 RETURNS TABLE (
   id uuid,
@@ -523,6 +526,9 @@ END;
 $func$;
 
 -- WhatsApp contacts on Approvals tab
+-- Return-type may differ from an earlier deployed version; drop before recreate.
+DROP FUNCTION IF EXISTS public.get_business_whatsapp_contacts_for_admin();
+
 CREATE OR REPLACE FUNCTION public.get_business_whatsapp_contacts_for_admin()
 RETURNS TABLE (
   business_id uuid,
