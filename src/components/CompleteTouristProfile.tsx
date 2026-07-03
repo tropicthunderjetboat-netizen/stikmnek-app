@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import TouristProfileForm from '@/components/TouristProfileForm';
+import { canAccessAdminPanel } from '@/lib/adminRoles';
 import { Users, ArrowRight, AlertCircle } from 'lucide-react';
 
 const CompleteTouristProfile: React.FC = () => {
@@ -13,9 +14,22 @@ const CompleteTouristProfile: React.FC = () => {
     userProfileLoadError,
     retryUserProfileFetch,
     touristOnboardingResume,
+    setCurrentView,
   } = useAppContext();
 
+  // Staff/admin accounts must never complete the tourist profile flow.
+  useEffect(() => {
+    if (!user) return;
+    const role = userProfile?.role || user.type || 'tourist';
+    if (canAccessAdminPanel(role, user.email)) {
+      setCurrentView('admin');
+    }
+  }, [user, userProfile?.role, setCurrentView]);
+
   if (!user?.id) return null;
+
+  const role = userProfile?.role || user.type || 'tourist';
+  if (canAccessAdminPanel(role, user.email)) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-teal-50/40 pt-20 pb-16">

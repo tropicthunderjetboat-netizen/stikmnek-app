@@ -327,6 +327,9 @@ const AppLayout: React.FC = () => {
   // ─── Profile-First gating (Tourists) ───
   useEffect(() => {
     if (!user || authLoading) return;
+    const role = userProfile?.role || user.type || 'tourist';
+    // Staff and admins are not tourists — skip traveller profile gate.
+    if (canAccessAdminPanel(role, user.email)) return;
     if (user.type !== 'tourist') return;
     if (userProfileLoadError) return;
     if (!userProfile) return; // wait for profile load
