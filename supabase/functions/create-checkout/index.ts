@@ -10,20 +10,18 @@ import { semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
 import {
   calculatePassPriceAud,
   parsePartySizeAndExtended,
+  validatePassStartDateIso,
+  getPayPalAccessToken,
+  isPayPalSandbox,
+  payPalApiBase,
+  SUPERSTAR_PRICE_AUD,
 } from '../_shared/pricingDynamic.ts';
-import { validatePassStartDateIso } from '../_shared/passDates.ts';
 import {
   createEdgeClients,
   errorResponse,
   getAuthUserFromRequest,
   jsonResponse,
-} from '../_shared/edgeAuth.ts';
-import {
-  getPayPalAccessToken,
-  isPayPalSandbox,
-  payPalApiBase,
-  SUPERSTAR_PRICE_AUD,
-} from '../_shared/paypalClient.ts';
+} from '../_shared/cors.ts';
 
 type ProductType = 'pass' | 'superstar';
 

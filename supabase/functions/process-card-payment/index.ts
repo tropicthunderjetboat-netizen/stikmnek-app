@@ -15,6 +15,10 @@ import {
   dynamicPassInclusiveDays,
   parsePartySizeAndExtended,
   validUntilOffsetDays,
+  addCalendarDaysIso,
+  calendarDaysBetweenValidRange,
+  endOfDayUtcIso,
+  validatePassStartDateIso,
 } from '../_shared/pricingDynamic.ts';
 import { transactionalPassProductNameEn } from '../_shared/passDisplay.ts';
 import { notifyAdminsOfPassPurchase } from '../_shared/purchaseNotify.ts';
@@ -110,13 +114,6 @@ async function getAuthUser(
   }
   return { user };
 }
-
-import {
-  addCalendarDaysIso,
-  calendarDaysBetweenValidRange,
-  endOfDayUtcIso,
-  validatePassStartDateIso,
-} from '../_shared/passDates.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
