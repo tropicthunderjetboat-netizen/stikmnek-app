@@ -352,38 +352,79 @@ Deno.serve(async (req) => {
         valid_until,
         duration_days,
         share_bonus_applied,
+        party_size,
+        is_extended,
+        group_label,
       } = body;
 
-      console.log('[send-email] user_email present:', !!user_email, typeof user_email, user_email ? `${user_email.slice(0, 2)}***@${user_email.split('@')[1] ?? '?'}` : '(missing)');
-
-      if (!user_email || typeof user_email !== 'string') {
-        console.warn('[send-email] Missing or invalid user_email in body. Keys received:', Object.keys(body ?? {}));
-        return errorResponse(req, 'Missing user_email');
+      const authAccountEmail = (authUser.email ?? '').trim();
+      if (!authAccountEmail) {
+        return errorResponse(req, 'Your account has no email address for receipts.', 400);
       }
 
-      const passLabel = transactionalPassProductNameEn();
-
-      /** Temporary: set PASS_CONFIRMATION_EMAIL_OVERRIDE in Supabase secrets to receive test receipts at a real inbox. Remove after verification. */
+      /** Temporary: set PASS_CONFIRMATION_EMAIL_OVERRIDE in Supabase secrets to receive test receipts at a real inbox. */
       const emailOverride = (Deno.env.get('PASS_CONFIRMATION_EMAIL_OVERRIDE') ?? '').trim();
-      const toEmail = emailOverride || user_email;
+      const toEmail = emailOverride || authAccountEmail;
       if (emailOverride) {
-        console.warn('[send-email] PASS_CONFIRMATION_EMAIL_OVERRIDE active — sending pass confirmation to:', emailOverride, '(not to user account email)');
+        console.warn('[send-email] PASS_CONFIRMATION_EMAIL_OVERRIDE active — sending to:', emailOverride);
       }
+
+      const receiptStr = String(receipt_number ?? '').trim();
+      let verifiedAmount = amount;
+      let verifiedCurrency = currency;
+      let verifiedValidFrom = valid_from;
+      let verifiedValidUntil = valid_until;
+      let verifiedShareBonus = share_bonus_applied;
+      let verifiedPartySize = party_size;
+      let verifiedIsExtended = is_extended;
+
+      if (receiptStr) {
+        const { data: passRows, error: passLookupErr } = await supabase
+          .from('passes')
+          .select(
+            'id, amount_paid, currency, valid_from, valid_until, share_bonus_applied, max_people, payment_provider, purchased_at',
+          )
+          .eq('user_id', authUser.id)
+          .order('purchased_at', { ascending: false })
+          .limit(30);
+        if (passLookupErr) {
+          console.warn('[send-email] pass lookup failed:', passLookupErr.message);
+        } else {
+          const match = (passRows ?? []).find((row) => {
+            const rid = String((row as { id?: string }).id ?? '');
+            const derived = `STK-${rid.replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+            return derived === receiptStr.toUpperCase();
+          }) as Record<string, unknown> | undefined;
+          if (!match) {
+            return errorResponse(req, 'No matching purchase found for this receipt.', 404, {
+              reason: 'receipt_not_found',
+            });
+          }
+          verifiedAmount = Number(match.amount_paid) || amount;
+          verifiedCurrency = match.currency ?? currency;
+          verifiedValidFrom = match.valid_from ?? valid_from;
+          verifiedValidUntil = match.valid_until ?? valid_until;
+          verifiedShareBonus = match.share_bonus_applied ?? share_bonus_applied;
+          verifiedPartySize = match.max_people ?? party_size;
+        }
+      } else {
+        return errorResponse(req, 'Missing receipt_number');
+      }
+
       console.log('[send-email] From (Resend):', getTransactionalFromHeader(), '| To:', toEmail);
 
+      const passLabel = transactionalPassProductNameEn();
       const subject = `StikmNek receipt — ${passLabel}`;
       const safeName = escapeHtml(user_name || '');
-      const safeReceipt = escapeHtml(receipt_number || '—');
+      const safeReceipt = escapeHtml(receiptStr || '—');
       const safePayment = escapeHtml(payment_method || '—');
-      const money = escapeHtml(formatMoney(amount, currency));
+      const money = escapeHtml(formatMoney(verifiedAmount, verifiedCurrency));
       const promo = shareBonusPromoText(pass_type);
 
-      // Duration must follow the *displayed* validity window (extended valid_until after share bonus),
-      // not `duration_days` from the client (often stale if the email was queued before bonus applied).
-      const fromKey = dateOnlyFromUnknown(valid_from);
-      const untilKey = dateOnlyFromUnknown(valid_until);
-      const displayFrom = fromKey ?? (valid_from != null && String(valid_from).trim() ? String(valid_from).trim() : '—');
-      const displayUntil = untilKey ?? (valid_until != null && String(valid_until).trim() ? String(valid_until).trim() : '—');
+      const fromKey = dateOnlyFromUnknown(verifiedValidFrom);
+      const untilKey = dateOnlyFromUnknown(verifiedValidUntil);
+      const displayFrom = fromKey ?? (verifiedValidFrom != null && String(verifiedValidFrom).trim() ? String(verifiedValidFrom).trim() : '—');
+      const displayUntil = untilKey ?? (verifiedValidUntil != null && String(verifiedValidUntil).trim() ? String(verifiedValidUntil).trim() : '—');
       const safeValidFrom = escapeHtml(displayFrom);
       const safeValidUntil = escapeHtml(displayUntil);
 
@@ -396,7 +437,35 @@ Deno.serve(async (req) => {
           : Number.isFinite(fallbackDurationNum) && fallbackDurationNum > 0
             ? `${Math.floor(fallbackDurationNum)} day${fallbackDurationNum === 1 ? '' : 's'}`
             : '—';
-      const shareApplied = share_bonus_applied === true || share_bonus_applied === 'true';
+      const shareApplied = verifiedShareBonus === true || verifiedShareBonus === 'true';
+
+      const partyNum = typeof verifiedPartySize === 'number'
+        ? verifiedPartySize
+        : Number(verifiedPartySize);
+      const partyLabel = (typeof group_label === 'string' && group_label.trim())
+        ? group_label.trim()
+        : Number.isFinite(partyNum) && partyNum >= 1
+          ? `${Math.floor(partyNum)} guest${Math.floor(partyNum) === 1 ? '' : 's'} (ages 6+)`
+          : '';
+      const safePartyLabel = escapeHtml(partyLabel);
+      const extendedPass = verifiedIsExtended === true || verifiedIsExtended === 'true';
+      const passDurationType = extendedPass ? '7-day whole trip (+A$15)' : '1-day pass';
+      const safePassDurationType = escapeHtml(passDurationType);
+
+      const partyRowHtml = safePartyLabel
+        ? `<tr>
+                      <td colspan="2" style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
+                        <div style="font-size:12px; color:#64748b;">Party size</div>
+                        <div style="font-size:14px; color:#0f172a;">${safePartyLabel}</div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colspan="2" style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
+                        <div style="font-size:12px; color:#64748b;">Pass option</div>
+                        <div style="font-size:14px; color:#0f172a;">${safePassDurationType}</div>
+                      </td>
+                    </tr>`
+        : '';
 
       // Premium, mobile-friendly, email-client-safe HTML (tables + inline styles).
       const html = `
@@ -451,6 +520,8 @@ Deno.serve(async (req) => {
                         <div style="font-size:14px; color:#0f172a;">${safeValidUntil}</div>
                       </td>
                     </tr>
+
+                    ${partyRowHtml}
 
                     <tr>
                       <td style="padding:12px 0; border-bottom:1px solid #f1f5f9;">
@@ -519,12 +590,14 @@ Deno.serve(async (req) => {
                 USER_NAME: user_name || '',
                 PASS_LABEL: passLabel,
                 RECEIPT_NUMBER: receipt_number || '',
-                AMOUNT_FORMATTED: formatMoney(amount, currency),
+                AMOUNT_FORMATTED: formatMoney(verifiedAmount, verifiedCurrency),
                 PAYMENT_METHOD: payment_method || '',
                 VALID_FROM: displayFrom,
                 VALID_UNTIL: displayUntil,
                 DURATION_LABEL: durationLabel,
                 SHARE_BONUS_LABEL: shareApplied ? 'Applied ✓' : 'Not applied',
+                PARTY_LABEL: partyLabel,
+                PASS_DURATION_TYPE: passDurationType,
                 PROMO_HEADLINE: promo.headline,
                 PROMO_BODY: promo.body,
                 FOOTER_YEAR: new Date().getFullYear(),

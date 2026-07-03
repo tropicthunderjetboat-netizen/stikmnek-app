@@ -1,161 +1,125 @@
 // deno-lint-ignore-file no-explicit-any
 /**
  * create-checkout Edge Function
- * Creates a PayPal order for pass purchase (sandbox or live).
- * Requires: PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET in Supabase Edge Function secrets.
- * Optional: PAYPAL_MODE=sandbox (default) or live. (Also accepts PAYPAL_SANDBOX=true/false.)
+ * Creates a PayPal order for pass purchase or Super Star credit ($5 AUD).
+ * Stores order → user binding in paypal_pending_orders before returning orderId.
  */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
-import { parsePartySizeAndExtended } from '../_shared/pricingDynamic.ts';
+import {
+  calculatePassPriceAud,
+  parsePartySizeAndExtended,
+} from '../_shared/pricingDynamic.ts';
+import { validatePassStartDateIso } from '../_shared/passDates.ts';
+import {
+  createEdgeClients,
+  errorResponse,
+  getAuthUserFromRequest,
+  jsonResponse,
+} from '../_shared/edgeAuth.ts';
+import {
+  getPayPalAccessToken,
+  isPayPalSandbox,
+  payPalApiBase,
+  SUPERSTAR_PRICE_AUD,
+} from '../_shared/paypalClient.ts';
 
-async function getPayPalAccessToken(sandbox: boolean): Promise<string> {
-  const clientId = Deno.env.get('PAYPAL_CLIENT_ID');
-  const clientSecret = Deno.env.get('PAYPAL_CLIENT_SECRET');
-  if (!clientId || !clientSecret) {
-    throw new Error('PAYPAL_CLIENT_ID or PAYPAL_CLIENT_SECRET not set');
-  }
-  const base = sandbox ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
-  const res = await fetch(`${base}/v1/oauth2/token`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: 'Basic ' + btoa(clientId + ':' + clientSecret),
-    },
-    body: 'grant_type=client_credentials',
-  });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error('PayPal auth failed: ' + res.status + ' ' + t);
-  }
-  const data = await res.json();
-  return data.access_token;
-}
+type ProductType = 'pass' | 'superstar';
 
-/**
- * Pass price in AUD — MUST match `src/data/pricing.ts` / `_shared/pricingDynamic.ts`.
- * Inlined here so deploy bundles cannot silently ship an old capped-at-6-guests formula.
- */
-function passPriceAud(partySize: number, isExtended: boolean): number {
-  const p = Math.min(20, Math.max(1, Math.floor(Number(partySize)) || 1));
-  let headcountAud = 15;
-  if (p >= 2) {
-    headcountAud += Math.min(p - 1, 5) * 10;
-  }
-  if (p >= 7) {
-    headcountAud += 10 + (p - 7) * 10;
-  }
-  return headcountAud + (isExtended ? 15 : 0);
-}
-
-/** Checkout must send explicit party + duration — never infer from profile (UI is source of truth). */
-function parseCheckoutParty(body: Record<string, unknown>): { partySize: number; isExtended: boolean } | null {
-  return parsePartySizeAndExtended(body);
+function parseProductType(body: Record<string, unknown>): ProductType {
+  const raw = String(body.productType ?? body.product_type ?? 'pass').toLowerCase();
+  return raw === 'superstar' ? 'superstar' : 'pass';
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getSafeCorsHeaders(req);
-  const jsonResponse = (data: object, status = 200) =>
-    new Response(JSON.stringify(data), {
-      status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  const errorResponse = (message: string, status = 400, extra?: Record<string, unknown>) =>
-    jsonResponse({ success: false, error: message, errorCode: status, ...extra }, status);
-
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: getSafeCorsHeaders(req) });
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return errorResponse('Missing Authorization header', 401);
+    const clients = createEdgeClients();
+    if (!clients) {
+      return errorResponse(req, 'Server configuration error', 500, { reason: 'missing_supabase_secrets' });
     }
+    const { authClient, serviceClient, authClientKeySource } = clients;
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    if (!supabaseUrl.trim() || !serviceKey.trim()) {
-      return errorResponse('Server configuration error', 500, { reason: 'missing_supabase_secrets' });
-    }
-    const supabase = createClient(supabaseUrl, serviceKey);
-    const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return errorResponse('Invalid or expired session', 401, {
-        reason: 'auth_invalid',
-        authError: authError?.message ?? null,
-      });
-    }
+    const authResult = await getAuthUserFromRequest(authClient, req);
+    if ('response' in authResult) return authResult.response;
+    const user = authResult.user;
 
     const body = await req.json().catch(() => ({}));
     const bodyObj = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
-    const startDate = bodyObj.startDate ?? bodyObj.start_date;
+    const productType = parseProductType(bodyObj);
     const returnUrl = bodyObj.returnUrl ?? bodyObj.return_url;
     const cancelUrl = bodyObj.cancelUrl ?? bodyObj.cancel_url;
 
-    const parsed = parseCheckoutParty(bodyObj);
-    if (!startDate) {
-      return errorResponse('Missing startDate', 400);
-    }
-    if (!parsed) {
-      console.error('[create-checkout] missing partySize in body', {
-        userId: user.id,
-        keys: Object.keys(bodyObj),
-        partySize: bodyObj.partySize,
-        party_size: bodyObj.party_size,
-      });
-      return errorResponse(
-        'Missing or invalid partySize (1–20). Go back, confirm how many people (ages 6+), then try again.',
-        400,
-      );
+    let amount: number;
+    let description: string;
+    let referenceId: string;
+    let metadata: Record<string, unknown>;
+    let customId: string;
+
+    if (productType === 'superstar') {
+      amount = SUPERSTAR_PRICE_AUD;
+      const businessId = String(bodyObj.businessId ?? bodyObj.business_id ?? '').trim();
+      const businessName = String(bodyObj.businessName ?? bodyObj.business_name ?? 'business').trim();
+      description = `StikmNek Super Star review — ${businessName.slice(0, 80)}`;
+      referenceId = `superstar_${businessId || 'review'}`;
+      metadata = { businessId: businessId || null, businessName };
+      customId = `${user.id}|superstar`.slice(0, 127);
+    } else {
+      const startDateRaw = bodyObj.startDate ?? bodyObj.start_date;
+      const startCheck = validatePassStartDateIso(startDateRaw);
+      if (!startCheck.ok) {
+        return errorResponse(req, startCheck.error, 400);
+      }
+      const startDate = startCheck.startDate;
+
+      const parsed = parsePartySizeAndExtended(bodyObj);
+      if (!parsed) {
+        return errorResponse(
+          req,
+          'Missing or invalid partySize (1–20). Go back, confirm how many people (ages 6+), then try again.',
+          400,
+        );
+      }
+      const { partySize, isExtended } = parsed;
+      amount = calculatePassPriceAud(partySize, isExtended);
+
+      const clientExpected = Number(bodyObj.expectedAmountAud ?? bodyObj.expected_amount_aud);
+      if (Number.isFinite(clientExpected) && Math.abs(clientExpected - amount) > 0.02) {
+        return errorResponse(
+          req,
+          `Checkout total mismatch (expected A$${clientExpected.toFixed(2)}, calculated A$${amount.toFixed(2)} for ${partySize} guests). Go back, confirm group size and pass type, then try again.`,
+          409,
+          { expectedAmount: amount, clientExpected, partySize, isExtended },
+        );
+      }
+
+      const passTypeDb: DbPassType = 'dynamic';
+      semanticPassIdFromDb(passTypeDb);
+      description = `StikmNek Pass — ${partySize} pax (${isExtended ? '7d' : '24h'}) from ${startDate}`;
+      referenceId = `pass_dynamic_${partySize}p_${isExtended ? '7d' : '1d'}_${startDate}`;
+      metadata = { partySize, isExtended, startDate, expectedAmount: amount };
+      customId = `${user.id}|pass|${partySize}|${isExtended ? 1 : 0}|${startDate}`.slice(0, 127);
     }
 
-    const { partySize, isExtended } = parsed;
-    const passTypeDb: DbPassType = 'dynamic';
-    const amount = passPriceAud(partySize, isExtended);
-
-    const clientExpected = Number(bodyObj.expectedAmountAud ?? bodyObj.expected_amount_aud);
-    if (Number.isFinite(clientExpected) && Math.abs(clientExpected - amount) > 0.02) {
-      console.error('[create-checkout] client/server total mismatch', {
-        clientExpected,
-        serverAmount: amount,
-        partySize,
-        isExtended,
-        partyReceived: bodyObj.partySize ?? bodyObj.party_size,
-        userId: user.id,
-      });
-      return errorResponse(
-        `Checkout total mismatch (expected A$${clientExpected.toFixed(2)}, calculated A$${amount.toFixed(2)} for ${partySize} guests). Go back, confirm group size and pass type, then try again.`,
-        409,
-        {
-          expectedAmount: amount,
-          clientExpected,
-          partySize,
-          isExtended,
-          partyReceived: bodyObj.partySize ?? bodyObj.party_size,
-        },
-      );
-    }
-
-    const mode = (Deno.env.get('PAYPAL_MODE') ?? Deno.env.get('PAYPAL_SANDBOX') ?? 'sandbox').toString().toLowerCase();
-    const sandbox = mode !== 'live' && mode !== 'production' && mode !== 'false';
-    const base = sandbox ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
+    const sandbox = isPayPalSandbox();
     const accessToken = await getPayPalAccessToken(sandbox);
+    const base = payPalApiBase(sandbox);
 
-    const semanticId = semanticPassIdFromDb(passTypeDb);
     const orderPayload = {
       intent: 'CAPTURE',
       purchase_units: [
         {
-          reference_id: `pass_dynamic_${partySize}p_${isExtended ? '7d' : '1d'}_${startDate}`,
+          reference_id: referenceId,
+          custom_id: customId,
           amount: {
             currency_code: 'AUD',
             value: amount.toFixed(2),
           },
-          description: `StikmNek Pass — ${partySize} pax (${isExtended ? '7d' : '24h'}) from ${startDate}`,
+          description,
         },
       ],
       application_context: {
@@ -169,10 +133,9 @@ Deno.serve(async (req) => {
 
     console.log('[create-checkout] creating order', {
       userId: user.id,
-      partySize,
-      isExtended,
+      productType,
       amount,
-      startDate,
+      authClientKeySource,
     });
 
     const orderRes = await fetch(`${base}/v2/checkout/orders`, {
@@ -187,39 +150,60 @@ Deno.serve(async (req) => {
     if (!orderRes.ok) {
       const errText = await orderRes.text();
       console.error('[create-checkout] PayPal create order failed:', orderRes.status, errText);
-      return errorResponse('PayPal could not create order: ' + errText.slice(0, 200), 502, {
+      return errorResponse(req, 'PayPal could not create order: ' + errText.slice(0, 200), 502, {
         reason: 'paypal_create_order_failed',
         paypalStatus: orderRes.status,
       });
     }
 
     const orderData = await orderRes.json();
-    const orderId = orderData.id;
-    const approveLink = orderData.links?.find((l: any) => l.rel === 'approve');
+    const orderId = orderData.id as string | undefined;
+    const approveLink = orderData.links?.find((l: { rel?: string }) => l.rel === 'approve');
     const approvalUrl = approveLink?.href ?? null;
 
     if (!orderId) {
-      return errorResponse('PayPal did not return an order id', 502, { reason: 'paypal_missing_order_id' });
-    }
-    if (!approvalUrl) {
-      console.warn('[create-checkout] PayPal returned no approve link (OK for Card Fields / wallet-less flows)');
+      return errorResponse(req, 'PayPal did not return an order id', 502, { reason: 'paypal_missing_order_id' });
     }
 
-    return jsonResponse({
+    const { error: bindErr } = await serviceClient.from('paypal_pending_orders').insert({
+      paypal_order_id: orderId,
+      user_id: user.id,
+      product_type: productType,
+      amount_aud: amount,
+      currency: 'AUD',
+      status: 'pending',
+      metadata,
+    });
+
+    if (bindErr) {
+      console.error('[create-checkout] failed to bind order to user:', bindErr);
+      return errorResponse(req, 'Could not register checkout session. Please try again.', 500, {
+        reason: 'order_bind_failed',
+      });
+    }
+
+    const response: Record<string, unknown> = {
       success: true,
       orderId,
       approvalUrl,
       amount,
       currency: 'AUD',
-      passType: semanticId,
-      partySize,
-      isExtended,
-      startDate,
-    });
-  } catch (err: any) {
+      productType,
+    };
+
+    if (productType === 'pass') {
+      response.passType = 'dynamic';
+      response.partySize = metadata.partySize;
+      response.isExtended = metadata.isExtended;
+      response.startDate = metadata.startDate;
+    }
+
+    return jsonResponse(req, response);
+  } catch (err: unknown) {
     console.error('[create-checkout]', err);
-    return errorResponse(err?.message ?? 'Create checkout failed', 500, {
-      reason: String(err?.message ?? '').includes('PAYPAL') ? 'paypal_config' : 'unexpected',
+    const msg = err instanceof Error ? err.message : String(err ?? 'Create checkout failed');
+    return errorResponse(req, msg || 'Create checkout failed', 500, {
+      reason: msg.includes('PAYPAL') ? 'paypal_config' : 'unexpected',
     });
   }
 });

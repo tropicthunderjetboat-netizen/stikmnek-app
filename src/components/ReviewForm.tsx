@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
-import { Star, Send, AlertCircle, CheckCircle2, Sparkles, DollarSign, Info, X, Loader2, CreditCard, Lock, Shield } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Star, Send, AlertCircle, CheckCircle2, Sparkles, DollarSign, Info, X, Loader2, Shield } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { t } from '@/data/translations';
+import { getPayPalClientId, loadPayPalButtonsSdk, type PayPalButtonsInstance } from '@/lib/paypalSdk';
 
 interface ReviewFormProps {
   businessId: string;
@@ -33,19 +34,6 @@ async function ensureFreshSession(): Promise<string | null> {
 }
 
 
-// Card formatting helpers
-function formatCardNumber(value: string): string {
-  const digits = value.replace(/\D/g, '').substring(0, 16);
-  const groups = digits.match(/.{1,4}/g);
-  return groups ? groups.join(' ') : digits;
-}
-
-function formatExpiry(value: string): string {
-  const digits = value.replace(/\D/g, '').substring(0, 4);
-  if (digits.length >= 3) return digits.substring(0, 2) + '/' + digits.substring(2);
-  return digits;
-}
-
 const ReviewForm: React.FC<ReviewFormProps> = ({
   businessId,
   offeringId = null,
@@ -71,16 +59,14 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   const [showSuperStarInfo, setShowSuperStarInfo] = useState(false);
 
   // Card state for Super Star
-  const [ssCardNumber, setSsCardNumber] = useState('');
-  const [ssCardExpiry, setSsCardExpiry] = useState('');
-  const [ssCardCvv, setSsCardCvv] = useState('');
-  const [ssCardName, setSsCardName] = useState('');
-  const [ssCardErrors, setSsCardErrors] = useState<Record<string, string>>({});
   const [ssPaymentError, setSsPaymentError] = useState<string | null>(null);
   const [ssPaymentStep, setSsPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
+  const [paypalButtonsReady, setPaypalButtonsReady] = useState(false);
+  const [paypalSdkError, setPaypalSdkError] = useState<string | null>(null);
 
-  const ssExpiryRef = useRef<HTMLInputElement>(null);
-  const ssCvvRef = useRef<HTMLInputElement>(null);
+  const paypalContainerRef = useRef<HTMLDivElement>(null);
+  const paypalClientId = getPayPalClientId();
+  const paypalEnabled = paypalClientId.length > 0;
 
   const ratingLabels: Record<number, Record<string, string>> = {
     1: { en: 'Poor', fr: 'Mauvais', bi: 'Nogud' },
@@ -132,98 +118,127 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     setShowSuperStarModal(true);
     setSsPaymentStep('form');
     setSsPaymentError(null);
-    setSsCardErrors({});
+    setPaypalSdkError(null);
   };
 
-  const validateSuperStarCard = (): boolean => {
-    const errs: Record<string, string> = {};
-    const cleanNum = ssCardNumber.replace(/\D/g, '');
-    if (!cleanNum || cleanNum.length < 13) errs.cardNumber = 'Enter a valid card number';
-    if (!ssCardExpiry || ssCardExpiry.length < 5) errs.cardExpiry = 'Enter expiry';
-    else {
-      const [mm, yy] = ssCardExpiry.split('/');
-      const month = parseInt(mm, 10);
-      const year = parseInt('20' + yy, 10);
-      const now = new Date();
-      if (month < 1 || month > 12) errs.cardExpiry = 'Invalid month';
-      else if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)) errs.cardExpiry = 'Card expired';
-    }
-    if (!ssCardCvv || ssCardCvv.length < 3) errs.cardCvv = 'Enter CVV';
-    if (!ssCardName.trim() || ssCardName.trim().length < 2) errs.cardName = 'Enter name';
-    setSsCardErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
-
-  const handlePurchaseSuperStar = async () => {
-    if (!user) return;
-    if (!validateSuperStarCard()) return;
-
-    try {
-      await validateSuperStarPaymentPrerequisites(businessId);
-    } catch {
+  useEffect(() => {
+    if (!showSuperStarModal || ssPaymentStep !== 'form' || !paypalEnabled || !user?.id) {
+      if (paypalContainerRef.current) paypalContainerRef.current.innerHTML = '';
+      setPaypalButtonsReady(false);
       return;
     }
 
-    setSuperStarProcessing(true);
-    setSsPaymentStep('processing');
-    setSsPaymentError(null);
+    let cancelled = false;
 
-    try {
-      const token = await ensureFreshSession();
-      if (!token) {
-        toast.error('Session expired. Please sign in again.');
-        setSuperStarProcessing(false);
-        setSsPaymentStep('form');
-        return;
+    (async () => {
+      try {
+        await loadPayPalButtonsSdk(paypalClientId);
+        if (cancelled) return;
+
+        const paypalNs = window as unknown as {
+          paypal?: { Buttons: (cfg: Record<string, unknown>) => PayPalButtonsInstance };
+        };
+        const paypal = paypalNs.paypal;
+        if (!paypal?.Buttons) {
+          throw new Error('PayPal Buttons not available');
+        }
+
+        const token = await ensureFreshSession();
+        if (!token) {
+          throw new Error('Session expired. Please sign in again.');
+        }
+
+        const buttons = paypal.Buttons({
+          style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'pay' },
+          createOrder: async () => {
+            const freshToken = await ensureFreshSession();
+            if (!freshToken) throw new Error('Session expired. Please sign in again.');
+
+            const { data, error } = await supabase.functions.invoke('create-checkout', {
+              body: {
+                productType: 'superstar',
+                businessId,
+                businessName: businessName || 'business',
+              },
+            });
+
+            if (error) {
+              const msg = (error as Error)?.message || 'Could not start PayPal checkout';
+              throw new Error(msg);
+            }
+            if (!data?.success || !data?.orderId) {
+              throw new Error(typeof data?.error === 'string' ? data.error : 'Could not create PayPal order');
+            }
+            return data.orderId as string;
+          },
+          onApprove: async (data: { orderID?: string }) => {
+            const orderId = data.orderID;
+            if (!orderId) throw new Error('Missing PayPal order ID');
+
+            setSuperStarProcessing(true);
+            setSsPaymentStep('processing');
+            setSsPaymentError(null);
+
+            try {
+              const { data: capData, error: capErr } = await supabase.functions.invoke('paypal-capture', {
+                body: { paypalOrderId: orderId },
+              });
+
+              if (capErr) throw capErr;
+              if (!capData?.success) {
+                throw new Error(typeof capData?.error === 'string' ? capData.error : 'Payment capture failed');
+              }
+
+              setSsPaymentStep('success');
+              setSuperStarPurchased(true);
+              setWantsSuperStar(true);
+              setRating(6);
+              toast.success('Super Star purchased!');
+              void refreshUserProfile?.();
+
+              setTimeout(() => {
+                setShowSuperStarModal(false);
+                setSsPaymentStep('form');
+              }, 2000);
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : 'Payment failed';
+              setSsPaymentError(msg);
+              toast.error(msg);
+              setSsPaymentStep('form');
+              throw err;
+            } finally {
+              setSuperStarProcessing(false);
+            }
+          },
+          onError: (err: unknown) => {
+            const msg = err instanceof Error ? err.message : 'PayPal error';
+            setSsPaymentError(msg);
+            toast.error(msg);
+          },
+          onCancel: () => {
+            toast.info('Payment cancelled');
+          },
+        });
+
+        const el = paypalContainerRef.current;
+        if (!el || cancelled) return;
+        el.innerHTML = '';
+        await buttons.render(el);
+        if (!cancelled) setPaypalButtonsReady(true);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        const msg = err instanceof Error ? err.message : 'PayPal failed to load';
+        setPaypalSdkError(msg);
+        setPaypalButtonsReady(false);
       }
+    })();
 
-      const { data, error } = await supabase.functions.invoke('process-card-payment', {
-        body: {
-          action: 'purchase_superstar',
-          businessId,
-          businessName: businessName || 'business',
-          userName: user.name,
-          cardNumber: ssCardNumber.replace(/\s/g, ''),
-          cardExpiry: ssCardExpiry,
-          cardCvv: ssCardCvv,
-          cardName: ssCardName.trim(),
-        },
-      });
-
-
-      if (error) throw error;
-
-      if (data?.success) {
-        setSsPaymentStep('success');
-        setSuperStarPurchased(true);
-        setWantsSuperStar(true);
-        setRating(6);
-        toast.success('Super Star purchased!');
-        // Refresh user profile to update superstar_credits
-        refreshUserProfile?.();
-
-        setTimeout(() => {
-          setShowSuperStarModal(false);
-          setSsPaymentStep('form');
-          // Reset card fields
-          setSsCardNumber('');
-          setSsCardExpiry('');
-          setSsCardCvv('');
-          setSsCardName('');
-        }, 2000);
-      } else {
-        throw new Error(data?.error || 'Payment failed');
-      }
-    } catch (err: any) {
-      console.error('Super Star payment error:', err);
-      const msg = err.message || 'Failed to process payment';
-      setSsPaymentError(msg);
-      toast.error(msg);
-      setSsPaymentStep('form');
-    } finally {
-      setSuperStarProcessing(false);
-    }
-  };
+    return () => {
+      cancelled = true;
+      if (paypalContainerRef.current) paypalContainerRef.current.innerHTML = '';
+      setPaypalButtonsReady(false);
+    };
+  }, [showSuperStarModal, ssPaymentStep, paypalEnabled, paypalClientId, user?.id, businessId, businessName, refreshUserProfile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -520,123 +535,35 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
                   </div>
 
                   {/* Payment Error */}
-                  {ssPaymentError && (
+                  {(ssPaymentError || paypalSdkError) && (
                     <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50 border border-red-200 mb-4">
                       <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                      <p className="text-sm text-red-600">{ssPaymentError}</p>
+                      <p className="text-sm text-red-600">{ssPaymentError || paypalSdkError}</p>
                     </div>
                   )}
 
-                  {/* Card Form */}
-                  <div className="space-y-3 mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CreditCard className="w-4 h-4 text-gray-600" />
-                      <span className="text-sm font-semibold text-gray-700">Card Details</span>
-                      <span className="text-[10px] text-gray-400 ml-auto">Secured by PayPal</span>
+                  {!paypalEnabled ? (
+                    <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900 mb-4">
+                      PayPal is not configured for this app. Super Star purchases require PayPal — contact support.
                     </div>
-
-                    {/* Cardholder Name */}
-                    <div>
-                      <input
-                        type="text"
-                        value={ssCardName}
-                        onChange={(e) => { setSsCardName(e.target.value); setSsCardErrors(p => ({ ...p, cardName: '' })); }}
-                        placeholder="Name on card"
-                        autoComplete="cc-name"
-                        className={`w-full px-3.5 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
-                          ssCardErrors.cardName ? 'border-red-300' : 'border-gray-200'
-                        }`}
-                      />
-                      {ssCardErrors.cardName && <p className="text-[11px] text-red-500 mt-0.5">{ssCardErrors.cardName}</p>}
-                    </div>
-
-                    {/* Card Number */}
-                    <div>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={ssCardNumber}
-                        onChange={(e) => {
-                          const f = formatCardNumber(e.target.value);
-                          setSsCardNumber(f);
-                          setSsCardErrors(p => ({ ...p, cardNumber: '' }));
-                          if (f.replace(/\s/g, '').length === 16) ssExpiryRef.current?.focus();
-                        }}
-                        placeholder="1234 5678 9012 3456"
-                        autoComplete="cc-number"
-                        maxLength={19}
-                        className={`w-full px-3.5 py-2.5 rounded-lg border text-sm font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
-                          ssCardErrors.cardNumber ? 'border-red-300' : 'border-gray-200'
-                        }`}
-                      />
-                      {ssCardErrors.cardNumber && <p className="text-[11px] text-red-500 mt-0.5">{ssCardErrors.cardNumber}</p>}
-                    </div>
-
-                    {/* Expiry + CVV */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <input
-                          ref={ssExpiryRef}
-                          type="text"
-                          inputMode="numeric"
-                          value={ssCardExpiry}
-                          onChange={(e) => {
-                            const f = formatExpiry(e.target.value);
-                            setSsCardExpiry(f);
-                            setSsCardErrors(p => ({ ...p, cardExpiry: '' }));
-                            if (f.length === 5) ssCvvRef.current?.focus();
-                          }}
-                          placeholder="MM/YY"
-                          autoComplete="cc-exp"
-                          maxLength={5}
-                          className={`w-full px-3.5 py-2.5 rounded-lg border text-sm font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
-                            ssCardErrors.cardExpiry ? 'border-red-300' : 'border-gray-200'
-                          }`}
-                        />
-                        {ssCardErrors.cardExpiry && <p className="text-[11px] text-red-500 mt-0.5">{ssCardErrors.cardExpiry}</p>}
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 mb-4">
+                        <Shield className="w-3.5 h-3.5 text-green-500" />
+                        <span className="text-[11px] text-gray-500">Secure payment via PayPal · A$5.00 AUD</span>
                       </div>
-                      <div>
-                        <input
-                          ref={ssCvvRef}
-                          type="text"
-                          inputMode="numeric"
-                          value={ssCardCvv}
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '').substring(0, 4);
-                            setSsCardCvv(val);
-                            setSsCardErrors(p => ({ ...p, cardCvv: '' }));
-                          }}
-                          placeholder="CVV"
-                          autoComplete="cc-csc"
-                          maxLength={4}
-                          className={`w-full px-3.5 py-2.5 rounded-lg border text-sm font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 ${
-                            ssCardErrors.cardCvv ? 'border-red-300' : 'border-gray-200'
-                          }`}
-                        />
-                        {ssCardErrors.cardCvv && <p className="text-[11px] text-red-500 mt-0.5">{ssCardErrors.cardCvv}</p>}
-                      </div>
-                    </div>
-                  </div>
+                      <div ref={paypalContainerRef} className="min-h-[120px]" />
+                      {!paypalButtonsReady && !paypalSdkError && (
+                        <div className="flex items-center justify-center gap-2 py-4 text-sm text-gray-500">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Loading PayPal…
+                        </div>
+                      )}
+                    </>
+                  )}
 
-                  {/* Security */}
-                  <div className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 mb-4">
-                    <Shield className="w-3.5 h-3.5 text-green-500" />
-                    <span className="text-[11px] text-gray-500">256-bit SSL encrypted</span>
-                    <Lock className="w-3.5 h-3.5 text-green-500 ml-auto" />
-                  </div>
-
-                  {/* Pay Button */}
-                  <button
-                    onClick={handlePurchaseSuperStar}
-                    disabled={superStarProcessing}
-                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-base transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                  >
-                    <Lock className="w-4 h-4" />
-                    {language === 'en' ? 'Pay $5.00 Securely' : language === 'fr' ? 'Payer 5,00$ en toute sécurité' : 'Tru eksperiens from turis we oli sevem wetem StikmNek'}
-                  </button>
-
-                  <p className="text-[11px] text-center text-gray-400 mt-2">
-                    {language === 'en' ? 'Secure payment via PayPal gateway. Non-refundable.' : 'Paiement sécurisé via PayPal. Non remboursable.'}
+                  <p className="text-[11px] text-center text-gray-400 mt-3">
+                    {language === 'en' ? 'Secure payment via PayPal. Non-refundable.' : 'Paiement sécurisé via PayPal. Non remboursable.'}
                   </p>
 
                   <button
@@ -656,7 +583,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
                     <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
                   </div>
                   <h4 className="text-lg font-bold text-gray-900 mb-1">Processing Payment</h4>
-                  <p className="text-sm text-gray-500">Securely processing your card...</p>
+                  <p className="text-sm text-gray-500">Securely processing your PayPal payment…</p>
                   <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
                     <Shield className="w-3 h-3" />
                     <span>Encrypted by PayPal</span>

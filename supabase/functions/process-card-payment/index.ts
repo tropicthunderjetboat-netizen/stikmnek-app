@@ -11,6 +11,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSafeCorsHeaders } from '../_shared/cors.ts';
 import { normalizePassTypeToDb, semanticPassIdFromDb, type DbPassType } from '../_shared/passTypes.ts';
 import {
+  calculatePassPriceAud,
   dynamicPassInclusiveDays,
   parsePartySizeAndExtended,
   validUntilOffsetDays,
@@ -21,17 +22,9 @@ import { notifyAdminsOfPassPurchase } from '../_shared/purchaseNotify.ts';
 type SupabaseServiceClient = ReturnType<typeof createClient>;
 const BEARER_PREFIX = /^Bearer\s+/i;
 
-/** Inlined — must match `src/data/pricing.ts` (guests 7–20 at A$10 each). */
+/** @deprecated Use calculatePassPriceAud from pricingDynamic */
 function passPriceAud(partySize: number, isExtended: boolean): number {
-  const p = Math.min(20, Math.max(1, Math.floor(Number(partySize)) || 1));
-  let headcountAud = 15;
-  if (p >= 2) {
-    headcountAud += Math.min(p - 1, 5) * 10;
-  }
-  if (p >= 7) {
-    headcountAud += 10 + (p - 7) * 10;
-  }
-  return headcountAud + (isExtended ? 15 : 0);
+  return calculatePassPriceAud(partySize, isExtended);
 }
 
 /** Decode JWT `iss` without verifying signature (diagnostics only). */
@@ -118,44 +111,12 @@ async function getAuthUser(
   return { user };
 }
 
-const SUPERSTAR_PRICE_AUD = 5.0;
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
-}
-
-function endOfDayDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T23:59:59.999Z');
-  return d.toISOString();
-}
-
-/** Start of calendar day in UTC as epoch ms (for YYYY-MM-DD already validated). */
-function utcStartOfCalendarDayMs(isoDateOnly: string): number {
-  return new Date(isoDateOnly + 'T00:00:00.000Z').getTime();
-}
-
-/** Today's calendar date start in UTC (midnight UTC for the current UTC date). */
-function utcTodayStartMs(): number {
-  const now = new Date();
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-}
-
-/** UTC midnight of the calendar day `days` after the UTC day containing `utcMidnightMs`. */
-function utcAddCalendarDays(utcMidnightMs: number, days: number): number {
-  const d = new Date(utcMidnightMs);
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + days, 0, 0, 0, 0);
-}
-
-/** Calendar span between valid_from and valid_until (matches addDays-based purchase flow). */
-function calendarDaysBetweenValidRange(validFrom: string, validUntil: string): number {
-  const a = new Date(validFrom + 'T00:00:00.000Z');
-  const b = new Date(validUntil + 'T00:00:00.000Z');
-  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 1;
-  const diff = Math.round((b.getTime() - a.getTime()) / 86400000);
-  return Math.max(1, diff);
-}
+import {
+  addCalendarDaysIso,
+  calendarDaysBetweenValidRange,
+  endOfDayUtcIso,
+  validatePassStartDateIso,
+} from '../_shared/passDates.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -219,26 +180,12 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'purchase_superstar') {
-      // ═══ SUPERSTAR PURCHASE — $5.00 AUD HARDCODED ═══
-      // TODO: Integrate actual card charge (PayPal/Stripe) for SUPERSTAR_PRICE_AUD
-      // For now: increment credits. Replace with real payment flow when ready.
-      const amountToCharge = SUPERSTAR_PRICE_AUD;
-
-      const { data: newCount, error: rpcError } = await supabase.rpc('increment_superstar_credits', {
-        p_user_id: authUser.id,
-      });
-
-      if (rpcError) {
-        console.error('increment_superstar_credits error:', rpcError);
-        return errorResponse(req, 'Failed to add Super Star credit', 500);
-      }
-
-      return jsonResponse(req, {
-        success: true,
-        superstar_credits: newCount ?? 1,
-        amount: amountToCharge,
-        currency: 'AUD',
-      });
+      return errorResponse(
+        req,
+        'Super Star purchases are processed via PayPal. Please update the app or pay with PayPal in the review flow.',
+        501,
+        { reason: 'superstar_use_paypal' },
+      );
     }
 
     if (action === 'purchase_pass') {
@@ -263,29 +210,12 @@ Deno.serve(async (req) => {
         }, 501);
       }
 
-      const startDate = body?.startDate ?? body?.start_date;
-
-      if (!startDate || !/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
-        return errorResponse(req, 'Missing or invalid startDate (YYYY-MM-DD)', 400);
+      const startDateRaw = body?.startDate ?? body?.start_date;
+      const startCheck = validatePassStartDateIso(startDateRaw);
+      if (!startCheck.ok) {
+        return errorResponse(req, startCheck.error, 400);
       }
-
-      // ─── Server-side: start date must not be before today's calendar date (UTC) ───
-      const startMs = utcStartOfCalendarDayMs(startDate);
-      if (Number.isNaN(startMs)) {
-        return errorResponse(req, 'Missing or invalid startDate (YYYY-MM-DD)', 400);
-      }
-      const todayStartMs = utcTodayStartMs();
-      if (startMs < todayStartMs) {
-        return errorResponse(req, 'Purchase start date cannot be in the past.', 400);
-      }
-      const maxStartMs = utcAddCalendarDays(todayStartMs, 30);
-      if (startMs > maxStartMs) {
-        return errorResponse(
-          req,
-          'Purchase start date cannot be more than 30 days in the future (UTC).',
-          400,
-        );
-      }
+      const startDate = startCheck.startDate;
 
       const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
       const parsed = parsePartySizeAndExtended(b);
@@ -323,8 +253,8 @@ Deno.serve(async (req) => {
 
       const maxPeople = partySize;
       const validFrom = startDate;
-      const validUntil = addDays(startDate, validUntilOffsetDays(isExtended, grantSecondWeek));
-      const expiresAt = endOfDayDate(validUntil);
+      const validUntil = addCalendarDaysIso(startDate, validUntilOffsetDays(isExtended, grantSecondWeek));
+      const expiresAt = endOfDayUtcIso(validUntil);
       const inclusiveDays = dynamicPassInclusiveDays(isExtended, grantSecondWeek);
       const shareBonusApplied = isExtended && grantSecondWeek;
       const receiptNumber = body?.receiptNumber ?? `STK-${Date.now().toString(36).toUpperCase()}`;

@@ -600,35 +600,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .order('id', { ascending: false })
         .limit(3);
       if (error) throw error;
-      if (data && data.length > 0) {
-        const pass = data[0];
-        const expiry = new Date(pass.expires_at);
-        if (expiry > new Date()) {
-          const validFrom = pass.valid_from ? new Date(pass.valid_from).toISOString().split('T')[0] : null;
-          const validUntil = pass.valid_until ? new Date(pass.valid_until).toISOString().split('T')[0] : null;
-          const peopleCount = pass.max_people ?? pass.people_count ?? null;
-          const shareBonusApplied = pass.share_bonus_applied ?? false;
-          // Only update if we have the same user — never clear user (prev can be null if race with setUser)
-          const paid = Number(pass.amount_paid);
-          const amountPaidAud = Number.isFinite(paid) && paid > 0 ? paid : null;
-          const cur = pass.currency != null ? String(pass.currency).trim().toUpperCase() : '';
-          setUser(prev => {
-            if (!prev || prev.id !== userId) return prev;
-            return {
-              ...prev,
-              pass: passProductIdFromDb(String(pass.pass_type)),
-              passId: pass.id,
-              passExpiry: expiry.toISOString().split('T')[0],
-              passValidFrom: validFrom,
-              passValidUntil: validUntil,
-              passPeopleCount: peopleCount,
-              shareBonusApplied,
-              passAmountPaidAud: amountPaidAud,
-              passCurrency: cur || 'AUD',
-            };
-          });
-        }
+
+      const clearPassFields = (prev: User | null): User | null => {
+        if (!prev || prev.id !== userId) return prev;
+        return {
+          ...prev,
+          pass: null,
+          passId: null,
+          passExpiry: null,
+          passValidFrom: null,
+          passValidUntil: null,
+          passPeopleCount: null,
+          shareBonusApplied: null,
+          passAmountPaidAud: null,
+          passCurrency: null,
+        };
+      };
+
+      if (!data || data.length === 0) {
+        setUser(clearPassFields);
+        return;
       }
+
+      const pass = data[0];
+      const expiry = new Date(pass.expires_at);
+      if (expiry <= new Date()) {
+        setUser(clearPassFields);
+        return;
+      }
+
+      const validFrom = pass.valid_from ? new Date(pass.valid_from).toISOString().split('T')[0] : null;
+      const validUntil = pass.valid_until ? new Date(pass.valid_until).toISOString().split('T')[0] : null;
+      const peopleCount = pass.max_people ?? pass.people_count ?? null;
+      const shareBonusApplied = pass.share_bonus_applied ?? false;
+      const paid = Number(pass.amount_paid);
+      const amountPaidAud = Number.isFinite(paid) && paid > 0 ? paid : null;
+      const cur = pass.currency != null ? String(pass.currency).trim().toUpperCase() : '';
+      setUser(prev => {
+        if (!prev || prev.id !== userId) return prev;
+        return {
+          ...prev,
+          pass: passProductIdFromDb(String(pass.pass_type)),
+          passId: pass.id,
+          passExpiry: expiry.toISOString().split('T')[0],
+          passValidFrom: validFrom,
+          passValidUntil: validUntil,
+          passPeopleCount: peopleCount,
+          shareBonusApplied,
+          passAmountPaidAud: amountPaidAud,
+          passCurrency: cur || 'AUD',
+        };
+      });
     } catch (err) {
       console.error('Failed to load pass:', err);
     }
@@ -1671,7 +1693,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAuthMode('signup-tourist');
         return;
       }
-      if (user.passId) {
+      if (user.passId && user.passExpiry) {
+        const exp = new Date(user.passExpiry + 'T23:59:59');
+        if (exp > new Date()) {
+          toast.info('You already have an active pass!');
+          return;
+        }
+      } else if (user.passId) {
         toast.info('You already have an active pass!');
         return;
       }

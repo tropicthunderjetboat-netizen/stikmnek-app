@@ -74,6 +74,13 @@ function toPassLang(language: string | undefined): Language {
   return language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
 }
 
+/** Matches checkout / email `formatMoney` (AUD with two decimals). */
+function formatReceiptAud(amount: unknown): string {
+  const n = typeof amount === 'number' ? amount : Number(amount);
+  if (!Number.isFinite(n)) return 'A$—';
+  return `A$${n.toFixed(2)}`;
+}
+
 function bonusDaysPillLabel(lang: Language, days: number): string {
   if (days === 7) return t('share.holiday_pill_days', lang);
   return t('share.extra_days_pill_n', lang).replace('__N__', String(days));
@@ -699,22 +706,77 @@ const PaymentConfirmation: React.FC = () => {
   paymentRef.current = payment;
 
   useEffect(() => {
-    const stored = localStorage.getItem('lastPayment');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as PaymentResult;
-        const normalized = passProductIdFromDb(parsed.passType);
-        if (normalized) parsed.passType = normalized;
-        const span = inclusiveCalendarDaysBetween(parsed.validFrom, parsed.validUntil);
-        if (span != null) {
-          parsed.days = span;
+    async function loadReceipt() {
+      const stored = localStorage.getItem('lastPayment');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored) as PaymentResult;
+          const normalized = passProductIdFromDb(parsed.passType);
+          if (normalized) parsed.passType = normalized;
+          const span = inclusiveCalendarDaysBetween(parsed.validFrom, parsed.validUntil);
+          if (span != null) {
+            parsed.days = span;
+          }
+          setPayment(parsed);
+          return;
+        } catch {
+          setPayment(null);
         }
-        setPayment(parsed);
-      } catch {
-        setPayment(null);
+      }
+
+      if (!user?.id || authLoading) return;
+
+      try {
+        const { data: passRow, error } = await supabase
+          .from('passes')
+          .select(
+            'id, pass_type, valid_from, valid_until, expires_at, amount_paid, currency, share_bonus_applied, max_people, purchased_at, payment_provider, payment_session_id',
+          )
+          .eq('user_id', user.id)
+          .eq('active', true)
+          .order('purchased_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error || !passRow) return;
+
+        const passId = String(passRow.id ?? '');
+        const receiptNumber = `STK-${passId.replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+        const vf = passRow.valid_from ? String(passRow.valid_from).slice(0, 10) : undefined;
+        const vu = passRow.valid_until ? String(passRow.valid_until).slice(0, 10) : undefined;
+        const span = inclusiveCalendarDaysBetween(vf, vu);
+        const partySize = Number(passRow.max_people) || 1;
+
+        const recovered: PaymentResult = {
+          receiptNumber,
+          passType: passProductIdFromDb(String(passRow.pass_type)) ?? 'dynamic',
+          passLabel: getPassDisplayTitle('dynamic'),
+          amount: Number(passRow.amount_paid) || 0,
+          currency: String(passRow.currency || 'AUD'),
+          paymentMethod: String(passRow.payment_provider || 'paypal'),
+          expiresAt: String(passRow.expires_at ?? ''),
+          validFrom: vf,
+          validUntil: vu,
+          days: span ?? undefined,
+          shareBonusApplied: Boolean(passRow.share_bonus_applied),
+          group: `Up to ${partySize} people (ages 6+)`,
+          partySize,
+          sessionId: passId,
+          completedAt: String(passRow.purchased_at ?? new Date().toISOString()),
+        };
+        setPayment(recovered);
+        try {
+          localStorage.setItem('lastPayment', JSON.stringify(recovered));
+        } catch {
+          /* ignore */
+        }
+      } catch (err) {
+        console.warn('[PaymentConfirmation] server receipt fallback failed:', err);
       }
     }
-  }, []);
+
+    void loadReceipt();
+  }, [user?.id, authLoading]);
 
   // After purchase, `refreshUserPass` loads the real pass row — sync receipt dates/duration/share flag from DB.
   useEffect(() => {
@@ -868,6 +930,9 @@ const PaymentConfirmation: React.FC = () => {
           valid_until: p.validUntil,
           duration_days: durationDays,
           share_bonus_applied: p.shareBonusApplied ?? false,
+          party_size: p.partySize ?? p.peopleCount ?? null,
+          is_extended: Boolean(p.isExtended),
+          group_label: p.group ?? null,
         },
       });
       if (data?.success) {
@@ -1044,10 +1109,10 @@ PAYMENT DETAILS
 Method: ${payment.paymentMethod === 'card' ? `Credit Card ending ${payment.cardLast4 || '****'}` : 'PayPal'}
 Currency: AUD (Australian Dollar)
 
-Amount: A$${payment.amount}.00 AUD
+Amount: ${formatReceiptAud(payment.amount)} AUD
 Processing Fee: A$0.00
 Tax: A$0.00
-Total: A$${payment.amount}.00 AUD
+Total: ${formatReceiptAud(payment.amount)} AUD
 
 ─────────────────────────────────────
 CUSTOMER
@@ -1190,7 +1255,7 @@ Enjoy your deals in Vanuatu!
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-extrabold">A${payment.amount}</p>
+                <p className="text-3xl font-extrabold">{formatReceiptAud(payment.amount)}</p>
                 <p className="text-white/70 text-xs">AUD</p>
               </div>
             </div>
@@ -1349,7 +1414,7 @@ Enjoy your deals in Vanuatu!
             <div className="border-t border-gray-100 pt-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">{passLabel}</span>
-                <span className="font-medium text-gray-900">A${payment.amount}.00</span>
+                <span className="font-medium text-gray-900">{formatReceiptAud(payment.amount)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Processing fee</span>
@@ -1357,7 +1422,7 @@ Enjoy your deals in Vanuatu!
               </div>
               <div className="flex justify-between text-sm border-t border-gray-100 pt-2 mt-2">
                 <span className="font-bold text-gray-900">Total Paid</span>
-                <span className="font-extrabold text-gray-900">A${payment.amount}.00 AUD</span>
+                <span className="font-extrabold text-gray-900">{formatReceiptAud(payment.amount)} AUD</span>
               </div>
             </div>
           </div>
