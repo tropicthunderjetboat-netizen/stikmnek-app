@@ -23,7 +23,7 @@ import {
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
 import CheckoutPricingSummary from '@/components/CheckoutPricingSummary';
-import { loadPayPalButtonsSdk, renderGuestCardFirstButtons, type PayPalSdkNamespace } from '@/lib/paypalSdk';
+import { loadPayPalButtonsSdk, renderPayPalCheckoutButtons, type PayPalSdkNamespace } from '@/lib/paypalSdk';
 import { t } from '@/data/translations';
 import type { Language } from '@/data/translations';
 
@@ -301,7 +301,8 @@ const PaymentCheckout: React.FC = () => {
   /** Smart Buttons checkout when public client id is configured (Expanded Card Fields not required). */
   const paypalSmartEnabled = paypalClientId.length > 0;
 
-  const paypalButtonContainerRef = useRef<HTMLDivElement>(null);
+  const paypalCardButtonRef = useRef<HTMLDivElement>(null);
+  const paypalWalletButtonRef = useRef<HTMLDivElement>(null);
   const [paypalButtonsSdkError, setPaypalButtonsSdkError] = useState<string | null>(null);
   const [paypalButtonsReady, setPaypalButtonsReady] = useState(false);
 
@@ -601,7 +602,8 @@ const PaymentCheckout: React.FC = () => {
     if (!paypalSmartEnabled || step !== 'payment') {
       setPaypalButtonsSdkError(null);
       setPaypalButtonsReady(false);
-      if (paypalButtonContainerRef.current) paypalButtonContainerRef.current.innerHTML = '';
+      if (paypalCardButtonRef.current) paypalCardButtonRef.current.innerHTML = '';
+      if (paypalWalletButtonRef.current) paypalWalletButtonRef.current.innerHTML = '';
       return;
     }
 
@@ -611,7 +613,8 @@ const PaymentCheckout: React.FC = () => {
     (async () => {
       setPaypalButtonsSdkError(null);
       setPaypalButtonsReady(false);
-      if (paypalButtonContainerRef.current) paypalButtonContainerRef.current.innerHTML = '';
+      if (paypalCardButtonRef.current) paypalCardButtonRef.current.innerHTML = '';
+      if (paypalWalletButtonRef.current) paypalWalletButtonRef.current.innerHTML = '';
 
       try {
         await loadPayPalButtonsSdk(paypalClientId);
@@ -830,12 +833,15 @@ const PaymentCheckout: React.FC = () => {
                 setCurrentView('payment-confirmation');
               }, 2500);
             } catch (err: unknown) {
-              const msg = err instanceof Error ? err.message : 'Payment failed';
+              let msg = err instanceof Error ? err.message : 'Payment failed';
               if (msg === 'SESSION_EXPIRED') {
                 toast.error('Your session has expired. Please sign in again.');
                 setShowAuth(true);
                 setAuthMode('signin');
               } else {
+                if (/capture|activate|pass could not/i.test(msg)) {
+                  msg += ' If PayPal charged you the full pass amount (not a small ~130 VT hold), email support with your PayPal receipt — we can activate your pass manually.';
+                }
                 toast.error(msg);
               }
               setPaymentError(msg);
@@ -858,10 +864,10 @@ const PaymentCheckout: React.FC = () => {
           },
         };
 
-        const el = paypalButtonContainerRef.current;
-        if (!el) throw new Error('PayPal button container not ready');
-        el.innerHTML = '';
-        await renderGuestCardFirstButtons(paypal, buttonConfig, el);
+        const cardEl = paypalCardButtonRef.current;
+        const walletEl = paypalWalletButtonRef.current;
+        if (!cardEl || !walletEl) throw new Error('PayPal button containers not ready');
+        await renderPayPalCheckoutButtons(paypal, buttonConfig, { card: cardEl, wallet: walletEl });
         if (!cancelled) setPaypalButtonsReady(true);
       } catch (e: unknown) {
         if (cancelled) return;
@@ -879,7 +885,8 @@ const PaymentCheckout: React.FC = () => {
       } catch {
         /* ignore */
       }
-      if (paypalButtonContainerRef.current) paypalButtonContainerRef.current.innerHTML = '';
+      if (paypalCardButtonRef.current) paypalCardButtonRef.current.innerHTML = '';
+      if (paypalWalletButtonRef.current) paypalWalletButtonRef.current.innerHTML = '';
     };
   }, [
     paypalSmartEnabled,
@@ -1567,11 +1574,11 @@ const PaymentCheckout: React.FC = () => {
                       </div>
                       <div>
                         <p className="font-bold text-gray-900 text-sm">
-                          {paypalSmartEnabled ? 'Pay with debit or credit card' : 'Credit or Debit Card'}
+                          {paypalSmartEnabled ? 'Pay with card or PayPal' : 'Credit or Debit Card'}
                         </p>
                         <p className="text-xs text-gray-500">
                           {paypalSmartEnabled
-                            ? 'No PayPal account needed — pay by card in PayPal’s secure window, then return to StikmNek.'
+                            ? 'Debit/credit card (no PayPal account needed) or PayPal wallet — both open PayPal’s secure window.'
                             : 'Pay securely on StikmNek — no redirect'}
                         </p>
                       </div>
@@ -1593,7 +1600,11 @@ const PaymentCheckout: React.FC = () => {
                           <span className="text-sm font-medium">Loading PayPal…</span>
                         </div>
                       )}
-                      <div ref={paypalButtonContainerRef} key={paypalMountKey} className="min-h-[48px] max-w-md" />
+                      <div key={paypalMountKey} className="min-h-[48px] max-w-md space-y-3">
+                        <div ref={paypalCardButtonRef} className="min-h-[48px]" />
+                        <p className="text-center text-xs text-gray-400 font-medium">or</p>
+                        <div ref={paypalWalletButtonRef} className="min-h-[48px]" />
+                      </div>
                       <p className="text-xs text-gray-500">
                         Total due: <strong>A${priceAud.toFixed(2)} AUD</strong> — charged when you complete payment in PayPal.
                       </p>

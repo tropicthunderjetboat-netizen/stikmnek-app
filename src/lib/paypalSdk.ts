@@ -69,11 +69,22 @@ export function getPayPalClientId(): string {
 }
 
 /** Prefer debit/credit card (no PayPal account); fall back to PayPal wallet only if card is ineligible. */
-export async function renderGuestCardFirstButtons(
+export type PayPalCheckoutButtonTargets = {
+  card: HTMLElement;
+  wallet: HTMLElement;
+};
+
+/** Render debit/credit card (black) and PayPal wallet (gold) when each is eligible. */
+export async function renderPayPalCheckoutButtons(
   paypal: PayPalSdkNamespace,
   buttonConfig: Record<string, unknown>,
-  container: HTMLElement,
-): Promise<'card' | 'wallet'> {
+  targets: PayPalCheckoutButtonTargets,
+): Promise<{ card: boolean; wallet: boolean }> {
+  targets.card.innerHTML = '';
+  targets.wallet.innerHTML = '';
+
+  const result = { card: false, wallet: false };
+
   const cardFunding = paypal.FUNDING?.CARD ?? 'card';
   const cardButtons = paypal.Buttons({
     ...buttonConfig,
@@ -81,8 +92,8 @@ export async function renderGuestCardFirstButtons(
     style: { layout: 'vertical', shape: 'rect', label: 'pay', color: 'black' },
   });
   if (cardButtons.isEligible()) {
-    await cardButtons.render(container);
-    return 'card';
+    await cardButtons.render(targets.card);
+    result.card = true;
   }
 
   const walletFunding = paypal.FUNDING?.PAYPAL ?? 'paypal';
@@ -92,11 +103,34 @@ export async function renderGuestCardFirstButtons(
     style: { layout: 'vertical', shape: 'rect', label: 'paypal', color: 'gold' },
   });
   if (walletButtons.isEligible()) {
-    await walletButtons.render(container);
-    return 'wallet';
+    await walletButtons.render(targets.wallet);
+    result.wallet = true;
   }
 
-  throw new Error(
-    'Debit/credit card checkout is not enabled on this PayPal business account. In PayPal → Account Settings, turn on Advanced Credit and Debit Card Payments and “PayPal account optional”.',
-  );
+  if (!result.card && !result.wallet) {
+    throw new Error(
+      'Payment buttons are not available on this PayPal account. Enable Advanced Credit and Debit Card Payments and “PayPal account optional” in PayPal → Account Settings.',
+    );
+  }
+
+  return result;
+}
+
+/** @deprecated Use renderPayPalCheckoutButtons */
+export async function renderGuestCardFirstButtons(
+  paypal: PayPalSdkNamespace,
+  buttonConfig: Record<string, unknown>,
+  container: HTMLElement,
+): Promise<'card' | 'wallet'> {
+  const cardSlot = document.createElement('div');
+  const walletSlot = document.createElement('div');
+  container.appendChild(cardSlot);
+  container.appendChild(walletSlot);
+  const { card, wallet } = await renderPayPalCheckoutButtons(paypal, buttonConfig, {
+    card: cardSlot,
+    wallet: walletSlot,
+  });
+  if (card) return 'card';
+  if (wallet) return 'wallet';
+  throw new Error('No payment buttons available');
 }

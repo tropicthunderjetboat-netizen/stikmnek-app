@@ -4,7 +4,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { t } from '@/data/translations';
-import { getPayPalClientId, loadPayPalButtonsSdk, renderGuestCardFirstButtons, type PayPalSdkNamespace } from '@/lib/paypalSdk';
+import { getPayPalClientId, loadPayPalButtonsSdk, renderPayPalCheckoutButtons, type PayPalSdkNamespace } from '@/lib/paypalSdk';
 
 interface ReviewFormProps {
   businessId: string;
@@ -64,7 +64,8 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
   const [paypalButtonsReady, setPaypalButtonsReady] = useState(false);
   const [paypalSdkError, setPaypalSdkError] = useState<string | null>(null);
 
-  const paypalContainerRef = useRef<HTMLDivElement>(null);
+  const paypalCardButtonRef = useRef<HTMLDivElement>(null);
+  const paypalWalletButtonRef = useRef<HTMLDivElement>(null);
   const paypalClientId = getPayPalClientId();
   const paypalEnabled = paypalClientId.length > 0;
 
@@ -123,7 +124,8 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
 
   useEffect(() => {
     if (!showSuperStarModal || ssPaymentStep !== 'form' || !paypalEnabled || !user?.id) {
-      if (paypalContainerRef.current) paypalContainerRef.current.innerHTML = '';
+      if (paypalCardButtonRef.current) paypalCardButtonRef.current.innerHTML = '';
+      if (paypalWalletButtonRef.current) paypalWalletButtonRef.current.innerHTML = '';
       setPaypalButtonsReady(false);
       return;
     }
@@ -216,10 +218,10 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           throw new Error('Session expired. Please sign in again.');
         }
 
-        const el = paypalContainerRef.current;
-        if (!el || cancelled) return;
-        el.innerHTML = '';
-        await renderGuestCardFirstButtons(paypal, buttonConfig, el);
+        const cardEl = paypalCardButtonRef.current;
+        const walletEl = paypalWalletButtonRef.current;
+        if (!cardEl || !walletEl || cancelled) return;
+        await renderPayPalCheckoutButtons(paypal, buttonConfig, { card: cardEl, wallet: walletEl });
         if (!cancelled) setPaypalButtonsReady(true);
       } catch (err: unknown) {
         if (cancelled) return;
@@ -231,7 +233,8 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
 
     return () => {
       cancelled = true;
-      if (paypalContainerRef.current) paypalContainerRef.current.innerHTML = '';
+      if (paypalCardButtonRef.current) paypalCardButtonRef.current.innerHTML = '';
+      if (paypalWalletButtonRef.current) paypalWalletButtonRef.current.innerHTML = '';
       setPaypalButtonsReady(false);
     };
   }, [showSuperStarModal, ssPaymentStep, paypalEnabled, paypalClientId, user?.id, businessId, businessName, refreshUserProfile]);
@@ -548,7 +551,11 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
                         <Shield className="w-3.5 h-3.5 text-green-500" />
                         <span className="text-[11px] text-gray-500">Secure payment via PayPal · A$5.00 AUD</span>
                       </div>
-                      <div ref={paypalContainerRef} className="min-h-[120px]" />
+                      <div className="min-h-[120px] space-y-3">
+                        <div ref={paypalCardButtonRef} className="min-h-[48px]" />
+                        <p className="text-center text-xs text-gray-400 font-medium">or</p>
+                        <div ref={paypalWalletButtonRef} className="min-h-[48px]" />
+                      </div>
                       {!paypalButtonsReady && !paypalSdkError && (
                         <div className="flex items-center justify-center gap-2 py-4 text-sm text-gray-500">
                           <Loader2 className="w-4 h-4 animate-spin" />
