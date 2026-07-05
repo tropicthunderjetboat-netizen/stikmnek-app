@@ -117,6 +117,74 @@ export async function fetchOfferingById(
   return null;
 }
 
+export type BusinessProfilePageData = {
+  id: string;
+  name: string;
+  location: string;
+  logoUrl: string | null;
+  description: string;
+  rating: number;
+  reviewCount: number;
+  offerings: Business[];
+};
+
+const PROFILE_PAGE_COLS =
+  'id, name, description, location, rating, review_count, logo_url, image, active';
+
+/**
+ * Public business profile: company row + all active offerings (for `/host/:slug` pages).
+ */
+export async function fetchBusinessProfilePage(
+  supabase: SupabaseClient,
+  supabaseUrl: string,
+  profileBusinessId: string,
+): Promise<BusinessProfilePageData | null> {
+  const id = String(profileBusinessId ?? '').trim();
+  if (!id) return null;
+
+  const { data: prof, error: pErr } = await supabase
+    .from('businesses')
+    .select(PROFILE_PAGE_COLS)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (pErr || !prof) return null;
+
+  const profile = prof as Record<string, unknown>;
+  if (profile.active === false) return null;
+
+  const { data: offs, error: oErr } = await supabase
+    .from('business_offerings')
+    .select(OFFERING_LISTING_COLUMNS)
+    .eq('business_id', id)
+    .eq('active', true)
+    .order('featured', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (oErr) return null;
+
+  const offerings: Business[] = [];
+  for (const row of (offs || []) as Record<string, unknown>[]) {
+    try {
+      offerings.push(mapJoinedOfferingToBusiness(row, profile, supabaseUrl));
+    } catch {
+      /* skip malformed row */
+    }
+  }
+
+  return {
+    id,
+    name: String(profile.name ?? '').trim() || 'Business',
+    location: String(profile.location ?? '').trim(),
+    logoUrl:
+      String(profile.logo_url ?? profile.image ?? '').trim() || null,
+    description: String(profile.description ?? '').trim(),
+    rating: Number(profile.rating) || 0,
+    reviewCount: Number(profile.review_count) || 0,
+    offerings,
+  };
+}
+
 /**
  * Load active tourist listings. Tries `business_listings_view` first (current schema),
  * then falls back to `business_offerings` + `businesses` if the view is missing or errors

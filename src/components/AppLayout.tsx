@@ -5,11 +5,13 @@ import { useAppContext, isTouristProfileCompleteForGate } from '@/contexts/AppCo
 import { canAccessAdminPanel } from '@/lib/adminRoles';
 import {
   dealSlugFromPathname,
+  hostSlugFromPathname,
   isRoutableAppPath,
   viewFromPathname,
   type ViewMode,
 } from '@/utils/viewModes';
 import { dealSlugForBusiness, offeringIdFromDealSlug } from '@/lib/dealUrl';
+import { businessIdFromHostSlug } from '@/lib/businessProfileUrl';
 import { fetchOfferingById } from '@/lib/loadListings';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import LegalDocumentPage from './LegalDocumentPage';
@@ -47,6 +49,7 @@ const BusinessOwnerDashboard = React.lazy(() => import('./BusinessOwnerDashboard
 const HelpCenter = React.lazy(() => import('./HelpCenter'));
 const MapView = React.lazy(() => import('./MapView'));
 const BusinessDetail = React.lazy(() => import('./BusinessDetail'));
+const BusinessProfilePage = React.lazy(() => import('./BusinessProfilePage'));
 const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
 
 /**
@@ -58,6 +61,7 @@ const TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
   'deals',
   'map',
   'business-detail',
+  'business-profile',
   'help',
   'faq',
   'business-guide',
@@ -74,6 +78,7 @@ const BUSINESS_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
   'map',
   'passes',
   'business-detail',
+  'business-profile',
   'help',
   'faq',
   'business-guide',
@@ -221,6 +226,8 @@ const AppLayout: React.FC = () => {
   } = useAppContext();
   const prevViewRef = useRef(currentView);
   const [dealNotFound, setDealNotFound] = useState(false);
+  const [hostProfileId, setHostProfileId] = useState<string | null>(null);
+  const [hostProfileNotFound, setHostProfileNotFound] = useState(false);
 
   useEffect(() => {
     const p = location.pathname;
@@ -285,6 +292,26 @@ const AppLayout: React.FC = () => {
     // `dealNotFound` is intentionally omitted: it's set here, not read, so including
     // it would re-run the effect and loop on a failed lookup.
   }, [location.pathname, dbBusinesses, dataLoaded, selectedBusiness, setSelectedBusiness]);
+
+  // ─── Deep-link resolver for /host/:slug (business profile page) ───
+  useEffect(() => {
+    const slug = hostSlugFromPathname(location.pathname);
+    if (!slug) {
+      setHostProfileId(null);
+      setHostProfileNotFound(false);
+      return;
+    }
+
+    const profileId = businessIdFromHostSlug(slug);
+    if (!profileId) {
+      if (dataLoaded) setHostProfileNotFound(true);
+      setHostProfileId(null);
+      return;
+    }
+
+    setHostProfileId(profileId);
+    setHostProfileNotFound(false);
+  }, [location.pathname, dataLoaded]);
 
   // ─── Role-based view access control ───
   useEffect(() => {
@@ -419,6 +446,29 @@ const AppLayout: React.FC = () => {
           );
         }
         return <BusinessDetail />;
+      }
+      case 'business-profile': {
+        if (hostProfileNotFound || !hostProfileId) {
+          if (hostSlugFromPathname(location.pathname) && !hostProfileId && !hostProfileNotFound) {
+            return (
+              <div className="pt-16">
+                <LoadingSkeleton />
+              </div>
+            );
+          }
+          return <NotFound />;
+        }
+        return (
+          <Suspense
+            fallback={
+              <div className="pt-16">
+                <LoadingSkeleton />
+              </div>
+            }
+          >
+            <BusinessProfilePage profileBusinessId={hostProfileId} />
+          </Suspense>
+        );
       }
       case 'deals':
         return (

@@ -883,6 +883,20 @@ const BusinessOwnerDashboard: React.FC = () => {
     });
   }, [unifiedBusinesses, selectedProfileId]);
 
+  /** Master profile row — company name + logo for Simple Hub header and share link. */
+  const profileCompanyRow = useMemo(() => {
+    if (!selectedProfileId) return null;
+    return (
+      approvedListingsSameProfile.find((b) => String(b.id) === String(selectedProfileId)) ??
+      unifiedBusinesses.find(
+        (b) =>
+          b._source === 'approved' &&
+          String(b.id) === String(selectedProfileId),
+      ) ??
+      null
+    );
+  }, [approvedListingsSameProfile, unifiedBusinesses, selectedProfileId]);
+
   /** Profile row id for business-wide settings (not tied to which listing is selected). */
   const ownerProfileBusinessId = useMemo(() => {
     if (selectedProfileId) return selectedProfileId;
@@ -2436,7 +2450,9 @@ const BusinessOwnerDashboard: React.FC = () => {
             {/* Overview tab — approved business: scanner-first Simple Hub */}
             {activeTab === 'overview' && selectedBusiness && selectedIsApproved && (
               <BusinessSimpleHub
-                businessName={selectedBusiness.name || 'Your listing'}
+                profileCompanyName={profileCompanyRow?.name?.trim() || 'Your business'}
+                profileLogoUrl={profileCompanyRow?.image || null}
+                profileBusinessId={selectedProfileId}
                 listingOptions={approvedListingsSameProfile.map((b) => ({
                   id: b.id,
                   name: b.name || 'Listing',
@@ -2445,7 +2461,6 @@ const BusinessOwnerDashboard: React.FC = () => {
                 }))}
                 selectedListingId={selectedBusinessId}
                 onSelectListing={setSelectedBusinessId}
-                profileBusinessId={selectedProfileId}
                 reviewCount={businessReviews.length}
                 submissionBadge={submissionsBadge}
                 hasBusinessProfile={Boolean(resolvedProfileBusinessId)}

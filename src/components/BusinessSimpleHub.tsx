@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { absoluteDealUrl } from '@/lib/dealUrl';
+import { absoluteBusinessProfileUrl } from '@/lib/businessProfileUrl';
+import BusinessProfileLogo from '@/components/BusinessProfileLogo';
 import {
   ScanLine, Edit3, Link2, Share2, ChevronDown, ChevronUp,
   BarChart3, MessageSquare, Image, Plus, ClipboardList,
-  ShieldCheck, Building2, Mail, CheckCircle, Store,
+  ShieldCheck, Building2, Mail, CheckCircle,
 } from 'lucide-react';
 
 interface ListingOption {
@@ -15,11 +16,13 @@ interface ListingOption {
 }
 
 interface BusinessSimpleHubProps {
-  businessName: string;
+  /** Company / trading name from the master `businesses` profile row. */
+  profileCompanyName: string;
+  profileLogoUrl?: string | null;
+  profileBusinessId: string;
   listingOptions: ListingOption[];
   selectedListingId: string;
   onSelectListing: (id: string) => void;
-  profileBusinessId: string;
   reviewCount: number;
   submissionBadge?: string;
   hasBusinessProfile: boolean;
@@ -28,11 +31,12 @@ interface BusinessSimpleHubProps {
 }
 
 const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
-  businessName,
+  profileCompanyName,
+  profileLogoUrl,
+  profileBusinessId,
   listingOptions,
   selectedListingId,
   onSelectListing,
-  profileBusinessId,
   reviewCount,
   submissionBadge,
   hasBusinessProfile,
@@ -43,23 +47,17 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
   const [moreOpen, setMoreOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const shareTarget = useMemo(() => {
-    const selected = listingOptions.find((l) => l.id === selectedListingId);
-    if (selected && String(selected.id) !== String(profileBusinessId) && !selected.isProfileRow) {
-      return selected;
-    }
-    return listingOptions.find((l) => String(l.id) !== String(profileBusinessId) && !l.isProfileRow) ?? selected;
-  }, [listingOptions, selectedListingId, profileBusinessId]);
-
-  const dealUrl = shareTarget ? absoluteDealUrl({ id: shareTarget.id, name: shareTarget.name }) : '';
+  const businessPageUrl = profileBusinessId
+    ? absoluteBusinessProfileUrl({ id: profileBusinessId, name: profileCompanyName })
+    : '';
 
   const t = (en: string, fr: string, bi: string) =>
     language === 'en' ? en : language === 'fr' ? fr : bi;
 
   const handleCopyLink = async () => {
-    if (!dealUrl) return;
+    if (!businessPageUrl) return;
     try {
-      await navigator.clipboard.writeText(dealUrl);
+      await navigator.clipboard.writeText(businessPageUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
@@ -68,17 +66,17 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
   };
 
   const handleNativeShare = async () => {
-    if (!dealUrl || !shareTarget) return;
+    if (!businessPageUrl) return;
     if (typeof navigator.share === 'function') {
       try {
         await navigator.share({
-          title: shareTarget.name,
+          title: profileCompanyName,
           text: t(
-            'Check out our StikmNek deal!',
-            'Découvrez notre offre StikmNek !',
-            'Lukim dil blong mifala long StikmNek!',
+            'See all our StikmNek deals!',
+            'Découvrez toutes nos offres StikmNek !',
+            'Lukim ol dil blong mifala long StikmNek!',
           ),
-          url: dealUrl,
+          url: businessPageUrl,
         });
         return;
       } catch {
@@ -145,22 +143,28 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
     },
   ];
 
-  const showListingPicker = listingOptions.length > 1;
+  const showListingPicker = listingOptions.filter((l) => !l.isProfileRow).length > 1;
+  const scanListingOptions = listingOptions.filter((l) => !l.isProfileRow);
 
   return (
     <div className="mx-auto max-w-lg space-y-5">
-      {/* Compact status header */}
+      {/* Profile header — company logo + greeting + business name */}
       <div className="rounded-2xl border border-teal-100 bg-white px-5 py-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-md shadow-teal-200/50">
-            <Store className="h-5 w-5 text-white" />
-          </div>
+          <BusinessProfileLogo
+            src={profileLogoUrl}
+            alt={profileCompanyName}
+            variant="sidebar"
+            className="h-12 w-12 shrink-0 rounded-xl shadow-md shadow-teal-200/40"
+          />
           <div className="min-w-0 flex-1">
             <p className="truncate text-lg font-extrabold text-gray-900">
-              {user?.name ? t(`Hi, ${user.name.split(' ')[0]}`, `Bonjour, ${user.name.split(' ')[0]}`, `Halo, ${user.name.split(' ')[0]}`) : t('Your business', 'Votre entreprise', 'Bisnis blong yu')}
+              {user?.name
+                ? t(`Hi, ${user.name.split(' ')[0]}`, `Bonjour, ${user.name.split(' ')[0]}`, `Halo, ${user.name.split(' ')[0]}`)
+                : t('Welcome', 'Bienvenue', 'Welkam')}
             </p>
             <div className="mt-0.5 flex flex-wrap items-center gap-2">
-              <span className="truncate text-sm text-gray-500">{businessName}</span>
+              <span className="truncate text-sm font-medium text-gray-600">{profileCompanyName}</span>
               <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
                 {t('Live', 'En ligne', 'Live')}
@@ -170,36 +174,7 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
         </div>
       </div>
 
-      {showListingPicker && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <label
-            htmlFor="simple-hub-listing"
-            className="mb-2 block text-[11px] font-bold uppercase tracking-wide text-gray-500"
-          >
-            {t('Which listing?', 'Quelle annonce ?', 'Wan listing?')}
-          </label>
-          <div className="relative">
-            <select
-              id="simple-hub-listing"
-              value={selectedListingId}
-              onChange={(e) => onSelectListing(e.target.value)}
-              className="w-full min-h-[48px] appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3.5 pr-11 text-base font-semibold text-gray-900 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
-            >
-              {listingOptions.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {(l.name || 'Listing').trim()}
-                  {l.isProfileRow
-                    ? t(' — company profile', ' — profil entreprise', ' — profil bisnis')
-                    : ''}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" aria-hidden />
-          </div>
-        </div>
-      )}
-
-      {/* Hero: Scan QR */}
+      {/* Hero: Scan QR — first action after header */}
       <button
         type="button"
         onClick={onOpenScanner}
@@ -208,7 +183,7 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
         <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10" />
         <div className="absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-white/5" />
         <div className="relative flex items-center gap-5">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm border border-white/25 shadow-lg transition-transform group-hover:scale-105">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white/20 shadow-lg backdrop-blur-sm transition-transform group-hover:scale-105">
             <ScanLine className="h-9 w-9" strokeWidth={2.25} />
           </div>
           <div className="min-w-0 flex-1">
@@ -229,12 +204,12 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
         </div>
       </button>
 
-      {/* Copy link + optional native share */}
+      {/* Copy / share business page (all listings) */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <button
           type="button"
           onClick={handleCopyLink}
-          disabled={!dealUrl}
+          disabled={!businessPageUrl}
           className="flex min-h-[56px] items-center justify-center gap-3 rounded-2xl border-2 border-teal-200 bg-white px-5 py-4 font-bold text-teal-800 shadow-sm transition-all hover:border-teal-300 hover:bg-teal-50 active:scale-[0.98] disabled:opacity-50"
         >
           {copied ? (
@@ -245,7 +220,7 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
           ) : (
             <>
               <Link2 className="h-6 w-6 text-teal-600" />
-              <span>{t('Copy listing link', 'Copier le lien', 'Kopim link blong listing')}</span>
+              <span>{t('Copy business page', 'Copier la page', 'Kopim business pej')}</span>
             </>
           )}
         </button>
@@ -253,7 +228,7 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
           <button
             type="button"
             onClick={handleNativeShare}
-            disabled={!dealUrl}
+            disabled={!businessPageUrl}
             className="flex min-h-[56px] items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 font-bold text-gray-800 shadow-sm transition-all hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98] disabled:opacity-50"
           >
             <Share2 className="h-6 w-6 text-gray-600" />
@@ -263,7 +238,11 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
       </div>
       {copied && (
         <p className="-mt-2 text-center text-xs text-gray-500">
-          {t('Paste on Facebook, WhatsApp, or Instagram', 'Collez sur Facebook, WhatsApp ou Instagram', 'Pastem long Facebook, WhatsApp o Instagram')}
+          {t(
+            'Paste in Facebook comments — tourists see all your deals',
+            'Collez dans les commentaires Facebook — les touristes voient toutes vos offres',
+            'Pastem long Facebook — turis i lukim ol dil blong yu',
+          )}
         </p>
       )}
 
@@ -284,8 +263,42 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
         </div>
       </button>
 
+      {/* Which listing — for scanning when owner has multiple deals */}
+      {showListingPicker && (
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <label
+            htmlFor="simple-hub-listing"
+            className="mb-2 block text-[11px] font-bold uppercase tracking-wide text-gray-500"
+          >
+            {t('Which listing to scan?', 'Quelle annonce scanner ?', 'Wan listing blong skanem?')}
+          </label>
+          <div className="relative">
+            <select
+              id="simple-hub-listing"
+              value={selectedListingId}
+              onChange={(e) => onSelectListing(e.target.value)}
+              className="w-full min-h-[48px] appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3.5 pr-11 text-base font-semibold text-gray-900 focus:border-teal-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              {scanListingOptions.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {(l.name || 'Listing').trim()}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" aria-hidden />
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            {t(
+              'Only needed when scanning — your shared link shows all deals',
+              'Uniquement pour le scan — votre lien partagé montre toutes les offres',
+              'Blong skanem nomo — link blong yu i soem ol dil',
+            )}
+          </p>
+        </div>
+      )}
+
       {/* More options */}
-      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         <button
           type="button"
           onClick={() => setMoreOpen((v) => !v)}

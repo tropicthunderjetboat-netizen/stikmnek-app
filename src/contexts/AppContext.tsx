@@ -15,7 +15,7 @@ import {
 
 import { GeoPosition, haversineDistance } from '@/hooks/useGeolocation';
 import { errorLogger } from '@/lib/errorLogger';
-import { viewFromPathname, type ViewMode } from '@/utils/viewModes';
+import { normalizeAppPathname, viewFromPathname, type ViewMode } from '@/utils/viewModes';
 import type { PassProductId } from '@/data/passCatalog';
 import { passProductIdFromDb } from '@/data/passCatalog';
 import { clampPartySize, MAX_PARTY_SIZE } from '@/data/pricing';
@@ -933,7 +933,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [setCurrentView]);
 
   /** After sign-in: hub if a `businesses` row exists, otherwise profile setup (step 2). */
-  const redirectBusinessUserAfterAuth = useCallback(async (userId: string) => {
+  const redirectBusinessUserAfterAuth = useCallback(async (userId: string, options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
     try {
       const { data, error } = await supabase
         .from('businesses')
@@ -949,26 +950,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const needsListing = await checkBusinessOwnerNeedsFirstListing(supabase, userId);
         setBusinessOwnerNeedsFirstListing(needsListing);
         setCurrentView('business-dashboard');
-        if (needsListing) {
-          toast.success(
-            'Welcome back! Submit your first deal next — photos, prices, and discount.',
-          );
+        if (!silent) {
+          if (needsListing) {
+            toast.success(
+              'Welcome back! Submit your first deal next — photos, prices, and discount.',
+            );
+            window.setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('switch-dashboard-tab', { detail: { tab: 'submit' } }));
+            }, 150);
+          } else {
+            toast.success('Welcome back!');
+          }
+        } else if (needsListing) {
           window.setTimeout(() => {
             window.dispatchEvent(new CustomEvent('switch-dashboard-tab', { detail: { tab: 'submit' } }));
           }, 150);
-        } else {
-          toast.success('Welcome back!');
         }
       } else {
         setBusinessOwnerNeedsFirstListing(false);
-        toast.success('Welcome! Set up your business profile to continue.');
+        if (!silent) {
+          toast.success('Welcome! Set up your business profile to continue.');
+        }
         setCurrentView('complete-business-profile');
       }
     } catch (err) {
       console.warn('[redirectBusinessUserAfterAuth]', err);
       setBusinessOwnerHasBusinessRow(null);
       setBusinessOwnerNeedsFirstListing(null);
-      toast.success('Welcome! Set up your business profile to continue.');
+      if (!silent) {
+        toast.success('Welcome! Set up your business profile to continue.');
+      }
       setCurrentView('complete-business-profile');
     }
   }, [setCurrentView]);
@@ -1089,6 +1100,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else {
           redirectForRole(role);
         }
+      } else if (
+        role === 'business' &&
+        typeof window !== 'undefined' &&
+        normalizeAppPathname(window.location.pathname) === '/' &&
+        viewFromPathname(window.location.pathname) === 'home'
+      ) {
+        // Returning owners opening the app at `/` go straight to My Business (no toast).
+        await redirectBusinessUserAfterAuth(authUser.id, { silent: true });
       }
     } catch (err) {
       console.error('[handleAuthenticatedUser] CRITICAL ERROR:', err);
