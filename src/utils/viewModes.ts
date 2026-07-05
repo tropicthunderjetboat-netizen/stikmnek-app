@@ -51,7 +51,10 @@ export const PATH_TO_VIEW: Record<string, ViewMode> = {
 /** Shareable per-deal route: `/deal/<readable-title>-<offeringId>`. */
 export const DEAL_PATH_RE = /^\/deal\/(.+)$/;
 
-/** Shareable business profile route: `/host/<readable-name>-<profileBusinessId>`. */
+/** Shareable business profile: `/partner/<name>-<id>` (legacy `/host/...` still works). */
+export const PARTNER_PATH_RE = /^\/partner\/(.+)$/;
+
+/** @deprecated Legacy business profile URLs */
 export const HOST_PATH_RE = /^\/host\/(.+)$/;
 
 /** Returns the deal slug if `pathname` is a `/deal/:slug` route, else null. */
@@ -60,11 +63,15 @@ export function dealSlugFromPathname(pathname: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
-/** Returns the host profile slug if `pathname` is a `/host/:slug` route, else null. */
-export function hostSlugFromPathname(pathname: string): string | null {
-  const m = normalizeAppPathname(pathname).match(HOST_PATH_RE);
+/** Returns the partner profile slug from `/partner/:slug` or legacy `/host/:slug`. */
+export function partnerSlugFromPathname(pathname: string): string | null {
+  const p = normalizeAppPathname(pathname);
+  const m = p.match(PARTNER_PATH_RE) || p.match(HOST_PATH_RE);
   return m ? decodeURIComponent(m[1]) : null;
 }
+
+/** @deprecated Use partnerSlugFromPathname */
+export const hostSlugFromPathname = partnerSlugFromPathname;
 
 export function viewFromPathname(pathname: string): ViewMode | null {
   if (dealSlugFromPathname(pathname)) return 'business-detail';

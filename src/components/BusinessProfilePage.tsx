@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import { fetchBusinessProfilePage, type BusinessProfilePageData } from '@/lib/loadListings';
+import { absoluteBusinessProfileUrl, businessProfilePath } from '@/lib/businessProfileUrl';
 import BusinessProfileLogo from '@/components/BusinessProfileLogo';
 import BusinessCard from '@/components/BusinessCard';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
-import { MapPin, Star, Store } from 'lucide-react';
+import { MapPin, Star, Store, Sparkles, ArrowRight } from 'lucide-react';
 
 interface BusinessProfilePageProps {
   profileBusinessId: string;
@@ -42,6 +44,15 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({ profileBusine
       cancelled = true;
     };
   }, [profileBusinessId]);
+
+  /** Canonical `/partner/...` URL (migrates legacy `/host/...` shares). */
+  useEffect(() => {
+    if (!profile) return;
+    const canonical = businessProfilePath({ id: profile.id, name: profile.name });
+    if (typeof window !== 'undefined' && window.location.pathname !== canonical) {
+      navigate(canonical, { replace: true });
+    }
+  }, [profile, navigate]);
 
   if (loading) {
     return (
@@ -81,18 +92,47 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({ profileBusine
     );
   }
 
+  const metaTitle = `${profile.name} · Deals on StikmNek`;
+  const metaDescription = t(
+    `${profile.offerings.length} live deal${profile.offerings.length === 1 ? '' : 's'} from ${profile.name}${profile.location ? ` in ${profile.location}` : ''}. Book tours, dining & activities in Vanuatu.`,
+    `${profile.offerings.length} offre${profile.offerings.length === 1 ? '' : 's'} en ligne de ${profile.name}. Réservez tours, restaurants et activités au Vanuatu.`,
+    `${profile.offerings.length} live dil from ${profile.name}. Bukim tour, kakae mo aktiviti long Vanuatu.`,
+  );
+  const metaUrl = absoluteBusinessProfileUrl({ id: profile.id, name: profile.name });
+  const metaImage = (profile.logoUrl || profile.offerings[0]?.image || '').trim();
+  const coverImage =
+    metaImage && !metaImage.startsWith('http')
+      ? `${typeof window !== 'undefined' ? window.location.origin : 'https://www.stikmnek.com'}${metaImage.startsWith('/') ? '' : '/'}${metaImage}`
+      : metaImage;
+
   return (
     <div className="pt-16 pb-16 min-h-screen bg-gray-50/80">
+      <Helmet prioritizeSeoTags>
+        <title>{metaTitle}</title>
+        <meta name="description" content={metaDescription} />
+        <link rel="canonical" href={metaUrl} />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="StikmNek" />
+        <meta property="og:title" content={metaTitle} />
+        <meta property="og:description" content={metaDescription} />
+        <meta property="og:url" content={metaUrl} />
+        {coverImage && <meta property="og:image" content={coverImage} />}
+        <meta name="twitter:card" content={coverImage ? 'summary_large_image' : 'summary'} />
+        <meta name="twitter:title" content={metaTitle} />
+        <meta name="twitter:description" content={metaDescription} />
+        {coverImage && <meta name="twitter:image" content={coverImage} />}
+      </Helmet>
+
       <div className="bg-gradient-to-br from-teal-700 via-emerald-700 to-teal-800 text-white">
         <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-          <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-center sm:gap-8 sm:text-left">
-            <div className="flex w-full shrink-0 justify-center sm:w-auto sm:justify-start">
+          <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:gap-8 sm:text-left">
+            {profile.logoUrl ? (
               <BusinessProfileLogo
                 src={profile.logoUrl}
                 alt={profile.name}
                 variant="profilePage"
               />
-            </div>
+            ) : null}
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold uppercase tracking-widest text-white/60">
                 {t('StikmNek Partner', 'Partenaire StikmNek', 'StikmNek Partner')}
@@ -139,6 +179,38 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({ profileBusine
             <BusinessCard key={biz.id} business={biz} />
           ))}
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setCurrentView('deals');
+            navigate('/deals');
+          }}
+          className="group relative mt-10 w-full overflow-hidden rounded-3xl bg-gradient-to-br from-teal-600 via-emerald-600 to-cyan-600 p-6 text-left text-white shadow-xl shadow-teal-300/40 transition-all hover:shadow-2xl active:scale-[0.98] sm:p-8"
+        >
+          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10" />
+          <div className="relative flex items-center gap-5">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white/20 shadow-lg">
+              <Sparkles className="h-7 w-7" strokeWidth={2.25} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold uppercase tracking-widest text-white/75">
+                {t('Explore Vanuatu', 'Explorez le Vanuatu', 'Lukim Vanuatu')}
+              </p>
+              <h3 className="mt-1 text-xl font-extrabold sm:text-2xl">
+                {t('Discover more deals on StikmNek', 'Plus d’offres sur StikmNek', 'Faenem moa dil long StikmNek')}
+              </h3>
+              <p className="mt-1.5 text-sm text-white/85">
+                {t(
+                  'Tours, dining, spa, shopping & more — save with a StikmNek pass',
+                  'Tours, restaurants, spa, shopping et plus — économisez avec un pass StikmNek',
+                  'Tour, kakae, spa mo moa — savem wetem StikmNek pas',
+                )}
+              </p>
+            </div>
+            <ArrowRight className="h-7 w-7 shrink-0 text-white/90 transition-transform group-hover:translate-x-1" />
+          </div>
+        </button>
       </div>
     </div>
   );

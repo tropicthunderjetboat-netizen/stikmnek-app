@@ -5,13 +5,13 @@ import { useAppContext, isTouristProfileCompleteForGate } from '@/contexts/AppCo
 import { canAccessAdminPanel } from '@/lib/adminRoles';
 import {
   dealSlugFromPathname,
-  hostSlugFromPathname,
+  partnerSlugFromPathname,
   isRoutableAppPath,
   viewFromPathname,
   type ViewMode,
 } from '@/utils/viewModes';
 import { dealSlugForBusiness, offeringIdFromDealSlug } from '@/lib/dealUrl';
-import { businessIdFromHostSlug } from '@/lib/businessProfileUrl';
+import { businessIdFromPartnerSlug } from '@/lib/businessProfileUrl';
 import { fetchOfferingById } from '@/lib/loadListings';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import LegalDocumentPage from './LegalDocumentPage';
@@ -293,16 +293,16 @@ const AppLayout: React.FC = () => {
     // it would re-run the effect and loop on a failed lookup.
   }, [location.pathname, dbBusinesses, dataLoaded, selectedBusiness, setSelectedBusiness]);
 
-  // ─── Deep-link resolver for /host/:slug (business profile page) ───
+  // ─── Deep-link resolver for /partner/:slug (business profile page) ───
   useEffect(() => {
-    const slug = hostSlugFromPathname(location.pathname);
+    const slug = partnerSlugFromPathname(location.pathname);
     if (!slug) {
       setHostProfileId(null);
       setHostProfileNotFound(false);
       return;
     }
 
-    const profileId = businessIdFromHostSlug(slug);
+    const profileId = businessIdFromPartnerSlug(slug);
     if (!profileId) {
       if (dataLoaded) setHostProfileNotFound(true);
       setHostProfileId(null);
@@ -449,7 +449,7 @@ const AppLayout: React.FC = () => {
       }
       case 'business-profile': {
         if (hostProfileNotFound || !hostProfileId) {
-          if (hostSlugFromPathname(location.pathname) && !hostProfileId && !hostProfileNotFound) {
+          if (partnerSlugFromPathname(location.pathname) && !hostProfileId && !hostProfileNotFound) {
             return (
               <div className="pt-16">
                 <LoadingSkeleton />

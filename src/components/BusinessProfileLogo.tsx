@@ -45,11 +45,11 @@ const VARIANT: Record<
     img: 'w-full h-full object-cover object-center',
     fallbackIcon: 'w-8 h-8',
   },
-  /** Public `/host/...` business page — large showcase for wide wordmarks */
+  /** Public `/partner/...` business page — logo hugs its natural size on mobile */
   profilePage: {
     wrap:
-      'h-[5.5rem] sm:h-28 w-[min(100%,18rem)] sm:w-80 rounded-2xl bg-white px-4 py-3 shadow-xl ring-2 ring-white/40',
-    img: 'h-full w-full object-contain object-center',
+      'inline-flex max-w-[calc(100vw-2.5rem)] items-center justify-center rounded-2xl bg-white px-3 py-2.5 shadow-xl ring-2 ring-white/40 sm:px-5 sm:py-3.5',
+    img: 'h-14 sm:h-[4.5rem] w-auto max-w-[min(calc(100vw-4rem),22rem)] object-contain object-center',
     fallbackIcon: 'w-10 h-10',
   },
 };
@@ -95,6 +95,7 @@ const BusinessProfileLogo: React.FC<BusinessProfileLogoProps> = ({
   }
 
   const isSidebar = variant === 'sidebar';
+  const isProfilePage = variant === 'profilePage';
 
   return (
     <div

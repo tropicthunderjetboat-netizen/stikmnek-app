@@ -126,6 +126,10 @@ interface UnifiedBusiness {
   _createdAt?: string;
   /** `public.businesses.id` when this row is a `business_offerings` listing */
   _profileBusinessId?: string;
+  /** Master profile trading name (from `businesses.name`) when row is an offering */
+  _profileDisplayName?: string;
+  /** Master profile logo (`businesses.logo_url`) when row is an offering */
+  _profileLogoUrl?: string;
   /** From `business_offerings.pricing_tiers` (or profile fallback); drives edit-listing tier editor. */
   pricingTiers?: unknown;
   /** Offering or profile map link (prefill full listing form). */
@@ -148,6 +152,9 @@ function mapOfferingRowToUnified(
   return {
     id: String(o.id),
     _profileBusinessId: pid,
+    _profileDisplayName: String(profile.name ?? '').trim() || undefined,
+    _profileLogoUrl:
+      String((profile.logo_url as string) || (profile.image as string) || '').trim() || undefined,
     name: listingDisplayTitleFromOfferingRow(o.title, profile.name),
     category: listingCategoryFromOffering(o, profile.category),
     description: String(o.description ?? ''),
@@ -884,17 +891,23 @@ const BusinessOwnerDashboard: React.FC = () => {
   }, [unifiedBusinesses, selectedProfileId]);
 
   /** Master profile row — company name + logo for Simple Hub header and share link. */
-  const profileCompanyRow = useMemo(() => {
-    if (!selectedProfileId) return null;
-    return (
-      approvedListingsSameProfile.find((b) => String(b.id) === String(selectedProfileId)) ??
-      unifiedBusinesses.find(
-        (b) =>
-          b._source === 'approved' &&
-          String(b.id) === String(selectedProfileId),
-      ) ??
-      null
+  const profileCompanyMeta = useMemo(() => {
+    if (!selectedProfileId) return { name: '', logo: null as string | null };
+    const stub = unifiedBusinesses.find(
+      (b) => b._source === 'approved' && String(b.id) === String(selectedProfileId),
     );
+    if (stub) {
+      return { name: (stub.name || '').trim(), logo: stub.image || null };
+    }
+    const offeringRow =
+      approvedListingsSameProfile.find(
+        (b) => String(b._profileBusinessId ?? '') === String(selectedProfileId),
+      ) ?? approvedListingsSameProfile[0];
+    if (!offeringRow) return { name: '', logo: null };
+    return {
+      name: (offeringRow._profileDisplayName || '').trim(),
+      logo: offeringRow._profileLogoUrl || offeringRow.image || null,
+    };
   }, [approvedListingsSameProfile, unifiedBusinesses, selectedProfileId]);
 
   /** Profile row id for business-wide settings (not tied to which listing is selected). */
@@ -2450,8 +2463,8 @@ const BusinessOwnerDashboard: React.FC = () => {
             {/* Overview tab — approved business: scanner-first Simple Hub */}
             {activeTab === 'overview' && selectedBusiness && selectedIsApproved && (
               <BusinessSimpleHub
-                profileCompanyName={profileCompanyRow?.name?.trim() || 'Your business'}
-                profileLogoUrl={profileCompanyRow?.image || null}
+                profileCompanyName={profileCompanyMeta.name || selectedBusiness?.name || 'Business'}
+                profileLogoUrl={profileCompanyMeta.logo}
                 profileBusinessId={selectedProfileId}
                 listingOptions={approvedListingsSameProfile.map((b) => ({
                   id: b.id,
