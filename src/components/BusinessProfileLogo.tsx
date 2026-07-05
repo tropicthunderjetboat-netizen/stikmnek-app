@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type BusinessProfileLogoVariant = 'hero' | 'inline' | 'chip' | 'sidebar';
+export type BusinessProfileLogoVariant = 'hero' | 'inline' | 'chip' | 'sidebar' | 'profilePage';
 
 type BusinessProfileLogoProps = {
   src: string | null | undefined;
@@ -45,6 +45,13 @@ const VARIANT: Record<
     img: 'w-full h-full object-cover object-center',
     fallbackIcon: 'w-8 h-8',
   },
+  /** Public `/host/...` business page — large showcase for wide wordmarks */
+  profilePage: {
+    wrap:
+      'h-[5.5rem] sm:h-28 w-[min(100%,18rem)] sm:w-80 rounded-2xl bg-white px-4 py-3 shadow-xl ring-2 ring-white/40',
+    img: 'h-full w-full object-contain object-center',
+    fallbackIcon: 'w-10 h-10',
+  },
 };
 
 /**
@@ -63,6 +70,20 @@ const BusinessProfileLogo: React.FC<BusinessProfileLogoProps> = ({
 
   if (!trimmed || failed) {
     if (variant === 'hero' || variant === 'sidebar') return null;
+    if (variant === 'profilePage') {
+      return (
+        <div
+          className={cn(
+            'flex shrink-0 items-center justify-center text-teal-600/40',
+            styles.wrap,
+            className,
+          )}
+          aria-hidden
+        >
+          <Store className={styles.fallbackIcon} />
+        </div>
+      );
+    }
     return (
       <div
         className={cn('flex shrink-0 items-center justify-center text-gray-300', styles.wrap, className)}

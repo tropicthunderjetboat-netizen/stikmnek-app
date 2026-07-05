@@ -3,9 +3,9 @@ import { useAppContext } from '@/contexts/AppContext';
 import { absoluteBusinessProfileUrl } from '@/lib/businessProfileUrl';
 import BusinessProfileLogo from '@/components/BusinessProfileLogo';
 import {
-  ScanLine, Edit3, Link2, Share2, ChevronDown, ChevronUp,
+  ScanLine, Edit3, Share2, ChevronDown, ChevronUp,
   BarChart3, MessageSquare, Image, Plus, ClipboardList,
-  ShieldCheck, Building2, Mail, CheckCircle,
+  ShieldCheck, Building2, Mail, CheckCircle, Sparkles,
 } from 'lucide-react';
 
 interface ListingOption {
@@ -154,8 +154,8 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
           <BusinessProfileLogo
             src={profileLogoUrl}
             alt={profileCompanyName}
-            variant="sidebar"
-            className="h-12 w-12 shrink-0 rounded-xl shadow-md shadow-teal-200/40"
+            variant="inline"
+            className="h-14 min-w-[3.5rem] max-w-[5.5rem] shrink-0 shadow-md shadow-teal-200/30"
           />
           <div className="min-w-0 flex-1">
             <p className="truncate text-lg font-extrabold text-gray-900">
@@ -204,46 +204,64 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
         </div>
       </button>
 
-      {/* Copy / share business page (all listings) */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* Copy / share business page — one link for all listings (Facebook comments) */}
+      <button
+        type="button"
+        onClick={handleCopyLink}
+        disabled={!businessPageUrl}
+        className={`group relative w-full overflow-hidden rounded-3xl p-5 text-left shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 sm:p-6 ${
+          copied
+            ? 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-300/40'
+            : 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 shadow-orange-300/50 hover:shadow-2xl hover:shadow-orange-400/50'
+        }`}
+      >
+        <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/15" />
+        <div className="absolute -bottom-8 -left-4 h-20 w-20 rounded-full bg-white/10" />
+        <div className="relative flex items-start gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/30 bg-white/20 shadow-lg backdrop-blur-sm">
+            {copied ? (
+              <CheckCircle className="h-8 w-8 text-white" strokeWidth={2.25} />
+            ) : (
+              <Sparkles className="h-7 w-7 text-white" strokeWidth={2.25} />
+            )}
+          </div>
+          <div className="min-w-0 flex-1 text-white">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-white/80">
+              {copied
+                ? t('Link copied!', 'Lien copié !', 'Link i kopim!')
+                : t('Tap to copy', 'Appuyez pour copier', 'Jusum blong kopim')}
+            </p>
+            <h3 className="mt-1 text-lg font-extrabold leading-snug sm:text-xl">
+              {copied
+                ? t('Paste in Facebook now', 'Collez sur Facebook', 'Pastem long Facebook')
+                : t('Share all your deals on Facebook', 'Partagez toutes vos offres', 'Serem ol dil blong yu')}
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-white/90">
+              {copied
+                ? t(
+                    'Open Facebook, find a comment to reply to, and paste your link. Tourists will see every listing at once.',
+                    'Ouvrez Facebook, répondez à un commentaire et collez le lien. Les touristes verront toutes vos offres.',
+                    'Openem Facebook, pastem link. Turis i lukim evri listing blong yu.',
+                  )
+                : t(
+                    'Copy your business page link and paste it in Facebook comments — one link shows tourists all your listings at once.',
+                    'Copiez le lien de votre page et collez-le dans les commentaires Facebook — une seule lien pour toutes vos offres.',
+                    'Kopim link blong business pej blong yu mo pastem long Facebook — wan link i soem ol listing blong yu.',
+                  )}
+            </p>
+          </div>
+        </div>
+      </button>
+      {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
         <button
           type="button"
-          onClick={handleCopyLink}
+          onClick={handleNativeShare}
           disabled={!businessPageUrl}
-          className="flex min-h-[56px] items-center justify-center gap-3 rounded-2xl border-2 border-teal-200 bg-white px-5 py-4 font-bold text-teal-800 shadow-sm transition-all hover:border-teal-300 hover:bg-teal-50 active:scale-[0.98] disabled:opacity-50"
+          className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-800 transition-all hover:bg-orange-100 active:scale-[0.98] disabled:opacity-50"
         >
-          {copied ? (
-            <>
-              <CheckCircle className="h-6 w-6 text-green-600" />
-              <span className="text-green-700">{t('Copied!', 'Copié !', 'Kopim!')}</span>
-            </>
-          ) : (
-            <>
-              <Link2 className="h-6 w-6 text-teal-600" />
-              <span>{t('Copy business page', 'Copier la page', 'Kopim business pej')}</span>
-            </>
-          )}
+          <Share2 className="h-5 w-5" />
+          <span>{t('Or share directly from your phone', 'Ou partager depuis le téléphone', 'O share direct long fon')}</span>
         </button>
-        {typeof navigator !== 'undefined' && typeof navigator.share === 'function' && (
-          <button
-            type="button"
-            onClick={handleNativeShare}
-            disabled={!businessPageUrl}
-            className="flex min-h-[56px] items-center justify-center gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 font-bold text-gray-800 shadow-sm transition-all hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98] disabled:opacity-50"
-          >
-            <Share2 className="h-6 w-6 text-gray-600" />
-            <span>{t('Share', 'Partager', 'Serem')}</span>
-          </button>
-        )}
-      </div>
-      {copied && (
-        <p className="-mt-2 text-center text-xs text-gray-500">
-          {t(
-            'Paste in Facebook comments — tourists see all your deals',
-            'Collez dans les commentaires Facebook — les touristes voient toutes vos offres',
-            'Pastem long Facebook — turis i lukim ol dil blong yu',
-          )}
-        </p>
       )}
 
       {/* Edit listing */}
