@@ -126,13 +126,15 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({ profileBusine
       <div className="bg-gradient-to-br from-teal-700 via-emerald-700 to-teal-800 text-white">
         <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
           <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:gap-8 sm:text-left">
-            {profile.logoUrl ? (
-              <BusinessProfileLogo
-                src={profile.logoUrl}
-                alt={profile.name}
-                variant="profilePage"
-              />
-            ) : null}
+            <div className="w-full max-w-md mx-auto sm:mx-0 sm:max-w-[20rem]">
+              {profile.logoUrl ? (
+                <BusinessProfileLogo
+                  src={profile.logoUrl}
+                  alt={profile.name}
+                  variant="profilePage"
+                />
+              ) : null}
+            </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold uppercase tracking-widest text-white/60">
                 {t('StikmNek Partner', 'Partenaire StikmNek', 'StikmNek Partner')}

@@ -45,11 +45,11 @@ const VARIANT: Record<
     img: 'w-full h-full object-cover object-center',
     fallbackIcon: 'w-8 h-8',
   },
-  /** Public `/partner/...` business page — logo hugs its natural size on mobile */
+  /** Public `/partner/...` business page — wide banner tile; logo scales to fill */
   profilePage: {
     wrap:
-      'inline-flex max-w-[calc(100vw-2.5rem)] items-center justify-center rounded-2xl bg-white px-3 py-2.5 shadow-xl ring-2 ring-white/40 sm:px-5 sm:py-3.5',
-    img: 'h-14 sm:h-[4.5rem] w-auto max-w-[min(calc(100vw-4rem),22rem)] object-contain object-center',
+      'w-full aspect-[2.35/1] max-h-[7.25rem] sm:max-h-[8.5rem] rounded-2xl bg-white shadow-xl ring-2 ring-white/40 overflow-hidden grid place-items-center',
+    img: 'block h-full w-full max-h-full max-w-full object-contain object-center p-1 scale-[1.28] sm:scale-[1.2]',
     fallbackIcon: 'w-10 h-10',
   },
 };
@@ -101,7 +101,7 @@ const BusinessProfileLogo: React.FC<BusinessProfileLogoProps> = ({
     <div
       className={cn(
         'flex items-center justify-center',
-        isSidebar ? 'w-full h-full shrink' : 'shrink-0',
+        isSidebar ? 'w-full h-full shrink' : isProfilePage ? 'w-full shrink-0' : 'shrink-0',
         styles.wrap,
         className,
       )}
