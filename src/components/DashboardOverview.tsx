@@ -9,6 +9,7 @@ import {
   Globe, Target, Award, Sparkles, Activity, ShoppingBag, ScanLine,
   Plus, Home, ShieldCheck
 } from 'lucide-react';
+import { absoluteDealUrl } from '@/lib/dealUrl';
 import {
   looksLikeRichDescriptionHtml,
   sanitizeBusinessDescriptionHtml,
@@ -97,7 +98,7 @@ const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   ];
 
   const handleShare = () => {
-    const url = `${window.location.origin}?business=${selectedBusiness.id}`;
+    const url = absoluteDealUrl(selectedBusiness);
     navigator.clipboard.writeText(url).then(() => {
       setShowShareTooltip(true);
       setTimeout(() => setShowShareTooltip(false), 2000);

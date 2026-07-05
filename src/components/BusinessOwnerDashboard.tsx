@@ -12,17 +12,17 @@ import {
   ArrowDownRight, Calendar, MapPin, Phone, Mail, Tag, Trash2,
   RefreshCw, ShieldCheck, History, ArrowRight, Info, ClipboardList,
   BellRing, ChevronDown, LayoutDashboard, Menu, ArrowLeft,
-  Sparkles, Settings, LogOut, Zap, Wifi, ScanLine, Building2
+  Sparkles, Settings, LogOut, Zap, Wifi, ScanLine, Building2, Home
 } from 'lucide-react';
 import EmailNotificationCenter from './EmailNotificationCenter';
 import PhotoUploader, { UploadedPhoto } from './PhotoUploader';
 import MySubmissions from './MySubmissions';
-import DashboardOverview from './DashboardOverview';
 import BusinessProfileSettings from './BusinessProfileSettings';
 import BusinessCredentialsSettings from './BusinessCredentialsSettings';
 import PricingDiscountFields, { DURATION_OPTIONS, addDays, todayStr } from './PricingDiscountFields';
 import QRScanner from './QRScanner';
 import BusinessHomeScreen from './BusinessHomeScreen';
+import BusinessSimpleHub from './BusinessSimpleHub';
 import DealExpiryWarningBanner from './DealExpiryWarningBanner';
 import PricingTiersEditor from './PricingTiersEditor';
 import {
@@ -1613,9 +1613,16 @@ const BusinessOwnerDashboard: React.FC = () => {
   };
 
   // ═══ SIDEBAR NAV ITEMS ═══
-  const navItems: { key: DashboardTab; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { key: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-5 h-5" /> },
-    ...(resolvedProfileBusinessId
+  const simpleHubNav = hasApprovedListingOffering && !ownerDataLoading;
+  const submissionsBadge =
+    unseenSubmissionChanges > 0
+      ? String(unseenSubmissionChanges)
+      : allSubmissions.length > 0
+        ? String(allSubmissions.length)
+        : undefined;
+
+  const profileNavItems: { key: DashboardTab; label: string; icon: React.ReactNode; badge?: string }[] =
+    resolvedProfileBusinessId
       ? [
           {
             key: 'profile' as const,
@@ -1628,15 +1635,47 @@ const BusinessOwnerDashboard: React.FC = () => {
             icon: <ShieldCheck className="w-5 h-5" />,
           },
         ]
-      : []),
-    { key: 'submissions', label: 'My Submissions', icon: <ClipboardList className="w-5 h-5" />, badge: unseenSubmissionChanges > 0 ? String(unseenSubmissionChanges) : (allSubmissions.length > 0 ? String(allSubmissions.length) : undefined) },
-    { key: 'edit', label: 'Edit Listing', icon: <Edit3 className="w-5 h-5" />, badge: currentPendingEdit ? '!' : undefined },
+      : [];
+
+  const secondaryNavItems: { key: DashboardTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { key: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" /> },
-    { key: 'reviews', label: 'Reviews', icon: <MessageSquare className="w-5 h-5" /> },
+    { key: 'reviews', label: 'Reviews', icon: <MessageSquare className="w-5 h-5" />, badge: businessReviews.length > 0 ? String(businessReviews.length) : undefined },
     { key: 'photos', label: 'Photos', icon: <Image className="w-5 h-5" /> },
+    { key: 'submissions', label: 'My Submissions', icon: <ClipboardList className="w-5 h-5" />, badge: submissionsBadge },
+    ...profileNavItems,
     { key: 'emails', label: 'Emails', icon: <Mail className="w-5 h-5" /> },
     { key: 'submit', label: 'New Listing', icon: <Plus className="w-5 h-5" /> },
   ];
+
+  const navItems: { key: DashboardTab; label: string; icon: React.ReactNode; badge?: string; section?: 'primary' | 'secondary' }[] =
+    simpleHubNav
+      ? [
+          {
+            key: 'overview',
+            label: language === 'en' ? 'Home' : language === 'fr' ? 'Accueil' : 'Hom',
+            icon: <Home className="w-5 h-5" />,
+            section: 'primary',
+          },
+          {
+            key: 'edit',
+            label: 'Edit Listing',
+            icon: <Edit3 className="w-5 h-5" />,
+            badge: currentPendingEdit ? '!' : undefined,
+            section: 'primary',
+          },
+          ...secondaryNavItems.map((item) => ({ ...item, section: 'secondary' as const })),
+        ]
+      : [
+          { key: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-5 h-5" />, section: 'primary' as const },
+          ...profileNavItems.map((item) => ({ ...item, section: 'primary' as const })),
+          { key: 'submissions', label: 'My Submissions', icon: <ClipboardList className="w-5 h-5" />, badge: submissionsBadge, section: 'primary' as const },
+          { key: 'edit', label: 'Edit Listing', icon: <Edit3 className="w-5 h-5" />, badge: currentPendingEdit ? '!' : undefined, section: 'primary' as const },
+          { key: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" />, section: 'primary' as const },
+          { key: 'reviews', label: 'Reviews', icon: <MessageSquare className="w-5 h-5" />, section: 'primary' as const },
+          { key: 'photos', label: 'Photos', icon: <Image className="w-5 h-5" />, section: 'primary' as const },
+          { key: 'emails', label: 'Emails', icon: <Mail className="w-5 h-5" />, section: 'primary' as const },
+          { key: 'submit', label: 'New Listing', icon: <Plus className="w-5 h-5" />, section: 'primary' as const },
+        ];
 
   const handleNavClick = (tab: DashboardTab) => {
     setActiveTab(tab);
@@ -1782,14 +1821,38 @@ const BusinessOwnerDashboard: React.FC = () => {
 
         <nav className="flex-1 overflow-y-auto py-3 px-3">
           <div className="space-y-1">
-            {navItems.map(item => (
-              <button key={item.key} type="button" onClick={() => handleNavClick(item.key)} className={`w-full flex min-h-11 items-center gap-3 rounded-xl transition-all relative ${sidebarCollapsed && !isMobile ? 'justify-center px-3 py-3' : 'px-3.5 py-2.5'} ${activeTab === item.key ? 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 font-semibold shadow-sm border border-teal-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`} title={sidebarCollapsed && !isMobile ? item.label : undefined}>
-                <span className={activeTab === item.key ? 'text-teal-600' : 'text-gray-400'}>{item.icon}</span>
-                {(!sidebarCollapsed || isMobile) && <span className="text-sm flex-1 text-left">{item.label}</span>}
-                {item.badge && (!sidebarCollapsed || isMobile) && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeTab === item.key ? 'bg-teal-200 text-teal-800' : 'bg-orange-100 text-orange-600'}`}>{item.badge}</span>}
-                {item.badge && sidebarCollapsed && !isMobile && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-orange-500 border-2 border-white" />}
-              </button>
-            ))}
+            {navItems.map((item, index) => {
+              const showMoreDivider =
+                simpleHubNav &&
+                item.section === 'secondary' &&
+                (index === 0 || navItems[index - 1]?.section === 'primary');
+              return (
+                <React.Fragment key={item.key}>
+                  {showMoreDivider && (
+                    <p className="px-3.5 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      {language === 'en' ? 'More' : language === 'fr' ? 'Plus' : 'Mo'}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleNavClick(item.key)}
+                    className={`w-full flex min-h-11 items-center gap-3 rounded-xl transition-all relative ${sidebarCollapsed && !isMobile ? 'justify-center px-3 py-3' : 'px-3.5 py-2.5'} ${activeTab === item.key ? 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-700 font-semibold shadow-sm border border-teal-100' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
+                    title={sidebarCollapsed && !isMobile ? item.label : undefined}
+                  >
+                    <span className={activeTab === item.key ? 'text-teal-600' : 'text-gray-400'}>{item.icon}</span>
+                    {(!sidebarCollapsed || isMobile) && <span className="text-sm flex-1 text-left">{item.label}</span>}
+                    {item.badge && (!sidebarCollapsed || isMobile) && (
+                      <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeTab === item.key ? 'bg-teal-200 text-teal-800' : 'bg-orange-100 text-orange-600'}`}>
+                        {item.badge}
+                      </span>
+                    )}
+                    {item.badge && sidebarCollapsed && !isMobile && (
+                      <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-orange-500 border-2 border-white" />
+                    )}
+                  </button>
+                </React.Fragment>
+              );
+            })}
           </div>
         </nav>
         <div className="border-t border-gray-100 p-3 space-y-1">
@@ -2227,7 +2290,7 @@ const BusinessOwnerDashboard: React.FC = () => {
         <div className="flex items-center justify-between px-4 h-16">
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)} className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors" aria-label="Open menu"><Menu className="w-5 h-5 text-gray-700" /></button>
-            <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center"><Store className="w-4 h-4 text-white" /></div><span className="font-bold text-gray-900 text-sm">Dashboard</span></div>
+            <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center"><Store className="w-4 h-4 text-white" /></div><span className="font-bold text-gray-900 text-sm">{simpleHubNav ? (language === 'en' ? 'My Business' : language === 'fr' ? 'Mon entreprise' : 'Bisnis blong mi') : 'Dashboard'}</span></div>
           </div>
           <button type="button" onClick={() => setCurrentView('home')} className="min-h-11 min-w-11 inline-flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors" aria-label="Back to site"><ArrowLeft className="w-5 h-5 text-gray-500" /></button>
         </div>
@@ -2247,8 +2310,9 @@ const BusinessOwnerDashboard: React.FC = () => {
 
         {/* Main Content */}
         <div className={`flex-1 min-w-0 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
-          <div className="pt-20 lg:pt-8 pb-28 lg:pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-w-0">
-            {/* Desktop Header */}
+          <div className={`pt-20 lg:pt-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-w-0 ${simpleHubNav && activeTab === 'overview' && selectedIsApproved ? 'pb-8 lg:pb-12' : 'pb-28 lg:pb-16'}`}>
+            {/* Desktop Header — hidden on simple home for approved owners */}
+            {!(simpleHubNav && activeTab === 'overview' && selectedIsApproved) && (
             <div className="hidden lg:flex items-center justify-between mb-8">
               <div>
                 <h1 className="text-2xl font-extrabold text-gray-900">{navItems.find(n => n.key === activeTab)?.label || 'Dashboard'}</h1>
@@ -2308,6 +2372,7 @@ const BusinessOwnerDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+            )}
 
 
             {/* ═══ DEAL EXPIRY WARNING BANNER ═══ */}
@@ -2368,9 +2433,25 @@ const BusinessOwnerDashboard: React.FC = () => {
             )}
 
             {/* Tab Content */}
-            {/* Overview tab — approved business: show full DashboardOverview */}
+            {/* Overview tab — approved business: scanner-first Simple Hub */}
             {activeTab === 'overview' && selectedBusiness && selectedIsApproved && (
-              <DashboardOverview selectedBusiness={selectedBusiness as any} totalRedemptions={totalRedemptions} totalRevenue={totalRevenue} businessReviews={businessReviews} pendingBusinesses={pendingBusinesses} currentPendingEdit={currentPendingEdit} onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)} onToggleActive={handleToggleActive} onOpenScanner={() => setShowScanner(true)} hasBusinessProfile={Boolean(resolvedProfileBusinessId)} />
+              <BusinessSimpleHub
+                businessName={selectedBusiness.name || 'Your listing'}
+                listingOptions={approvedListingsSameProfile.map((b) => ({
+                  id: b.id,
+                  name: b.name || 'Listing',
+                  image: b.image,
+                  isProfileRow: String(b.id) === String(selectedProfileId),
+                }))}
+                selectedListingId={selectedBusinessId}
+                onSelectListing={setSelectedBusinessId}
+                profileBusinessId={selectedProfileId}
+                reviewCount={businessReviews.length}
+                submissionBadge={submissionsBadge}
+                hasBusinessProfile={Boolean(resolvedProfileBusinessId)}
+                onOpenScanner={() => setShowScanner(true)}
+                onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)}
+              />
             )}
             {activeTab === 'profile' && resolvedProfileBusinessId && (
               <BusinessProfileSettings
@@ -2481,7 +2562,8 @@ const BusinessOwnerDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Action Button - Scan QR Code */}
+      {/* Floating Action Button - Scan QR (hidden on Simple Hub home where scan is the hero) */}
+      {!(simpleHubNav && activeTab === 'overview' && selectedIsApproved) && (
       <button
         onClick={() => setShowScanner(true)}
         className="fixed bottom-6 right-6 z-50 group flex items-center gap-2 pl-4 pr-5 py-3.5 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-semibold shadow-xl shadow-teal-300/40 hover:shadow-2xl hover:shadow-teal-400/50 hover:from-teal-500 hover:to-emerald-500 active:scale-95 transition-all duration-200"
@@ -2494,6 +2576,7 @@ const BusinessOwnerDashboard: React.FC = () => {
         </div>
         <span className="text-sm hidden sm:inline">Scan QR</span>
       </button>
+      )}
 
       {showScanner && (
         <QRScanner

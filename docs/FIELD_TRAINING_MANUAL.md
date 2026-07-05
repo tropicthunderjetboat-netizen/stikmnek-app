@@ -1,414 +1,252 @@
-# StikmNek Field Training Manual
+# StikmNek Field Agent Training Manual
 
-**Who this is for:** The person we hire to walk into businesses, sign them up, and teach owners and staff how to use StikmNek — especially **listing their business** and **scanning tourist pass QR codes**.
+**For:** Field agents who visit businesses, sign them up, and teach staff how to scan tourist passes.
 
-**Languages:** Teach in **Bislama** first when the owner is not comfortable in English. English sections below are what you say; Bislama boxes are copy-paste teaching lines.
+**Website:** www.stikmnek.com · **Support:** Andy — +678 7766107 · stikmnek@gmail.com
 
-**Last updated:** June 2026 · Align with `docs/MASTER_AI_PROMPT.md` and in-app Help Center.
+**Updated:** July 2026
+
+**Google Docs version (simple, for agents):** Upload `docs/FIELD_TRAINING_SIMPLE_GOOGLE_DOCS.html` to Google Drive → Open with Google Docs.
 
 ---
 
 ## Table of contents
 
-1. [Your job in one page](#1-your-job-in-one-page)
-2. [What StikmNek is (say this simply)](#2-what-stikmnek-is-say-this-simply)
-3. [Before you visit a business](#3-before-you-visit-a-business)
-4. [Walk-in visit script (15–20 minutes)](#4-walk-in-visit-script-1520-minutes)
-5. [Full training session (45–60 minutes)](#5-full-training-session-4560-minutes)
-6. [Module A — Create account & Business Hub](#module-a--create-account--business-hub)
-7. [Module B — Submit a listing (most important)](#module-b--submit-a-listing-most-important)
-8. [Module C — QR scanner & redemption (most important)](#module-c--qr-scanner--redemption-most-important)
-9. [Module D — After approval (daily use)](#module-d--after-approval-daily-use)
-10. [Listing approval checklist (for you)](#listing-approval-checklist-for-you)
-11. [Common problems & fixes](#common-problems--fixes)
-12. [Objections & honest answers](#objections--honest-answers)
-13. [WhatsApp follow-up templates](#whatsapp-follow-up-templates)
-14. [Handouts & links](#handouts--links)
-15. [Rules you must never break](#rules-you-must-never-break)
+1. [Your job](#1-your-job)
+2. [Getting their interest (introduction)](#2-getting-their-interest-introduction)
+3. [What to bring](#3-what-to-bring)
+4. [Set up on the company phone (Staff → Onboard)](#4-set-up-on-the-company-phone-staff--onboard)
+5. [Teach the owner (their phone + printed QR)](#5-teach-the-owner-their-phone--printed-qr)
+6. [Daily use for owners](#6-daily-use-for-owners)
+7. [Approval checklist](#7-approval-checklist)
+8. [Objections](#8-objections)
+9. [WhatsApp follow-up](#9-whatsapp-follow-up)
+10. [Rules](#10-rules)
+11. [Before you leave](#11-before-you-leave)
 
 ---
 
-## 1. Your job in one page
+## 1. Your job
+
+You visit businesses **in person** with the **StikmNek company phone**.
+
+**Workflow:**
+
+1. **Get their interest** — Part 2
+2. **Set them up** — you do almost everything on the company phone (Staff → **Onboard**)
+3. **Give them their login** — email + password on a card
+4. **Teach them** — sign in on their phone, Business Hub, practice scanning
+5. **Practice scan** — use the **printed StikmNek practice QR code**
 
 | You do | You do not |
 |--------|------------|
-| Visit businesses in person (Port Vila, Luganville, islands when planned) | Promise tourists will come tomorrow |
-| Explain StikmNek in **simple Bislama or English** | Say businesses must pay to list |
-| **Sit with them** and complete sign-up + first listing on **their phone** | Leave after only giving a flyer |
-| Teach **every staff member** who might scan QR codes | Assume the owner will teach staff alone |
-| Practice **one real scan** (demo pass) after approval | Skip camera permission / scan practice |
-| Check listing quality before asking Andy to approve | Approve blurry photos or fake prices |
-| Follow up on WhatsApp within 48 hours | Argue if they are slow — stay patient |
+| Staff login on company phone | Say they must pay to list |
+| Complete Onboard (account + listing) | Promise tourists tomorrow |
+| Approve in **Approvals** after quality check | Approve bad photos or fake prices |
+| Teach scan with printed QR | Leave without finishing setup |
 
-**Success for one business:** Account created → listing submitted → you helped fix any rejection → owner can open scanner and complete a test scan → at least one staff person can repeat the scan steps.
-
-**Support:** Andy / StikmNek — **stikmnek@gmail.com** · **+678 7766107** · **www.stikmnek.com**
+**Done when:** listing live · owner signed in · practice scan completed (printed QR OK).
 
 ---
 
-## 2. What StikmNek is (say this simply)
+## 2. Getting their interest (introduction)
 
-### English (30 seconds)
+### Walk in
 
-> StikmNek is a **free** website and phone app for Vanuatu businesses. Tourists **buy a pass** on their phone (they pay StikmNek — not you). They browse your deal, visit you, and show a **QR code**. You **scan it in your Business Hub** and give them the discount on your menu or tour price. **You never pay to list.** We only make money when tourists buy passes.
+Ask for the **owner or manager**. If busy: *“I only need five minutes — it’s free and it brings tourists to your business.”*
 
-### Bislama (30 seconds)
+### 60-second pitch (learn by heart)
 
-> StikmNek i **fri** blong ol bisnis long Vanuatu. Ol turis i **pem pas** long fon blong ol — ol i no pem yu. Ol i lukluk deels, kam long yu, mo **soem QR kod**. Yu **skanem insaed long app blong bisnis** — yu givim diskaon long praes blong yu. **Yu no pem blong putum bisnis long app.** StikmNek i kisim mani long pas blong turis nomo.
+> “Hi, I’m [name] from **StikmNek**. We’re building the **official tourist discount pass** for Vanuatu. Tourists buy it **before they arrive**, browse businesses on our **map and deals list**, visit you, and show a **QR code**. You **scan it** and charge your **StikmNek price in vatu**.
+>
+> **You never pay us to join.** You choose your discount. We earn when tourists buy the pass — not from you.
+>
+> I can put you on the app **today** in about **15 minutes**. Would you like to be one of the first businesses in [area] on the map?”
 
-### Draw on paper (helps everyone)
+### Three reasons to join
 
-```
-Tourist phone                    Your phone
-┌─────────────┐                 ┌─────────────┐
-│ StikmNek    │    shows QR     │ Business    │
-│ Pass + QR   │ ──────────────► │ Hub Scanner │
-└─────────────┘                 └─────────────┘
-       │                               │
-       │  pays StikmNek (AUD)          │  honors YOUR deal price (VT)
-       ▼                               ▼
-```
+- **Free advertising** — tourists see them before travel
+- **No risk** — they set prices; can turn deal off any day
+- **Early advantage** — listings going live now
+
+### Show them (if you have signal)
+
+Open www.stikmnek.com → **Deals** and **Map**. Say: *“This is where tourists look. We want your business here.”*
+
+### Ask for the yes
+
+> “Can we do your free listing now? I’ll need your name, a few photos, and prices in vatu. I do the typing — you answer questions.”
 
 ---
 
-## 3. Before you visit a business
+## 3. What to bring
 
-**On your phone (trainer kit):**
+**Company phone:** charged · signed in as **Staff** · know **Onboard**, **Approvals**, **Businesses**
 
-- [ ] Phone charged, mobile data or Wi‑Fi working
-- [ ] Logged into **www.stikmnek.com** (know how to open **My Business** / Business Hub)
-- [ ] Demo tourist pass ready (ask Andy for demo account) for practice scans after approval
-- [ ] Printed or PDF: [Business Owner Guide](https://www.stikmnek.com/business-owner-guide-print.html)
-- [ ] This manual on your phone
+**Printed:** StikmNek **practice QR code** · blank **login cards** · optional [owner guide](https://www.stikmnek.com/business-owner-guide-print.html)
 
-**Ask the owner to prepare (or help them gather on the spot):**
+**Gather from owner:** name · email · business name · category · phone/WhatsApp · address · hours · normal + deal price (VT) · 3–5 photos
 
-| Item | Example |
+**Categories:** Dining · Activities · Tours · Transportation · Shopping · Spa & Wellness · Accommodation
+
+---
+
+## 4. Set up on the company phone (Staff → Onboard)
+
+Almost all setup is on the **company phone**. Owner watches and answers.
+
+### A. Open Staff dashboard
+
+1. www.stikmnek.com → sign in (staff account)
+2. Top menu → **Staff**
+3. Tab → **Onboard**
+
+### B. Step 1 — Owner login
+
+1. Owner name
+2. Email (check spelling)
+3. Password (write on login card)
+4. Create login
+
+### C. Step 2 — Listing form
+
+1. Deal title
+2. Category
+3. Description
+4. Discount label (e.g. “20% OFF”)
+5. Original price (VT) and deal price (VT) — deal must be **lower**
+6. Discount start date + duration
+7. Address, phone, WhatsApp, hours
+8. Photos (3–5, real, daylight)
+9. Tours/activities: tier pricing if needed
+10. Submit
+
+**Example:** Normal 2,500 VT → StikmNek 2,000 VT → guest saves 500 VT
+
+### D. After submit
+
+- Upload logo → **Save logo**
+- Copy email + password to **login card**
+- Owner can use “Forgot password” later
+
+### E. Approve (Approvals tab)
+
+Check Part 7 checklist → **Approve**
+
+---
+
+## 5. Teach the owner (their phone + printed QR)
+
+### Sign in (their phone)
+
+www.stikmnek.com → Sign In → email + password → **My Business**
+
+### Key menu items
+
+| Item | Purpose |
 |------|---------|
-| Business name | "Island Grill" |
-| Category | Dining, Tours, Activities, Spa, Shopping, Accommodation |
-| Phone + WhatsApp | Number staff answer |
-| Address | Where tourists find you |
-| Hours | "Mon–Sat 11am–9pm" |
-| Normal price + StikmNek price | In **VT** (vatu) |
-| 3–5 photos | Food, shop front, tour boat — bright light |
-| Email | One they can access (for login) |
+| Overview | Home + quick actions |
+| Scan a Pass / Scan QR | Scanner (also green button at bottom) |
+| My Submissions | Pending / approved |
+| Edit Listing | Change deal; Active/Inactive is instant |
+| Business Profile | Logo, map pin (after approval) |
+| Analytics | Scan counts |
 
-**Categories (exact names in the form):** Dining · Tours · Activities · Spa & Wellness · Shopping · Accommodation
+### Practice scan (printed QR)
 
-**Tours & activities:** Form has **adult / child / infant** prices — help them fill each tier.
+**Only after listing is Approved.**
 
----
+1. My Business → Scan a Pass or Scan QR
+2. Allow camera
+3. Scan **printed practice QR**
+4. Read VT amount on screen
+5. Confirm redemption
 
-## 4. Walk-in visit script (15–20 minutes)
+**Teach all counter staff:** bright screen → scan → read VT → confirm → discount on bill.
 
-Use when the owner is busy. Goal: **account + listing started**, return for scan training.
+Leave printed QR at counter for extra practice.
 
-| Step | You say (EN) | Bislama |
-|------|----------------|---------|
-| 1. Hello | "Morning, I'm [name] from StikmNek. We help local businesses get tourists from a phone app — **listing is free**." | "Gud moning, mi [nem] from StikmNek. Mifala helpem ol lokal bisnis kasem turis long app — **i fri blong listim**." |
-| 2. Value | "Tourists buy a pass before they travel. When they visit you, they show a QR code and you scan it — like checking a ticket." | "Ol turis i pem pas bifo ol i kam. Taem ol i kam, ol i soem QR — yu skanem, olsem wan taet." |
-| 3. No catch | "You don't pay us. You only give the discount you choose on your listing." | "Yu no pem StikmNek. Yu givim nomo diskaon yu putum long listing." |
-| 4. Ask | "Can we take 15 minutes now to put you on the app? I'll do it on your phone." | "Yu save givim 15 minit nau? Mi bae mi helpem long fon blong yu." |
-| 5. Do it | Sign up → Business → New Listing → photos → Submit | Same steps, slow voice |
-| 6. Close | "StikmNek team will approve in 1–2 days. I'll come back to teach scanning — or call me when you see 'Approved'." | "Team bae oli apruv long 1–2 dei. Mi bae mi kam bak blong skan — o kol mi taem yu luk 'Approved'." |
+**Scan fails?** Allow camera in settings · hold steady · listing must be approved · Business account not Tourist
 
 ---
 
-## 5. Full training session (45–60 minutes)
-
-| Time | Topic | Outcome |
-|------|--------|---------|
-| 0–5 min | What StikmNek is (Section 2) | Owner understands: tourist pays pass, business scans QR |
-| 5–15 min | Module A — Account & Hub | Signed in, sees Business Hub |
-| 15–35 min | Module B — Listing | Listing submitted |
-| 35 min | Break / approve later | — |
-| *After approval* | Module C — QR scan | Owner + 1 staff scan demo pass successfully |
-| 10 min | Module D — Daily use | Knows Active/Inactive, who to call for help |
-| 5 min | Handout + WhatsApp | Photo of printed guide, your number saved |
-
-**Rule:** Do not leave until the owner has **tapped through** each step themselves at least once.
-
----
-
-## Module A — Create account & Business Hub
-
-### Steps (teach on owner's phone)
-
-1. Open browser: **Chrome** or **Safari** (best on Android/iPhone).
-2. Go to **www.stikmnek.com**
-3. Tap **Sign In** → **Sign Up** → choose **Business** (NOT Tourist).
-4. Name, email, password — write password on paper if they forget easily.
-5. Check email — tap confirm link if StikmNek sends one.
-6. Sign in again → they should see **Business Hub** (sidebar) or tap top menu **My Business**.
-
-### Business Hub menu (exact labels — point at each)
-
-| Menu item | What it does |
-|-----------|----------------|
-| **Overview** | Home screen, stats, open scanner |
-| **My Submissions** | Pending / approved / needs changes |
-| **New Listing** | Add a deal |
-| **Edit Listing** | Change details (after approval) |
-| **Analytics** | Redemption counts |
-| **Reviews** | Tourist feedback |
-| **Photos** | Gallery |
-| **Credentials** | Optional permits / insurance (helps trust) |
-
-### Bislama teaching lines
-
-- "Tap **Sign In**, afta **Sign Up**, pikim **Business** — no **Tourist**."
-- "Business Hub — hem i **ples blong manijim** bisnis blong yu."
-- " **My Submissions** — luk hia blong save if listing i redi o i wet long apruv."
-
-### Trainer check
-
-- [ ] Owner can sign in without your help
-- [ ] Owner can find **New Listing** alone
-
----
-
-## Module B — Submit a listing (most important)
-
-This is what most owners struggle with. Go **field by field**.
-
-### Step-by-step in the app
-
-1. Business Hub → **New Listing**
-2. **Business / deal name** — real name tourists will search
-3. **Category** — pick one (see table in Section 3)
-4. **Description** — short, honest: what you sell, where, why visit
-5. **Discount label** — e.g. "20% OFF" or "500 VT OFF" (words tourists read)
-6. **Prices (VT)**  
-   - **Original price** = normal walk-in price  
-   - **Deal price** = what StikmNek pass holders pay  
-   - Deal price must be **lower** than original
-7. **Location / address** — be specific (near wharf, resort name, etc.)
-8. **Phone** — number that answers
-9. **WhatsApp** (optional) — same or different number
-10. **Hours** — when open (helps tourists)
-11. **Photos** — tap upload, pick 3–5 clear photos
-12. Tick **partner terms** if shown
-13. Tap **Submit for approval**
-
-### Photo rules (teach simply)
-
-| Good | Bad |
-|------|-----|
-| Daylight, food/shop in focus | Dark, blurry |
-| Shows real business | Stock photos from internet |
-| 3+ photos | No photos |
-
-**Bislama:** "Yu mas putum **foto blong tru bisnis** — no stolan foto long internet."
-
-### Pricing example (write on paper for them)
-
-| | VT |
-|--|-----|
-| Normal lunch | 2,500 |
-| StikmNek price | 2,000 |
-| Tourist saves | 500 |
-
-### Tours / activities only
-
-- Use **tiered pricing**: Adult, Child, Infant — each with normal + deal price
-- Help them count: "How much for one adult on the tour today?"
-
-### After submit
-
-- Open **My Submissions** → status **Pending**
-- Tell them: "StikmNek team (Andy / [your name]) checks listing. When **Approved**, tourists see you on the map."
-- If **Needs changes** — read the note, fix, resubmit together
-
-### Trainer check
-
-- [ ] Prices in VT, deal < original
-- [ ] Phone works (call it in front of them)
-- [ ] At least 3 photos uploaded
-- [ ] Listing shows in My Submissions
-
----
-
-## Module C — QR scanner & redemption (most important)
-
-**When to teach:** After listing is **Approved**. Scanner is disabled until then.
-
-### What happens in real life
-
-1. Tourist buys **StikmNek Pass** (on their phone, before or during trip).
-2. Tourist opens pass → shows **QR code** on screen.
-3. Your staff opens **Business Hub** → **Scan a Pass** (Overview or floating Scan button).
-4. Browser asks **camera permission** → tap **Allow**.
-5. Point camera at QR — app reads pass.
-6. Screen shows: tourist name, pass valid or not, dates.
-7. If owner has **more than one listing** → pick the correct deal.
-8. For tours: enter **how many adults / children / infants** for this visit.
-9. Tap **Confirm redemption** — done. Give discount on bill.
-
-### Teach staff the 5-finger method
-
-1. **Bright screen** — tourist turns brightness up  
-2. **Allow camera** — business phone  
-3. **Scan** — hold steady  
-4. **Pick listing** — if asked  
-5. **Confirm** — tap confirm  
-
-### Bislama (for staff)
-
-| Step | Say |
-|------|-----|
-| Ask tourist | "Yu gat StikmNek pas? Soem QR long fon." |
-| Open scanner | "Go long **My Business** → **Scan a Pass**." |
-| Camera | "Tap **Allow** taem browser i askim kamera." |
-| Valid | "Grin — pas i gud. Givim diskaon." |
-| Not valid | "Pas i no gud — luk dat o kol bos." |
-| Confirm | "Tap **Confirm** blong finisim." |
-
-### Practice with demo pass
-
-Andy can provide a **demo tourist account**. You scan it in front of the owner until they do it alone twice.
-
-### If scan fails
-
-| Problem | Fix |
-|---------|-----|
-| Camera blocked | Phone Settings → Browser → allow Camera for stikmnek.com |
-| QR won't read | Tourist: brighter screen, hold still; wipe camera lens |
-| "Pass expired" | Tourist must buy new pass or check dates |
-| "Not authorized" | They signed up as Tourist — need **Business** account |
-| Manual entry | Scanner screen → switch to manual → paste code if tourist sends it |
-
-### Trainer check
-
-- [ ] Owner scanned demo pass successfully  
-- [ ] Second staff member tried once  
-- [ ] They know invalid pass = no discount  
-
----
-
-## Module D — After approval (daily use)
+## 6. Daily use for owners
 
 | Task | How |
 |------|-----|
-| Turn listing off (closed day) | Edit Listing → **Inactive** (immediate) |
-| Turn listing on | **Active** |
-| Change prices / text | Edit Listing → submit → waits for admin review |
-| See redemptions | Analytics tab |
-| Reply to reviews | Reviews tab |
-| Optional trust badges | Credentials — upload permit / insurance |
-
-**Bislama:** "Taem yu pas, yu save putum listing **Inactive**. Taem yu op, **Active**."
+| Closed today | Edit Listing → Inactive |
+| Open again | Active |
+| Tourist visits | Scan → confirm → StikmNek price in VT |
+| Change prices | Edit Listing → submit (reviewed) |
+| Scan count | Analytics |
 
 ---
 
-## Listing approval checklist (for you)
+## 7. Approval checklist
 
-Before you tell Andy "please approve", check:
-
-- [ ] **Real business** — you visited or video-called
-- [ ] **Name** matches shop sign / known locally
-- [ ] **Photos** are their own, clear, relevant
-- [ ] **Prices** realistic for Vanuatu (VT), deal lower than normal
-- [ ] **Phone / WhatsApp** works
-- [ ] **Address** findable on map
-- [ ] **Description** honest, not empty
-- [ ] **Discount** meaningful (guide: encourage ~15–20%+ where possible — not a hard rule)
-- [ ] **Category** correct
-- [ ] **Partner terms** understood: honor discount when pass is valid
-
-Reject or send back if: wrong photos, fake prices, duplicate listing, offensive content.
+- [ ] Real business you visited
+- [ ] Name matches shop
+- [ ] Real, clear photos
+- [ ] VT prices realistic; deal &lt; normal
+- [ ] Phone works
+- [ ] Address clear
+- [ ] Description filled in
+- [ ] Category correct
 
 ---
 
-## Common problems & fixes
+## 8. Objections
 
-| Owner says | You do |
-|------------|--------|
-| "I don't understand apps" | Do every tap for them twice; leave paper guide |
-| "No email" | Help create Gmail; or use family member email with permission |
-| "No smartphone" | Business needs at least one smartphone for scanning — tablet OK |
-| "Internet bad" | Submit on Wi‑Fi at office; scan needs internet at redemption time |
-| "Where is scanner?" | My Business → Overview → **Scan a Pass** |
-| "Edit not on website yet" | Explain admin review; Active/Inactive is instant |
-| "Tourist already scanned today" | Same pass can scan again same day at same place (new scan each visit) |
-
----
-
-## Objections & honest answers
-
-| Objection | Answer (EN) | Bislama (short) |
-|-----------|-------------|-----------------|
-| "What's the catch?" | Tourists pay StikmNek for the pass. You list free and honor your discount. No commission on your sale. | "Turis i pem pas. Yu list fri. Yu givim diskaon yu promes." |
-| "Hotspots / What To Do charges us" | Those charge for listings. StikmNek is free for local businesses. | "Ol narawan i kisim mani blong list. StikmNek i fri." |
-| "No tourists yet" | We're signing businesses first; you're early on the map. | "Mifala putum bisnis pastaim — yu kam promes." |
-| "Too much discount" | You choose prices. Even 10–15% helps tourists choose you. | "Yu deside praes. Smol diskaon i helpem." |
-| "Staff will forget" | Leave printed guide at counter; one practice scan per shift. | "Livim pepa long kaonta; practis skan." |
+| They say | You say |
+|----------|---------|
+| What’s the catch? | Tourists pay the pass. You list free. No commission on your sale. |
+| We use Facebook | This reaches tourists who don’t know your page — before they travel. |
+| No tourists yet | We’re signing businesses first — you’re early on the map. |
+| Discount too big | You set both prices. Even 10% helps. |
+| Bad with phones | I set up on my phone. You only practise scan once. |
+| Call back later | Only 15 minutes and free — can we take photos now? |
 
 ---
 
-## WhatsApp follow-up templates
+## 9. WhatsApp follow-up
 
-**After first visit (listing submitted):**
-
-```
-Halo [name], mi [your name] from StikmNek. Tenkyu long miiting yu tede.
-Listing blong yu i go long "Pending" — team bae oli apruv long 1-2 dei.
-Yu save luk long www.stikmnek.com → Sign In → My Business → My Submissions.
-Questions? Reply hia o kol +678 7766107.
-```
-
-**When approved:**
+**After setup:**
 
 ```
-Gud news — listing blong yu i LIVE long StikmNek!
-Nau yu save skan QR: www.stikmnek.com → My Business → Scan a Pass.
-Mi save kam blong 10 min practis wetem yu if yu want. Wanem dei i gud?
+Hi [name], this is [your name] from StikmNek. Thanks for joining today.
+Your business is on StikmNek. Login: www.stikmnek.com → Sign In → My Business.
+Email: [email]. Password: (on your card).
+Questions? Call +678 7766107.
 ```
 
-**If they haven't scanned after 2 weeks:**
+**After scan training:**
 
 ```
-Halo [name], i gat turis yet long yu? Rememba: taem ol i soem QR, yu skan long app blong save diskaon.
-Mi save helpem 5 min — kol mi [your number].
+Hi [name], great job practising the QR scan today.
+Remember: tourist shows QR → My Business → Scan a Pass → Confirm.
+Keep the practice QR at your counter. Call me if staff need a refresher.
 ```
 
 ---
 
-## Handouts & links
+## 10. Rules
 
-| Resource | URL / location |
-|----------|----------------|
-| Website | https://www.stikmnek.com |
-| Sign up (business) | https://www.stikmnek.com/business/new |
-| Printable owner guide (give / WhatsApp PDF) | https://www.stikmnek.com/business-owner-guide-print.html |
-| In-app Help → Business Owner Guide | Menu → Help → Business Owner Guide |
-| Master strategy context | `docs/MASTER_AI_PROMPT.md` (internal) |
-| Canva / field one-pager spec | `docs/CANVA_AD_ONE_PAGER.md` (internal) |
-
-**Print tip:** Open printable guide in Chrome → Print → Save as PDF → send on WhatsApp.
+1. Never say they must **pay to list**.
+2. Never promise **how many tourists** will come.
+3. Never approve **junk listings**.
+4. Tourist pays **StikmNek**; business honours **their discount**.
 
 ---
 
-## Rules you must never break
+## 11. Before you leave
 
-These are **company policy** (see master prompt):
-
-1. **Never** tell a business they must **pay to list**.
-2. **Never** promise **commissions**, **featured placement for money**, or **bribes** for approval.
-3. **Never** promise a fixed number of tourists or pass sales.
-4. **Never** approve junk listings to hit a quota.
-5. **Always** say tourists pay **StikmNek**; business honors **their listed discount**.
-
----
-
-## Trainer self-check (end of week)
-
-- [ ] Visited ___ businesses
-- [ ] ___ listings submitted
-- [ ] ___ approved live
-- [ ] ___ owners completed real or demo scan
-- [ ] Issues logged to Andy: _______________
+- [ ] Listing live (checked on website)
+- [ ] Login card in owner’s hand
+- [ ] Owner signed in once on their phone
+- [ ] Practice scan with printed QR
+- [ ] One staff member watched
+- [ ] Your number saved
 
 ---
 
-*StikmNek Limited · Vanuatu · For internal field onboarding. When app labels change, update this doc and `HelpCenter.tsx` / `business-owner-guide-print.html` together.*
+*StikmNek Limited · Vanuatu · Align with `FIELD_TRAINING_SIMPLE_GOOGLE_DOCS.html` for the agent Google Doc.*
