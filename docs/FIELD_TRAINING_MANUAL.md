@@ -227,6 +227,17 @@ Remember: tourist shows QR → My Business → Scan a Pass → Confirm.
 Keep the practice QR at your counter. Call me if staff need a refresher.
 ```
 
+**Broadcast — business page + Facebook sharing (existing owners):**
+
+See `stikmnek-outreach-scripts.md` → *WhatsApp broadcast — existing business owners*. Short version:
+
+```
+Hi [name] — StikmNek update for [business].
+My Business is simpler: scan QR + share your business page (your own mini website on StikmNek). Multiple deals = one link shows them all.
+Sign in → My Business → orange "Share all your deals on Facebook" → Copy → paste in Facebook comments.
+www.stikmnek.com | Reply DONE when you've tried it.
+```
+
 ---
 
 ## 10. Rules

@@ -381,6 +381,7 @@ const AdminPendingSubmissionReview: React.FC<Props> = ({ biz, language, onSaved 
                 website={draft.website}
                 onMapUrlChange={(v) => setDraft((d) => ({ ...d, mapUrl: v }))}
                 onWebsiteChange={(v) => setDraft((d) => ({ ...d, website: v }))}
+                category={draft.category}
                 language={language}
               />
               {categoryUsesTieredPricing(draft.category) && (

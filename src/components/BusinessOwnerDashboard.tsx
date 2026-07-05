@@ -2189,6 +2189,7 @@ const BusinessOwnerDashboard: React.FC = () => {
                 website={submitForm.website}
                 onMapUrlChange={(val) => setSubmitForm(prev => ({ ...prev, mapUrl: val }))}
                 onWebsiteChange={(val) => setSubmitForm(prev => ({ ...prev, website: val }))}
+                category={submitForm.category}
                 language={language}
               />
             </div>

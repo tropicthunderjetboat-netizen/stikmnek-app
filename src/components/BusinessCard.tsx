@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { plainTextFromHtml } from '@/lib/businessDescriptionHtml';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { absoluteDealUrl, dealPathForBusiness } from '@/lib/dealUrl';
+import { shortPriceUnitSuffix } from '@/lib/categoryPricing';
 import { isListingFavorited } from '@/lib/favoritesUi';
 import BusinessProfileLogo from '@/components/BusinessProfileLogo';
 
@@ -76,6 +77,10 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
     '/placeholder.svg';
 
   // Compute super star count: use DB field if available, otherwise count from reviews
+  const priceUnitSuffix = shortPriceUnitSuffix(
+    business.category,
+    language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en',
+  );
   const superStarCount = (business.superStarCount && business.superStarCount > 0)
     ? business.superStarCount
     : dbReviews.filter((r: any) => r.business_id === profileId && (r.offering_id ? String(r.offering_id) === String(business.id) : true) && r.has_super_star).length;
@@ -464,7 +469,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
             {hasDiscount && (
               <span className="text-sm text-gray-400 line-through">{formatVT(originalPrice)}</span>
             )}
-            <span className="text-xs text-gray-400">{t('general.per_person', language)}</span>
+            <span className="text-xs text-gray-400">{priceUnitSuffix}</span>
           </div>
 
           <button

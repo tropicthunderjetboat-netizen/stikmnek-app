@@ -26,7 +26,7 @@ import {
   defaultPricingTiersForNewListing,
   type PricingTierInput,
 } from '@/lib/pricingTiers';
-import { categoryUsesPerUnitPricing, perUnitPriceHint, unitLabelForCategory } from '@/lib/categoryPricing';
+import { categoryUsesPerUnitPricing, perUnitPriceHint, shortPriceUnitSuffix } from '@/lib/categoryPricing';
 import { CATEGORY_SELECT_KEYS, categoryLabelForKey } from '@/data/businesses';
 import { businessHoursFromProfileRow, normalizeListingCategoryKey } from '@/lib/businessOfferingMap';
 import { listingHoursFieldCopy } from '@/lib/listingHoursLabels';
@@ -2252,10 +2252,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                     {formatVT(parseFloat(form.originalPrice) - parseFloat(displayAutoDealPrice))}{' '}
                     <span className="text-xs font-normal text-gray-400">
                       {categoryUsesPerUnitPricing(form.category)
-                        ? unitLabelForCategory(
+                        ? shortPriceUnitSuffix(
                             form.category,
                             language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en',
-                          ).singular
+                          )
                         : language === 'en'
                           ? 'per person'
                           : language === 'fr'

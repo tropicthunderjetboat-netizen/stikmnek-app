@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import ReviewForm from '@/components/ReviewForm';
 import PhotoGallery from '@/components/PhotoGallery';
 import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe, getPhotoDisplayUrl } from '@/lib/utils';
+import { shortPriceUnitSuffix } from '@/lib/categoryPricing';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { trackInteractionEvent } from '@/lib/interactionEvents';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
@@ -1225,6 +1226,11 @@ const BusinessDetail: React.FC = () => {
                         : language === 'fr'
                           ? 'Votre tarif membre StikmNek'
                           : 'Praes blong memba StikmNek'}
+                      {' · '}
+                      {shortPriceUnitSuffix(
+                        biz.category,
+                        language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en',
+                      )}
                     </p>
                   </div>
               </div>

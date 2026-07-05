@@ -3201,6 +3201,7 @@ const AdminPanel: React.FC = () => {
                   website={addForm.website}
                   onMapUrlChange={(v) => setAddForm(p => ({...p, mapUrl: v}))}
                   onWebsiteChange={(v) => setAddForm(p => ({...p, website: v}))}
+                  category={addForm.category}
                   language={language}
                 />
 
@@ -3340,6 +3341,7 @@ const AdminPanel: React.FC = () => {
                   website={editForm.website}
                   onMapUrlChange={(v) => setEditForm(p => ({...p, mapUrl: v}))}
                   onWebsiteChange={(v) => setEditForm(p => ({...p, website: v}))}
+                  category={editForm.category}
                   language={language}
                 />
 

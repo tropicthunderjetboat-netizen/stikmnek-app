@@ -3,6 +3,11 @@ import { Tag, Percent, ArrowRight, Calendar, Globe } from 'lucide-react';
 import LocationMapPicker from '@/components/LocationMapPicker';
 import WebsiteUrlInput from '@/components/WebsiteUrlInput';
 import { formatVT } from '@/lib/utils';
+import {
+  categoryUsesPerUnitPricing,
+  perUnitPriceHint,
+  shortPriceUnitSuffix,
+} from '@/lib/categoryPricing';
 
 const DURATION_OPTIONS = [
   { value: '1_day', label: '1 Day', labelFr: '1 Jour', days: 1 },
@@ -44,6 +49,8 @@ interface PricingDiscountFieldsProps {
   website?: string;
   onMapUrlChange?: (val: string) => void;
   onWebsiteChange?: (val: string) => void;
+  /** Listing category — drives per-person vs per-stay price hints. */
+  category?: string;
   // Language
   language?: string;
 }
@@ -65,8 +72,18 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
   website = '',
   onMapUrlChange,
   onWebsiteChange,
+  category = '',
   language = 'en',
 }) => {
+  const lang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  const priceHint = categoryUsesPerUnitPricing(category)
+    ? perUnitPriceHint(category, lang)
+    : lang === 'fr'
+      ? 'Prix normal par personne en Vatu'
+      : lang === 'bi'
+        ? 'Stanad praes long wan man (VT)'
+        : 'Regular price per person in Vatu';
+  const savingsUnitSuffix = shortPriceUnitSuffix(category, lang);
   // Auto-calculate deal price (same for flat & tiered categories — tier table is additional, not a substitute).
   const calculatedDealPrice = useMemo(() => {
     const orig = parseFloat(String(originalPrice).replace(/,/g, ''));
@@ -144,9 +161,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
                   placeholder="5000"
                 />
               </div>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                {language === 'en' ? 'Regular price per person in Vatu' : 'Prix normal par personne en Vatu'}
-              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{priceHint}</p>
             </div>
           )}
 
@@ -250,9 +265,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
               </span>
               <span className="text-sm font-bold text-emerald-600">
                 {formatVT(parseFloat(originalPrice) - parseFloat(calculatedDealPrice))}{' '}
-                <span className="text-xs font-normal text-gray-400">
-                  {language === 'en' ? 'per person' : 'par personne'}
-                </span>
+                <span className="text-xs font-normal text-gray-400">{savingsUnitSuffix}</span>
               </span>
             </div>
           </div>

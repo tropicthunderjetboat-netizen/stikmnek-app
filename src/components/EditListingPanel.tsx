@@ -788,6 +788,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                   });
                 }}
                 language={language}
+                category={selectedBusiness.category}
               />
 
               {form.deal_price >= form.original_price && form.original_price > 0 && (
