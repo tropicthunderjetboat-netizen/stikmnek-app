@@ -201,6 +201,7 @@ const AdminUserManager: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'tourist' | 'business' | 'admin'>('all');
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
@@ -377,12 +378,29 @@ const AdminUserManager: React.FC = () => {
   };
 
   const nonAdminUsers = users.filter(u => u.role !== 'admin');
-  const filteredUsers = users.filter(u =>
-    (u.display_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.user_id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredUsers = users.filter(u => {
+    if (roleFilter !== 'all' && u.role !== roleFilter) return false;
+    const q = searchQuery.toLowerCase();
+    if (!q) return true;
+    return (
+      (u.display_name || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      u.role.toLowerCase().includes(q) ||
+      u.user_id.toLowerCase().includes(q)
+    );
+  });
+
+  const roleCounts = {
+    all: users.length,
+    tourist: users.filter((u) => u.role === 'tourist').length,
+    business: users.filter((u) => u.role === 'business').length,
+    admin: users.filter((u) => u.role === 'admin').length,
+  };
+
+  const handleRoleFilter = (filter: typeof roleFilter) => {
+    setRoleFilter(filter);
+    setSearchQuery('');
+  };
 
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -402,52 +420,76 @@ const AdminUserManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header with stats */}
+      {/* Header with stats — click to filter the list */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-white border border-gray-100 shadow-sm">
+        <button
+          type="button"
+          onClick={() => handleRoleFilter('all')}
+          className={`p-4 rounded-xl bg-white border shadow-sm text-left transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
+            roleFilter === 'all' ? 'border-teal-400 ring-2 ring-teal-200' : 'border-gray-100'
+          }`}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
               <Users className="w-5 h-5 text-gray-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{roleCounts.all}</p>
               <p className="text-xs text-gray-500">Total Users</p>
             </div>
           </div>
-        </div>
-        <div className="p-4 rounded-xl bg-white border border-gray-100 shadow-sm">
+        </button>
+        <button
+          type="button"
+          onClick={() => handleRoleFilter('tourist')}
+          className={`p-4 rounded-xl bg-white border shadow-sm text-left transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
+            roleFilter === 'tourist' ? 'border-teal-400 ring-2 ring-teal-200' : 'border-gray-100'
+          }`}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center">
               <User className="w-5 h-5 text-teal-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-teal-700">{users.filter(u => u.role === 'tourist').length}</p>
+              <p className="text-2xl font-bold text-teal-700">{roleCounts.tourist}</p>
               <p className="text-xs text-gray-500">Tourists</p>
             </div>
           </div>
-        </div>
-        <div className="p-4 rounded-xl bg-white border border-gray-100 shadow-sm">
+        </button>
+        <button
+          type="button"
+          onClick={() => handleRoleFilter('business')}
+          className={`p-4 rounded-xl bg-white border shadow-sm text-left transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+            roleFilter === 'business' ? 'border-blue-400 ring-2 ring-blue-200' : 'border-gray-100'
+          }`}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
               <Briefcase className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-blue-700">{users.filter(u => u.role === 'business').length}</p>
+              <p className="text-2xl font-bold text-blue-700">{roleCounts.business}</p>
               <p className="text-xs text-gray-500">Businesses</p>
             </div>
           </div>
-        </div>
-        <div className="p-4 rounded-xl bg-white border border-gray-100 shadow-sm">
+        </button>
+        <button
+          type="button"
+          onClick={() => handleRoleFilter('admin')}
+          className={`p-4 rounded-xl bg-white border shadow-sm text-left transition-all hover:shadow-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+            roleFilter === 'admin' ? 'border-purple-400 ring-2 ring-purple-200' : 'border-gray-100'
+          }`}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
               <ShieldCheck className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-purple-700">{users.filter(u => u.role === 'admin').length}</p>
+              <p className="text-2xl font-bold text-purple-700">{roleCounts.admin}</p>
               <p className="text-xs text-gray-500">Admins</p>
             </div>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Action bar */}
@@ -462,7 +504,16 @@ const AdminUserManager: React.FC = () => {
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
           />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {roleFilter !== 'all' && (
+            <button
+              type="button"
+              onClick={() => handleRoleFilter('all')}
+              className="px-3 py-2 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs font-semibold hover:bg-teal-100 transition-colors"
+            >
+              Clear filter · showing {roleFilter}s
+            </button>
+          )}
           <button
             onClick={loadUsers}
             disabled={loading}
@@ -471,19 +522,6 @@ const AdminUserManager: React.FC = () => {
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          {nonAdminUsers.length > 0 && (
-            <button
-              onClick={() => {
-                setBulkDeleteAcknowledged(false);
-                setShowBulkConfirm(true);
-              }}
-              disabled={bulkDeleting}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50 shadow-sm"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete All Non-Admin ({nonAdminUsers.length})
-            </button>
-          )}
         </div>
       </div>
 
@@ -596,7 +634,11 @@ const AdminUserManager: React.FC = () => {
             <div className="p-8 text-center">
               <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
               <p className="text-sm text-gray-500">
-                {searchQuery ? 'No users match your search.' : 'No users found in the database.'}
+                {searchQuery
+                  ? 'No users match your search.'
+                  : roleFilter !== 'all'
+                    ? `No ${roleFilter} users found.`
+                    : 'No users found in the database.'}
               </p>
             </div>
           )}
@@ -729,6 +771,36 @@ const AdminUserManager: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* Danger zone — bulk delete at bottom to avoid accidental clicks */}
+      {nonAdminUsers.length > 0 && (
+        <div className="rounded-xl border-2 border-dashed border-red-200 bg-red-50/40 p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h4 className="text-sm font-bold text-red-900 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" aria-hidden />
+                Danger zone
+              </h4>
+              <p className="text-xs text-red-800/80 mt-1 max-w-xl">
+                Permanently delete every non-admin user and their data. Admin ({ADMIN_EMAIL}) is preserved.
+                Use only when resetting a test environment — not for routine management.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setBulkDeleteAcknowledged(false);
+                setShowBulkConfirm(true);
+              }}
+              disabled={bulkDeleting}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50 shadow-sm shrink-0"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete All Non-Admin ({nonAdminUsers.length})
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ═══ BULK DELETE CONFIRMATION MODAL ═══ */}
       {showBulkConfirm && (
