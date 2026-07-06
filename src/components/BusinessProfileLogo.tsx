@@ -45,11 +45,11 @@ const VARIANT: Record<
     img: 'w-full h-full object-cover object-center',
     fallbackIcon: 'w-8 h-8',
   },
-  /** Public `/partner/...` page — white plate sized to the logo (wide wordmarks, no empty frame). */
+  /** Public `/partner/...` page — fixed square white plate; logo fills it with a small inset. */
   profilePage: {
     wrap:
-      'inline-flex max-w-full items-center justify-center rounded-2xl bg-white px-4 py-3 sm:px-5 sm:py-3.5 shadow-xl ring-2 ring-white/40',
-    img: 'block h-auto w-auto max-h-14 max-w-[min(calc(100vw-2.5rem),17.5rem)] sm:max-h-[4.75rem] sm:max-w-[19rem] object-contain object-center',
+      'grid place-items-center h-28 w-28 sm:h-32 sm:w-32 rounded-2xl bg-white p-2 sm:p-2.5 shadow-xl ring-2 ring-white/40',
+    img: 'block h-full w-full object-contain object-center',
     fallbackIcon: 'w-10 h-10',
   },
 };
@@ -100,8 +100,8 @@ const BusinessProfileLogo: React.FC<BusinessProfileLogoProps> = ({
   return (
     <div
       className={cn(
-        'flex items-center justify-center',
-        isSidebar ? 'w-full h-full shrink' : isProfilePage ? 'inline-flex max-w-full shrink-0' : 'shrink-0',
+        isProfilePage ? 'shrink-0' : 'flex items-center justify-center',
+        isSidebar ? 'w-full h-full shrink' : !isProfilePage ? 'shrink-0' : '',
         styles.wrap,
         className,
       )}
