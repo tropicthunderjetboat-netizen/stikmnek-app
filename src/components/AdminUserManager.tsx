@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
-  Users, Trash2, Loader2, RefreshCw, AlertTriangle, Shield,
-  ShieldCheck, Briefcase, User, CheckCircle, XCircle, X, Search, Copy
+  Users, Trash2, Loader2, RefreshCw, AlertTriangle,
+  ShieldCheck, Briefcase, User, CheckCircle, XCircle, X, Search, Shield, FileText
 } from 'lucide-react';
 
 interface UserProfile {
@@ -71,131 +71,6 @@ function getEdgeFunctionErrorMessage(
     ''
   );
 }
-
-// ═══════════════════════════════════════════════════════════
-// FAULT-TOLERANT SQL - each DELETE wrapped in its own block
-// so missing tables won't crash the whole script
-// ═══════════════════════════════════════════════════════════
-const ROBUST_SQL_SCRIPT = `-- FAULT-TOLERANT: Delete ALL non-admin users
--- Keeps: admin@stikmnek.com
--- Each table wrapped in its own block so missing tables are skipped
-
-DO $$
-DECLARE
-  admin_id uuid;
-  r record;
-  del_count int := 0;
-BEGIN
-  -- Step 1: Find admin user ID
-  SELECT id INTO admin_id FROM auth.users WHERE email = 'admin@stikmnek.com';
-  
-  IF admin_id IS NULL THEN
-    RAISE EXCEPTION 'Admin user admin@stikmnek.com not found in auth.users!';
-  END IF;
-  
-  RAISE NOTICE 'Admin ID: %', admin_id;
-
-  -- Step 2: Clean each public table (skip if table doesn't exist)
-  BEGIN DELETE FROM favorites WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'favorites: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: favorites table not found'; WHEN undefined_column THEN RAISE NOTICE 'SKIP: favorites column mismatch'; WHEN OTHERS THEN RAISE NOTICE 'SKIP favorites: %', SQLERRM; END;
-
-  BEGIN DELETE FROM pass_purchases WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'pass_purchases: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: pass_purchases table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP pass_purchases: %', SQLERRM; END;
-
-  BEGIN DELETE FROM passes WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'passes: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: passes table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP passes: %', SQLERRM; END;
-
-  BEGIN DELETE FROM redemptions WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'redemptions: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: redemptions table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP redemptions: %', SQLERRM; END;
-
-  BEGIN DELETE FROM search_history WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'search_history: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: search_history table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP search_history: %', SQLERRM; END;
-
-  BEGIN DELETE FROM support_tickets WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'support_tickets: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: support_tickets table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP support_tickets: %', SQLERRM; END;
-
-  BEGIN DELETE FROM notifications WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'notifications: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: notifications table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP notifications: %', SQLERRM; END;
-
-  BEGIN DELETE FROM feedback WHERE user_id IS NOT NULL AND user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'feedback: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: feedback table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP feedback: %', SQLERRM; END;
-
-  BEGIN DELETE FROM error_logs WHERE user_id IS NOT NULL AND user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'error_logs: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: error_logs table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP error_logs: %', SQLERRM; END;
-
-  BEGIN DELETE FROM reviews WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'reviews: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: reviews table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP reviews: %', SQLERRM; END;
-
-  BEGIN DELETE FROM review_responses WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'review_responses: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: review_responses table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP review_responses: %', SQLERRM; END;
-
-  BEGIN DELETE FROM business_photos WHERE uploaded_by != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'business_photos: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: business_photos table not found'; WHEN undefined_column THEN RAISE NOTICE 'SKIP: business_photos.uploaded_by column not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP business_photos: %', SQLERRM; END;
-
-  BEGIN DELETE FROM pending_businesses WHERE owner_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'pending_businesses: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: pending_businesses table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP pending_businesses: %', SQLERRM; END;
-
-  BEGIN DELETE FROM pending_edits WHERE owner_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'pending_edits: % rows deleted', del_count; EXCEPTION WHEN undefined_table THEN RAISE NOTICE 'SKIP: pending_edits table not found'; WHEN OTHERS THEN RAISE NOTICE 'SKIP pending_edits: %', SQLERRM; END;
-
-  -- Step 3: Delete user_profiles
-  BEGIN DELETE FROM user_profiles WHERE user_id != admin_id; GET DIAGNOSTICS del_count = ROW_COUNT; RAISE NOTICE 'user_profiles: % rows deleted', del_count; EXCEPTION WHEN OTHERS THEN RAISE NOTICE 'SKIP user_profiles: %', SQLERRM; END;
-
-  -- Step 4: Delete from auth.users (the important part!)
-  FOR r IN SELECT id, email FROM auth.users WHERE id != admin_id
-  LOOP
-    BEGIN
-      DELETE FROM auth.users WHERE id = r.id;
-      RAISE NOTICE 'Deleted auth user: % (%)', r.email, r.id;
-    EXCEPTION WHEN OTHERS THEN
-      RAISE NOTICE 'FAILED to delete auth user % (%): %', r.email, r.id, SQLERRM;
-    END;
-  END LOOP;
-
-  RAISE NOTICE '';
-  RAISE NOTICE '========================================';
-  RAISE NOTICE 'DONE! All non-admin users deleted.';
-  RAISE NOTICE 'Admin preserved: admin@stikmnek.com';
-  RAISE NOTICE '========================================';
-END $$;`;
-
-// ═══════════════════════════════════════════════════════════
-// SIMPLE VERSION - just user_profiles + auth.users
-// ═══════════════════════════════════════════════════════════
-const SIMPLE_SQL_SCRIPT = `-- SIMPLE VERSION: Just delete user_profiles + auth.users
--- Use this if the full script fails
-
--- Step 1: Delete all non-admin profiles
-DELETE FROM user_profiles 
-WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');
-
--- Step 2: Delete all non-admin auth users
--- Run this AFTER step 1 succeeds
-DO $$
-DECLARE
-  admin_id uuid;
-  r record;
-BEGIN
-  SELECT id INTO admin_id FROM auth.users WHERE email = 'admin@stikmnek.com';
-  FOR r IN SELECT id, email FROM auth.users WHERE id != admin_id
-  LOOP
-    BEGIN
-      DELETE FROM auth.users WHERE id = r.id;
-      RAISE NOTICE 'Deleted: %', r.email;
-    EXCEPTION WHEN OTHERS THEN
-      RAISE NOTICE 'Failed %: %', r.email, SQLERRM;
-    END;
-  END LOOP;
-END $$;`;
-
-// ═══════════════════════════════════════════════════════════
-// STEP BY STEP - individual queries to run one at a time
-// ═══════════════════════════════════════════════════════════
-const STEP_BY_STEP_QUERIES = [
-  `DELETE FROM favorites WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM pass_purchases WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM passes WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM redemptions WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM search_history WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM support_tickets WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM notifications WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM feedback WHERE user_id IS NOT NULL AND user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM error_logs WHERE user_id IS NOT NULL AND user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM reviews WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM review_responses WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM pending_businesses WHERE owner_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM pending_edits WHERE owner_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `DELETE FROM user_profiles WHERE user_id != (SELECT id FROM auth.users WHERE email = 'admin@stikmnek.com');`,
-  `-- LAST: Delete auth users (run this after ALL above succeed)
-DO $$ DECLARE admin_id uuid; r record; BEGIN SELECT id INTO admin_id FROM auth.users WHERE email = 'admin@stikmnek.com'; FOR r IN SELECT id FROM auth.users WHERE id != admin_id LOOP DELETE FROM auth.users WHERE id = r.id; END LOOP; END $$;`,
-];
-
 
 const AdminUserManager: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -679,97 +554,30 @@ const AdminUserManager: React.FC = () => {
         </div>
       )}
 
-      {/* ═══ SQL HELPER - FAULT TOLERANT VERSION ═══ */}
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <h4 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-2">
-          <Shield className="w-4 h-4 text-teal-600" />
-          Fault-Tolerant SQL Script (Supabase SQL Editor)
+      {/* SQL fallback — scripts live in repo, not in this UI */}
+      <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4">
+        <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-gray-500" aria-hidden />
+          If in-app delete fails — SQL fallback (developers only)
         </h4>
-        <p className="text-xs text-gray-500 mb-1">
-          This script skips tables that don't exist and won't fail on missing columns.
-          Copy and paste into <strong>Supabase Dashboard &gt; SQL Editor</strong> and click <strong>Run</strong>.
+        <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+          Normal workflow: use <strong>Delete</strong> on a row, or <strong>Danger zone</strong> below for bulk removal.
+          If the edge function errors or you are resetting a dev database, use the SQL scripts in the GitHub repo — not shown here on purpose.
         </p>
-        <p className="text-xs text-red-600 font-semibold mb-3">
-          Keeps admin@stikmnek.com. Deletes ALL other users from every table including auth.users.
+        <ul className="mt-3 space-y-1.5 text-xs text-gray-600 font-mono">
+          <li>
+            <span className="text-gray-500 font-sans">Guide →</span>{' '}
+            <code className="bg-white px-1.5 py-0.5 rounded border border-gray-200">docs/ADMIN_USER_PURGE_SQL.md</code>
+          </li>
+          <li>
+            <span className="text-gray-500 font-sans">Script →</span>{' '}
+            <code className="bg-white px-1.5 py-0.5 rounded border border-gray-200">supabase/scripts/admin-purge-non-admin-users.sql</code>
+          </li>
+        </ul>
+        <p className="text-xs text-gray-500 mt-3">
+          Run in <strong>Supabase Dashboard → SQL Editor</strong>. Keeps <code className="text-[11px]">{ADMIN_EMAIL}</code>.
+          Last resort: <strong>Authentication → Users</strong> and delete manually.
         </p>
-        <div className="bg-gray-900 rounded-lg p-4 font-mono text-[11px] text-green-400 overflow-x-auto max-h-80 overflow-y-auto">
-          <pre className="whitespace-pre-wrap">{ROBUST_SQL_SCRIPT}</pre>
-        </div>
-        <div className="flex flex-wrap gap-3 mt-3">
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(ROBUST_SQL_SCRIPT);
-              toast.success('Fault-tolerant SQL copied to clipboard!', {
-                description: 'Paste in Supabase SQL Editor and click Run',
-                duration: 5000,
-              });
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition-colors shadow-sm"
-          >
-            <Copy className="w-4 h-4" />
-            Copy Fault-Tolerant SQL
-          </button>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(SIMPLE_SQL_SCRIPT);
-              toast.success('Simple SQL copied!', {
-                description: 'Try this if the full script fails',
-                duration: 5000,
-              });
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200 transition-colors"
-          >
-            <Copy className="w-3.5 h-3.5" />
-            Copy Simple Version
-          </button>
-        </div>
-      </div>
-
-      {/* ═══ STEP BY STEP MANUAL INSTRUCTIONS ═══ */}
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-500" />
-          If SQL Still Fails - Run One at a Time
-        </h4>
-        <p className="text-xs text-gray-500 mb-4">
-          Run each query individually in the SQL Editor. <strong>Skip any that give errors</strong> and move to the next. 
-          The last step (auth.users) is the most important one.
-        </p>
-        <div className="space-y-2">
-          {STEP_BY_STEP_QUERIES.map((q, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <span className={`flex-shrink-0 w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center mt-1 ${
-                i === STEP_BY_STEP_QUERIES.length - 1 
-                  ? 'bg-red-100 text-red-700' 
-                  : 'bg-gray-100 text-gray-600'
-              }`}>
-                {i + 1}
-              </span>
-              <code className="flex-1 text-[10px] text-gray-700 font-mono bg-gray-50 px-3 py-2 rounded-lg border border-gray-100 break-all leading-relaxed">
-                {q.length > 120 ? q.substring(0, 120) + '...' : q}
-              </code>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(q);
-                  toast.success(`Step ${i + 1} copied!`);
-                }}
-                className={`flex-shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-colors mt-0.5 ${
-                  i === STEP_BY_STEP_QUERIES.length - 1
-                    ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Copy
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 p-3 rounded-xl bg-blue-50 border border-blue-200">
-          <p className="text-xs text-blue-700">
-            <strong>Last resort:</strong> Go to <strong>Supabase Dashboard &gt; Authentication &gt; Users</strong> and manually delete each user 
-            (click the 3 dots next to each user &gt; Delete User). This always works but is slower.
-          </p>
-        </div>
       </div>
 
       {/* Danger zone — bulk delete at bottom to avoid accidental clicks */}
