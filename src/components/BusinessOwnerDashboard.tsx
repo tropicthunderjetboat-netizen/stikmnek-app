@@ -2466,7 +2466,7 @@ const BusinessOwnerDashboard: React.FC = () => {
               <BusinessSimpleHub
                 profileCompanyName={profileCompanyMeta.name || selectedBusiness?.name || 'Business'}
                 profileLogoUrl={profileCompanyMeta.logo}
-                profileBusinessId={selectedProfileId}
+                profileBusinessId={resolvedProfileBusinessId || selectedProfileId}
                 listingOptions={approvedListingsSameProfile.map((b) => ({
                   id: b.id,
                   name: b.name || 'Listing',

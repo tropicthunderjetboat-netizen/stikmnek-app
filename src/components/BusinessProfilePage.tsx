@@ -31,7 +31,7 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({ profileBusine
     void (async () => {
       const data = await fetchBusinessProfilePage(supabase, SUPABASE_URL, profileBusinessId);
       if (cancelled) return;
-      if (!data || data.offerings.length === 0) {
+      if (!data) {
         setProfile(null);
         setNotFound(true);
       } else {
@@ -167,20 +167,32 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({ profileBusine
           <h2 className="text-lg font-extrabold text-gray-900">
             {t('Our deals', 'Nos offres', 'Ol dil blong mifala')}
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            {t(
-              `${profile.offerings.length} live offer${profile.offerings.length === 1 ? '' : 's'} on StikmNek`,
-              `${profile.offerings.length} offre${profile.offerings.length === 1 ? '' : 's'} en ligne`,
-              `${profile.offerings.length} live dil`,
-            )}
-          </p>
+          {profile.offerings.length > 0 ? (
+            <p className="mt-1 text-sm text-gray-500">
+              {t(
+                `${profile.offerings.length} live offer${profile.offerings.length === 1 ? '' : 's'} on StikmNek`,
+                `${profile.offerings.length} offre${profile.offerings.length === 1 ? '' : 's'} en ligne`,
+                `${profile.offerings.length} live dil`,
+              )}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+              {t(
+                'No live deals right now — check back soon or browse all StikmNek offers.',
+                'Aucune offre en ligne pour le moment — revenez bientôt ou parcourez toutes les offres.',
+                'No gat live dil right now — lukim bae o lukim olgeta dil long StikmNek.',
+              )}
+            </p>
+          )}
         </div>
 
+        {profile.offerings.length > 0 && (
         <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {profile.offerings.map((biz) => (
             <BusinessCard key={biz.id} business={biz} />
           ))}
         </div>
+        )}
 
         <button
           type="button"

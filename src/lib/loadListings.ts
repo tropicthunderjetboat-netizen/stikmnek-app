@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Business } from '@/data/businesses';
+import { touristFacingOfferings } from '@/data/businesses';
 import {
   BUSINESS_LISTINGS_VIEW_COLUMNS,
   BUSINESS_PROFILE_EMBED_COLS,
@@ -132,26 +133,46 @@ const PROFILE_PAGE_COLS =
   'id, name, description, location, rating, review_count, logo_url, image, active';
 
 /**
- * Public business profile: company row + all active offerings (for `/host/:slug` pages).
+ * Public business profile: company row + live tourist-facing offerings (for `/partner/:slug` pages).
+ * Profile `businesses.active` may be false (onboarding stub) while offerings are live — same as Explore.
  */
 export async function fetchBusinessProfilePage(
   supabase: SupabaseClient,
   supabaseUrl: string,
   profileBusinessId: string,
 ): Promise<BusinessProfilePageData | null> {
-  const id = String(profileBusinessId ?? '').trim();
+  let id = String(profileBusinessId ?? '').trim();
   if (!id) return null;
 
-  const { data: prof, error: pErr } = await supabase
+  let { data: prof, error: pErr } = await supabase
     .from('businesses')
     .select(PROFILE_PAGE_COLS)
     .eq('id', id)
     .maybeSingle();
 
+  // Shared link may accidentally use an offering UUID — resolve to master profile.
+  if (!pErr && !prof) {
+    const { data: offRow } = await supabase
+      .from('business_offerings')
+      .select('business_id')
+      .eq('id', id)
+      .maybeSingle();
+    const parentId = String((offRow as { business_id?: string } | null)?.business_id ?? '').trim();
+    if (parentId) {
+      id = parentId;
+      const retry = await supabase
+        .from('businesses')
+        .select(PROFILE_PAGE_COLS)
+        .eq('id', id)
+        .maybeSingle();
+      prof = retry.data;
+      pErr = retry.error;
+    }
+  }
+
   if (pErr || !prof) return null;
 
   const profile = prof as Record<string, unknown>;
-  if (profile.active === false) return null;
 
   const { data: offs, error: oErr } = await supabase
     .from('business_offerings')
@@ -163,14 +184,15 @@ export async function fetchBusinessProfilePage(
 
   if (oErr) return null;
 
-  const offerings: Business[] = [];
+  const mapped: Business[] = [];
   for (const row of (offs || []) as Record<string, unknown>[]) {
     try {
-      offerings.push(mapJoinedOfferingToBusiness(row, profile, supabaseUrl));
+      mapped.push(mapJoinedOfferingToBusiness(row, profile, supabaseUrl));
     } catch {
       /* skip malformed row */
     }
   }
+  const offerings = touristFacingOfferings(mapped);
 
   return {
     id,
