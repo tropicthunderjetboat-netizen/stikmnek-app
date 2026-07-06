@@ -39,6 +39,10 @@ import AdminWhatsAppContacts, {
   type BusinessWhatsAppContact,
   fetchBusinessWhatsAppContactsForAdmin,
 } from '@/components/AdminWhatsAppContacts';
+import AdminExpiredListings, {
+  type ExpiredBusinessListing,
+  fetchExpiredBusinessListingsForAdmin,
+} from '@/components/AdminExpiredListings';
 import { fetchListingEditorBusiness } from '@/lib/listingEditorState';
 import type { EmbeddedListingEdit, AdminAddListingContext } from '@/components/BusinessListingForm';
 import {
@@ -193,6 +197,9 @@ const AdminPanel: React.FC = () => {
   const [loadingPending, setLoadingPending] = useState(false);
   const [incompleteProfiles, setIncompleteProfiles] = useState<IncompleteBusinessProfile[]>([]);
   const [loadingIncompleteProfiles, setLoadingIncompleteProfiles] = useState(false);
+  const [expiredListings, setExpiredListings] = useState<ExpiredBusinessListing[]>([]);
+  const [loadingExpiredListings, setLoadingExpiredListings] = useState(false);
+  const [showExpiredOnly, setShowExpiredOnly] = useState(false);
   const [whatsappContacts, setWhatsappContacts] = useState<BusinessWhatsAppContact[]>([]);
   const [loadingWhatsappContacts, setLoadingWhatsappContacts] = useState(false);
   const [loadingBusinesses, setLoadingBusinesses] = useState(false);
@@ -406,6 +413,19 @@ const AdminPanel: React.FC = () => {
     }
   }, [user]);
 
+  const loadExpiredListings = useCallback(async () => {
+    if (!user) return;
+    setLoadingExpiredListings(true);
+    try {
+      const rows = await fetchExpiredBusinessListingsForAdmin();
+      setExpiredListings(rows);
+    } catch (err) {
+      console.warn('[Admin] expired listings load failed:', err);
+    } finally {
+      setLoadingExpiredListings(false);
+    }
+  }, [user]);
+
   const loadPendingDirect = useCallback(async (showToast = false) => {
     try {
       const { data, error } = await supabase.from('pending_businesses').select('*').order('created_at', { ascending: false });
@@ -591,8 +611,9 @@ const AdminPanel: React.FC = () => {
     loadPending();
     void loadIncompleteProfiles();
     void loadWhatsappContacts();
+    void loadExpiredListings();
     if (!editsLoadedRef.current) { editsLoadedRef.current = true; loadPendingEdits(); }
-  }, [user, loadIncompleteProfiles, loadWhatsappContacts]);
+  }, [user, loadIncompleteProfiles, loadWhatsappContacts, loadExpiredListings]);
 
   const loadPendingEdits = async (showToast = false) => {
     if (!user) return;
@@ -1043,7 +1064,8 @@ const AdminPanel: React.FC = () => {
   useEffect(() => {
     if (activeTab !== 'businesses') return;
     handleRefreshBusinesses();
-  }, [activeTab, handleRefreshBusinesses]);
+    void loadExpiredListings();
+  }, [activeTab, handleRefreshBusinesses, loadExpiredListings]);
 
   useEffect(() => {
     if (activeTab !== 'approvals' || !user) return;
@@ -1448,6 +1470,7 @@ const AdminPanel: React.FC = () => {
   const allBusinesses = adminBusinesses;
 
   const filteredBiz = allBusinesses.filter(b => {
+    if (showExpiredOnly && !listingDiscountExpired(b)) return false;
     const q = searchBiz.toLowerCase();
     return (
       b.name.toLowerCase().includes(q) ||
@@ -1456,6 +1479,25 @@ const AdminPanel: React.FC = () => {
       (b.location || '').toLowerCase().includes(q)
     );
   });
+
+  const expiredOfferingCount = useMemo(
+    () => adminBusinesses.filter((b) => listingDiscountExpired(b)).length,
+    [adminBusinesses],
+  );
+
+  const handleGoToExpiredBusiness = useCallback((profileId: string, businessName: string) => {
+    setSearchBiz(businessName);
+    setShowExpiredOnly(false);
+    setExpandedProfiles((prev) => {
+      const next = new Set(prev);
+      next.add(profileId);
+      return next;
+    });
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`admin-profile-${profileId}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
 
   // ─── Group deals/listings under their parent business profile ───
   // The data model already separates company profiles (`businesses`: contact details +
@@ -1816,6 +1858,19 @@ const AdminPanel: React.FC = () => {
         {/* ═══ BUSINESSES TAB ═══ */}
         {activeTab === 'businesses' && (
           <div className="space-y-4">
+            <AdminExpiredListings
+              listings={expiredListings}
+              loading={loadingExpiredListings}
+              onRefresh={() => {
+                void loadExpiredListings();
+                void handleRefreshBusinesses();
+              }}
+              onReactivated={() => {
+                void loadExpiredListings();
+                void handleRefreshBusinesses();
+              }}
+              onGoToBusiness={handleGoToExpiredBusiness}
+            />
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="relative max-w-md flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -1827,10 +1882,24 @@ const AdminPanel: React.FC = () => {
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-sm text-gray-500 font-medium">
                   {businessProfileGroups.length} business{businessProfileGroups.length === 1 ? '' : 'es'} · {filteredBiz.length} deal{filteredBiz.length === 1 ? '' : 's'}
                 </span>
+                {expiredOfferingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowExpiredOnly((v) => !v)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                      showExpiredOnly
+                        ? 'bg-red-600 text-white border-red-600'
+                        : 'bg-white text-red-700 border-red-200 hover:bg-red-50'
+                    }`}
+                  >
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {showExpiredOnly ? 'Showing expired only' : `${expiredOfferingCount} expired`}
+                  </button>
+                )}
                 <button
                   onClick={handleRefreshBusinesses}
                   disabled={loadingBusinesses}
@@ -1861,10 +1930,12 @@ const AdminPanel: React.FC = () => {
                   const expanded = expandedProfiles.has(group.profileId);
                   const sampleProfile = !group.isFromDb;
                   const dealCount = group.deals.length;
+                  const expiredDealCount = group.deals.filter((d) => listingDiscountExpired(d)).length;
                   const previewDeal = group.deals[0];
                   return (
                     <div
                       key={group.profileId}
+                      id={`admin-profile-${group.profileId}`}
                       className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
                     >
                       {/* ── Business profile header ── */}
@@ -1897,6 +1968,12 @@ const AdminPanel: React.FC = () => {
                             <span className="px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 text-[11px] font-bold">
                               {dealCount} deal{dealCount === 1 ? '' : 's'}
                             </span>
+                            {expiredDealCount > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-bold">
+                                <AlertCircle className="w-3 h-3" />
+                                {expiredDealCount} expired
+                              </span>
+                            )}
                             {group.credVerifiedCount > 0 && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold">
                                 <ShieldCheck className="w-3 h-3" />
@@ -2016,7 +2093,12 @@ const AdminPanel: React.FC = () => {
                                     )}
                                     <span className="text-[11px] text-gray-400">{biz.rating} ★ ({biz.reviewCount})</span>
                                     {dealExpired && (
-                                      <span className="px-1.5 py-0.5 rounded bg-red-100 text-[10px] font-bold text-red-700 uppercase">Expired</span>
+                                      <span className="px-1.5 py-0.5 rounded bg-red-100 text-[10px] font-bold text-red-700 uppercase">
+                                        Expired
+                                        {biz.discountValidUntil
+                                          ? ` · ${new Date(`${String(biz.discountValidUntil).slice(0, 10)}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                                          : ''}
+                                      </span>
                                     )}
                                   </div>
                                 </div>
