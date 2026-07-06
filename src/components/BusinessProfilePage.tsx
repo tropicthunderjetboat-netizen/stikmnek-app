@@ -123,35 +123,64 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({ profileBusine
         {coverImage && <meta name="twitter:image" content={coverImage} />}
       </Helmet>
 
-      <div className="bg-gradient-to-br from-teal-700 via-emerald-700 to-teal-800 text-white">
-        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
-          <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:gap-8 sm:text-left">
-            <div className="w-full max-w-md mx-auto sm:mx-0 sm:max-w-[20rem]">
-              {profile.logoUrl ? (
+      <div className="relative overflow-hidden text-white">
+        {/* Layered gradient + soft glow (Vanuatu / tropical feel) */}
+        <div
+          className="absolute inset-0 bg-gradient-to-br from-teal-900 via-emerald-800 to-teal-700"
+          aria-hidden
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-tr from-cyan-600/30 via-transparent to-emerald-400/20"
+          aria-hidden
+        />
+        <div
+          className="absolute -right-12 -top-20 h-56 w-56 rounded-full bg-emerald-300/25 blur-3xl sm:h-72 sm:w-72"
+          aria-hidden
+        />
+        <div
+          className="absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl sm:h-80 sm:w-80"
+          aria-hidden
+        />
+        <div
+          className="absolute left-1/2 top-0 h-32 w-[120%] -translate-x-1/2 bg-gradient-to-b from-white/10 to-transparent"
+          aria-hidden
+        />
+        {/* Gentle wave into page body */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-gray-50/90 to-transparent sm:h-10"
+          aria-hidden
+        />
+
+        <div className="relative mx-auto max-w-5xl px-4 pb-10 pt-8 sm:px-6 sm:pb-12 sm:pt-10">
+          <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:items-center sm:gap-8 sm:text-left">
+            {profile.logoUrl ? (
+              <div className="mx-auto w-fit max-w-full shrink-0 sm:mx-0">
                 <BusinessProfileLogo
                   src={profile.logoUrl}
                   alt={profile.name}
                   variant="profilePage"
                 />
-              ) : null}
-            </div>
+              </div>
+            ) : null}
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold uppercase tracking-widest text-white/60">
+              <span className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/90 shadow-sm backdrop-blur-sm sm:text-xs">
                 {t('StikmNek Partner', 'Partenaire StikmNek', 'StikmNek Partner')}
-              </p>
-              <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">{profile.name}</h1>
+              </span>
+              <h1 className="mt-3 text-2xl font-extrabold tracking-tight drop-shadow-sm sm:text-3xl">
+                {profile.name}
+              </h1>
               {profile.location && (
-                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-white/80 sm:justify-start">
-                  <MapPin className="h-4 w-4 shrink-0" />
+                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-white/85 sm:justify-start">
+                  <MapPin className="h-4 w-4 shrink-0 text-emerald-200" />
                   <span>{profile.location}</span>
                 </p>
               )}
               {profile.rating > 0 && (
-                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm font-semibold text-white/90 sm:justify-start">
-                  <Star className="h-4 w-4 fill-yellow-300 text-yellow-300" />
+                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm font-semibold text-white/95 sm:justify-start">
+                  <Star className="h-4 w-4 fill-amber-300 text-amber-300" />
                   {profile.rating.toFixed(1)}
                   {profile.reviewCount > 0 && (
-                    <span className="font-normal text-white/70">
+                    <span className="font-normal text-white/75">
                       ({profile.reviewCount} {t('reviews', 'avis', 'riviu')})
                     </span>
                   )}
@@ -160,9 +189,21 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({ profileBusine
             </div>
           </div>
         </div>
+
+        <svg
+          className="relative block w-full text-gray-50/90"
+          viewBox="0 0 1440 48"
+          preserveAspectRatio="none"
+          aria-hidden
+        >
+          <path
+            fill="currentColor"
+            d="M0,32 C360,48 720,8 1080,24 C1260,32 1380,40 1440,36 L1440,48 L0,48 Z"
+          />
+        </svg>
       </div>
 
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 -mt-4">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 -mt-2">
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="text-lg font-extrabold text-gray-900">
             {t('Our deals', 'Nos offres', 'Ol dil blong mifala')}
