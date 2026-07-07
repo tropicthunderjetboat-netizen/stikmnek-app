@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getPhotoDisplayUrl } from '@/lib/utils';
+import { getBusinessImageUrl, getPhotoDisplayUrl } from '@/lib/utils';
 import {
   legacyUntaggedPhotoBelongsToOffering,
   supplementUntaggedPhotosForRecentNewestOffering,
@@ -92,6 +92,28 @@ export async function fetchApprovedPhotosForOffering(
   const approved = rows.filter((p) => String(p.status || '').toLowerCase() === 'approved');
   /** Listing editor enforces the same cap as `PhotoUploader` (public gallery may show more). */
   return approved.slice(0, 5);
+}
+
+/**
+ * Hero / card cover URL for one listing: approved gallery photos first (same rules as
+ * `PhotoGallery`), then the offering `image` field. Avoids stale or profile-fallback URLs
+ * blocking real gallery photos.
+ */
+export async function resolveListingCoverImageUrl(
+  client: SupabaseClient,
+  profileBusinessId: string,
+  offeringId: string,
+  listingImageField: string | undefined | null,
+  supabaseUrl: string,
+): Promise<string> {
+  const photos = await fetchApprovedPhotosForOffering(client, profileBusinessId, offeringId, supabaseUrl);
+  for (const p of photos) {
+    const url = getPhotoDisplayUrl(p, supabaseUrl) || String(p.url || '').trim();
+    if (url) return url;
+  }
+  const fromListing =
+    getBusinessImageUrl(listingImageField, supabaseUrl) || String(listingImageField || '').trim();
+  return fromListing;
 }
 
 /** Map DB rows to `PhotoUploader` / submit payload shape. */

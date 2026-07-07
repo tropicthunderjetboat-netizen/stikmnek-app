@@ -8,7 +8,8 @@ import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, Mes
 import { toast } from 'sonner';
 import ReviewForm from '@/components/ReviewForm';
 import PhotoGallery from '@/components/PhotoGallery';
-import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe, getPhotoDisplayUrl } from '@/lib/utils';
+import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
+import { resolveListingCoverImageUrl } from '@/lib/fetchApprovedPhotosForOffering';
 import { shortPriceUnitSuffix } from '@/lib/categoryPricing';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { trackInteractionEvent } from '@/lib/interactionEvents';
@@ -43,10 +44,6 @@ import {
   primaryEmbeddedOffering,
   primaryOfferingDescriptionHtml,
 } from '@/data/businesses';
-import {
-  legacyUntaggedPhotoBelongsToOffering,
-  supplementUntaggedPhotosForRecentNewestOffering,
-} from '@/lib/offeringPhotoPartition';
 import { isListingFavorited } from '@/lib/favoritesUi';
 import BusinessCredentialsTile from '@/components/BusinessCredentialsTile';
 import BusinessProfileLogo from '@/components/BusinessProfileLogo';
@@ -59,8 +56,6 @@ import {
   type BusinessCredentialsPublic,
   type BusinessCredentialsRow,
 } from '@/lib/businessCredentials';
-import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
-
 type ReviewResponseRow = { review_id: string; response: string; created_at: string };
 
 /** Master profile fields required by `mapJoinedOfferingToBusiness` (listing detail lives on offerings). */
@@ -419,85 +414,20 @@ const BusinessDetail: React.FC = () => {
   const hasWhatsApp = digitsForWaMe(businessWhatsAppRaw).length >= 5;
 
   useEffect(() => {
-    if (!effectiveBiz?.id || !profileId) return;
-    const listingCover = String(effectiveBiz.image || '').trim();
-    if (listingCover) {
-      setDisplayCoverImage(listingCover);
+    if (!effectiveBiz?.id || !profileId) {
+      setDisplayCoverImage('');
       return;
     }
     let cancelled = false;
     void (async () => {
-      let { data, error } = await supabase
-        .from('business_photos')
-        .select('url, file_path')
-        .eq('business_id', profileId)
-        .eq('offering_id', effectiveBiz.id)
-        .eq('status', 'approved')
-        .order('is_main', { ascending: false })
-        .order('created_at', { ascending: true })
-        .limit(1);
-      if (cancelled || error) return;
-      let first = data?.[0] as { url?: string; file_path?: string } | undefined;
-      if (!first) {
-        const { count, error: cntErr } = await supabase
-          .from('business_offerings')
-          .select('id', { count: 'exact', head: true })
-          .eq('business_id', profileId)
-          .eq('active', true);
-        const offerCount = !cntErr && typeof count === 'number' ? count : 99;
-
-        const legacy = await supabase
-          .from('business_photos')
-          .select('url, file_path, created_at')
-          .eq('business_id', profileId)
-          .is('offering_id', null)
-          .eq('status', 'approved')
-          .order('is_main', { ascending: false })
-          .order('created_at', { ascending: true });
-
-        if (cancelled || legacy.error || !legacy.data?.length) {
-          // leave first undefined
-        } else if (offerCount === 1) {
-          first = legacy.data[0] as { url?: string; file_path?: string };
-        } else if (offerCount > 1) {
-          const { data: rows, error: oErr } = await supabase
-            .from('business_offerings')
-            .select('id, created_at')
-            .eq('business_id', profileId)
-            .eq('active', true)
-            .order('created_at', { ascending: true });
-          if (!cancelled && !oErr && rows?.length) {
-            const ordered = rows as OfferingCreatedRow[];
-            let match = legacy.data.find((row) => {
-              const r = row as { created_at?: string };
-              return legacyUntaggedPhotoBelongsToOffering(
-                String(r.created_at || ''),
-                effectiveBiz.id,
-                ordered,
-              );
-            });
-            if (!match) {
-              const extra = supplementUntaggedPhotosForRecentNewestOffering(
-                legacy.data as { created_at: string }[],
-                effectiveBiz.id,
-                ordered,
-              );
-              if (extra.length > 0) {
-                match = extra[0] as { url?: string; file_path?: string };
-              }
-            }
-            first = match as { url?: string; file_path?: string } | undefined;
-          }
-        } else {
-          first = undefined;
-        }
-      }
-      if (!first) {
-        setDisplayCoverImage('');
-        return;
-      }
-      const resolved = getPhotoDisplayUrl(first, SUPABASE_URL) || first.url || '';
-      setDisplayCoverImage(resolved);
+      const resolved = await resolveListingCoverImageUrl(
+        supabase,
+        profileId,
+        effectiveBiz.id,
+        effectiveBiz.image,
+        SUPABASE_URL,
+      );
+      if (!cancelled) setDisplayCoverImage(resolved);
     })();
     return () => {
       cancelled = true;
@@ -660,7 +590,8 @@ const BusinessDetail: React.FC = () => {
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 200);
-  const metaImage = (displayCoverImage || biz.image || '').trim();
+  const heroCoverSrc = (displayCoverImage || biz.image || '').trim() || '/placeholder.svg';
+  const metaImage = heroCoverSrc.startsWith('/placeholder') ? '' : heroCoverSrc;
   const metaUrl = absoluteDealUrl(biz);
 
   return (
@@ -751,7 +682,14 @@ const BusinessDetail: React.FC = () => {
           </div>
         )}
         <div className="relative rounded-2xl overflow-hidden mb-6 shadow-lg">
-          <img src={displayCoverImage || biz.image} alt={biz.name} className="w-full h-64 sm:h-80 object-cover" />
+          <img
+            src={heroCoverSrc}
+            alt={biz.name}
+            className="w-full h-64 sm:h-80 object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/placeholder.svg';
+            }}
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           <div className="absolute bottom-4 left-4 right-4">
             <div className="flex items-center gap-2 mb-2">
