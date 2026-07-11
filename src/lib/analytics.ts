@@ -1,23 +1,30 @@
 /**
  * StikmNek Analytics Tracking Utility
  * Tracks key user actions, page views, and performance metrics.
- * Dual-destination: localStorage (always) + Google Analytics 4 (when consent given).
+ * Triple-destination: localStorage (always) + GA4 + Meta Pixel (when consent given).
  *
  * PERFORMANCE: Constructor is lightweight. Heavy work (localStorage parsing,
- * performance observers, GA init) is deferred to after first idle to avoid
+ * performance observers, GA/Meta init) is deferred to after first idle to avoid
  * blocking the main thread during page load.
  *
  * GA4 Integration:
  *   - gtag.js is loaded dynamically when user accepts cookies
  *   - Events are forwarded to GA4 via gtag('event', ...)
- *   - Consent state is managed via localStorage 'stikm-cookie-consent'
- *   - GA_MEASUREMENT_ID is fetched from the server to keep it private
+ *
+ * Meta Pixel Integration:
+ *   - fbevents.js is loaded dynamically when user accepts cookies
+ *   - Standard events forwarded via fbq('track', ...)
+ *
+ * Consent state is managed via localStorage 'stikm-cookie-consent'.
+ * Measurement IDs are read from data attributes in index.html.
  */
 
 declare global {
   interface Window {
     gtag: (...args: any[]) => void;
     dataLayer: any[];
+    fbq: (...args: any[]) => void;
+    _fbq: (...args: any[]) => void;
   }
 }
 
@@ -62,6 +69,8 @@ class Analytics {
   private pageViewCount = 0;
   private gaInitialized = false;
   private gaMeasurementId: string | null = null;
+  private metaPixelInitialized = false;
+  private metaPixelId: string | null = null;
   private consentGiven = false;
   private heavyInitDone = false;
   private pendingEvents: Array<() => void> = [];
@@ -125,6 +134,7 @@ class Analytics {
       if (consent === 'accepted') {
         this.consentGiven = true;
         this.initGA();
+        this.initMetaPixel();
       }
     } catch (_e) {}
   }
@@ -132,6 +142,7 @@ class Analytics {
   onConsentAccepted() {
     this.consentGiven = true;
     this.initGA();
+    this.initMetaPixel();
   }
 
   onConsentDeclined() {
@@ -140,6 +151,9 @@ class Analytics {
       window.gtag('consent', 'update', {
         analytics_storage: 'denied',
       });
+    }
+    if (window.fbq) {
+      window.fbq('consent', 'revoke');
     }
   }
 
@@ -223,6 +237,65 @@ class Analytics {
     };
   }
 
+  // ─── Meta Pixel Initialization ───
+
+  private initMetaPixel() {
+    if (this.metaPixelInitialized || !this.consentGiven) return;
+
+    const existingScript = document.querySelector('script[data-meta-pixel-id]');
+    const pixelId = existingScript?.getAttribute('data-meta-pixel-id') || null;
+
+    if (!pixelId) {
+      this.metaPixelInitialized = true;
+      console.log('[Analytics] Meta Pixel skipped (no pixel ID found in page)');
+      return;
+    }
+
+    if (document.querySelector('script[src*="connect.facebook.net"]')) {
+      this.metaPixelInitialized = true;
+      return;
+    }
+
+    this.metaPixelId = pixelId;
+    this.bootstrapFbq();
+
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = 'https://connect.facebook.net/en_US/fbevents.js';
+    script.onload = () => {
+      window.fbq('init', pixelId);
+      window.fbq('track', 'PageView');
+      this.metaPixelInitialized = true;
+      console.log('[Analytics] Meta Pixel initialized: ' + pixelId);
+    };
+    script.onerror = () => {
+      console.warn('[Analytics] Failed to load Meta Pixel - fbevents.js unavailable');
+      this.metaPixelInitialized = true;
+    };
+    document.head.appendChild(script);
+  }
+
+  private bootstrapFbq() {
+    if (window.fbq) return;
+
+    const queue: any[] = [];
+    const fbq = (...args: any[]) => {
+      if ((fbq as any).callMethod) {
+        (fbq as any).callMethod(...args);
+      } else {
+        queue.push(args);
+      }
+    };
+
+    (fbq as any).push = fbq;
+    (fbq as any).loaded = true;
+    (fbq as any).version = '2.0';
+    (fbq as any).queue = queue;
+
+    window.fbq = fbq;
+    if (!window._fbq) window._fbq = fbq;
+  }
+
   // ─── Send event to GA4 ───
   private sendToGA(eventName: string, params?: Record<string, any>) {
     if (!this.consentGiven || !window.gtag) return;
@@ -233,6 +306,15 @@ class Analytics {
         ...params,
         session_id: this.sessionId,
       });
+    } catch (_e) {}
+  }
+
+  // ─── Send event to Meta Pixel ───
+  private sendToMeta(eventName: string, params?: Record<string, any>) {
+    if (!this.consentGiven || !window.fbq) return;
+
+    try {
+      window.fbq('track', eventName, params);
     } catch (_e) {}
   }
 
@@ -300,6 +382,7 @@ class Analytics {
       page_title: pageName,
       page_location: window.location.href,
     });
+    this.sendToMeta('PageView');
   }
 
   signIn(method: string) {
@@ -310,6 +393,7 @@ class Analytics {
   signUp(userType: string) {
     this.track('sign_up', 'auth', userType);
     this.sendToGA('sign_up', { method: userType });
+    this.sendToMeta('CompleteRegistration', { status: true, content_name: userType });
   }
 
   signOut() {
@@ -324,6 +408,11 @@ class Analytics {
       currency: 'AUD',
       items: [{ item_name: passType + '_pass', price: amount, quantity: 1 }],
     });
+    this.sendToMeta('Purchase', {
+      value: amount,
+      currency: 'AUD',
+      content_name: passType + '_pass',
+    });
   }
 
 
@@ -331,6 +420,11 @@ class Analytics {
     this.track('view_business', 'engagement', businessName, undefined, { businessId });
     this.sendToGA('view_item', {
       items: [{ item_id: businessId, item_name: businessName }],
+    });
+    this.sendToMeta('ViewContent', {
+      content_ids: [businessId],
+      content_name: businessName,
+      content_type: 'business',
     });
   }
 
@@ -351,11 +445,15 @@ class Analytics {
     this.sendToGA(isFavorite ? 'add_to_wishlist' : 'remove_from_wishlist', {
       items: [{ item_id: businessId }],
     });
+    if (isFavorite) {
+      this.sendToMeta('AddToWishlist', { content_ids: [businessId] });
+    }
   }
 
   searchQuery(query: string, resultCount: number) {
     this.track('search', 'engagement', query, resultCount);
     this.sendToGA('search', { search_term: query });
+    this.sendToMeta('Search', { search_string: query });
   }
 
   filterCategory(category: string) {
@@ -372,6 +470,11 @@ class Analytics {
       value: amount,
       currency: 'AUD',
       items: [{ item_name: passType + '_pass', price: amount }],
+    });
+    this.sendToMeta('InitiateCheckout', {
+      value: amount,
+      currency: 'AUD',
+      content_name: passType + '_pass',
     });
   }
 
@@ -497,6 +600,7 @@ class Analytics {
       commerceEvents: this.events.filter(e => e.category === 'commerce').length,
       errors: this.events.filter(e => e.event === 'error').length,
       gaInitialized: this.gaInitialized,
+      metaPixelInitialized: this.metaPixelInitialized,
       consentGiven: this.consentGiven,
     };
   }
@@ -508,6 +612,10 @@ class Analytics {
 
   isGAActive(): boolean {
     return this.gaInitialized && this.consentGiven;
+  }
+
+  isMetaPixelActive(): boolean {
+    return this.metaPixelInitialized && this.consentGiven;
   }
 }
 
