@@ -68,8 +68,10 @@ class Analytics {
   private sessionId: string | null = null;
   private pageViewCount = 0;
   private gaInitialized = false;
+  private gaLoading = false;
   private gaMeasurementId: string | null = null;
   private metaPixelInitialized = false;
+  private metaLoading = false;
   private metaPixelId: string | null = null;
   private consentGiven = false;
   private heavyInitDone = false;
@@ -159,23 +161,16 @@ class Analytics {
 
   // ─── Google Analytics 4 Initialization ───
 
-  private async initGA() {
-    if (this.gaInitialized) return;
-
-    try {
-      const { supabase } = await import('@/lib/supabase');
-      await supabase.functions.invoke('sentry-relay', {
-        body: { action: 'health' },
-      });
-      this.loadGtagScript();
-    } catch (_e) {
-      this.loadGtagScript();
-    }
+  private initGA() {
+    if (!this.consentGiven || this.gaInitialized || this.gaLoading) return;
+    this.gaLoading = true;
+    this.loadGtagScript();
   }
 
   private loadGtagScript() {
-    if (document.querySelector('script[src*="googletagmanager.com/gtag"]')) {
+    if (document.querySelector('script[src*="googletagmanager.com/gtag/js"]')) {
       this.gaInitialized = true;
+      this.gaLoading = false;
       return;
     }
 
@@ -184,20 +179,27 @@ class Analytics {
       window.dataLayer.push(arguments);
     };
 
+    // Consent Mode: deny by default, grant immediately when user has accepted.
     window.gtag('consent', 'default', {
-      analytics_storage: this.consentGiven ? 'granted' : 'denied',
+      analytics_storage: 'denied',
+      ad_storage: 'denied',
+    });
+    window.gtag('consent', 'update', {
+      analytics_storage: 'granted',
+      ad_storage: 'granted',
     });
 
     const existingScript = document.querySelector('script[data-ga-id]');
     const measurementId = existingScript?.getAttribute('data-ga-id') || null;
 
-    if (measurementId) {
-      this.gaMeasurementId = measurementId;
-      this.configureGA(measurementId);
-    } else {
-      this.gaInitialized = true;
-      console.log('[Analytics] GA4 initialized in local-only mode (no measurement ID found in page)');
+    if (!measurementId) {
+      this.gaLoading = false;
+      console.warn('[Analytics] GA4 skipped (no measurement ID found in page)');
+      return;
     }
+
+    this.gaMeasurementId = measurementId;
+    this.configureGA(measurementId);
   }
 
   private configureGA(measurementId: string) {
@@ -210,6 +212,8 @@ class Analytics {
       window.gtag('js', new Date());
       window.gtag('config', measurementId, {
         send_page_view: true,
+        page_location: window.location.href,
+        page_title: document.title,
         cookie_flags: 'SameSite=None;Secure',
         custom_map: {
           dimension1: 'user_type',
@@ -222,55 +226,53 @@ class Analytics {
       }
 
       this.gaInitialized = true;
+      this.gaLoading = false;
       console.log('[Analytics] GA4 initialized with measurement ID: ' + measurementId);
-
-      if (this.consentGiven) {
-        window.gtag('consent', 'update', {
-          analytics_storage: 'granted',
-        });
-      }
     };
 
     script.onerror = () => {
       console.warn('[Analytics] Failed to load gtag.js - GA4 will not be available');
-      this.gaInitialized = true;
+      this.gaLoading = false;
     };
   }
 
   // ─── Meta Pixel Initialization ───
 
   private initMetaPixel() {
-    if (this.metaPixelInitialized || !this.consentGiven) return;
+    if (!this.consentGiven || this.metaPixelInitialized || this.metaLoading) return;
 
     const existingScript = document.querySelector('script[data-meta-pixel-id]');
     const pixelId = existingScript?.getAttribute('data-meta-pixel-id') || null;
 
     if (!pixelId) {
-      this.metaPixelInitialized = true;
-      console.log('[Analytics] Meta Pixel skipped (no pixel ID found in page)');
+      console.warn('[Analytics] Meta Pixel skipped (no pixel ID found in page)');
       return;
     }
 
-    if (document.querySelector('script[src*="connect.facebook.net"]')) {
+    if (document.querySelector('script[src*="connect.facebook.net/en_US/fbevents.js"]')) {
       this.metaPixelInitialized = true;
       return;
     }
 
+    this.metaLoading = true;
     this.metaPixelId = pixelId;
     this.bootstrapFbq();
+
+    // Meta standard pattern: queue init + PageView before the script finishes loading.
+    window.fbq('init', pixelId);
+    window.fbq('track', 'PageView');
 
     const script = document.createElement('script');
     script.async = true;
     script.src = 'https://connect.facebook.net/en_US/fbevents.js';
     script.onload = () => {
-      window.fbq('init', pixelId);
-      window.fbq('track', 'PageView');
       this.metaPixelInitialized = true;
+      this.metaLoading = false;
       console.log('[Analytics] Meta Pixel initialized: ' + pixelId);
     };
     script.onerror = () => {
       console.warn('[Analytics] Failed to load Meta Pixel - fbevents.js unavailable');
-      this.metaPixelInitialized = true;
+      this.metaLoading = false;
     };
     document.head.appendChild(script);
   }
