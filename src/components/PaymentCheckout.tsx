@@ -564,21 +564,19 @@ const PaymentCheckout: React.FC = () => {
 
   if (!cart) {
     return (
-      <div className="min-h-screen bg-gray-50 pt-20 pb-16">
-        <div className="max-w-lg mx-auto px-4 text-center pt-20">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gray-100 flex items-center justify-center">
-            <CreditCard className="w-10 h-10 text-gray-400" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-3">No Pass Selected</h2>
-          <p className="text-gray-500 mb-6">Please select a pass to purchase first.</p>
-          <button
-            type="button"
-            onClick={() => navigate('/passes?info=1')}
-            className="px-6 py-3 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors"
-          >
-            View Passes
-          </button>
-        </div>
+      <div className="min-h-[100dvh] bg-neutral-950 text-white flex flex-col items-center justify-center px-6 text-center">
+        <p className="text-lg font-bold mb-2">No pass selected</p>
+        <p className="text-sm text-neutral-400 mb-6">Go back and choose a pass to continue.</p>
+        <button
+          type="button"
+          onClick={() => {
+            setCurrentView('home');
+            navigate('/');
+          }}
+          className="min-h-11 px-6 rounded-xl bg-teal-600 font-semibold"
+        >
+          Back to exploring
+        </button>
       </div>
     );
   }
@@ -1144,810 +1142,299 @@ const PaymentCheckout: React.FC = () => {
   };
 
 
-  const Icon = Ticket;
-  const passCardGradient = 'from-teal-500 to-emerald-600';
-  const currentStepIndex = step === 'dates' ? 0 : step === 'payment' ? 1 : step === 'success' ? 2 : 2;
+
+  const goHome = () => {
+    setCurrentView('home');
+    navigate('/');
+  };
+
+  const peopleWord = partySize === 1 ? '1 person' : `${partySize} people`;
+  const planWord = isExtended ? '7-Day Pass' : '1-Day Pass';
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20 pb-16">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Back Button */}
-        <button
-          type="button"
-          onClick={() => navigate('/passes?info=1')}
-          className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-6 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm font-medium">Back to Passes</span>
-        </button>
+    <div className="min-h-[100dvh] bg-neutral-950 text-white">
+      <div className="max-w-md mx-auto px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <div className="flex items-center justify-between py-3">
+          <button
+            type="button"
+            onClick={() => (step === 'payment' ? setStep('dates') : goHome())}
+            className="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-white"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {step === 'payment' ? 'Back' : 'Explore'}
+          </button>
+          <p className="text-sm font-bold tracking-tight">StikmNek</p>
+          <span className="w-14" />
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          {/* Payment Form - Left */}
-          <div className="lg:col-span-3 space-y-6">
+        {step === 'processing' && (
+          <div className="py-24 text-center space-y-4">
+            <Loader2 className="w-10 h-10 text-teal-400 animate-spin mx-auto" />
+            <p className="text-lg font-bold">Processing payment</p>
+            <p className="text-sm text-neutral-400">Stay on this page — usually a few seconds.</p>
+          </div>
+        )}
+
+        {step === 'success' && (
+          <div className="py-20 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-teal-600/30 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-teal-400" />
+            </div>
+            <p className="text-xl font-bold">You’re in</p>
+            <p className="text-sm text-neutral-400">Your pass is ready. Start messaging places from Your Trip.</p>
+            <button
+              type="button"
+              onClick={() => setCurrentView('payment-confirmation')}
+              className="w-full min-h-12 rounded-xl bg-teal-600 font-bold"
+            >
+              Continue
+            </button>
+          </div>
+        )}
+
+        {step === 'dates' && (
+          <div className="space-y-6 pt-2">
             <div>
-              <h1 className="text-2xl font-extrabold text-gray-900">Checkout</h1>
-              <p className="text-gray-500 text-sm mt-1">Complete your purchase securely with your credit or debit card</p>
+              <h1 className="text-2xl font-bold leading-tight">Your pass</h1>
+              <p className="text-neutral-400 text-sm mt-1">Almost done — then message places direct.</p>
             </div>
 
-            {/* Step Indicator */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {['Choose Dates', 'Card Details', 'Complete'].map((label, i) => (
-                <div key={label} className="flex items-center gap-1.5 sm:gap-2">
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                    i <= currentStepIndex
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    {i < currentStepIndex ? (
-                      <Check className="w-3.5 h-3.5" strokeWidth={3} />
-                    ) : (
-                      i + 1
-                    )}
-                  </div>
-                  <span className={`text-xs font-medium hidden sm:inline ${
-                    i <= currentStepIndex ? 'text-teal-700' : 'text-gray-400'
-                  }`}>{label}</span>
-                  {i < 2 && <ChevronRight className="w-3.5 h-3.5 text-gray-300" />}
-                </div>
-              ))}
+            <div className="rounded-2xl bg-gradient-to-br from-teal-600 to-teal-800 p-5 shadow-lg shadow-teal-950/40">
+              <p className="text-teal-100 text-xs font-semibold uppercase tracking-wide">{planWord}</p>
+              <p className="text-3xl font-bold mt-1">A${priceAud.toFixed(2)}</p>
+              <p className="text-sm text-teal-100/90 mt-1">{peopleWord} · ages 6+</p>
             </div>
 
-            {/* ═══ STEP 1: DATE SELECTION ═══ */}
-            {step === 'dates' && (
-              <div className="space-y-5">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <CalendarRange className="w-5 h-5 text-teal-600" />
-                  When do you want your discounts to start?
-                </h3>
-
-                <div className="bg-white rounded-xl p-6 border border-gray-200 space-y-5">
-                  {/* Info Banner */}
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 border border-teal-100">
-                    <Info className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm text-teal-800">
-                      <p className="font-semibold mb-1">How it works</p>
-                      <p className="text-teal-700">{t('checkout.how_it_works_compact', checkoutLang)}</p>
-                    </div>
-                  </div>
-
-                  {profilePartySummary && (
-                    <div className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm">
-                      <p className="text-xs font-bold uppercase tracking-wide text-teal-700 mb-1.5">
-                        {t('checkout.profile_party_title', checkoutLang)}
-                      </p>
-                      <p className="text-sm text-gray-700 leading-relaxed">{profilePartySummary}</p>
-                    </div>
-                  )}
-
-                  <div className="pt-1">
-                    <h4 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-3">
-                      {t('checkout.section_pass_group', checkoutLang)}
-                    </h4>
-                  <div>
-                    {!showPartyEditor && profilePartyCount > 0 ? (
-                      <div className="flex items-center justify-between gap-3 rounded-xl border-2 border-teal-100 bg-teal-50/40 px-4 py-3">
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-teal-700">
-                            {t('checkout.party_summary_label', checkoutLang)}
-                          </p>
-                          <p className="text-sm font-bold text-gray-900 mt-0.5">
-                            {t('checkout.party_summary_line', checkoutLang).replace('__N__', String(partySize))}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setShowPartyEditor(true)}
-                          className="text-sm font-semibold text-teal-700 hover:text-teal-900 px-3 py-1.5 rounded-lg border border-teal-200 bg-white shrink-0"
-                        >
-                          {t('checkout.party_edit', checkoutLang)}
-                        </button>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="block text-sm font-semibold text-gray-700">People (ages 6+)</label>
-                          {profilePartyCount > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setShowPartyEditor(false)}
-                              className="text-xs font-semibold text-teal-600 hover:text-teal-800"
-                            >
-                              {t('checkout.party_done', checkoutLang)}
-                            </button>
-                          )}
-                        </div>
-                        <select
-                          value={partySize}
-                          onChange={(e) => handlePartySizeChange(Number(e.target.value))}
-                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                        >
-                          {Array.from({ length: MAX_PARTY_SIZE }, (_, i) => i + 1).map((n) => (
-                            <option key={n} value={n}>
-                              {n} {n === 1 ? 'person' : 'people'}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <span className="block text-sm font-semibold text-gray-700 mb-2">{t('checkout.plan_pick_title', checkoutLang)}</span>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => handleDurationChange(false)}
-                        className={`text-left rounded-xl border-2 p-4 transition-all ${
-                          !isExtended
-                            ? 'border-teal-600 bg-teal-50/80 ring-2 ring-teal-300 shadow-md'
-                            : 'border-gray-200 bg-white hover:border-teal-200'
-                        }`}
-                      >
-                        <p className="text-sm font-extrabold text-gray-900">{t('checkout.plan_day_title', checkoutLang)}</p>
-                        <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                          {t('checkout.plan_day_sub', checkoutLang)}
-                        </p>
-                        <p className="text-lg font-extrabold text-teal-700 mt-3">
-                          A${priceShortOption.toFixed(2)}{' '}
-                          <span className="text-xs font-semibold text-gray-500">{t('checkout.option_total', checkoutLang)}</span>
-                        </p>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDurationChange(true)}
-                        className={`text-left rounded-xl border-2 p-4 transition-all ${
-                          isExtended
-                            ? 'border-teal-600 bg-teal-50/80 ring-2 ring-teal-300 shadow-md'
-                            : 'border-gray-200 bg-white hover:border-teal-200'
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-extrabold text-gray-900">{t('checkout.plan_holiday_title', checkoutLang)}</p>
-                          {tripNights != null && tripNights >= 1 && (
-                            <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
-                              {t('checkout.option_extended_badge', checkoutLang).replace('__NIGHTS__', String(tripNights))}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 leading-snug">
-                          {t('checkout.plan_holiday_sub', checkoutLang)}
-                        </p>
-                        <p className="mt-2 text-[11px] font-bold text-emerald-900 leading-snug bg-emerald-100/90 border border-emerald-200 rounded-lg px-2.5 py-1.5">
-                          {t('checkout.share_second_week_unlock', checkoutLang)}
-                        </p>
-                        <p className="text-lg font-extrabold text-teal-700 mt-3">
-                          A${priceExtendedOption.toFixed(2)}{' '}
-                          <span className="text-xs font-normal text-gray-500">
-                            (+A${EXTEND_FEE_AUD.toFixed(0)} vs day pass)
-                          </span>
-                        </p>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3.5 mt-4">
-                    <div className="flex items-start gap-2.5">
-                      <span className="text-lg flex-shrink-0 mt-0.5" role="img" aria-label="Information">
-                        ℹ️
-                      </span>
-                      <p className="text-sm text-blue-900 leading-relaxed">
-                        <span className="font-semibold">Children under 6 are FREE!</span>{' '}
-                        {`They don't count toward your party size and can accompany your group at no extra cost.`}
-                      </p>
-                    </div>
-                  </div>
-
-                  {showGroupSizeWarning && (
-                    <div className="bg-amber-50 border-l-4 border-amber-500 rounded-r-lg p-4 mt-3 mb-4">
-                      <div className="flex items-start gap-3">
-                        <span className="text-xl flex-shrink-0" aria-hidden="true">
-                          ⚠️
-                        </span>
-                        <div className="flex-1">
-                          <p className="font-semibold text-amber-900 text-sm sm:text-base">
-                            Group Size Limit Reached
-                          </p>
-                          <p className="text-sm text-amber-800 mt-1">
-                            Maximum {MAX_PARTY_SIZE} people per voucher. For groups larger than {MAX_PARTY_SIZE}, please purchase a second voucher after completing this one.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <CheckoutPricingSummary
-                    partySize={partySize}
-                    isExtended={isExtended}
-                    language={checkoutLang}
-                  />
-                  </div>
-
-                  <div className="mt-6 pt-2">
-                    <div className="rounded-2xl border-2 border-teal-300/80 bg-gradient-to-br from-teal-50/95 via-white to-emerald-50/90 p-5 sm:p-6 shadow-[0_20px_50px_-20px_rgba(13,148,136,0.45)] ring-1 ring-teal-200/60">
-                      <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6 pb-5 border-b border-teal-200/60">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-600 text-white shadow-lg shadow-teal-700/25">
-                          <CalendarRange className="w-6 h-6" aria-hidden />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="text-base sm:text-lg font-black uppercase tracking-wide text-teal-950">
-                            {t('checkout.section_dates', checkoutLang)}
-                          </h4>
-                          <p className="text-sm text-teal-900/90 mt-1.5 leading-snug font-medium">
-                            {t('checkout.section_dates_sub', checkoutLang)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-5">
-                        {/* Start Date Picker */}
-                        <div className="rounded-xl bg-white/95 border border-teal-200/90 p-4 shadow-sm">
-                          <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-teal-600 shrink-0" />
-                            Discounts Valid From (Start Date)
-                          </label>
-                          <input
-                            type="date"
-                            value={startDate}
-                            min={minStartDate}
-                            max={maxStartDate}
-                            onChange={(e) => {
-                              startDateTouchedRef.current = true;
-                              const next = e.target.value;
-                              setStartDate(next);
-                              syncPaySessionRef({ startDate: next });
-                            }}
-                            className="w-full px-4 py-3.5 rounded-xl border-2 border-teal-100 bg-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all cursor-pointer hover:border-teal-300"
-                          />
-                          <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                            You can start your pass up to 30 days from today (UTC calendar, same as checkout validation)
-                          </p>
-                        </div>
-
-                        {/* End Date (Auto-calculated) */}
-                        <div className="rounded-xl bg-white/95 border border-orange-200/80 p-4 shadow-sm">
-                          <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-2 flex-wrap">
-                            <Calendar className="w-4 h-4 text-orange-500 shrink-0" />
-                            Discounts Valid Until (End Date)
-                            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-orange-50 text-orange-800 font-bold border border-orange-200/80">
-                              Auto-calculated
-                            </span>
-                          </label>
-                          <div className="relative">
-                            <input
-                              type="date"
-                              value={endDate}
-                              readOnly
-                              className="w-full px-4 py-3.5 rounded-xl border-2 border-orange-100/90 bg-orange-50/40 text-sm font-medium text-gray-700 cursor-not-allowed"
-                            />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                              <Lock className="w-4 h-4 text-orange-300" />
-                            </div>
-                          </div>
-                          <p className="text-xs text-gray-600 mt-2 leading-relaxed">{coverageUi.endHelper}</p>
-                        </div>
-                      </div>
-
-                      {/* Date range preview — focal card */}
-                      <div className="mt-6 rounded-2xl bg-gradient-to-b from-emerald-100/80 via-teal-50/90 to-white p-4 sm:p-5 border-2 border-emerald-400/55 shadow-inner shadow-emerald-900/10">
-                        <p className="text-[11px] font-black text-teal-950 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-amber-500 shrink-0" aria-hidden />
-                          {t('checkout.discount_window_card_title', checkoutLang)}
-                        </p>
-                        <div className="flex flex-col sm:flex-row sm:items-stretch gap-4">
-                          <div className="flex-1 bg-white rounded-xl p-3.5 border-2 border-teal-300/50 shadow-md">
-                            <p className="text-[10px] text-teal-700 font-bold uppercase tracking-wider">
-                              {t('checkout.window_label_start', checkoutLang)}
-                            </p>
-                            <p className="text-sm font-bold text-gray-900 mt-1">{formatDate(startDate)}</p>
-                          </div>
-                          <div className="flex sm:flex-col items-center justify-center gap-2 flex-shrink-0 px-1">
-                            <div className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs font-black shadow-md text-center leading-snug max-w-[12.5rem] ring-1 ring-white/30">
-                              {coverageUi.periodBadge}
-                            </div>
-                            {coverageUi.windowTripHint && (
-                              <p className="text-[10px] text-slate-600 text-center leading-snug max-w-[13rem] font-medium">
-                                {coverageUi.windowTripHint}
-                              </p>
-                            )}
-                            {coverageUi.periodSub && (
-                              <p className="text-[10px] text-teal-900/85 text-center leading-snug max-w-[13rem] mt-0.5 hidden sm:block font-medium">
-                                {coverageUi.periodSub}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex-1 bg-white rounded-xl p-3.5 border-2 border-orange-300/50 shadow-md">
-                            <p className="text-[10px] text-orange-800 font-bold uppercase tracking-wider">
-                              {t('checkout.window_label_end', checkoutLang)}
-                            </p>
-                            <p className="text-sm font-bold text-gray-900 mt-1">{formatDate(endDate)}</p>
-                          </div>
-                        </div>
-                        {coverageUi.periodSub && (
-                          <p className="text-[10px] text-teal-900/85 text-center leading-snug mt-3 sm:hidden font-medium px-1">
-                            {coverageUi.periodSub}
-                          </p>
-                        )}
-
-                        {startDate === minStartDate && (
-                          <p className="text-xs text-teal-800 mt-4 flex items-center gap-2 rounded-lg bg-white/70 border border-teal-200/60 px-3 py-2.5 font-semibold">
-                            <Zap className="w-3.5 h-3.5 flex-shrink-0 text-amber-500" />
-                            Starting on the earliest available day — discounts activate right after purchase.
-                          </p>
-                        )}
-                        {startDate > minStartDate && (
-                          <p className="text-xs text-teal-800 mt-4 flex items-center gap-2 rounded-lg bg-white/70 border border-teal-200/60 px-3 py-2.5 font-semibold">
-                            <Calendar className="w-3.5 h-3.5 flex-shrink-0 text-teal-600" />
-                            Your discounts will activate on {formatDate(startDate)}.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    syncPaySessionRef({
-                      startDate,
-                      partySize,
-                      cartPartySize: cart?.partySize,
-                      isExtended,
-                    });
-                    setStep('payment');
-                  }}
-                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200 flex items-center justify-center gap-2"
-                >
-                  Continue to Payment
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold">People on the pass</p>
+                <p className="text-[11px] text-neutral-500">Kids under 6 free</p>
               </div>
-            )}
-
-            {/* ═══ STEP 2: CARD DETAILS & PAY ═══ */}
-            {step === 'payment' && (
-              <div className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <CreditCard className="w-5 h-5 text-teal-600" />
-                    Enter Card Details
-                  </h3>
-                  <button
-                    onClick={() => setStep('dates')}
-                    className="text-sm text-teal-600 hover:text-teal-700 font-medium"
-                  >
-                    Change dates
-                  </button>
-                </div>
-
-                {/* Date summary bar */}
-                <div className="flex gap-3 p-3 rounded-xl bg-teal-50 border border-teal-100 text-sm">
-                  <CalendarRange className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
-                  <div className="text-teal-800 min-w-0">
-                    <p>
-                      <strong>{formatDate(startDate)}</strong>
-                      <span className="mx-2 text-teal-400">to</span>
-                      <strong>{formatDate(endDate)}</strong>
-                    </p>
-                    <p className="text-xs text-teal-700 mt-1 leading-snug">
-                      <span className="font-semibold">{coverageUi.periodBadge}</span>
-                      {coverageUi.paymentBarSecondary ? (
-                        <span className="text-teal-600"> · {coverageUi.paymentBarSecondary}</span>
-                      ) : null}
-                    </p>
-                  </div>
-                </div>
-
-                <CheckoutPricingSummary
-                  partySize={partySize}
-                  isExtended={isExtended}
-                  language={checkoutLang}
-                />
-
-                {/* Payment Error */}
-                {paymentError && (
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200">
-                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-red-800">Payment Failed</p>
-                      <p className="text-sm text-red-600 mt-0.5">{paymentError}</p>
-                    </div>
-                  </div>
-                )}
-
-                {paypalButtonsSdkError && paypalSmartEnabled && (
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
-                    <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-amber-900">Card checkout unavailable</p>
-                      <p className="text-sm text-amber-800 mt-0.5">{paypalButtonsSdkError}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Card Form */}
-                <div className="bg-white rounded-xl p-6 border border-gray-200 space-y-5">
-                  {/* Card Header */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
-                        <CreditCard className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-900 text-sm">
-                          {paypalSmartEnabled ? 'Pay with credit or debit card' : 'Credit or Debit Card'}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {paypalSmartEnabled
-                            ? 'Secure card payment — no extra account needed.'
-                            : 'Pay securely on StikmNek — no redirect'}
-                        </p>
-                      </div>
-                    </div>
-                    {!paypalSmartEnabled && (
-                      <div className="flex items-center gap-1.5">
-                        <CardBrandIcon brand="visa" className="w-8 h-5" />
-                        <CardBrandIcon brand="mastercard" className="w-8 h-5" />
-                        <CardBrandIcon brand="amex" className="w-8 h-5" />
-                      </div>
-                    )}
-                  </div>
-
-                  {paypalSmartEnabled && !paypalButtonsSdkError && (
-                    <div className="border-t border-gray-100 pt-5 space-y-4 relative">
-                      {!paypalButtonsReady && (
-                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl bg-white/85 backdrop-blur-[1px] text-gray-600 min-h-[52px]">
-                          <Loader2 className="w-7 h-7 animate-spin text-teal-600" />
-                          <span className="text-sm font-medium">Loading secure checkout…</span>
-                        </div>
-                      )}
-                      <div key={paypalMountKey} className="min-h-[48px] max-w-md space-y-3">
-                        <div ref={paypalCardButtonRef} className="min-h-[48px]" />
-                        <div ref={paypalWalletButtonRef} className="sr-only min-h-[1px]" aria-hidden />
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        Total due: <strong>A${priceAud.toFixed(2)} AUD</strong> — charged when you complete card payment.
-                      </p>
-                    </div>
-                  )}
-
-                  {!paypalSmartEnabled && (
-                  <div className="border-t border-gray-100 pt-5 space-y-4">
-                    {/* Cardholder Name */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Cardholder Name
-                      </label>
-                      <input
-                        type="text"
-                        value={cardName}
-                        onChange={(e) => { setCardName(e.target.value); setCardErrors(prev => ({ ...prev, cardName: '' })); }}
-                        placeholder="Name on card"
-                        autoComplete="cc-name"
-                        className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all ${
-                          cardErrors.cardName ? 'border-red-300 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      />
-                      {cardErrors.cardName && (
-                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          {cardErrors.cardName}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Card Number */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                        Card Number
-                      </label>
-                      <div className="relative">
-                        <input
-                          ref={cardNumberRef}
-                          type="text"
-                          inputMode="numeric"
-                          value={cardNumber}
-                          onChange={(e) => {
-                            const formatted = formatCardNumber(e.target.value);
-                            setCardNumber(formatted);
-                            setCardErrors(prev => ({ ...prev, cardNumber: '' }));
-                            // Auto-advance to expiry when card number is complete
-                            if (formatted.replace(/\s/g, '').length === 16) {
-                              expiryRef.current?.focus();
-                            }
-                          }}
-                          placeholder="1234 5678 9012 3456"
-                          autoComplete="cc-number"
-                          maxLength={19}
-                          className={`w-full px-4 py-3 pr-14 rounded-xl border-2 text-sm font-mono font-medium tracking-wider focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all ${
-                            cardErrors.cardNumber ? 'border-red-300 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <CardBrandIcon brand={cardType} className="w-8 h-5" />
-                        </div>
-                      </div>
-                      {cardErrors.cardNumber && (
-                        <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          {cardErrors.cardNumber}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Expiry + CVV Row */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                          Expiry Date
-                        </label>
-                        <input
-                          ref={expiryRef}
-                          type="text"
-                          inputMode="numeric"
-                          value={cardExpiry}
-                          onChange={(e) => {
-                            const formatted = formatExpiry(e.target.value);
-                            setCardExpiry(formatted);
-                            setCardErrors(prev => ({ ...prev, cardExpiry: '' }));
-                            if (formatted.length === 5) {
-                              cvvRef.current?.focus();
-                            }
-                          }}
-                          placeholder="MM/YY"
-                          autoComplete="cc-exp"
-                          maxLength={5}
-                          className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-mono font-medium tracking-wider focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all ${
-                            cardErrors.cardExpiry ? 'border-red-300 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        />
-                        {cardErrors.cardExpiry && (
-                          <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            {cardErrors.cardExpiry}
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                          CVV
-                        </label>
-                        <div className="relative">
-                          <input
-                            ref={cvvRef}
-                            type="text"
-                            inputMode="numeric"
-                            value={cardCvv}
-                            onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '').substring(0, 4);
-                              setCvv(val);
-                              setCardErrors(prev => ({ ...prev, cardCvv: '' }));
-                            }}
-                            placeholder="123"
-                            autoComplete="cc-csc"
-                            maxLength={4}
-                            className={`w-full px-4 py-3 rounded-xl border-2 text-sm font-mono font-medium tracking-wider focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all ${
-                              cardErrors.cardCvv ? 'border-red-300 bg-red-50/50' : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          />
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <Lock className="w-4 h-4 text-gray-300" />
-                          </div>
-                        </div>
-                        {cardErrors.cardCvv && (
-                          <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" />
-                            {cardErrors.cardCvv}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  )}
-
-                  {/* Security badges */}
-                  <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <Shield className="w-4 h-4 text-green-500" />
-                      <span>256-bit SSL</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <Lock className="w-4 h-4 text-green-500" />
-                      <span>Encrypted</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                      <Check className="w-4 h-4 text-green-500" />
-                      <span>Instant Activation</span>
-                    </div>
-                  </div>
-                </div>
-
-                {!paypalSmartEnabled && (
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={handlePayWithCard}
-                  disabled={processing}
-                  className="w-full py-4 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-lg transition-all shadow-lg shadow-teal-200 hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                  aria-label="Fewer people"
+                  disabled={partySize <= 1}
+                  onClick={() => handlePartySizeChange(partySize - 1)}
+                  className="w-12 h-12 rounded-xl bg-white/10 font-bold text-lg disabled:opacity-30"
                 >
-                  {processing ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Processing payment...
-                    </>
-                  ) : (
-                    <>
-                      <Lock className="w-5 h-5" />
-                      Pay A${priceAud.toFixed(2)} with Card
-                    </>
-                  )}
+                  −
                 </button>
-                )}
-
-                <p className="text-xs text-center text-gray-400">
-                  {paypalSmartEnabled
-                    ? 'Pay by debit or credit card in the secure window. Your pass activates after payment succeeds.'
-                    : 'Card is processed securely. You stay on StikmNek — no redirect.'}
-                </p>
-              </div>
-            )}
-
-            {/* ═══ PROCESSING STATE ═══ */}
-            {step === 'processing' && (
-              <div className="bg-white rounded-xl p-12 border border-gray-200 text-center">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-teal-50 flex items-center justify-center">
-                  <Loader2 className="w-10 h-10 text-teal-600 animate-spin" />
+                <div className="flex-1 text-center rounded-xl bg-white/5 border border-white/10 py-3">
+                  <span className="text-xl font-bold">{partySize}</span>
+                  <span className="text-neutral-400 text-sm ml-1">{partySize === 1 ? 'person' : 'people'}</span>
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Processing Your Payment</h3>
-                <p className="text-gray-500 mb-4">
-                  Securely processing your card payment...
-                </p>
-                <p className="text-sm text-gray-400">
-                  Please don't close this page. This usually takes just a few seconds.
-                </p>
-                <div className="mt-6 flex items-center justify-center gap-2 text-xs text-gray-400">
-                  <Shield className="w-3.5 h-3.5" />
-                  <span>256-bit SSL encrypted</span>
-                </div>
-              </div>
-            )}
-
-            {/* ═══ SUCCESS STATE ═══ */}
-            {step === 'success' && paymentResult && (
-              <div className="bg-white rounded-xl p-8 border border-green-200 text-center">
-                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-100 flex items-center justify-center animate-in zoom-in duration-300">
-                  <CheckCircle className="w-12 h-12 text-green-600" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h3>
-                <p className="text-gray-500 mb-6">
-                  Your {passLabel} is now active. Redirecting to your receipt...
-                </p>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 border border-green-200 text-sm text-green-700 font-medium">
-                  <CreditCard className="w-4 h-4" />
-                  {paymentResult.cardLast4
-                    ? `Card ending in ${paymentResult.cardLast4}`
-                    : 'Payment confirmed'}
-                </div>
-                <div className="mt-6 w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-green-500 h-full rounded-full animate-pulse" style={{ width: '100%' }} />
-                </div>
-              </div>
-            )}
-
-            {/* Security Badges */}
-            <div className="flex items-center justify-center gap-6 py-4">
-              <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                <Shield className="w-4 h-4" />
-                <span>SSL Secured</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                <Lock className="w-4 h-4" />
-                <span>Card Data Encrypted</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                <Check className="w-4 h-4" />
-                <span>Money-back Guarantee</span>
+                <button
+                  type="button"
+                  aria-label="More people"
+                  disabled={partySize >= MAX_PARTY_SIZE}
+                  onClick={() => handlePartySizeChange(partySize + 1)}
+                  className="w-12 h-12 rounded-xl bg-white/10 font-bold text-lg disabled:opacity-30"
+                >
+                  +
+                </button>
               </div>
             </div>
-          </div>
 
-          {/* Order Summary - Right */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden sticky top-24">
-              <div className="p-5 border-b border-gray-100">
-                <h3 className="font-bold text-gray-900">Order Summary</h3>
+            <div>
+              <p className="text-sm font-semibold mb-2">How long?</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDurationChange(false)}
+                  className={`rounded-xl border-2 p-3.5 text-left transition-colors ${
+                    !isExtended ? 'border-teal-500 bg-teal-500/15' : 'border-white/10 bg-white/5'
+                  }`}
+                >
+                  <p className="font-bold text-sm">1 day</p>
+                  <p className="text-teal-300 font-semibold text-sm mt-1">A${priceShortOption.toFixed(0)}</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDurationChange(true)}
+                  className={`rounded-xl border-2 p-3.5 text-left transition-colors ${
+                    isExtended ? 'border-teal-500 bg-teal-500/15' : 'border-white/10 bg-white/5'
+                  }`}
+                >
+                  <p className="font-bold text-sm">7 days</p>
+                  <p className="text-teal-300 font-semibold text-sm mt-1">A${priceExtendedOption.toFixed(0)}</p>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-2" htmlFor="pass-start-date">
+                Start date
+              </label>
+              <input
+                id="pass-start-date"
+                type="date"
+                value={startDate}
+                min={minStartDate}
+                max={maxStartDate}
+                onChange={(e) => {
+                  startDateTouchedRef.current = true;
+                  const next = e.target.value;
+                  setStartDate(next);
+                  syncPaySessionRef({ startDate: next });
+                }}
+                className="w-full px-4 py-3.5 rounded-xl bg-white/5 border border-white/15 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 [color-scheme:dark]"
+              />
+              {endDate ? (
+                <p className="text-xs text-neutral-500 mt-2">
+                  Valid until <span className="text-neutral-300 font-medium">{formatDate(endDate)}</span>
+                </p>
+              ) : null}
+            </div>
+
+            {showGroupSizeWarning ? (
+              <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
+                Max {MAX_PARTY_SIZE} people per pass. Need more? Buy a second pass after this one.
+              </p>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => {
+                syncPaySessionRef({
+                  startDate,
+                  partySize,
+                  cartPartySize: cart?.partySize,
+                  isExtended,
+                });
+                setStep('payment');
+              }}
+              className="w-full min-h-12 rounded-xl bg-teal-500 hover:bg-teal-400 text-white font-bold text-base active:scale-[0.99] transition-transform"
+            >
+              Continue · A${priceAud.toFixed(2)}
+            </button>
+            <p className="text-center text-[11px] text-neutral-500">Receipt to {user.email}</p>
+          </div>
+        )}
+
+        {step === 'payment' && (
+          <div className="space-y-5 pt-2">
+            <div>
+              <h1 className="text-2xl font-bold">Pay</h1>
+              <p className="text-sm text-neutral-400 mt-1">
+                {planWord} for {peopleWord} · A${priceAud.toFixed(2)}
+              </p>
+              <p className="text-xs text-neutral-500 mt-1">
+                {formatDate(startDate)} → {formatDate(endDate)}
+              </p>
+            </div>
+
+            {paymentError ? (
+              <div className="rounded-xl bg-red-500/15 border border-red-500/40 px-3 py-2.5 text-sm text-red-200">
+                {paymentError}
+              </div>
+            ) : null}
+            {paypalButtonsSdkError && paypalSmartEnabled ? (
+              <div className="rounded-xl bg-amber-500/15 border border-amber-500/40 px-3 py-2.5 text-sm text-amber-100">
+                {paypalButtonsSdkError}
+              </div>
+            ) : null}
+
+            <div className="rounded-2xl bg-white text-neutral-900 p-4 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-neutral-900 flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm">Credit or debit card</p>
+                  <p className="text-xs text-neutral-500">Secure checkout</p>
+                </div>
               </div>
 
-              <div className="p-5">
-                {/* Pass Card */}
-                <div className={`relative bg-gradient-to-br ${passCardGradient} rounded-xl p-5 text-white mb-5 overflow-hidden`}>
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
-                  <div className="relative">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Icon className="w-5 h-5" />
-                      <span className="text-sm font-medium text-white/80">StikmNek</span>
+              {paypalSmartEnabled && !paypalButtonsSdkError ? (
+                <div className="relative min-h-[48px]">
+                  {!paypalButtonsReady ? (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 text-neutral-500 bg-white/90 rounded-xl">
+                      <Loader2 className="w-5 h-5 animate-spin text-teal-600" />
+                      <span className="text-sm">Loading…</span>
                     </div>
-                    <h4 className="text-lg font-bold">{passLabel}</h4>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/20 text-white text-xs font-semibold">
-                        <Users className="w-3 h-3" />
-                        {groupLabel}
-                      </span>
-                    </div>
-                    <p className="text-sm text-white/80 mt-2 leading-snug">
-                      {coverageUi.orderDealsLine}
-                    </p>
+                  ) : null}
+                  <div key={paypalMountKey} className="space-y-3">
+                    <div ref={paypalCardButtonRef} className="min-h-[48px]" />
+                    <div ref={paypalWalletButtonRef} className="sr-only" aria-hidden />
                   </div>
                 </div>
+              ) : null}
 
-                {/* Date Range in Summary */}
-                <div className="mb-5 p-3.5 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
-                  <p className="text-[10px] font-semibold text-teal-600 uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <CalendarRange className="w-3 h-3" />
-                    Discount Validity
-                  </p>
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500">Valid From</span>
-                      <span className="font-bold text-gray-900">{formatDate(startDate)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500">Valid Until</span>
-                      <span className="font-bold text-gray-900">{endDate ? formatDate(endDate) : '—'}</span>
-                    </div>
-                    <div className="pt-1 border-t border-teal-100 space-y-0.5">
-                      <div className="flex items-center justify-between text-xs gap-2">
-                        <span className="text-gray-500 shrink-0">{t('checkout.summary_duration_label', checkoutLang)}</span>
-                        <span className="font-bold text-teal-700 text-right leading-snug">{coverageUi.summaryPrimary}</span>
-                      </div>
-                      {coverageUi.summarySecondary && (
-                        <p className="text-[10px] text-gray-500 text-right leading-snug">{coverageUi.summarySecondary}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mb-5">
-                  <CheckoutPricingSummary
-                    partySize={partySize}
-                    isExtended={isExtended}
-                    language={checkoutLang}
-                    variant="sidebar"
+              {!paypalSmartEnabled ? (
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={cardName}
+                    onChange={(e) => { setCardName(e.target.value); setCardErrors((p) => ({ ...p, cardName: '' })); }}
+                    placeholder="Name on card"
+                    autoComplete="cc-name"
+                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm"
                   />
-                </div>
-
-                {/* Payment Method Indicator */}
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100 mb-4">
-                  <CreditCard className="w-5 h-5 text-gray-600" />
-                  <div className="flex-1">
-                    <span className="text-sm font-semibold text-gray-700">Credit / Debit Card</span>
-                    <p className="text-[10px] text-gray-400">Secure card checkout</p>
+                  {cardErrors.cardName ? <p className="text-xs text-red-500">{cardErrors.cardName}</p> : null}
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={cardNumber}
+                    onChange={(e) => {
+                      setCardNumber(formatCardNumber(e.target.value));
+                      setCardErrors((p) => ({ ...p, cardNumber: '' }));
+                    }}
+                    placeholder="Card number"
+                    autoComplete="cc-number"
+                    className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm"
+                  />
+                  {cardErrors.cardNumber ? <p className="text-xs text-red-500">{cardErrors.cardNumber}</p> : null}
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={cardExpiry}
+                      onChange={(e) => {
+                        let v = e.target.value.replace(/\D/g, '').slice(0, 4);
+                        if (v.length >= 3) v = `${v.slice(0, 2)}/${v.slice(2)}`;
+                        setCardExpiry(v);
+                        setCardErrors((p) => ({ ...p, cardExpiry: '' }));
+                      }}
+                      placeholder="MM/YY"
+                      autoComplete="cc-exp"
+                      className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm"
+                    />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={cardCvv}
+                      onChange={(e) => {
+                        setCvv(e.target.value.replace(/\D/g, '').slice(0, 4));
+                        setCardErrors((p) => ({ ...p, cardCvv: '' }));
+                      }}
+                      placeholder="CVV"
+                      autoComplete="cc-csc"
+                      className="w-full px-3 py-2.5 rounded-xl border border-neutral-200 text-sm"
+                    />
                   </div>
-                  <Shield className="w-4 h-4 text-green-500" />
+                  <button
+                    type="button"
+                    onClick={() => void handlePayWithCard()}
+                    disabled={processing}
+                    className="w-full min-h-12 rounded-xl bg-teal-600 text-white font-bold disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    Pay A${priceAud.toFixed(2)}
+                  </button>
                 </div>
-
-                {/* Features */}
-                <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Includes:</p>
-                  {['Unlimited deal redemptions', 'QR code access', 'Real-time savings tracker', 'Map navigation'].map((f, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                      <Check className="w-3.5 h-3.5 text-teal-600" strokeWidth={3} />
-                      {f}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Billing Email */}
-              <div className="px-5 pb-5">
-                <p className="text-xs text-gray-400">
-                  Receipt will be sent to <strong className="text-gray-600">{user.email}</strong>
-                </p>
-              </div>
+              ) : null}
             </div>
+
+            <p className="text-center text-[11px] text-neutral-500 flex items-center justify-center gap-1.5">
+              <Shield className="w-3.5 h-3.5" /> Secure payment · pass unlocks messaging
+            </p>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
 };
+
 
 export default PaymentCheckout;

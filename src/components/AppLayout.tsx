@@ -507,6 +507,7 @@ const AppLayout: React.FC = () => {
     currentView === 'business-dashboard' ||
     currentView === 'complete-profile' ||
     currentView === 'complete-business-profile' ||
+    currentView === 'checkout' ||
     (currentView === 'home' && user?.type !== 'business');
   const hideFooter =
     currentView === 'admin' ||
