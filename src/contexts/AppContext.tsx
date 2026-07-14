@@ -1735,7 +1735,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ═══════════════════════════════════════════════════════════
   const purchasePass = useCallback(
     async (opts?: { isExtended?: boolean; partySize?: number }) => {
+      // Anonymous buyers: stash cart from swipe/vibe cards, then signup → resume checkout.
       if (!user) {
+        const { checkoutFromTrip, loadTripState, savePendingCheckout } = await import('@/lib/tripStorage');
+        const fromTrip = checkoutFromTrip(loadTripState());
+        savePendingCheckout({
+          partySize: opts?.partySize !== undefined ? clampPartySize(opts.partySize) : fromTrip.partySize,
+          isExtended: opts?.isExtended !== undefined ? opts.isExtended : fromTrip.isExtended,
+        });
         setShowAuth(true);
         setAuthMode('signup-tourist');
         return;
@@ -1770,6 +1777,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     },
     [user, userProfile, setCurrentView],
   );
+
+  // After signup/signin from swipe paywall: open checkout with vibe-card party size.
+  useEffect(() => {
+    if (!user?.id) return;
+    if (user.type === 'business' || user.type === 'admin' || user.type === 'staff') return;
+    if (user.passId) {
+      void import('@/lib/tripStorage').then(({ consumePendingCheckout }) => {
+        consumePendingCheckout();
+      });
+      return;
+    }
+    let cancelled = false;
+    void import('@/lib/tripStorage').then(({ consumePendingCheckout }) => {
+      if (cancelled) return;
+      const pending = consumePendingCheckout();
+      if (!pending) return;
+      setCart(pending);
+      setCurrentView('checkout');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.passId, user?.type, setCurrentView]);
 
   const refreshUserProfile = useCallback(async () => {
     if (!user?.id) return;

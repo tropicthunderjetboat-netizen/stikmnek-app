@@ -21,12 +21,9 @@ import NotFound from '@/pages/NotFound';
 import Navbar from './Navbar';
 import Hero from './Hero';
 import HowItWorks from './HowItWorks';
-import CategoryShowcase from './CategoryShowcase';
-import FeaturedLeaderboard from './FeaturedLeaderboard';
 import BusinessGrid from './BusinessGrid';
 import PassCards from './PassCards';
 import PassesEntryGate from './PassesEntryGate';
-import ReviewsSection from './ReviewsSection';
 import ListYourBusinessCta from './ListYourBusinessCta';
 import ForBusinessLanding from './ForBusinessLanding';
 import Footer from './Footer';
@@ -39,6 +36,7 @@ import FloatingPassButton from './FloatingPassButton';
 import LoadingSkeleton from './LoadingSkeleton';
 import CompleteTouristProfile from './CompleteTouristProfile';
 import CompleteBusinessProfile from './CompleteBusinessProfile';
+import SwipeDiscover from './SwipeDiscover';
 
 // ── Lazy-loaded route components ──
 const Dashboard = React.lazy(() => import('./Dashboard'));
@@ -58,6 +56,7 @@ const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
  * To expand browsing later, add view names here and optionally show a nav link to complete-profile.
  */
 const TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
+  'home',
   'deals',
   'map',
   'business-detail',
@@ -177,34 +176,20 @@ function BusinessListingFormInLayout({ padded }: { padded: boolean }) {
   return form;
 }
 
-/** Signed-in tourists get a shorter home — deals first, less marketing scroll on mobile. */
+/** Tourist / anonymous home = swipe discover. Business owners keep marketing home if they land here. */
 function HomePage() {
   const { user } = useAppContext();
-  const signedInTourist = user?.type === 'tourist';
-
-  if (signedInTourist) {
+  if (user?.type === 'business') {
     return (
       <>
         <Hero />
-        <FeaturedLeaderboard />
-        <CategoryShowcase />
+        <HowItWorks />
         <PassCards embeddedOnHome />
+        <ListYourBusinessCta />
       </>
     );
   }
-
-  return (
-    <>
-      <Hero />
-      <HowItWorks />
-      <CategoryShowcase />
-      <FeaturedLeaderboard />
-      <PassCards embeddedOnHome />
-      <MapView />
-      <ReviewsSection />
-      <ListYourBusinessCta />
-    </>
-  );
+  return <SwipeDiscover />;
 }
 
 const AppLayout: React.FC = () => {
@@ -519,7 +504,8 @@ const AppLayout: React.FC = () => {
   const hideMainNav =
     currentView === 'business-dashboard' ||
     currentView === 'complete-profile' ||
-    currentView === 'complete-business-profile';
+    currentView === 'complete-business-profile' ||
+    (currentView === 'home' && user?.type !== 'business');
   const hideFooter =
     currentView === 'admin' ||
     currentView === 'checkout' ||
@@ -527,7 +513,8 @@ const AppLayout: React.FC = () => {
     currentView === 'business-dashboard' ||
     currentView === 'business-join' ||
     currentView === 'complete-profile' ||
-    currentView === 'complete-business-profile';
+    currentView === 'complete-business-profile' ||
+    (currentView === 'home' && user?.type !== 'business');
 
   const showTouristProfileNudge =
     user?.type === 'tourist' &&
