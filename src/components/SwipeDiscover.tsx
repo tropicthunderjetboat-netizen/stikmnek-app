@@ -9,6 +9,7 @@ import {
   customerFacingListPrice,
   effectiveListingDealPrice,
   listingOfferBadgeText,
+  primaryEmbeddedOffering,
   touristFacingOfferings,
   type Business,
 } from '@/data/businesses';
@@ -18,6 +19,7 @@ import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { digitsForWaMe, formatVT, getPhotoDisplayUrl } from '@/lib/utils';
 import { fetchApprovedPhotosForOffering } from '@/lib/fetchApprovedPhotosForOffering';
+import { pricingTiersForDisplay } from '@/lib/pricingTiers';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import {
   checkoutFromTrip,
@@ -908,14 +910,30 @@ function DetailSheet({
   const price = customerFacingListPrice(business);
   const fullText = plainDescription(business);
   const [expanded, setExpanded] = useState(false);
+  const [showMorePricing, setShowMorePricing] = useState(false);
   const [gallery, setGallery] = useState<string[]>(() => (business.image ? [business.image] : []));
   const [photoIdx, setPhotoIdx] = useState(0);
   const needsReadMore = fullText.split(' ').length > 28;
+
+  const pricingTiers = useMemo(() => {
+    const o = primaryEmbeddedOffering(business);
+    const raw =
+      business.pricingTiers ??
+      (business as { pricing_tiers?: unknown }).pricing_tiers ??
+      o?.pricing_tiers ??
+      (o as { tier_pricing?: unknown } | null)?.tier_pricing;
+    return pricingTiersForDisplay(raw).filter(
+      (t) => (Number(t.deal_price_vt) || 0) > 0 || (Number(t.original_price_vt) || 0) > 0,
+    );
+  }, [business]);
+
+  const hasTierPricing = pricingTiers.length >= 2;
 
   useEffect(() => {
     let cancelled = false;
     setPhotoIdx(0);
     setExpanded(false);
+    setShowMorePricing(false);
     setGallery(business.image ? [business.image] : []);
     const pid = profileBusinessIdFor(business);
     void (async () => {
@@ -1015,10 +1033,55 @@ function DetailSheet({
               </button>
             )}
           </div>
-          <div className="flex flex-wrap gap-3 text-sm text-neutral-300">
-            {price > 0 && <span>💰 {formatVT(price)}</span>}
+          <div className="flex flex-wrap items-center gap-3 text-sm text-neutral-300">
+            {price > 0 && <span>💰 {formatVT(price)}{hasTierPricing ? ' from' : ''}</span>}
             {business.location && <span>📍 {business.location}</span>}
           </div>
+
+          {hasTierPricing && (
+            <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowMorePricing((v) => !v)}
+                className="w-full flex items-center justify-between px-3.5 py-3 text-left"
+              >
+                <span className="text-sm font-semibold text-teal-300">
+                  {showMorePricing ? 'Hide pricing' : 'More pricing'}
+                </span>
+                <span className="text-xs text-neutral-400">
+                  {showMorePricing ? '▲' : '▼'} Adults, kids &amp; more
+                </span>
+              </button>
+              {showMorePricing && (
+                <ul className="border-t border-white/10 divide-y divide-white/10">
+                  {pricingTiers.map((tier, i) => {
+                    const orig = Number(tier.original_price_vt) || 0;
+                    const deal = Number(tier.deal_price_vt) || 0;
+                    const showDeal = deal > 0 && (orig <= 0 || deal < orig);
+                    const showOrig = orig > 0;
+                    if (!showDeal && !showOrig) return null;
+                    return (
+                      <li key={`${tier.label}-${i}`} className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-sm">
+                        <span className="text-neutral-200 font-medium">{tier.label || `Option ${i + 1}`}</span>
+                        <span className="tabular-nums text-right">
+                          {showOrig && showDeal ? (
+                            <>
+                              <span className="text-neutral-500 line-through mr-2">{formatVT(orig)}</span>
+                              <span className="text-teal-300 font-semibold">{formatVT(deal)}</span>
+                            </>
+                          ) : (
+                            <span className="text-teal-300 font-semibold">
+                              {formatVT(showDeal ? deal : orig)}
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       </div>
       <div className="absolute bottom-0 inset-x-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-neutral-950/95 border-t border-white/10 space-y-2">
