@@ -134,6 +134,7 @@ export function consumePendingCheckout(): PendingCheckout | null {
 }
 
 export const TAP_HINT_KEY = 'stikmnek_swipe_tap_hint_seen';
+export const WELCOME_CARD_KEY = 'stikmnek_swipe_welcome_seen';
 
 export function hasSeenTapHint(): boolean {
   if (!canUseStorage()) return true;
@@ -148,6 +149,24 @@ export function markTapHintSeen(): void {
   if (!canUseStorage()) return;
   try {
     window.localStorage.setItem(TAP_HINT_KEY, '1');
+  } catch {
+    /* ignore */
+  }
+}
+
+export function hasSeenWelcomeCard(): boolean {
+  if (!canUseStorage()) return true;
+  try {
+    return window.localStorage.getItem(WELCOME_CARD_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+export function markWelcomeCardSeen(): void {
+  if (!canUseStorage()) return;
+  try {
+    window.localStorage.setItem(WELCOME_CARD_KEY, '1');
   } catch {
     /* ignore */
   }

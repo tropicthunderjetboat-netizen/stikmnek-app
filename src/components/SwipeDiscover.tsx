@@ -22,14 +22,16 @@ import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import {
   checkoutFromTrip,
   hasSeenTapHint,
+  hasSeenWelcomeCard,
   loadTripState,
   markTapHintSeen,
+  markWelcomeCardSeen,
   saveTripState,
   type TripLength,
   type TripState,
 } from '@/lib/tripStorage';
 
-type FeedItem = { kind: 'place'; business: Business };
+type FeedItem = { kind: 'welcome' } | { kind: 'place'; business: Business };
 
 function peopleWord(n: number): string {
   const p = clampPartySize(n);
@@ -93,6 +95,7 @@ export default function SwipeDiscover() {
   const [vibe, setVibe] = useState<'length' | 'party' | null>(null);
   const [dragY, setDragY] = useState(0);
   const [showTapCoach, setShowTapCoach] = useState(() => !hasSeenTapHint());
+  const [welcomeDone, setWelcomeDone] = useState(() => hasSeenWelcomeCard());
   const touchStartY = useRef<number | null>(null);
   const preloaded = useRef<Set<string>>(new Set());
   const lengthPrompted = useRef(false);
@@ -142,12 +145,20 @@ export default function SwipeDiscover() {
 
   const saveCount = trip.savedPlaceIds.length;
 
-  const feed: FeedItem[] = useMemo(
-    () => listings.map((b) => ({ kind: 'place' as const, business: b })),
-    [listings],
-  );
+  const feed: FeedItem[] = useMemo(() => {
+    const places = listings.map((b) => ({ kind: 'place' as const, business: b }));
+    if (welcomeDone) return places;
+    return [{ kind: 'welcome' as const }, ...places];
+  }, [listings, welcomeDone]);
 
   const current = feed[Math.min(index, Math.max(0, feed.length - 1))] ?? null;
+
+  const finishWelcome = useCallback(() => {
+    setWelcomeDone(true);
+    markWelcomeCardSeen();
+    setIndex(0);
+    setDragY(0);
+  }, []);
 
   const dismissTapCoach = useCallback(() => {
     setShowTapCoach(false);
@@ -189,8 +200,12 @@ export default function SwipeDiscover() {
 
   const goNext = useCallback(() => {
     setDragY(0);
+    if (current?.kind === 'welcome') {
+      finishWelcome();
+      return;
+    }
     setIndex((i) => Math.min(i + 1, Math.max(0, feed.length - 1)));
-  }, [feed.length]);
+  }, [feed.length, current?.kind, finishWelcome]);
 
   const goPrev = useCallback(() => {
     setDragY(0);
@@ -408,6 +423,9 @@ export default function SwipeDiscover() {
         onTouchEnd={onTouchEnd}
         onWheel={onWheel}
       >
+        {current?.kind === 'welcome' && (
+          <WelcomeCard onStart={finishWelcome} />
+        )}
         {current?.kind === 'place' && (
           <PlaceCard
             business={current.business}
@@ -516,6 +534,57 @@ export default function SwipeDiscover() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function WelcomeCard({ onStart }: { onStart: () => void }) {
+  return (
+    <div className="relative h-full w-full flex flex-col justify-end px-6 pb-28 bg-gradient-to-b from-teal-950 via-neutral-950 to-neutral-950">
+      <div
+        className="absolute inset-0 opacity-[0.35]"
+        style={{
+          backgroundImage:
+            'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(13,148,136,0.45), transparent 60%)',
+        }}
+      />
+      <div className="relative z-10 max-w-sm mx-auto w-full space-y-6">
+        <div>
+          <p className="text-teal-400 text-xs font-semibold tracking-wide uppercase mb-2">Welcome</p>
+          <h2 className="text-[28px] font-bold leading-tight text-white">
+            Plan your Vanuatu trip in one place
+          </h2>
+          <p className="mt-3 text-neutral-400 text-sm leading-relaxed">
+            Browse places. Save what you like. When you’re ready, a pass unlocks WhatsApp so you can message them direct.
+          </p>
+        </div>
+
+        <ul className="space-y-3 text-sm text-neutral-200">
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs shrink-0">↑</span>
+            <span>Swipe up for the next place</span>
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+              <Heart className="w-3.5 h-3.5 text-teal-400" />
+            </span>
+            <span>Heart saves it to Your Trip</span>
+          </li>
+          <li className="flex items-start gap-3">
+            <span className="mt-0.5 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs shrink-0">Aa</span>
+            <span>Tap a name for photos and details</span>
+          </li>
+        </ul>
+
+        <button
+          type="button"
+          onClick={onStart}
+          className="w-full min-h-12 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm active:scale-[0.98] transition-transform"
+        >
+          Start exploring
+        </button>
+        <p className="text-center text-[11px] text-neutral-500">Or swipe up · free to browse</p>
+      </div>
     </div>
   );
 }
@@ -771,7 +840,7 @@ function DetailSheet({
           </div>
         )}
 
-        <div className="px-4 py-4 space-y-4 pb-28">
+        <div className="px-4 py-4 space-y-4 pb-[11.5rem]">
           <div>
             <h2 className="text-2xl font-bold">{business.name}</h2>
             <span className="inline-block mt-2 rounded-md bg-teal-600 text-xs font-semibold px-2.5 py-1">
@@ -782,7 +851,7 @@ function DetailSheet({
               <button
                 type="button"
                 onClick={() => setExpanded((v) => !v)}
-                className="mt-2 text-sm font-semibold text-teal-400"
+                className="mt-2 mb-2 text-sm font-semibold text-teal-400"
               >
                 {expanded ? 'Show less' : 'Read more'}
               </button>
