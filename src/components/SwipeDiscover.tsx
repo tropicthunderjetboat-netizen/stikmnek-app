@@ -16,10 +16,14 @@ import { calculatePassPrice, clampPartySize } from '@/data/pricing';
 import { favoriteKeyForOffering, favoriteKeyForProfile, isListingFavorited } from '@/lib/favoritesUi';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
-import { digitsForWaMe, formatVT } from '@/lib/utils';
+import { digitsForWaMe, formatVT, getPhotoDisplayUrl } from '@/lib/utils';
+import { fetchApprovedPhotosForOffering } from '@/lib/fetchApprovedPhotosForOffering';
+import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import {
   checkoutFromTrip,
+  hasSeenTapHint,
   loadTripState,
+  markTapHintSeen,
   saveTripState,
   type TripLength,
   type TripState,
@@ -27,8 +31,32 @@ import {
 
 type FeedItem = { kind: 'place'; business: Business };
 
+function peopleWord(n: number): string {
+  const p = clampPartySize(n);
+  return p === 1 ? '1 person' : `${p} people`;
+}
+
+function passCtaLabel(isExtended: boolean, paidPeople: number, price: number): string {
+  return `Get ${isExtended ? '7-Day' : '1-Day'} Pass for ${peopleWord(paidPeople)} · A$${price}`;
+}
+
+function shuffleBusinesses(list: Business[]): Business[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = out[i];
+    out[i] = out[j]!;
+    out[j] = tmp!;
+  }
+  return out;
+}
+
+function plainDescription(b: Business): string {
+  return (b.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function oneLiner(b: Business): string {
-  const raw = (b.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const raw = plainDescription(b);
   if (!raw) return 'A must-do while you’re in Vanuatu.';
   const words = raw.split(' ').slice(0, 12);
   return words.join(' ') + (raw.split(' ').length > 12 ? '…' : '');
@@ -64,15 +92,40 @@ export default function SwipeDiscover() {
   const [paywallBiz, setPaywallBiz] = useState<Business | null>(null);
   const [vibe, setVibe] = useState<'length' | 'party' | null>(null);
   const [dragY, setDragY] = useState(0);
-  const [hintVisible, setHintVisible] = useState(true);
+  const [showTapCoach, setShowTapCoach] = useState(() => !hasSeenTapHint());
   const touchStartY = useRef<number | null>(null);
   const preloaded = useRef<Set<string>>(new Set());
   const lengthPrompted = useRef(false);
   const partyPrompted = useRef(false);
   const lastWheelAt = useRef(0);
+  /** Stable random order for this browser visit */
+  const shuffleOrderRef = useRef<string[] | null>(null);
 
   const hasPass = Boolean(user?.pass);
-  const listings = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
+
+  const listings = useMemo(() => {
+    const base = touristFacingOfferings(dbBusinesses);
+    if (base.length === 0) {
+      shuffleOrderRef.current = null;
+      return [];
+    }
+    const byId = new Map(base.map((b) => [b.id, b]));
+    if (!shuffleOrderRef.current) {
+      shuffleOrderRef.current = shuffleBusinesses(base).map((b) => b.id);
+    } else {
+      const known = new Set(shuffleOrderRef.current);
+      const missing = base.filter((b) => !known.has(b.id));
+      if (missing.length) {
+        shuffleOrderRef.current = [
+          ...shuffleOrderRef.current.filter((id) => byId.has(id)),
+          ...shuffleBusinesses(missing).map((b) => b.id),
+        ];
+      } else {
+        shuffleOrderRef.current = shuffleOrderRef.current.filter((id) => byId.has(id));
+      }
+    }
+    return shuffleOrderRef.current.map((id) => byId.get(id)!).filter(Boolean);
+  }, [dbBusinesses]);
 
   const persist = useCallback((next: TripState) => {
     setTrip(next);
@@ -96,7 +149,19 @@ export default function SwipeDiscover() {
 
   const current = feed[Math.min(index, Math.max(0, feed.length - 1))] ?? null;
 
-  // Secret cards: full-screen after 2 / 4 saves (one tap each, then gone)
+  const dismissTapCoach = useCallback(() => {
+    setShowTapCoach(false);
+    markTapHintSeen();
+  }, []);
+
+  const openDetail = useCallback(
+    (b: Business) => {
+      dismissTapCoach();
+      setDetail(b);
+    },
+    [dismissTapCoach],
+  );
+
   useEffect(() => {
     if (detail || paywallBiz || vibe) return;
     if (!trip.vibeTripLengthDone && saveCount >= 2 && !lengthPrompted.current) {
@@ -110,7 +175,6 @@ export default function SwipeDiscover() {
     }
   }, [saveCount, trip.vibeTripLengthDone, trip.vibePartyDone, detail, paywallBiz, vibe]);
 
-  // Preload next 3 images
   useEffect(() => {
     for (let i = index; i < Math.min(index + 4, feed.length); i++) {
       const item = feed[i];
@@ -122,11 +186,6 @@ export default function SwipeDiscover() {
       img.src = src;
     }
   }, [index, feed]);
-
-  useEffect(() => {
-    if (index < 3) setHintVisible(true);
-    else setHintVisible(false);
-  }, [index]);
 
   const goNext = useCallback(() => {
     setDragY(0);
@@ -142,14 +201,11 @@ export default function SwipeDiscover() {
     async (b: Business) => {
       const id = placeKey(b);
       const already = trip.savedPlaceIds.includes(id);
-      let nextIds = trip.savedPlaceIds;
       if (already) {
-        nextIds = trip.savedPlaceIds.filter((x) => x !== id);
-        persist({ ...trip, savedPlaceIds: nextIds });
+        persist({ ...trip, savedPlaceIds: trip.savedPlaceIds.filter((x) => x !== id) });
         toast.message('Removed from Your Trip');
       } else {
-        nextIds = [...trip.savedPlaceIds, id];
-        persist({ ...trip, savedPlaceIds: nextIds });
+        persist({ ...trip, savedPlaceIds: [...trip.savedPlaceIds, id] });
         toast.success('Saved to Your Trip ✈️', {
           style: { background: '#FF6B6B', color: '#fff', border: 'none' },
         });
@@ -161,9 +217,11 @@ export default function SwipeDiscover() {
           }
         }
       }
-      // Sync to account favorites when logged in (best-effort)
       if (user) {
-        const key = b.id !== profileBusinessIdFor(b) ? favoriteKeyForOffering(b.id) : favoriteKeyForProfile(profileBusinessIdFor(b));
+        const key =
+          b.id !== profileBusinessIdFor(b)
+            ? favoriteKeyForOffering(b.id)
+            : favoriteKeyForProfile(profileBusinessIdFor(b));
         const favNow = favorites.includes(key) || isListingFavorited(favorites, b);
         if (!already && !favNow) void toggleFavorite(b);
         if (already && favNow) void toggleFavorite(b);
@@ -216,7 +274,9 @@ export default function SwipeDiscover() {
         visitDate: 'To be confirmed',
         adults: clampPartySize(trip.paidPeople || 1),
         children: 0,
-        estimatedPriceWithDiscount: formatVT(effectiveListingDealPrice(b) || customerFacingListPrice(b)),
+        estimatedPriceWithDiscount: formatVT(
+          effectiveListingDealPrice(b) || customerFacingListPrice(b),
+        ),
         userName: user?.name || 'Guest',
       });
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -286,14 +346,11 @@ export default function SwipeDiscover() {
     );
   }
 
-  const pricePreview = calculatePassPrice(
-    clampPartySize(trip.paidPeople || 1),
-    trip.tripLength === '2-4' || trip.tripLength === '5-7',
-  );
+  const isExtended = trip.tripLength === '2-4' || trip.tripLength === '5-7';
+  const pricePreview = calculatePassPrice(clampPartySize(trip.paidPeople || 1), isExtended);
 
   return (
     <div className="fixed inset-0 z-40 bg-neutral-950 text-white overflow-hidden touch-none select-none">
-      {/* Top chrome */}
       <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
         <div className="pointer-events-auto">
           <p className="text-sm font-bold tracking-tight">StikmNek</p>
@@ -305,7 +362,7 @@ export default function SwipeDiscover() {
               type="button"
               onClick={() => {
                 const first = listings.find((b) => trip.savedPlaceIds.includes(b.id));
-                if (first) setDetail(first);
+                if (first) openDetail(first);
               }}
               className="rounded-full bg-white/15 backdrop-blur px-3 py-1.5 text-xs font-semibold"
               aria-label="Your trip"
@@ -328,9 +385,7 @@ export default function SwipeDiscover() {
 
       {showSoftNudge && (
         <div className="absolute top-14 inset-x-3 z-30 rounded-xl bg-teal-600 text-white text-sm px-3 py-2.5 flex items-start gap-2 shadow-lg">
-          <p className="flex-1 leading-snug">
-            Trip looking good 👍 Message these places with a pass.
-          </p>
+          <p className="flex-1 leading-snug">Trip looking good 👍 Message these places with a pass.</p>
           <button
             type="button"
             className="shrink-0 text-white/80 text-lg leading-none px-1"
@@ -342,10 +397,12 @@ export default function SwipeDiscover() {
         </div>
       )}
 
-      {/* Card stage */}
       <div
         className="absolute inset-0"
-        style={{ transform: `translateY(${dragY * 0.35}px)`, transition: dragY === 0 ? 'transform 0.2s ease' : undefined }}
+        style={{
+          transform: `translateY(${dragY * 0.35}px)`,
+          transition: dragY === 0 ? 'transform 0.2s ease' : undefined,
+        }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -355,9 +412,10 @@ export default function SwipeDiscover() {
           <PlaceCard
             business={current.business}
             saved={isSaved(current.business)}
-            showHint={hintVisible && index < 3}
+            showTapCoach={showTapCoach && !detail && !vibe && !paywallBiz}
+            onDismissCoach={dismissTapCoach}
             onHeart={() => void heartPlace(current.business)}
-            onOpen={() => setDetail(current.business)}
+            onOpen={() => openDetail(current.business)}
             onNext={goNext}
           />
         )}
@@ -403,15 +461,14 @@ export default function SwipeDiscover() {
         </div>
       )}
 
-      {/* Bottom trip strip when saves exist */}
-      {savedBusinesses.length > 0 && !detail && !paywallBiz && (
+      {savedBusinesses.length > 0 && !detail && !paywallBiz && !vibe && (
         <div className="absolute bottom-0 inset-x-0 z-20 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none">
           <div className="pointer-events-auto flex gap-2 overflow-x-auto pb-1">
             {savedBusinesses.slice(0, 8).map((b) => (
               <button
                 key={b.id}
                 type="button"
-                onClick={() => setDetail(b)}
+                onClick={() => openDetail(b)}
                 className="shrink-0 w-14 h-14 rounded-xl overflow-hidden ring-2 ring-teal-500/60"
               >
                 <img src={b.image} alt="" className="w-full h-full object-cover" />
@@ -437,7 +494,7 @@ export default function SwipeDiscover() {
           hasPass={hasPass}
           paidPeople={trip.paidPeople}
           pricePreview={pricePreview}
-          isExtended={trip.tripLength === '2-4' || trip.tripLength === '5-7'}
+          isExtended={isExtended}
           onClose={() => setDetail(null)}
           onHeart={() => void heartPlace(detail)}
           onGetPass={() => openCheckout()}
@@ -450,7 +507,7 @@ export default function SwipeDiscover() {
         <PaywallSheet
           businessName={paywallBiz.name}
           paidPeople={clampPartySize(trip.paidPeople || 1)}
-          isExtended={trip.tripLength === '2-4' || trip.tripLength === '5-7'}
+          isExtended={isExtended}
           price={pricePreview}
           onClose={() => setPaywallBiz(null)}
           onBuy={() => {
@@ -466,14 +523,16 @@ export default function SwipeDiscover() {
 function PlaceCard({
   business,
   saved,
-  showHint,
+  showTapCoach,
+  onDismissCoach,
   onHeart,
   onOpen,
   onNext,
 }: {
   business: Business;
   saved: boolean;
-  showHint: boolean;
+  showTapCoach: boolean;
+  onDismissCoach: () => void;
   onHeart: () => void;
   onOpen: () => void;
   onNext: () => void;
@@ -495,16 +554,45 @@ function PlaceCard({
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/30" />
       </button>
 
-      <div className="absolute bottom-24 left-4 right-24 z-10 pointer-events-none">
-        <h2 className="text-[20px] font-bold leading-tight drop-shadow-md">{business.name}</h2>
-        <span className="inline-block mt-2 rounded-md bg-teal-600 text-white text-xs font-semibold px-2.5 py-1">
+      <div className="absolute bottom-24 left-4 right-24 z-10">
+        <button type="button" onClick={onOpen} className="text-left pointer-events-auto group">
+          <h2
+            className={`text-[20px] font-bold leading-tight drop-shadow-md underline decoration-white/40 underline-offset-4 group-active:decoration-teal-400 ${
+              showTapCoach ? 'ring-2 ring-teal-400/80 ring-offset-2 ring-offset-transparent rounded-sm' : ''
+            }`}
+          >
+            {business.name}
+          </h2>
+        </button>
+        <span className="inline-block mt-2 rounded-md bg-teal-600 text-white text-xs font-semibold px-2.5 py-1 pointer-events-none">
           {dealPillText(business)}
         </span>
         {business.location ? (
-          <p className="mt-2 text-xs text-neutral-300 flex items-center gap-1">
+          <p className="mt-2 text-xs text-neutral-300 flex items-center gap-1 pointer-events-none">
             <MapPin className="w-3.5 h-3.5" /> {business.location}
           </p>
         ) : null}
+
+        {showTapCoach && (
+          <div className="mt-3 pointer-events-auto relative max-w-[14rem]">
+            <div className="absolute -top-1.5 left-6 w-3 h-3 bg-white rotate-45" />
+            <div className="relative rounded-2xl bg-white text-neutral-900 px-3 py-2.5 shadow-lg">
+              <p className="text-xs font-semibold leading-snug">
+                Tap the name to see photos &amp; more about this place
+              </p>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDismissCoach();
+                }}
+                className="mt-1.5 text-[11px] font-bold text-teal-700"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="absolute bottom-24 right-4 z-10 flex flex-col items-center gap-3">
@@ -517,9 +605,7 @@ function PlaceCard({
           className="w-16 h-16 rounded-full bg-black/35 backdrop-blur flex items-center justify-center border border-white/20 active:scale-95 transition-transform"
           aria-label={saved ? 'Remove from trip' : 'Save to trip'}
         >
-          <Heart
-            className={`w-8 h-8 ${saved ? 'fill-teal-500 text-teal-500' : 'text-white'}`}
-          />
+          <Heart className={`w-8 h-8 ${saved ? 'fill-teal-500 text-teal-500' : 'text-white'}`} />
         </button>
         <button
           type="button"
@@ -532,12 +618,6 @@ function PlaceCard({
           Next ↑
         </button>
       </div>
-
-      {showHint && (
-        <p className="absolute bottom-10 inset-x-0 text-center text-sm text-white/70 animate-pulse z-10 pointer-events-none">
-          Tap for details · swipe up for next
-        </p>
-      )}
     </div>
   );
 }
@@ -599,12 +679,43 @@ function DetailSheet({
 }) {
   const hasWa = businessListingHasWhatsApp(business);
   const price = customerFacingListPrice(business);
-  const maps =
-    business.mapUrl ||
-    business.map_url ||
-    (business.lat && business.lng
-      ? `https://maps.google.com/?q=${business.lat},${business.lng}`
-      : null);
+  const fullText = plainDescription(business);
+  const [expanded, setExpanded] = useState(false);
+  const [gallery, setGallery] = useState<string[]>(() => (business.image ? [business.image] : []));
+  const [photoIdx, setPhotoIdx] = useState(0);
+  const needsReadMore = fullText.split(' ').length > 28;
+
+  useEffect(() => {
+    let cancelled = false;
+    setPhotoIdx(0);
+    setExpanded(false);
+    setGallery(business.image ? [business.image] : []);
+    const pid = profileBusinessIdFor(business);
+    void (async () => {
+      try {
+        const rows = await fetchApprovedPhotosForOffering(supabase, pid, business.id, SUPABASE_URL);
+        if (cancelled) return;
+        const urls = rows
+          .map((p) => getPhotoDisplayUrl(p, SUPABASE_URL) || String(p.url || '').trim())
+          .filter(Boolean);
+        if (urls.length === 0) return;
+        const cover = business.image?.trim();
+        const ordered = cover && !urls.includes(cover) ? [cover, ...urls] : urls;
+        setGallery(ordered);
+      } catch {
+        /* keep cover */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [business]);
+
+  const blurb = !fullText
+    ? oneLiner(business)
+    : expanded || !needsReadMore
+      ? fullText
+      : `${fullText.split(' ').slice(0, 28).join(' ')}…`;
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-neutral-950 animate-in slide-in-from-bottom duration-200">
@@ -617,33 +728,70 @@ function DetailSheet({
         </button>
       </div>
       <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y">
-        <div className="relative h-[50vh] bg-neutral-900">
-          <img src={business.image} alt="" className="w-full h-full object-cover" />
+        <div className="relative h-[42vh] bg-neutral-900">
+          {gallery[photoIdx] ? (
+            <img src={gallery[photoIdx]} alt="" className="w-full h-full object-cover" />
+          ) : null}
+          {gallery.length > 1 && (
+            <>
+              <div className="absolute inset-y-0 left-0 w-1/3" onClick={() => setPhotoIdx((i) => Math.max(0, i - 1))} />
+              <div
+                className="absolute inset-y-0 right-0 w-1/3"
+                onClick={() => setPhotoIdx((i) => Math.min(gallery.length - 1, i + 1))}
+              />
+              <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5">
+                {gallery.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-label={`Photo ${i + 1}`}
+                    onClick={() => setPhotoIdx(i)}
+                    className={`h-1.5 rounded-full transition-all ${i === photoIdx ? 'w-4 bg-white' : 'w-1.5 bg-white/40'}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
+
+        {gallery.length > 1 && (
+          <div className="flex gap-2 overflow-x-auto px-4 py-3">
+            {gallery.map((src, i) => (
+              <button
+                key={`${src}-${i}`}
+                type="button"
+                onClick={() => setPhotoIdx(i)}
+                className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden ring-2 ${
+                  i === photoIdx ? 'ring-teal-500' : 'ring-transparent'
+                }`}
+              >
+                <img src={src} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="px-4 py-4 space-y-4 pb-28">
           <div>
             <h2 className="text-2xl font-bold">{business.name}</h2>
             <span className="inline-block mt-2 rounded-md bg-teal-600 text-xs font-semibold px-2.5 py-1">
               {dealPillText(business)}
             </span>
-            <p className="mt-3 text-neutral-400 text-base">{oneLiner(business)}</p>
+            <p className="mt-3 text-neutral-300 text-base leading-relaxed">{blurb}</p>
+            {needsReadMore && (
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="mt-2 text-sm font-semibold text-teal-400"
+              >
+                {expanded ? 'Show less' : 'Read more'}
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap gap-3 text-sm text-neutral-300">
             {price > 0 && <span>💰 {formatVT(price)}</span>}
             {business.location && <span>📍 {business.location}</span>}
           </div>
-          {maps && (
-            <a
-              href={maps}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block rounded-xl overflow-hidden border border-white/10"
-            >
-              <div className="bg-neutral-900 aspect-video flex items-center justify-center text-sm text-neutral-400">
-                Open in Google Maps →
-              </div>
-            </a>
-          )}
         </div>
       </div>
       <div className="absolute bottom-0 inset-x-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-neutral-950/95 border-t border-white/10 space-y-2">
@@ -654,7 +802,7 @@ function DetailSheet({
               onClick={onGetPass}
               className="w-full min-h-12 rounded-xl bg-teal-600 font-bold text-sm"
             >
-              Get {isExtended ? '7-Day' : '1-Day'} Pass for {paidPeople} · A${pricePreview}
+              {passCtaLabel(isExtended, paidPeople, pricePreview)}
             </button>
             <p className="text-center text-[11px] text-neutral-500">Message direct + unlock deals</p>
             <button
@@ -721,12 +869,8 @@ function PaywallSheet({
         <p className="text-sm text-neutral-400 text-center">
           Get your pass to unlock WhatsApp + deals. You’ll message them direct — we never take bookings.
         </p>
-        <button
-          type="button"
-          onClick={onBuy}
-          className="w-full min-h-12 rounded-xl bg-teal-600 font-bold"
-        >
-          Get {isExtended ? '7-Day' : '1-Day'} Pass for {paidPeople} · A${price}
+        <button type="button" onClick={onBuy} className="w-full min-h-12 rounded-xl bg-teal-600 font-bold">
+          {passCtaLabel(isExtended, paidPeople, price)}
         </button>
         <button type="button" onClick={onClose} className="w-full text-sm text-neutral-400 py-2">
           Maybe later

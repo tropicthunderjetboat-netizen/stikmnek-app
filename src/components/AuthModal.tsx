@@ -1,4 +1,4 @@
-import React, { useId, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { SITE_URL, supabase } from '@/lib/supabase';
@@ -7,6 +7,8 @@ import { X, Mail, Lock, User, Briefcase, Plane, Loader2, Shield, ArrowLeft, Stor
 import { Dialog, DialogClose, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { calculatePassPrice } from '@/data/pricing';
+import { peekPendingCheckout, type PendingCheckout } from '@/lib/tripStorage';
 
 const AuthModal: React.FC = () => {
   const {
@@ -20,6 +22,20 @@ const AuthModal: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
+  const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null);
+
+  useEffect(() => {
+    if (!showAuth) {
+      setPendingCheckout(null);
+      return;
+    }
+    setPendingCheckout(peekPendingCheckout());
+  }, [showAuth, authMode]);
+
+  const buyingPass = authMode === 'signup-tourist' && pendingCheckout != null;
+  const pendingPrice = buyingPass
+    ? calculatePassPrice(pendingCheckout.partySize, pendingCheckout.isExtended)
+    : null;
 
   const idBase = useId();
   const ids = useMemo(() => {
@@ -128,11 +144,15 @@ const AuthModal: React.FC = () => {
   const isBizSignup = authMode === 'signup-business';
   const headerGradient = isBizSignup
     ? 'from-emerald-600 to-teal-700'
+    : buyingPass
+    ? 'from-teal-600 to-teal-700'
     : authMode === 'signup-tourist'
     ? 'from-sky-500 to-blue-600'
     : 'from-teal-600 to-emerald-600';
   const headerIcon = isBizSignup
     ? <Store className="w-6 h-6" />
+    : buyingPass
+    ? <Plane className="w-6 h-6" />
     : authMode === 'signup-tourist'
     ? <Globe className="w-6 h-6" />
     : <User className="w-6 h-6" />;
@@ -140,6 +160,8 @@ const AuthModal: React.FC = () => {
     ? t('auth.signin', language)
     : isBizSignup
     ? (language === 'en' ? 'Business Sign Up' : language === 'fr' ? 'Inscription Entreprise' : 'Bisnis Saen Ap')
+    : buyingPass
+    ? (language === 'en' ? 'Almost there' : language === 'fr' ? 'Presque prêt' : 'Koksave i klaos')
     : (language === 'en' ? 'Tourist Sign Up' : language === 'fr' ? 'Inscription Touriste' : 'Turis Saen Ap');
   const headerSubtitle = forgotPasswordMode
     ? (language === 'en' ? 'We\'ll send you a reset link' : language === 'fr' ? 'Nous vous enverrons un lien' : 'Bae mifala sendem link long yu')
@@ -147,6 +169,12 @@ const AuthModal: React.FC = () => {
     ? (language === 'en' ? 'Welcome back to StikmNek' : language === 'fr' ? 'Bienvenue sur StikmNek' : 'Welkam bak long StikmNek')
     : isBizSignup
     ? (language === 'en' ? 'Create your business account to start listing' : language === 'fr' ? 'Créez votre compte entreprise' : 'Mekem bisnis akaont blong yu')
+    : buyingPass
+    ? (language === 'en'
+      ? `Quick free account, then PayPal for your ${pendingCheckout?.isExtended ? '7-day' : '1-day'} pass (A$${pendingPrice}).`
+      : language === 'fr'
+        ? `Compte gratuit rapide, puis PayPal pour votre pass (A$${pendingPrice}).`
+        : `Kwik free akaont, afta PayPal blong pas blong yu (A$${pendingPrice}).`)
     : (language === 'en' ? 'Create your account to start saving' : language === 'fr' ? 'Créez votre compte pour économiser' : 'Mekem akaont blong yu blong sevem');
 
   const onOpenChange = (open: boolean) => {
@@ -369,9 +397,21 @@ const AuthModal: React.FC = () => {
           icon: headerIcon,
           title: headerTitle,
           subtitle: headerSubtitle,
-          showBack: isSignup,
+          showBack: isSignup && !buyingPass,
           onBack: () => { setAuthMode('signup'); resetForm(); },
         })}
+
+        {buyingPass && (
+          <div className="px-6 pt-4">
+            <div className="rounded-xl bg-teal-50 border border-teal-100 px-3 py-2.5 text-[12px] text-teal-900 leading-snug">
+              {language === 'en'
+                ? 'Takes about 20 seconds. Your saved places stay on this phone.'
+                : language === 'fr'
+                  ? 'Environ 20 secondes. Vos lieux enregistrés restent sur ce téléphone.'
+                  : 'About 20 seconds. Saved ples i stap long fon blong yu.'}
+            </div>
+          </div>
+        )}
 
         {isBizSignup && (
           <div className="px-6 pt-4">
@@ -463,18 +503,24 @@ const AuthModal: React.FC = () => {
             type="submit"
             disabled={submitting || authLoading}
             className={`w-full py-3 rounded-xl bg-gradient-to-r ${
-              isBizSignup ? 'from-emerald-600 to-teal-700' : authMode === 'signup-tourist' ? 'from-sky-500 to-blue-600' : 'from-teal-600 to-emerald-600'
+              isBizSignup
+                ? 'from-emerald-600 to-teal-700'
+                : buyingPass || authMode === 'signup-tourist'
+                  ? 'from-teal-600 to-teal-700'
+                  : 'from-teal-600 to-emerald-600'
             } text-white font-bold text-sm hover:opacity-90 transition-all shadow-lg ${
-              isBizSignup ? 'shadow-emerald-200' : authMode === 'signup-tourist' ? 'shadow-sky-200' : 'shadow-teal-200'
+              isBizSignup ? 'shadow-emerald-200' : 'shadow-teal-200'
             } disabled:opacity-60 flex items-center justify-center gap-2`}
           >
             {(submitting || authLoading) && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isBizSignup ? <Store className="w-4 h-4" /> : authMode === 'signup-tourist' ? <Globe className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+            {isBizSignup ? <Store className="w-4 h-4" /> : buyingPass ? <Plane className="w-4 h-4" /> : authMode === 'signup-tourist' ? <Globe className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
             {authMode === 'signin'
               ? (language === 'en' ? 'Sign In' : language === 'fr' ? 'Se connecter' : 'Saen In')
               : isBizSignup
                 ? (language === 'en' ? 'Create Business Account' : language === 'fr' ? 'Créer un compte entreprise' : 'Mekem wan Bisnis Akaont')
-                : (language === 'en' ? 'Create Tourist Account' : language === 'fr' ? 'Créer un compte touriste' : 'Mekem wan Turis Akaont')}
+                : buyingPass
+                  ? (language === 'en' ? 'Continue to PayPal' : language === 'fr' ? 'Continuer vers PayPal' : 'Go hed long PayPal')
+                  : (language === 'en' ? 'Create account' : language === 'fr' ? 'Créer un compte' : 'Mekem akaont')}
           </button>
 
           <p className="text-center text-sm text-gray-500">
@@ -500,11 +546,17 @@ const AuthModal: React.FC = () => {
           <div className="flex items-start gap-2.5 p-3 rounded-xl bg-gray-50 border border-gray-100">
             <Shield className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
             <p className="text-[10px] text-gray-400 leading-relaxed">
-              {language === 'en'
-                ? 'By continuing, you agree to our Terms of Service and Privacy Policy. Your data is protected under GDPR compliance.'
-                : language === 'fr'
-                  ? "En continuant, vous acceptez nos Conditions d'utilisation et notre Politique de confidentialité."
-                  : 'Taem yu kontiniu, yu agri long Tems blong Sevis mo Praevesi Polisi blong mifala.'}
+              {buyingPass
+                ? (language === 'en'
+                  ? 'Next step is PayPal. We don’t take bookings — you message places yourself after you pay.'
+                  : language === 'fr'
+                    ? 'Ensuite vient PayPal. Nous ne prenons pas de réservations — vous contactez les lieux vous-même.'
+                    : 'Nekis step hemi PayPal. Mifala no tekem booking — yu mesejem ples yu yet.')
+                : language === 'en'
+                  ? 'By continuing, you agree to our Terms of Service and Privacy Policy. Your data is protected under GDPR compliance.'
+                  : language === 'fr'
+                    ? "En continuant, vous acceptez nos Conditions d'utilisation et notre Politique de confidentialité."
+                    : 'Taem yu kontiniu, yu agri long Tems blong Sevis mo Praevesi Polisi blong mifala.'}
             </p>
           </div>
         </div>

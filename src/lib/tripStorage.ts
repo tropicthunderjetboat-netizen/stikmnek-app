@@ -101,6 +101,22 @@ export function savePendingCheckout(pending: PendingCheckout): void {
   }
 }
 
+/** Read pending checkout without clearing (for signup copy). */
+export function peekPendingCheckout(): PendingCheckout | null {
+  if (!canUseStorage()) return null;
+  try {
+    const raw = window.sessionStorage.getItem(PENDING_CHECKOUT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PendingCheckout>;
+    return {
+      partySize: clampPartySize(Number(parsed.partySize) || 1),
+      isExtended: Boolean(parsed.isExtended),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function consumePendingCheckout(): PendingCheckout | null {
   if (!canUseStorage()) return null;
   try {
@@ -114,5 +130,25 @@ export function consumePendingCheckout(): PendingCheckout | null {
     };
   } catch {
     return null;
+  }
+}
+
+export const TAP_HINT_KEY = 'stikmnek_swipe_tap_hint_seen';
+
+export function hasSeenTapHint(): boolean {
+  if (!canUseStorage()) return true;
+  try {
+    return window.localStorage.getItem(TAP_HINT_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
+export function markTapHintSeen(): void {
+  if (!canUseStorage()) return;
+  try {
+    window.localStorage.setItem(TAP_HINT_KEY, '1');
+  } catch {
+    /* ignore */
   }
 }

@@ -61,6 +61,8 @@ const TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
   'map',
   'business-detail',
   'business-profile',
+  'checkout',
+  'payment-confirmation',
   'help',
   'faq',
   'business-guide',
