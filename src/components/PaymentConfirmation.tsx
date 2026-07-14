@@ -925,7 +925,7 @@ const PaymentConfirmation: React.FC = () => {
           currency: 'AUD',
           payment_method: p.paymentMethod === 'card'
             ? `Credit Card ending ${p.cardLast4 || '****'}`
-            : 'PayPal',
+            : 'Credit or debit card',
           valid_from: p.validFrom,
           valid_until: p.validUntil,
           duration_days: durationDays,
@@ -1106,7 +1106,7 @@ Valid Until: ${receiptDiscountUntilDate ? formatDateLong(receiptDiscountUntilDat
 ─────────────────────────────────────
 PAYMENT DETAILS
 ─────────────────────────────────────
-Method: ${payment.paymentMethod === 'card' ? `Credit Card ending ${payment.cardLast4 || '****'}` : 'PayPal'}
+Method: ${payment.paymentMethod === 'card' ? `Credit Card ending ${payment.cardLast4 || '****'}` : 'Credit or debit card'}
 Currency: AUD (Australian Dollar)
 
 Amount: ${formatReceiptAud(payment.amount)} AUD
@@ -1385,7 +1385,7 @@ Enjoy your deals in Vanuatu!
                 <p className="text-sm font-semibold text-gray-900">
                   {payment.paymentMethod === 'card'
                     ? `Card ending ${payment.cardLast4 || '****'}`
-                    : 'PayPal'}
+                    : 'Credit or debit card'}
                 </p>
               </div>
 

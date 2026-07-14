@@ -22,16 +22,19 @@ import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import {
   checkoutFromTrip,
   hasSeenTapHint,
-  hasSeenWelcomeCard,
   loadTripState,
   markTapHintSeen,
-  markWelcomeCardSeen,
   saveTripState,
   type TripLength,
   type TripState,
 } from '@/lib/tripStorage';
+import { APP_ICON } from '@/lib/brand';
 
-type FeedItem = { kind: 'welcome' } | { kind: 'place'; business: Business };
+type FeedItem = { kind: 'welcome' } | { kind: 'end' } | { kind: 'place'; business: Business };
+
+/** Same Vanuatu hero used on the marketing site — warm, inviting. */
+const WELCOME_HERO =
+  'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1770856886882_dff396d7.jpg';
 
 function peopleWord(n: number): string {
   const p = clampPartySize(n);
@@ -76,6 +79,36 @@ function placeKey(b: Business): string {
   return b.id;
 }
 
+/** Full photo visible (no crop) + soft blurred fill behind for letterboxing. */
+function FitPhoto({
+  src,
+  className = '',
+  imgClassName = '',
+}: {
+  src: string;
+  className?: string;
+  imgClassName?: string;
+}) {
+  if (!src) return <div className={`bg-neutral-900 ${className}`} />;
+  return (
+    <div className={`relative overflow-hidden bg-neutral-950 ${className}`}>
+      <img
+        src={src}
+        alt=""
+        aria-hidden
+        draggable={false}
+        className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl opacity-50"
+      />
+      <img
+        src={src}
+        alt=""
+        draggable={false}
+        className={`relative z-[1] h-full w-full object-contain object-center ${imgClassName}`}
+      />
+    </div>
+  );
+}
+
 export default function SwipeDiscover() {
   const navigate = useNavigate();
   const {
@@ -95,7 +128,9 @@ export default function SwipeDiscover() {
   const [vibe, setVibe] = useState<'length' | 'party' | null>(null);
   const [dragY, setDragY] = useState(0);
   const [showTapCoach, setShowTapCoach] = useState(() => !hasSeenTapHint());
-  const [welcomeDone, setWelcomeDone] = useState(() => hasSeenWelcomeCard());
+  /** Session-only: welcome shows again every fresh visit / page load */
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  const [shuffleKey, setShuffleKey] = useState(0);
   const touchStartY = useRef<number | null>(null);
   const preloaded = useRef<Set<string>>(new Set());
   const lengthPrompted = useRef(false);
@@ -128,6 +163,15 @@ export default function SwipeDiscover() {
       }
     }
     return shuffleOrderRef.current.map((id) => byId.get(id)!).filter(Boolean);
+  }, [dbBusinesses, shuffleKey]);
+
+  const reshuffleFeed = useCallback(() => {
+    const base = touristFacingOfferings(dbBusinesses);
+    shuffleOrderRef.current = shuffleBusinesses(base).map((b) => b.id);
+    setWelcomeDismissed(true);
+    setShuffleKey((k) => k + 1);
+    setIndex(0);
+    setDragY(0);
   }, [dbBusinesses]);
 
   const persist = useCallback((next: TripState) => {
@@ -147,15 +191,16 @@ export default function SwipeDiscover() {
 
   const feed: FeedItem[] = useMemo(() => {
     const places = listings.map((b) => ({ kind: 'place' as const, business: b }));
-    if (welcomeDone) return places;
-    return [{ kind: 'welcome' as const }, ...places];
-  }, [listings, welcomeDone]);
+    const withEnd: FeedItem[] =
+      places.length > 0 ? [...places, { kind: 'end' as const }] : places;
+    if (welcomeDismissed) return withEnd;
+    return [{ kind: 'welcome' as const }, ...withEnd];
+  }, [listings, welcomeDismissed]);
 
   const current = feed[Math.min(index, Math.max(0, feed.length - 1))] ?? null;
 
   const finishWelcome = useCallback(() => {
-    setWelcomeDone(true);
-    markWelcomeCardSeen();
+    setWelcomeDismissed(true);
     setIndex(0);
     setDragY(0);
   }, []);
@@ -204,8 +249,12 @@ export default function SwipeDiscover() {
       finishWelcome();
       return;
     }
+    if (current?.kind === 'end') {
+      reshuffleFeed();
+      return;
+    }
     setIndex((i) => Math.min(i + 1, Math.max(0, feed.length - 1)));
-  }, [feed.length, current?.kind, finishWelcome]);
+  }, [feed.length, current?.kind, finishWelcome, reshuffleFeed]);
 
   const goPrev = useCallback(() => {
     setDragY(0);
@@ -426,6 +475,15 @@ export default function SwipeDiscover() {
         {current?.kind === 'welcome' && (
           <WelcomeCard onStart={finishWelcome} />
         )}
+        {current?.kind === 'end' && (
+          <EndCard
+            hasPass={hasPass}
+            savedCount={saveCount}
+            passLabel={passCtaLabel(isExtended, trip.paidPeople, pricePreview)}
+            onBrowseAgain={reshuffleFeed}
+            onGetPass={() => openCheckout()}
+          />
+        )}
         {current?.kind === 'place' && (
           <PlaceCard
             business={current.business}
@@ -479,7 +537,7 @@ export default function SwipeDiscover() {
         </div>
       )}
 
-      {savedBusinesses.length > 0 && !detail && !paywallBiz && !vibe && (
+      {savedBusinesses.length > 0 && !detail && !paywallBiz && !vibe && current?.kind === 'place' && (
         <div className="absolute bottom-0 inset-x-0 z-20 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none">
           <div className="pointer-events-auto flex gap-2 overflow-x-auto pb-1">
             {savedBusinesses.slice(0, 8).map((b) => (
@@ -489,7 +547,7 @@ export default function SwipeDiscover() {
                 onClick={() => openDetail(b)}
                 className="shrink-0 w-14 h-14 rounded-xl overflow-hidden ring-2 ring-teal-500/60"
               >
-                <img src={b.image} alt="" className="w-full h-full object-cover" />
+                <FitPhoto src={b.image} className="h-full w-full" />
               </button>
             ))}
             {!hasPass && (
@@ -540,50 +598,152 @@ export default function SwipeDiscover() {
 
 function WelcomeCard({ onStart }: { onStart: () => void }) {
   return (
-    <div className="relative h-full w-full flex flex-col justify-end px-6 pb-28 bg-gradient-to-b from-teal-950 via-neutral-950 to-neutral-950">
-      <div
-        className="absolute inset-0 opacity-[0.35]"
-        style={{
-          backgroundImage:
-            'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(13,148,136,0.45), transparent 60%)',
-        }}
+    <div className="relative h-full w-full overflow-hidden">
+      <img
+        src={WELCOME_HERO}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+        draggable={false}
       />
-      <div className="relative z-10 max-w-sm mx-auto w-full space-y-6">
-        <div>
-          <p className="text-teal-400 text-xs font-semibold tracking-wide uppercase mb-2">Welcome</p>
-          <h2 className="text-[28px] font-bold leading-tight text-white">
-            Plan your Vanuatu trip in one place
-          </h2>
-          <p className="mt-3 text-neutral-400 text-sm leading-relaxed">
-            Browse places. Save what you like. When you’re ready, a pass unlocks WhatsApp so you can message them direct.
-          </p>
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-teal-950/40" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(13,148,136,0.25),_transparent_55%)]" />
+
+      <div className="relative z-10 h-full flex flex-col justify-between px-6 pt-[max(2.5rem,env(safe-area-inset-top))] pb-28">
+        <div className="flex flex-col items-center text-center pt-6">
+          <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-2xl shadow-teal-900/50 ring-2 ring-white/30 mb-4 bg-white">
+            <img
+              src={APP_ICON}
+              alt="StikmNek"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const el = e.currentTarget;
+                el.style.display = 'none';
+                const parent = el.parentElement;
+                if (parent) {
+                  parent.classList.add('bg-gradient-to-br', 'from-teal-500', 'to-emerald-600', 'flex', 'items-center', 'justify-center');
+                  parent.innerHTML = '<span class="text-white text-2xl font-bold">S</span>';
+                }
+              }}
+            />
+          </div>
+          <p className="text-2xl font-bold text-white tracking-tight drop-shadow-md">StikmNek</p>
+          <p className="mt-1 text-sm text-teal-200/90">Your Vanuatu trip starts here</p>
         </div>
 
-        <ul className="space-y-3 text-sm text-neutral-200">
-          <li className="flex items-start gap-3">
-            <span className="mt-0.5 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs shrink-0">↑</span>
-            <span>Swipe up for the next place</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="mt-0.5 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-              <Heart className="w-3.5 h-3.5 text-teal-400" />
-            </span>
-            <span>Heart saves it to Your Trip</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="mt-0.5 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs shrink-0">Aa</span>
-            <span>Tap a name for photos and details</span>
-          </li>
-        </ul>
+        <div className="max-w-sm mx-auto w-full space-y-5">
+          <div className="text-center">
+            <h2 className="text-[26px] font-bold leading-tight text-white drop-shadow-md">
+              Plan your trip in one place
+            </h2>
+            <p className="mt-2.5 text-neutral-200 text-sm leading-relaxed">
+              Browse beaches, tours &amp; local spots. Heart what you love. Message places when you’re ready — we never take the booking.
+            </p>
+          </div>
 
-        <button
-          type="button"
-          onClick={onStart}
-          className="w-full min-h-12 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm active:scale-[0.98] transition-transform"
-        >
-          Start exploring
-        </button>
-        <p className="text-center text-[11px] text-neutral-500">Or swipe up · free to browse</p>
+          <ul className="rounded-2xl bg-black/35 backdrop-blur-md border border-white/10 px-4 py-3.5 space-y-2.5 text-sm text-white/95">
+            <li className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center text-xs shrink-0">↑</span>
+              <span>Swipe up for the next place</span>
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center shrink-0">
+                <Heart className="w-3.5 h-3.5 text-teal-300 fill-teal-300" />
+              </span>
+              <span>Heart = save to Your Trip</span>
+            </li>
+            <li className="flex items-center gap-3">
+              <span className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center text-[10px] font-bold shrink-0">Aa</span>
+              <span>Tap a name for photos &amp; deals</span>
+            </li>
+          </ul>
+
+          <button
+            type="button"
+            onClick={onStart}
+            className="w-full min-h-12 rounded-2xl bg-teal-500 hover:bg-teal-400 text-white font-bold text-base shadow-lg shadow-teal-900/40 active:scale-[0.98] transition-transform"
+          >
+            Start exploring
+          </button>
+          <p className="text-center text-[11px] text-white/60">Or swipe up · free to browse</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EndCard({
+  hasPass,
+  savedCount,
+  passLabel,
+  onBrowseAgain,
+  onGetPass,
+}: {
+  hasPass: boolean;
+  savedCount: number;
+  passLabel: string;
+  onBrowseAgain: () => void;
+  onGetPass: () => void;
+}) {
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      <img
+        src={WELCOME_HERO}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+        draggable={false}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-teal-950/50" />
+
+      <div className="relative z-10 h-full flex flex-col justify-end px-6 pb-28">
+        <div className="max-w-sm mx-auto w-full space-y-5 text-center">
+          <div className="flex justify-center">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-xl ring-2 ring-white/30 bg-white">
+              <img
+                src={APP_ICON}
+                alt="StikmNek"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+          </div>
+          <div>
+            <p className="text-teal-300 text-xs font-semibold uppercase tracking-wide mb-2">You’ve reached the end</p>
+            <h2 className="text-[26px] font-bold text-white leading-tight">
+              That’s all the places — for now
+            </h2>
+            <p className="mt-2.5 text-sm text-neutral-200 leading-relaxed">
+              Swipe up to shuffle and browse again
+              {savedCount > 0 ? ` · ${savedCount} saved to Your Trip` : ''}.
+            </p>
+          </div>
+
+          {!hasPass && (
+            <div className="rounded-2xl bg-teal-600/90 px-4 py-3.5 text-left">
+              <p className="text-sm font-bold text-white">Don’t forget your pass</p>
+              <p className="mt-1 text-xs text-teal-50 leading-snug">
+                A pass unlocks WhatsApp so you can message these places and lock in dates.
+              </p>
+              <button
+                type="button"
+                onClick={onGetPass}
+                className="mt-3 w-full min-h-11 rounded-xl bg-white text-teal-800 text-sm font-bold active:scale-[0.98] transition-transform"
+              >
+                {passLabel}
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={onBrowseAgain}
+            className="w-full min-h-12 rounded-2xl bg-white/15 backdrop-blur border border-white/25 text-white font-bold text-sm active:scale-[0.98] transition-transform"
+          >
+            Shuffle &amp; browse again
+          </button>
+          <p className="text-[11px] text-white/55">Or swipe up to continue</p>
+        </div>
       </div>
     </div>
   );
@@ -614,13 +774,8 @@ function PlaceCard({
         onClick={onOpen}
         aria-label={`Open ${business.name}`}
       >
-        <img
-          src={business.image}
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover"
-          draggable={false}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/30" />
+        <FitPhoto src={business.image} className="absolute inset-0 h-full w-full" />
+        <div className="absolute inset-0 z-[2] bg-gradient-to-t from-black/85 via-black/15 to-black/35" />
       </button>
 
       <div className="absolute bottom-24 left-4 right-24 z-10">
@@ -799,16 +954,16 @@ function DetailSheet({
       <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y">
         <div className="relative h-[42vh] bg-neutral-900">
           {gallery[photoIdx] ? (
-            <img src={gallery[photoIdx]} alt="" className="w-full h-full object-cover" />
+            <FitPhoto src={gallery[photoIdx]!} className="absolute inset-0 h-full w-full" />
           ) : null}
           {gallery.length > 1 && (
             <>
-              <div className="absolute inset-y-0 left-0 w-1/3" onClick={() => setPhotoIdx((i) => Math.max(0, i - 1))} />
+              <div className="absolute inset-y-0 left-0 z-[3] w-1/3" onClick={() => setPhotoIdx((i) => Math.max(0, i - 1))} />
               <div
-                className="absolute inset-y-0 right-0 w-1/3"
+                className="absolute inset-y-0 right-0 z-[3] w-1/3"
                 onClick={() => setPhotoIdx((i) => Math.min(gallery.length - 1, i + 1))}
               />
-              <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1.5">
+              <div className="absolute bottom-3 inset-x-0 z-[3] flex justify-center gap-1.5">
                 {gallery.map((_, i) => (
                   <button
                     key={i}
@@ -834,7 +989,7 @@ function DetailSheet({
                   i === photoIdx ? 'ring-teal-500' : 'ring-transparent'
                 }`}
               >
-                <img src={src} alt="" className="w-full h-full object-cover" />
+                <FitPhoto src={src} className="h-full w-full" />
               </button>
             ))}
           </div>

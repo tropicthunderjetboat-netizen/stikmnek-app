@@ -171,10 +171,10 @@ const AuthModal: React.FC = () => {
     ? (language === 'en' ? 'Create your business account to start listing' : language === 'fr' ? 'Créez votre compte entreprise' : 'Mekem bisnis akaont blong yu')
     : buyingPass
     ? (language === 'en'
-      ? `Quick free account, then PayPal for your ${pendingCheckout?.isExtended ? '7-day' : '1-day'} pass (A$${pendingPrice}).`
+      ? `Quick free account, then pay by credit card for your ${pendingCheckout?.isExtended ? '7-day' : '1-day'} pass (A$${pendingPrice}).`
       : language === 'fr'
-        ? `Compte gratuit rapide, puis PayPal pour votre pass (A$${pendingPrice}).`
-        : `Kwik free akaont, afta PayPal blong pas blong yu (A$${pendingPrice}).`)
+        ? `Compte gratuit rapide, puis paiement par carte pour votre pass (A$${pendingPrice}).`
+        : `Kwik free akaont, afta pem wetem card blong pas blong yu (A$${pendingPrice}).`)
     : (language === 'en' ? 'Create your account to start saving' : language === 'fr' ? 'Créez votre compte pour économiser' : 'Mekem akaont blong yu blong sevem');
 
   const onOpenChange = (open: boolean) => {
@@ -519,7 +519,7 @@ const AuthModal: React.FC = () => {
               : isBizSignup
                 ? (language === 'en' ? 'Create Business Account' : language === 'fr' ? 'Créer un compte entreprise' : 'Mekem wan Bisnis Akaont')
                 : buyingPass
-                  ? (language === 'en' ? 'Continue to PayPal' : language === 'fr' ? 'Continuer vers PayPal' : 'Go hed long PayPal')
+                  ? (language === 'en' ? 'Continue to pay' : language === 'fr' ? 'Continuer vers le paiement' : 'Go hed blong pem')
                   : (language === 'en' ? 'Create account' : language === 'fr' ? 'Créer un compte' : 'Mekem akaont')}
           </button>
 
@@ -548,10 +548,10 @@ const AuthModal: React.FC = () => {
             <p className="text-[10px] text-gray-400 leading-relaxed">
               {buyingPass
                 ? (language === 'en'
-                  ? 'Next step is PayPal. We don’t take bookings — you message places yourself after you pay.'
+                  ? 'Next you’ll pay by credit or debit card. We don’t take bookings — you message places yourself after you pay.'
                   : language === 'fr'
-                    ? 'Ensuite vient PayPal. Nous ne prenons pas de réservations — vous contactez les lieux vous-même.'
-                    : 'Nekis step hemi PayPal. Mifala no tekem booking — yu mesejem ples yu yet.')
+                    ? 'Ensuite, vous payez par carte. Nous ne prenons pas de réservations — vous contactez les lieux vous-même.'
+                    : 'Nekis yu pem wetem card. Mifala no tekem booking — yu mesejem ples yu yet.')
                 : language === 'en'
                   ? 'By continuing, you agree to our Terms of Service and Privacy Policy. Your data is protected under GDPR compliance.'
                   : language === 'fr'

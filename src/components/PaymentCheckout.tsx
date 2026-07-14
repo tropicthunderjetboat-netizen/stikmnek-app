@@ -720,7 +720,7 @@ const PaymentCheckout: React.FC = () => {
                 isExtended: ext,
               });
               throw new Error(
-                `Payment amount mismatch (expected A$${expectedAud.toFixed(2)}, PayPal order A$${serverAmount.toFixed(2)}). Tap “Change dates”, confirm group size and 7-day pass, then pay again.`,
+                `Payment amount mismatch (expected A$${expectedAud.toFixed(2)}, order A$${serverAmount.toFixed(2)}). Tap “Change dates”, confirm group size and 7-day pass, then pay again.`,
               );
             }
             return String(orderId);
@@ -840,7 +840,7 @@ const PaymentCheckout: React.FC = () => {
                 setAuthMode('signin');
               } else {
                 if (/capture|activate|pass could not/i.test(msg)) {
-                  msg += ' If PayPal charged you the full pass amount (not a small ~130 VT hold), email support with your PayPal receipt — we can activate your pass manually.';
+                  msg += ' If you were charged the full pass amount (not a small ~130 VT hold), email support with your payment receipt — we can activate your pass manually.';
                 }
                 toast.error(msg);
               }
@@ -855,7 +855,7 @@ const PaymentCheckout: React.FC = () => {
             const m =
               err && typeof err === 'object' && 'message' in err
                 ? String((err as { message: string }).message)
-                : 'PayPal error';
+                : 'Payment error';
             toast.error(m);
             setPaymentError(m);
           },
@@ -871,7 +871,7 @@ const PaymentCheckout: React.FC = () => {
         if (!cancelled) setPaypalButtonsReady(true);
       } catch (e: unknown) {
         if (cancelled) return;
-        const msg = e instanceof Error ? e.message : 'PayPal failed to initialize';
+        const msg = e instanceof Error ? e.message : 'Checkout failed to load';
         setPaypalButtonsSdkError(msg);
         setPaypalButtonsReady(false);
         console.error('[PaymentCheckout] PayPal Buttons init', e);
@@ -1558,7 +1558,7 @@ const PaymentCheckout: React.FC = () => {
                   <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
                     <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-semibold text-amber-900">PayPal checkout unavailable</p>
+                      <p className="text-sm font-semibold text-amber-900">Card checkout unavailable</p>
                       <p className="text-sm text-amber-800 mt-0.5">{paypalButtonsSdkError}</p>
                     </div>
                   </div>
@@ -1574,11 +1574,11 @@ const PaymentCheckout: React.FC = () => {
                       </div>
                       <div>
                         <p className="font-bold text-gray-900 text-sm">
-                          {paypalSmartEnabled ? 'Pay with card or PayPal' : 'Credit or Debit Card'}
+                          {paypalSmartEnabled ? 'Pay with credit or debit card' : 'Credit or Debit Card'}
                         </p>
                         <p className="text-xs text-gray-500">
                           {paypalSmartEnabled
-                            ? 'Debit/credit card (no PayPal account needed) or PayPal wallet — both open PayPal’s secure window.'
+                            ? 'Secure card payment — no extra account needed.'
                             : 'Pay securely on StikmNek — no redirect'}
                         </p>
                       </div>
@@ -1597,16 +1597,15 @@ const PaymentCheckout: React.FC = () => {
                       {!paypalButtonsReady && (
                         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl bg-white/85 backdrop-blur-[1px] text-gray-600 min-h-[52px]">
                           <Loader2 className="w-7 h-7 animate-spin text-teal-600" />
-                          <span className="text-sm font-medium">Loading PayPal…</span>
+                          <span className="text-sm font-medium">Loading secure checkout…</span>
                         </div>
                       )}
                       <div key={paypalMountKey} className="min-h-[48px] max-w-md space-y-3">
                         <div ref={paypalCardButtonRef} className="min-h-[48px]" />
-                        <p className="text-center text-xs text-gray-400 font-medium">or</p>
-                        <div ref={paypalWalletButtonRef} className="min-h-[48px]" />
+                        <div ref={paypalWalletButtonRef} className="sr-only min-h-[1px]" aria-hidden />
                       </div>
                       <p className="text-xs text-gray-500">
-                        Total due: <strong>A${priceAud.toFixed(2)} AUD</strong> — charged when you complete payment in PayPal.
+                        Total due: <strong>A${priceAud.toFixed(2)} AUD</strong> — charged when you complete card payment.
                       </p>
                     </div>
                   )}
@@ -1920,7 +1919,7 @@ const PaymentCheckout: React.FC = () => {
                   <CreditCard className="w-5 h-5 text-gray-600" />
                   <div className="flex-1">
                     <span className="text-sm font-semibold text-gray-700">Credit / Debit Card</span>
-                    <p className="text-[10px] text-gray-400">Powered by PayPal Gateway</p>
+                    <p className="text-[10px] text-gray-400">Secure card checkout</p>
                   </div>
                   <Shield className="w-4 h-4 text-green-500" />
                 </div>
