@@ -636,7 +636,10 @@ function WelcomeCard({ onStart }: { onStart: () => void }) {
               Plan your trip in one place
             </h2>
             <p className="mt-2.5 text-neutral-200 text-sm leading-relaxed">
-              Browse beaches, tours &amp; local spots. Heart what you love. Message places when you’re ready — we never take the booking.
+              Browse beaches, tours and local spots. Tap the heart to save places for your trip. When you’re ready, a pass lets you message them direct — we never take the booking.
+            </p>
+            <p className="mt-2 text-teal-200/95 text-sm leading-relaxed font-medium">
+              You’re supporting local, grassroots businesses across Vanuatu.
             </p>
           </div>
 
@@ -649,7 +652,7 @@ function WelcomeCard({ onStart }: { onStart: () => void }) {
               <span className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center shrink-0">
                 <Heart className="w-3.5 h-3.5 text-teal-300 fill-teal-300" />
               </span>
-              <span>Heart = save to Your Trip</span>
+              <span>Tap ♥ to save a place to your trip</span>
             </li>
             <li className="flex items-center gap-3">
               <span className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center text-[10px] font-bold shrink-0">Aa</span>
