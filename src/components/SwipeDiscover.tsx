@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MapPin, MessageCircle, Phone, QrCode, Search, Star, Store, User, X } from 'lucide-react';
+import { Heart, MapPin, MessageCircle, Phone, Search, Star, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
@@ -153,6 +153,11 @@ export default function SwipeDiscover() {
   /** Session-only: welcome shows again every fresh visit / page load */
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [shuffleKey, setShuffleKey] = useState(0);
+  /** Session: first two place cards show a floating tip once. */
+  const [dismissedFloatHints, setDismissedFloatHints] = useState<Record<0 | 1, boolean>>({
+    0: false,
+    1: false,
+  });
   const touchStartY = useRef<number | null>(null);
   const preloaded = useRef<Set<string>>(new Set());
   const lengthPrompted = useRef(false);
@@ -457,10 +462,9 @@ export default function SwipeDiscover() {
     setShowAuth(true);
   }, [setAuthMode, setShowAuth]);
 
-  const openPartnerJoin = useCallback(() => {
-    setCurrentView('business-join');
-    navigate('/for-business');
-  }, [navigate, setCurrentView]);
+  const dismissFloatHint = useCallback((which: 0 | 1) => {
+    setDismissedFloatHints((prev) => ({ ...prev, [which]: true }));
+  }, []);
 
   const showSoftNudge = saveCount >= 5 && !trip.softNudgeDismissed && !hasPass;
 
@@ -529,18 +533,6 @@ export default function SwipeDiscover() {
           >
             <Search className="w-4 h-4 text-white" />
           </button>
-          {!user && current?.kind !== 'welcome' && (
-            <button
-              type="button"
-              onClick={openPartnerSignIn}
-              className="rounded-full bg-white/15 backdrop-blur pl-2 pr-2.5 h-9 flex items-center gap-1 text-[11px] font-semibold text-white/90"
-              aria-label="Business or admin sign in"
-              title="Business / Admin sign in"
-            >
-              <Store className="w-3.5 h-3.5 shrink-0" aria-hidden />
-              Partner
-            </button>
-          )}
           {hasPass && (
             <button
               type="button"
@@ -584,7 +576,6 @@ export default function SwipeDiscover() {
             onStart={finishWelcome}
             dealCount={listings.length}
             onPartnerSignIn={openPartnerSignIn}
-            onPartnerJoin={openPartnerJoin}
           />
         )}
         {current?.kind === 'end' && (
@@ -604,6 +595,13 @@ export default function SwipeDiscover() {
             rating={current.business.rating || 0}
             showTapCoach={showTapCoach && !detail && !vibe && !paywallBiz && !reviewsBiz && !searchOpen}
             onDismissCoach={dismissTapCoach}
+            floatHint={(() => {
+              const placeIdx = feed.slice(0, index).filter((i) => i.kind === 'place').length;
+              if (placeIdx === 0 && !dismissedFloatHints[0]) return 'swipe' as const;
+              if (placeIdx === 1 && !dismissedFloatHints[1]) return 'heart' as const;
+              return null;
+            })()}
+            onDismissFloatHint={dismissFloatHint}
             onHeart={() => void heartPlace(current.business)}
             onOpen={() => openDetail(current.business)}
             onReviews={() => setReviewsBiz(current.business)}
@@ -741,24 +739,25 @@ export default function SwipeDiscover() {
   );
 }
 
-const WELCOME_PASS_QR_URL =
-  'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=stikmnek-pass-example&color=0d9488&bgcolor=ffffff&margin=8';
-
 function WelcomeCard({
   onStart,
   dealCount,
   onPartnerSignIn,
-  onPartnerJoin,
 }: {
   onStart: () => void;
   dealCount: number;
   onPartnerSignIn: () => void;
-  onPartnerJoin: () => void;
 }) {
-  const dealsLabel =
+  const dealsMeta =
     dealCount > 0
-      ? `${dealCount} local deal${dealCount === 1 ? '' : 's'} live right now`
-      : 'Local deals across Vanuatu';
+      ? `${dealCount} local deals • Free to browse • Swipe up to start`
+      : 'Free to browse • Swipe up to start';
+
+  const howItWorks = [
+    { icon: '♥', title: 'Save places', body: 'Tap the heart on spots you want to visit.' },
+    { icon: '1', title: 'Get a pass', body: 'One pass unlocks WhatsApp and member deals.' },
+    { icon: '✦', title: 'Support local', body: 'You book with them direct — we never take the booking.' },
+  ];
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -768,116 +767,77 @@ function WelcomeCard({
         className="absolute inset-0 h-full w-full object-cover"
         draggable={false}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-teal-950/40" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(13,148,136,0.25),_transparent_55%)]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/35" />
 
-      {/* Corner banner — partner / admin entry (below top chrome so it doesn’t clash with search) */}
-      <div className="absolute top-[max(3.35rem,calc(env(safe-area-inset-top)+2.85rem))] right-3 z-20">
-        <div className="rounded-2xl bg-black/45 backdrop-blur-md border border-white/20 shadow-lg overflow-hidden">
-          <p className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-wider text-teal-200/90">
-            Business / Admin
-          </p>
-          <div className="flex items-stretch divide-x divide-white/15">
-            <button
-              type="button"
-              onClick={onPartnerSignIn}
-              className="px-3 py-2 text-xs font-bold text-white hover:bg-white/10 active:bg-white/15"
-            >
-              Sign in
-            </button>
-            <button
-              type="button"
-              onClick={onPartnerJoin}
-              className="px-3 py-2 text-xs font-semibold text-teal-100 hover:bg-white/10 active:bg-white/15"
-            >
-              List a deal
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="relative z-10 h-full flex flex-col justify-between px-6 pt-[max(2.5rem,env(safe-area-inset-top))] pb-28">
-        <div className="flex flex-col items-center text-center pt-6">
-          <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-2xl shadow-teal-900/50 ring-2 ring-white/30 mb-4 bg-white">
-            <img
-              src={APP_ICON}
-              alt="StikmNek"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const el = e.currentTarget;
-                el.style.display = 'none';
-                const parent = el.parentElement;
-                if (parent) {
-                  parent.classList.add('bg-gradient-to-br', 'from-teal-500', 'to-emerald-600', 'flex', 'items-center', 'justify-center');
-                  parent.innerHTML = '<span class="text-white text-2xl font-bold">S</span>';
-                }
-              }}
-            />
-          </div>
-          <p className="text-2xl font-bold text-white tracking-tight drop-shadow-md">StikmNek</p>
-          <p className="mt-1 text-sm text-teal-200/90">Your Vanuatu trip starts here</p>
-        </div>
-
-        <div className="max-w-sm mx-auto w-full space-y-4">
+      <div className="relative z-10 h-full flex flex-col px-6 pt-[max(3.5rem,calc(env(safe-area-inset-top)+2.5rem))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
           <div className="text-center">
-            <h2 className="text-[26px] font-bold leading-tight text-white drop-shadow-md">
-              Plan your trip in one place
-            </h2>
-            <p className="mt-2.5 text-neutral-200 text-sm leading-relaxed">
-              Get a pass and message places on WhatsApp — you book with them direct. We never take the booking.
+            <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-2xl shadow-black/40 ring-2 ring-white/25 mb-4 bg-white">
+              <img
+                src={APP_ICON}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.style.display = 'none';
+                  const parent = el.parentElement;
+                  if (parent) {
+                    parent.classList.add(
+                      'bg-gradient-to-br',
+                      'from-teal-500',
+                      'to-emerald-600',
+                      'flex',
+                      'items-center',
+                      'justify-center',
+                    );
+                    parent.innerHTML = '<span class="text-white text-2xl font-bold">S</span>';
+                  }
+                }}
+              />
+            </div>
+            <p className="text-2xl font-bold text-white tracking-tight drop-shadow-md">StikmNek</p>
+            <h1 className="mt-4 text-[28px] font-bold leading-tight text-white drop-shadow-md">
+              Plan your trip. Support local.
+            </h1>
+            <p className="mt-3 text-[15px] text-neutral-200 leading-relaxed">
+              Build your trip by tapping ♥. Your pass helps grassroots Vanuatu businesses thrive.
             </p>
           </div>
 
-          <div className="flex items-stretch gap-3">
-            <div className="shrink-0 rounded-2xl bg-white p-2 shadow-lg shadow-black/30 ring-1 ring-white/20">
-              <img
-                src={WELCOME_PASS_QR_URL}
-                alt="Example pass QR code"
-                width={88}
-                height={88}
-                className="w-[88px] h-[88px] rounded-lg"
-                loading="lazy"
-              />
-            </div>
-            <div className="flex-1 min-w-0 rounded-2xl bg-black/35 backdrop-blur-md border border-white/10 px-3.5 py-3 flex flex-col justify-center gap-1.5">
-              <div className="flex items-center gap-2 text-teal-200">
-                <QrCode className="w-4 h-4 shrink-0" aria-hidden />
-                <span className="text-xs font-semibold leading-snug">Show your pass QR for deals in person</span>
+          <div className="mt-7 space-y-2.5">
+            {howItWorks.map((step) => (
+              <div
+                key={step.title}
+                className="flex items-start gap-3 rounded-2xl bg-white/10 border border-white/15 px-3.5 py-3 backdrop-blur-sm"
+              >
+                <span className="w-8 h-8 shrink-0 rounded-full bg-[#0FB5B5]/25 text-[#0FB5B5] flex items-center justify-center text-sm font-bold">
+                  {step.icon}
+                </span>
+                <div className="min-w-0 pt-0.5">
+                  <p className="text-sm font-semibold text-white leading-tight">{step.title}</p>
+                  <p className="mt-0.5 text-[13px] text-neutral-300 leading-snug">{step.body}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-white">
-                <MessageCircle className="w-4 h-4 shrink-0 text-teal-300" aria-hidden />
-                <span className="text-xs font-semibold leading-snug">WhatsApp unlocks with your pass</span>
-              </div>
-              <p className="text-[13px] font-bold text-teal-300 tabular-nums pt-0.5">{dealsLabel}</p>
-            </div>
+            ))}
           </div>
-
-          <ul className="rounded-2xl bg-black/35 backdrop-blur-md border border-white/10 px-4 py-3.5 space-y-2.5 text-sm text-white/95">
-            <li className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center text-xs shrink-0">↑</span>
-              <span>Swipe up for the next place</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center shrink-0">
-                <Heart className="w-3.5 h-3.5 text-teal-300 fill-teal-300" />
-              </span>
-              <span>Tap ♥ to save a place to your trip</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-teal-500/30 flex items-center justify-center text-[10px] font-bold shrink-0">Aa</span>
-              <span>Tap a name for photos &amp; deals</span>
-            </li>
-          </ul>
 
           <button
             type="button"
             onClick={onStart}
-            className="w-full min-h-12 rounded-2xl bg-teal-500 hover:bg-teal-400 text-white font-bold text-base shadow-lg shadow-teal-900/40 active:scale-[0.98] transition-transform"
+            className="mt-7 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base shadow-lg shadow-black/30 active:scale-[0.98] transition-transform"
           >
             Start exploring
           </button>
-          <p className="text-center text-[11px] text-white/60">Or swipe up · free to browse</p>
+          <p className="mt-3 text-center text-[14px] leading-snug text-[#A3A3A3]">{dealsMeta}</p>
         </div>
+
+        <button
+          type="button"
+          onClick={onPartnerSignIn}
+          className="mt-4 text-center text-[13px] text-white/45 hover:text-white/70 underline-offset-2 hover:underline"
+        >
+          Business login
+        </button>
       </div>
     </div>
   );
@@ -968,6 +928,8 @@ function PlaceCard({
   rating,
   showTapCoach,
   onDismissCoach,
+  floatHint,
+  onDismissFloatHint,
   onHeart,
   onOpen,
   onReviews,
@@ -979,11 +941,27 @@ function PlaceCard({
   rating: number;
   showTapCoach: boolean;
   onDismissCoach: () => void;
+  floatHint: 'swipe' | 'heart' | null;
+  onDismissFloatHint: (which: 0 | 1) => void;
   onHeart: () => void;
   onOpen: () => void;
   onReviews: () => void;
   onNext: () => void;
 }) {
+  useEffect(() => {
+    if (!floatHint) return;
+    const which: 0 | 1 = floatHint === 'swipe' ? 0 : 1;
+    const t = window.setTimeout(() => onDismissFloatHint(which), 3000);
+    return () => window.clearTimeout(t);
+  }, [floatHint, onDismissFloatHint]);
+
+  const floatHintText =
+    floatHint === 'swipe'
+      ? 'Swipe up for the next place'
+      : floatHint === 'heart'
+        ? 'Tap ♥ to save this place'
+        : null;
+
   return (
     <div className="relative h-full w-full">
       <button
@@ -995,6 +973,14 @@ function PlaceCard({
         <FitPhoto src={business.image} className="absolute inset-0 h-full w-full" />
         <div className="absolute inset-0 z-[2] bg-gradient-to-t from-black/85 via-black/15 to-black/35" />
       </button>
+
+      {floatHintText && (
+        <div className="absolute top-[max(4.5rem,calc(env(safe-area-inset-top)+3.5rem))] inset-x-0 z-20 flex justify-center px-6 pointer-events-none">
+          <div className="rounded-full bg-black/70 backdrop-blur-md border border-white/20 px-4 py-2.5 shadow-lg">
+            <p className="text-sm font-semibold text-white text-center leading-snug">{floatHintText}</p>
+          </div>
+        </div>
+      )}
 
       <div className="absolute bottom-24 left-4 right-24 z-10">
         <button type="button" onClick={onOpen} className="text-left pointer-events-auto group">
@@ -1044,7 +1030,9 @@ function PlaceCard({
             e.stopPropagation();
             onHeart();
           }}
-          className="w-16 h-16 rounded-full bg-black/35 backdrop-blur flex items-center justify-center border border-white/20 active:scale-95 transition-transform"
+          className={`w-16 h-16 rounded-full bg-black/35 backdrop-blur flex items-center justify-center border border-white/20 active:scale-95 transition-transform ${
+            floatHint === 'heart' ? 'ring-2 ring-[#0FB5B5] ring-offset-2 ring-offset-transparent' : ''
+          }`}
           aria-label={saved ? 'Remove from trip' : 'Save to trip'}
         >
           <Heart className={`w-8 h-8 ${saved ? 'fill-teal-500 text-teal-500' : 'text-white'}`} />
