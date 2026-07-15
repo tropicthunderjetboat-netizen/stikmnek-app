@@ -2017,7 +2017,17 @@ const BusinessOwnerDashboard: React.FC = () => {
                         {photo.is_main && <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-teal-600 text-white text-[9px] font-bold uppercase">Main</div>}
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
                           {!photo.is_main && <button onClick={() => handleSetMainPhoto(photo)} className="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700">Set as Main</button>}
-                          <button onClick={() => handleDeleteGalleryPhoto(photo)} disabled={deletingPhotoId === photo.id} className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600 flex items-center gap-1 disabled:opacity-50">{deletingPhotoId === photo.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}Delete</button>
+                          <button
+                            onClick={() => {
+                              if (!window.confirm('Remove this photo permanently? This cannot be undone.')) return;
+                              void handleDeleteGalleryPhoto(photo);
+                            }}
+                            disabled={deletingPhotoId === photo.id}
+                            className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600 flex items-center gap-1 disabled:opacity-50"
+                          >
+                            {deletingPhotoId === photo.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                            Delete
+                          </button>
                         </div>
                       </div>
                     ))}

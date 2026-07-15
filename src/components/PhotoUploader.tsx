@@ -16,6 +16,16 @@ import {
 import { toast } from 'sonner';
 import LogoCropDialog from '@/components/LogoCropDialog';
 import { useAppContext } from '@/contexts/AppContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export interface UploadedPhoto {
   id: string;
@@ -269,6 +279,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
     replaceIndex?: number;
   } | null>(null);
   const [cropQueue, setCropQueue] = useState<{ src: string; fileName: string }[]>([]);
+  const [photoPendingDelete, setPhotoPendingDelete] = useState<UploadedPhoto | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photosRef = useRef(photos);
   photosRef.current = photos;
@@ -833,14 +844,17 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
 
   const handleRemovePhoto = useCallback(async (photo: UploadedPhoto) => {
     try {
-      await supabase.storage.from('business-photos').remove([photo.filePath]);
+      if (photo.filePath) {
+        await supabase.storage.from('business-photos').remove([photo.filePath]);
+      }
     } catch (err) {
       console.warn('Failed to remove from storage (non-critical):', err);
     }
 
-    onPhotosChange(photos.filter(p => p.id !== photo.id));
+    onPhotosChange(photosRef.current.filter((p) => p.id !== photo.id));
+    setPhotoPendingDelete(null);
     toast.success('Photo removed');
-  }, [photos, onPhotosChange]);
+  }, [onPhotosChange]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -1138,7 +1152,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleRemovePhoto(photo);
+                    setPhotoPendingDelete(photo);
                   }}
                   className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg"
                   title="Remove photo"
@@ -1219,6 +1233,45 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           }}
         />
       )}
+
+      <AlertDialog
+        open={Boolean(photoPendingDelete)}
+        onOpenChange={(open) => {
+          if (!open) setPhotoPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent className="z-[130]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {language === 'en'
+                ? 'Remove this photo?'
+                : language === 'fr'
+                  ? 'Supprimer cette photo ?'
+                  : 'Removem foto ia?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {language === 'en'
+                ? 'This permanently deletes the file. You can cancel if you tapped by mistake.'
+                : language === 'fr'
+                  ? 'Cela supprime définitivement le fichier. Annulez si c’était une erreur.'
+                  : 'Bae i deleteem foto olgeta. Kanselem sipos i mistek.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {language === 'en' ? 'Cancel' : language === 'fr' ? 'Annuler' : 'Kanselem'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+              onClick={() => {
+                if (photoPendingDelete) void handleRemovePhoto(photoPendingDelete);
+              }}
+            >
+              {language === 'en' ? 'Remove photo' : language === 'fr' ? 'Supprimer' : 'Removem'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
