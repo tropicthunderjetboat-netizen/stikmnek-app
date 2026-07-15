@@ -286,14 +286,13 @@ export default function SwipeDiscover() {
     async (b: Business) => {
       const id = placeKey(b);
       const already = trip.savedPlaceIds.includes(id);
+      const tripToastStyle = { background: '#FF6B6B', color: '#fff', border: 'none' } as const;
       if (already) {
         persist({ ...trip, savedPlaceIds: trip.savedPlaceIds.filter((x) => x !== id) });
-        toast.message('Removed from Your Trip');
+        toast.success('Removed from Your Trip', { style: tripToastStyle });
       } else {
         persist({ ...trip, savedPlaceIds: [...trip.savedPlaceIds, id] });
-        toast.success('Saved to Your Trip ✈️', {
-          style: { background: '#FF6B6B', color: '#fff', border: 'none' },
-        });
+        toast.success('Saved to Your Trip ✈️', { style: tripToastStyle });
         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
           try {
             navigator.vibrate(12);
@@ -308,8 +307,8 @@ export default function SwipeDiscover() {
             ? favoriteKeyForOffering(b.id)
             : favoriteKeyForProfile(profileBusinessIdFor(b));
         const favNow = favorites.includes(key) || isListingFavorited(favorites, b);
-        if (!already && !favNow) void toggleFavorite(b);
-        if (already && favNow) void toggleFavorite(b);
+        if (!already && !favNow) void toggleFavorite(b, { silent: true });
+        if (already && favNow) void toggleFavorite(b, { silent: true });
       }
     },
     [trip, persist, user, favorites, toggleFavorite],

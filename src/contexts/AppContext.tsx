@@ -294,7 +294,7 @@ interface AppContextType {
   /** Encoded keys: `off:<offering_uuid>` or `biz:<profile_businesses.id>` (see favoritesUi). */
   favorites: string[];
   /** Pass a `Business` listing for per-deal favorites, or a profile id string for map “whole venue”. */
-  toggleFavorite: (target: Business | string) => Promise<void>;
+  toggleFavorite: (target: Business | string, opts?: { silent?: boolean }) => Promise<void>;
   cart: CartItem | null;
   setCart: (item: CartItem | null) => void;
   /** Opens checkout; optional `isExtended` / `partySize` override profile defaults. */
@@ -1618,12 +1618,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // TOGGLE FAVORITE
   // ═══════════════════════════════════════════════════════════
   const toggleFavorite = useCallback(
-    async (target: Business | string) => {
+    async (target: Business | string, opts?: { silent?: boolean }) => {
       if (!user) {
         setShowAuth(true);
         setAuthMode('signin');
         return;
       }
+      const silent = Boolean(opts?.silent);
       let profileId: string;
       let offeringId: string | null;
       if (typeof target === 'string') {
@@ -1640,7 +1641,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (isFav) {
         setFavorites((prev) => prev.filter((f) => f !== key && f !== bizKey));
-        toast.success('Removed from favorites');
+        if (!silent) toast.success('Removed from favorites');
         if (offeringId) {
           let { error } = await supabase
             .from('favorites')
@@ -1683,7 +1684,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       setFavorites((prev) => [...prev, key]);
-      toast.success('Added to favorites');
+      if (!silent) toast.success('Added to favorites');
       const insertRow: { user_id: string; business_id: string; offering_id?: string | null } = {
         user_id: user.id,
         business_id: profileId,

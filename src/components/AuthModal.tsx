@@ -23,6 +23,8 @@ const AuthModal: React.FC = () => {
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null);
+  /** Visible viewport height (shrinks when mobile keyboard opens). */
+  const [viewportMaxPx, setViewportMaxPx] = useState<number | null>(null);
 
   useEffect(() => {
     if (!showAuth) {
@@ -31,6 +33,36 @@ const AuthModal: React.FC = () => {
     }
     setPendingCheckout(peekPendingCheckout());
   }, [showAuth, authMode]);
+
+  useEffect(() => {
+    if (!showAuth) {
+      setViewportMaxPx(null);
+      return;
+    }
+    const sync = () => {
+      const vv = window.visualViewport;
+      const h = vv?.height ?? window.innerHeight;
+      const top = vv?.offsetTop ?? 0;
+      // Leave a little air under the keyboard / notch.
+      setViewportMaxPx(Math.max(240, Math.floor(h - top - 16)));
+    };
+    sync();
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', sync);
+    vv?.addEventListener('scroll', sync);
+    window.addEventListener('resize', sync);
+    return () => {
+      vv?.removeEventListener('resize', sync);
+      vv?.removeEventListener('scroll', sync);
+      window.removeEventListener('resize', sync);
+    };
+  }, [showAuth]);
+
+  const scrollFieldIntoView = (el: HTMLElement) => {
+    window.setTimeout(() => {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 80);
+  };
 
   const buyingPass = authMode === 'signup-tourist' && pendingCheckout != null;
   const pendingPrice = buyingPass
@@ -366,6 +398,7 @@ const AuthModal: React.FC = () => {
                     type="email"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: '' })); }}
+                    onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
                     className={`pl-10 rounded-xl ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
                     placeholder="you@example.com"
                     autoComplete="email"
@@ -443,6 +476,7 @@ const AuthModal: React.FC = () => {
                   type="text"
                   value={name}
                   onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: '' })); }}
+                  onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
                   className={`pl-10 rounded-xl ${errors.name ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
                   placeholder={isBizSignup ? 'John Smith (Business Owner)' : 'John Smith'}
                   autoComplete="name"
@@ -462,6 +496,7 @@ const AuthModal: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setErrors((p) => ({ ...p, email: '' })); }}
+                onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
                 className={`pl-10 rounded-xl ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
                 placeholder={isBizSignup ? 'business@example.com' : 'you@example.com'}
                 autoComplete="email"
@@ -481,6 +516,7 @@ const AuthModal: React.FC = () => {
                   type="password"
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setErrors((p) => ({ ...p, password: '' })); }}
+                  onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
                   className={`pl-10 rounded-xl ${errors.password ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
                   placeholder="Min 6 characters"
                   autoComplete={authMode === 'signin' ? 'current-password' : 'new-password'}
@@ -570,7 +606,8 @@ const AuthModal: React.FC = () => {
     <Dialog open={showAuth} onOpenChange={onOpenChange}>
       <DialogContent
         aria-labelledby={ids.title}
-        className="p-0 overflow-hidden max-h-[95vh] overflow-y-auto w-[calc(100vw-2rem)] sm:w-full"
+        className="p-0 overflow-y-auto overscroll-contain w-[calc(100vw-2rem)] sm:w-full top-[max(0.75rem,env(safe-area-inset-top))] translate-y-0 sm:top-[50%] sm:translate-y-[-50%] max-h-[min(92dvh,95vh)]"
+        style={viewportMaxPx ? { maxHeight: viewportMaxPx } : undefined}
       >
         <DialogTitle className="sr-only">
           {language === 'en'
