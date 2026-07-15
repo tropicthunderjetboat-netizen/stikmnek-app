@@ -452,6 +452,16 @@ export default function SwipeDiscover() {
     [feed],
   );
 
+  const openPartnerSignIn = useCallback(() => {
+    setAuthMode('signin');
+    setShowAuth(true);
+  }, [setAuthMode, setShowAuth]);
+
+  const openPartnerJoin = useCallback(() => {
+    setCurrentView('business-join');
+    navigate('/for-business');
+  }, [navigate, setCurrentView]);
+
   const showSoftNudge = saveCount >= 5 && !trip.softNudgeDismissed && !hasPass;
 
   if (!dataLoaded) {
@@ -479,16 +489,6 @@ export default function SwipeDiscover() {
       </div>
     );
   }
-
-  const openPartnerSignIn = useCallback(() => {
-    setAuthMode('signin');
-    setShowAuth(true);
-  }, [setAuthMode, setShowAuth]);
-
-  const openPartnerJoin = useCallback(() => {
-    setCurrentView('business-join');
-    navigate('/for-business');
-  }, [navigate, setCurrentView]);
 
   const isExtended = trip.tripLength === '2-4' || trip.tripLength === '5-7';
   const pricePreview = calculatePassPrice(clampPartySize(trip.paidPeople || 1), isExtended);
