@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MapPin, MessageCircle, Phone, Star, User, X } from 'lucide-react';
+import { Heart, MapPin, MessageCircle, Phone, Search, Star, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
@@ -144,6 +144,8 @@ export default function SwipeDiscover() {
   const [detail, setDetail] = useState<Business | null>(null);
   const [paywallBiz, setPaywallBiz] = useState<Business | null>(null);
   const [reviewsBiz, setReviewsBiz] = useState<Business | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [vibe, setVibe] = useState<'length' | 'party' | null>(null);
   const [dragY, setDragY] = useState(0);
   const [showTapCoach, setShowTapCoach] = useState(() => !hasSeenTapHint());
@@ -387,7 +389,7 @@ export default function SwipeDiscover() {
   };
 
   const onWheel = (e: React.WheelEvent) => {
-    if (detail || paywallBiz || vibe || reviewsBiz) return;
+    if (detail || paywallBiz || vibe || reviewsBiz || searchOpen) return;
     const now = Date.now();
     if (now - lastWheelAt.current < 450) return;
     if (Math.abs(e.deltaY) < 40) return;
@@ -399,6 +401,43 @@ export default function SwipeDiscover() {
   const savedBusinesses = useMemo(
     () => listings.filter((b) => trip.savedPlaceIds.includes(b.id)),
     [listings, trip.savedPlaceIds],
+  );
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return listings
+      .filter((b) => {
+        const name = (b.name || '').toLowerCase();
+        const loc = (b.location || '').toLowerCase();
+        const cat = (b.category || '').toLowerCase();
+        const tags = (b.tags || []).join(' ').toLowerCase();
+        const deal = dealPillText(b).toLowerCase();
+        return (
+          name.includes(q) ||
+          loc.includes(q) ||
+          cat.includes(q) ||
+          tags.includes(q) ||
+          deal.includes(q)
+        );
+      })
+      .slice(0, 12);
+  }, [listings, searchQuery]);
+
+  const jumpToBusiness = useCallback(
+    (b: Business) => {
+      const placeIndex = feed.findIndex((item) => item.kind === 'place' && item.business.id === b.id);
+      if (placeIndex >= 0) {
+        setIndex(placeIndex);
+        setDragY(0);
+      }
+      setSearchOpen(false);
+      setSearchQuery('');
+      setDetail(null);
+      setReviewsBiz(null);
+      setPaywallBiz(null);
+    },
+    [feed],
   );
 
   const showSoftNudge = saveCount >= 5 && !trip.softNudgeDismissed && !hasPass;
@@ -455,13 +494,11 @@ export default function SwipeDiscover() {
           )}
           <button
             type="button"
-            onClick={() => {
-              setCurrentView('deals');
-              navigate('/deals');
-            }}
-            className="rounded-full bg-white/15 backdrop-blur px-3 py-1.5 text-xs font-semibold text-neutral-200"
+            onClick={() => setSearchOpen(true)}
+            className="rounded-full bg-white/15 backdrop-blur w-9 h-9 flex items-center justify-center"
+            aria-label="Search places"
           >
-            List
+            <Search className="w-4 h-4 text-white" />
           </button>
           {hasPass && (
             <button
@@ -476,7 +513,7 @@ export default function SwipeDiscover() {
         </div>
       </div>
 
-      {showSoftNudge && (
+      {showSoftNudge && !searchOpen && (
         <div className="absolute top-14 inset-x-3 z-30 rounded-xl bg-teal-600 text-white text-sm px-3 py-2.5 flex items-start gap-2 shadow-lg">
           <p className="flex-1 leading-snug">Trip looking good 👍 Message these places with a pass.</p>
           <button
@@ -519,7 +556,7 @@ export default function SwipeDiscover() {
             saved={isSaved(current.business)}
             reviewCount={reviewsForBusiness(dbReviews, current.business).length || current.business.reviewCount || 0}
             rating={current.business.rating || 0}
-            showTapCoach={showTapCoach && !detail && !vibe && !paywallBiz && !reviewsBiz}
+            showTapCoach={showTapCoach && !detail && !vibe && !paywallBiz && !reviewsBiz && !searchOpen}
             onDismissCoach={dismissTapCoach}
             onHeart={() => void heartPlace(current.business)}
             onOpen={() => openDetail(current.business)}
@@ -569,7 +606,7 @@ export default function SwipeDiscover() {
         </div>
       )}
 
-      {savedBusinesses.length > 0 && !detail && !paywallBiz && !vibe && !reviewsBiz && current?.kind === 'place' && (
+      {savedBusinesses.length > 0 && !detail && !paywallBiz && !vibe && !reviewsBiz && !searchOpen && current?.kind === 'place' && (
         <div className="absolute bottom-0 inset-x-0 z-20 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none">
           <div className="pointer-events-auto flex gap-2 overflow-x-auto pb-1">
             {savedBusinesses.slice(0, 8).map((b) => (
@@ -611,6 +648,25 @@ export default function SwipeDiscover() {
           onMessage={() => tryContact(detail, 'whatsapp')}
           onCall={() => tryContact(detail, 'call')}
           onReviews={() => setReviewsBiz(detail)}
+        />
+      )}
+
+      {searchOpen && (
+        <SearchSheet
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          results={searchResults}
+          onClose={() => {
+            setSearchOpen(false);
+            setSearchQuery('');
+          }}
+          onSelect={jumpToBusiness}
+          onBrowseList={() => {
+            setSearchOpen(false);
+            setSearchQuery('');
+            setCurrentView('deals');
+            navigate('/deals');
+          }}
         />
       )}
 
@@ -1211,6 +1267,103 @@ function DetailSheet({
               Show your QR for the passholder price. StikmNek doesn’t take bookings.
             </p>
           </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SearchSheet({
+  query,
+  onQueryChange,
+  results,
+  onClose,
+  onSelect,
+  onBrowseList,
+}: {
+  query: string;
+  onQueryChange: (q: string) => void;
+  results: Business[];
+  onClose: () => void;
+  onSelect: (b: Business) => void;
+  onBrowseList: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const t = window.setTimeout(() => inputRef.current?.focus(), 50);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  return (
+    <div className="absolute inset-0 z-[60] flex flex-col bg-black/70" onClick={onClose}>
+      <div
+        className="pt-[max(0.75rem,env(safe-area-inset-top))] px-3 pb-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 rounded-2xl bg-neutral-900 border border-white/15 px-3 py-2.5 shadow-xl">
+          <Search className="w-4 h-4 text-neutral-400 shrink-0" />
+          <input
+            ref={inputRef}
+            type="search"
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            placeholder="Search places, areas, deals…"
+            className="flex-1 bg-transparent text-sm text-white placeholder:text-neutral-500 outline-none min-w-0"
+            autoComplete="off"
+            enterKeyHint="search"
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs font-semibold text-teal-300 shrink-0 px-1"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="flex-1 overflow-y-auto overscroll-contain touch-pan-y px-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {query.trim().length < 2 ? (
+          <div className="rounded-2xl bg-neutral-900/90 border border-white/10 px-4 py-5 text-center space-y-3">
+            <p className="text-sm text-neutral-300">Type a place, area, or deal</p>
+            <button
+              type="button"
+              onClick={onBrowseList}
+              className="text-sm font-semibold text-teal-300"
+            >
+              Or browse full list →
+            </button>
+          </div>
+        ) : results.length === 0 ? (
+          <div className="rounded-2xl bg-neutral-900/90 border border-white/10 px-4 py-8 text-center">
+            <p className="text-sm text-neutral-400">No matches for “{query.trim()}”</p>
+          </div>
+        ) : (
+          <ul className="rounded-2xl bg-neutral-900/95 border border-white/10 overflow-hidden divide-y divide-white/10">
+            {results.map((b) => (
+              <li key={b.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(b)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-white/5 active:bg-white/10"
+                >
+                  <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-neutral-800">
+                    {b.image ? <FitPhoto src={b.image} className="h-full w-full" /> : null}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-white truncate">{b.name}</p>
+                    <p className="text-xs text-neutral-400 truncate">
+                      {b.location || b.category}
+                      {dealPillText(b) ? ` · ${dealPillText(b)}` : ''}
+                    </p>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>
