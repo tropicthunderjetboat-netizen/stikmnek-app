@@ -65,12 +65,20 @@ const ForBusinessLanding: React.FC = () => {
 
   const benefits = [
     { Icon: Gift, title: 'No listing fee', body: 'Join at zero cost — no advertising invoice, no contract.' },
-    { Icon: Store, title: 'You set the deal', body: 'Your discount, your prices, your photos — change anytime.' },
-    { Icon: BarChart3, title: 'Track redemptions', body: 'See every scan in your dashboard with real numbers.' },
+    {
+      Icon: Store,
+      title: 'You set the deal',
+      body: 'Your discount, your prices, vertical photos for the tourist phone feed.',
+    },
     {
       Icon: MessageCircle,
       title: 'WhatsApp enquiries',
-      body: 'Pass holders tap WhatsApp on your listing and message you directly.',
+      body: 'Pass holders message you directly — StikmNek never takes the booking.',
+    },
+    {
+      Icon: BadgeCheck,
+      title: 'Scan pass QR',
+      body: 'Verify the tourist pass in your dashboard — no fake paper vouchers.',
     },
     {
       Icon: Banknote,
@@ -78,11 +86,15 @@ const ForBusinessLanding: React.FC = () => {
       body: 'Tourists pay you in vatu at your door — StikmNek never takes a cut.',
     },
     {
+      Icon: BarChart3,
+      title: 'Track redemptions',
+      body: 'See every scan in your dashboard with real numbers.',
+    },
+    {
       Icon: Globe,
       title: 'Three languages',
       body: 'List in English, French, and Bislama — the app works in all three.',
     },
-    { Icon: BadgeCheck, title: 'Verified passes', body: 'Scan QR codes in the app — no fake paper vouchers.' },
     {
       Icon: Heart,
       title: 'Built for grassroots',
@@ -96,7 +108,7 @@ const ForBusinessLanding: React.FC = () => {
         <title>Join StikmNek | Vanuatu Business Deals</title>
         <meta
           name="description"
-          content="Join StikmNek at zero cost. Direct WhatsApp contact from tourists, they pay you in vatu, you control your deal. English, French & Bislama. Built for grassroots Vanuatu businesses."
+          content="Join StikmNek free. Tourists swipe local deals, message you on WhatsApp, and show a pass QR. You control your offer — we never take the booking."
         />
         <link rel="canonical" href="https://www.stikmnek.com/for-business" />
       </Helmet>
@@ -104,8 +116,15 @@ const ForBusinessLanding: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-b from-teal-950 via-teal-900 to-emerald-950 text-white">
         {/* Hero */}
         <section className="relative px-4 pt-24 pb-10 sm:px-6 sm:pt-28 sm:pb-14 overflow-hidden">
+          <img
+            src="/port-vila-harbour.png"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-35"
+            aria-hidden
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-teal-950/85 via-teal-900/80 to-emerald-950" aria-hidden />
           <div
-            className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_20%_0%,rgba(52,211,153,0.35),transparent_45%),radial-gradient(circle_at_90%_20%,rgba(251,191,36,0.2),transparent_40%)]"
+            className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_20%_0%,rgba(52,211,153,0.35),transparent_45%),radial-gradient(circle_at_90%_20%,rgba(251,191,36,0.2),transparent_40%)]"
             aria-hidden
           />
           <div className="relative max-w-lg mx-auto text-center">
@@ -118,21 +137,29 @@ const ForBusinessLanding: React.FC = () => {
               For Vanuatu businesses
             </p>
             <h1 className="text-3xl sm:text-4xl font-black leading-[1.08] tracking-tight mb-4">
-              Your deal. Your discount.
-              <span className="block text-emerald-300 mt-1">You&apos;re in complete control.</span>
+              Tourists swipe your deal.
+              <span className="block text-emerald-300 mt-1">You message on WhatsApp.</span>
             </h1>
-            <p className="text-teal-100/85 text-base sm:text-lg leading-relaxed mb-8">
-              StikmNek is Vanuatu&apos;s tourist deals app — and it costs you nothing to join. You choose your
-              offer, set your discount, and decide when it&apos;s live. Each tourist buys one pass for their trip
-              — that lets them use deals at every business on StikmNek, including yours. Your discount only
-              applies when they visit you and you scan their pass — and you can track every one in your dashboard.
+            <p className="text-teal-100/85 text-base sm:text-lg leading-relaxed mb-6">
+              StikmNek is free to join. Tourists browse a phone feed of local places, save favourites, buy a
+              trip pass, then message you on WhatsApp and show a QR for your deal. You never pay a listing fee
+              — and we never take the booking.
             </p>
+
+            <div className="rounded-2xl bg-black/25 border border-white/15 px-4 py-3 mb-8 text-left text-sm text-teal-50/95 space-y-2">
+              <p className="font-semibold text-white">How it works for you</p>
+              <ol className="list-decimal list-inside space-y-1 text-teal-100/90">
+                <li>List your deal + vertical photos (phone cover)</li>
+                <li>Tourists find you in the swipe feed</li>
+                <li>They WhatsApp you · you scan their pass QR</li>
+              </ol>
+            </div>
 
             <div className="flex flex-wrap justify-center gap-2 mb-8">
               {[
                 { Icon: Gift, t: 'No listing fee' },
-                { Icon: Store, t: 'You set the deal' },
-                { Icon: BarChart3, t: 'Track redemptions' },
+                { Icon: MessageCircle, t: 'WhatsApp direct' },
+                { Icon: BadgeCheck, t: 'Scan pass QR' },
               ].map(({ Icon, t: label }) => (
                 <span
                   key={label}
@@ -163,6 +190,11 @@ const ForBusinessLanding: React.FC = () => {
               >
                 Already have an account? Sign in
               </button>
+            )}
+            {liveDeals > 0 && (
+              <p className="mt-5 text-xs font-semibold text-emerald-200/90 tabular-nums">
+                {liveDeals} local deal{liveDeals === 1 ? '' : 's'} already live for tourists
+              </p>
             )}
           </div>
         </section>

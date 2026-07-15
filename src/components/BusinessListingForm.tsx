@@ -3,7 +3,8 @@ import { useAppContext } from '@/contexts/AppContext';
 import { FunctionsHttpError, FunctionsFetchError, PostgrestError } from '@supabase/supabase-js';
 import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
 import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
-import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, ArrowLeft, AlertTriangle, Globe, Info, X, FileText } from 'lucide-react';
+import { Store, Check, Loader2, Tag, Calendar, Percent, ArrowRight, ArrowLeft, AlertTriangle, Globe, Info, X, FileText, Smartphone } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { bodyFor as legalBodyFor, TITLES as LEGAL_TITLES } from './LegalDocumentPage';
 
 import { formatVT } from '@/lib/utils';
@@ -538,6 +539,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
   const [agreedPartnerTerms, setAgreedPartnerTerms] = useState(false);
   /** Show the partner terms in a modal so reading them never navigates away (and loses the draft). */
   const [showTerms, setShowTerms] = useState(false);
+  const [showFeedPreview, setShowFeedPreview] = useState(false);
   /** Current wizard step (guided mode only). */
   const [step, setStep] = useState(() => initialDraft?.step ?? 0);
   const wizardFormRef = useRef<HTMLFormElement | null>(null);
@@ -2532,6 +2534,20 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                 userId={user?.id || ''}
               />
             </div>
+            {photos.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowFeedPreview(true)}
+                className="mt-3 w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-teal-200 bg-teal-50 text-teal-800 text-sm font-semibold hover:bg-teal-100 transition-colors"
+              >
+                <Smartphone className="w-4 h-4" aria-hidden />
+                {language === 'en'
+                  ? 'Preview in tourist feed'
+                  : language === 'fr'
+                    ? 'Aperçu dans le fil touriste'
+                    : 'Preview long turis feed'}
+              </button>
+            )}
             {fieldErrors.photos && (
               <p className="text-sm text-red-600 mt-2 flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden />
@@ -2754,6 +2770,86 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
           </div>
         </div>
       )}
+
+      {showFeedPreview &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[2100] flex flex-col bg-neutral-950 text-white"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Tourist feed preview"
+          >
+            <div className="flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+              <div>
+                <p className="text-sm font-bold">StikmNek</p>
+                <p className="text-[11px] text-neutral-400">
+                  {language === 'en'
+                    ? 'Tourist swipe preview'
+                    : language === 'fr'
+                      ? 'Aperçu fil touriste'
+                      : 'Turis swipe preview'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFeedPreview(false)}
+                className="rounded-full bg-white/15 w-10 h-10 flex items-center justify-center"
+                aria-label="Close preview"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 flex items-center justify-center px-6 pb-8 min-h-0">
+              <div className="relative w-full max-w-[320px] aspect-[9/16] rounded-[1.75rem] overflow-hidden border border-white/15 shadow-2xl bg-neutral-900">
+                {photos[0]?.url || photos[0]?.preview ? (
+                  <img
+                    src={photos[0].url || photos[0].preview}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-neutral-500 text-sm">
+                    No photo yet
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                <div className="absolute bottom-0 inset-x-0 p-4 pb-5 space-y-2">
+                  {(form.discount || form.dealPrice) && (
+                    <span className="inline-block rounded-lg bg-teal-500 px-2.5 py-1 text-xs font-bold">
+                      {form.discount?.trim() ||
+                        (Number(form.dealPrice) > 0 ? formatVT(Number(form.dealPrice)) : 'Deal')}
+                    </span>
+                  )}
+                  <p className="text-xl font-bold leading-tight drop-shadow-md">
+                    {form.name?.trim() ||
+                      (language === 'en'
+                        ? 'Your deal title'
+                        : language === 'fr'
+                          ? 'Titre de l’offre'
+                          : 'Taetol blong dil')}
+                  </p>
+                  <p className="text-xs text-white/70">
+                    {language === 'en'
+                      ? 'Tourists swipe here · tap ♥ to save · WhatsApp with a pass'
+                      : language === 'fr'
+                        ? 'Les touristes swipent ici · ♥ pour sauver · WhatsApp avec un pass'
+                        : 'Turis i swipe ia · ♥ blong sevem · WhatsApp wetem pas'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-center text-xs text-neutral-400 px-6 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              {language === 'en'
+                ? 'Cover photo = first image. Use vertical crops so the feed fills the phone.'
+                : language === 'fr'
+                  ? 'Couverture = première photo. Cadrez en vertical pour remplir l’écran.'
+                  : 'Cover = first foto. Crop vertical blong fillim fon.'}
+            </p>
+          </div>,
+          document.body,
+        )}
     </section>
   );
 };

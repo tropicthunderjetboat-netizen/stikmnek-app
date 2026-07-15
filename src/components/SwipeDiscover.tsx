@@ -49,9 +49,8 @@ function starCount(rating: number): number {
 
 type FeedItem = { kind: 'welcome' } | { kind: 'end' } | { kind: 'place'; business: Business };
 
-/** Same Vanuatu hero used on the marketing site — warm, inviting. */
-const WELCOME_HERO =
-  'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1770856886882_dff396d7.jpg';
+/** Real Port Vila harbour photo (vertical) — tourist welcome + end cards. */
+const WELCOME_HERO = '/port-vila-harbour.png';
 
 function peopleWord(n: number): string {
   const p = clampPartySize(n);
