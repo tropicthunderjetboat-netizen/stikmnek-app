@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MapPin, MessageCircle, Phone, QrCode, Search, Star, User, X } from 'lucide-react';
+import { Heart, MapPin, MessageCircle, Phone, QrCode, Search, Star, Store, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
@@ -136,6 +136,8 @@ export default function SwipeDiscover() {
     purchasePass,
     toggleFavorite,
     setCurrentView,
+    setShowAuth,
+    setAuthMode,
   } = useAppContext();
 
   const [trip, setTrip] = useState<TripState>(() => loadTripState());
@@ -478,6 +480,16 @@ export default function SwipeDiscover() {
     );
   }
 
+  const openPartnerSignIn = useCallback(() => {
+    setAuthMode('signin');
+    setShowAuth(true);
+  }, [setAuthMode, setShowAuth]);
+
+  const openPartnerJoin = useCallback(() => {
+    setCurrentView('business-join');
+    navigate('/for-business');
+  }, [navigate, setCurrentView]);
+
   const isExtended = trip.tripLength === '2-4' || trip.tripLength === '5-7';
   const pricePreview = calculatePassPrice(clampPartySize(trip.paidPeople || 1), isExtended);
 
@@ -517,6 +529,18 @@ export default function SwipeDiscover() {
           >
             <Search className="w-4 h-4 text-white" />
           </button>
+          {!user && current?.kind !== 'welcome' && (
+            <button
+              type="button"
+              onClick={openPartnerSignIn}
+              className="rounded-full bg-white/15 backdrop-blur pl-2 pr-2.5 h-9 flex items-center gap-1 text-[11px] font-semibold text-white/90"
+              aria-label="Business or admin sign in"
+              title="Business / Admin sign in"
+            >
+              <Store className="w-3.5 h-3.5 shrink-0" aria-hidden />
+              Partner
+            </button>
+          )}
           {hasPass && (
             <button
               type="button"
@@ -556,7 +580,12 @@ export default function SwipeDiscover() {
         onWheel={onWheel}
       >
         {current?.kind === 'welcome' && (
-          <WelcomeCard onStart={finishWelcome} dealCount={listings.length} />
+          <WelcomeCard
+            onStart={finishWelcome}
+            dealCount={listings.length}
+            onPartnerSignIn={openPartnerSignIn}
+            onPartnerJoin={openPartnerJoin}
+          />
         )}
         {current?.kind === 'end' && (
           <EndCard
@@ -715,7 +744,17 @@ export default function SwipeDiscover() {
 const WELCOME_PASS_QR_URL =
   'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=stikmnek-pass-example&color=0d9488&bgcolor=ffffff&margin=8';
 
-function WelcomeCard({ onStart, dealCount }: { onStart: () => void; dealCount: number }) {
+function WelcomeCard({
+  onStart,
+  dealCount,
+  onPartnerSignIn,
+  onPartnerJoin,
+}: {
+  onStart: () => void;
+  dealCount: number;
+  onPartnerSignIn: () => void;
+  onPartnerJoin: () => void;
+}) {
   const dealsLabel =
     dealCount > 0
       ? `${dealCount} local deal${dealCount === 1 ? '' : 's'} live right now`
@@ -731,6 +770,31 @@ function WelcomeCard({ onStart, dealCount }: { onStart: () => void; dealCount: n
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-teal-950/40" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(13,148,136,0.25),_transparent_55%)]" />
+
+      {/* Corner banner — partner / admin entry (below top chrome so it doesn’t clash with search) */}
+      <div className="absolute top-[max(3.35rem,calc(env(safe-area-inset-top)+2.85rem))] right-3 z-20">
+        <div className="rounded-2xl bg-black/45 backdrop-blur-md border border-white/20 shadow-lg overflow-hidden">
+          <p className="px-3 pt-2 text-[10px] font-semibold uppercase tracking-wider text-teal-200/90">
+            Business / Admin
+          </p>
+          <div className="flex items-stretch divide-x divide-white/15">
+            <button
+              type="button"
+              onClick={onPartnerSignIn}
+              className="px-3 py-2 text-xs font-bold text-white hover:bg-white/10 active:bg-white/15"
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              onClick={onPartnerJoin}
+              className="px-3 py-2 text-xs font-semibold text-teal-100 hover:bg-white/10 active:bg-white/15"
+            >
+              List a deal
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="relative z-10 h-full flex flex-col justify-between px-6 pt-[max(2.5rem,env(safe-area-inset-top))] pb-28">
         <div className="flex flex-col items-center text-center pt-6">
