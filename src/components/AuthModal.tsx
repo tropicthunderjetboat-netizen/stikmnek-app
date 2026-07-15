@@ -1,14 +1,16 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { SITE_URL, supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { X, Mail, Lock, User, Briefcase, Plane, Loader2, Shield, ArrowLeft, Store, MapPin, Globe } from 'lucide-react';
-import { Dialog, DialogClose, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { calculatePassPrice } from '@/data/pricing';
 import { peekPendingCheckout, type PendingCheckout } from '@/lib/tripStorage';
+
+type AuthFrame = { top: number; height: number };
 
 const AuthModal: React.FC = () => {
   const {
@@ -23,8 +25,11 @@ const AuthModal: React.FC = () => {
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState<PendingCheckout | null>(null);
-  /** Visible viewport height (shrinks when mobile keyboard opens). */
-  const [viewportMaxPx, setViewportMaxPx] = useState<number | null>(null);
+  /** Keep the sheet inside the visible area when the mobile keyboard opens. */
+  const [authFrame, setAuthFrame] = useState<AuthFrame>({
+    top: 8,
+    height: typeof window !== 'undefined' ? Math.max(280, window.innerHeight - 16) : 560,
+  });
 
   useEffect(() => {
     if (!showAuth) {
@@ -35,33 +40,50 @@ const AuthModal: React.FC = () => {
   }, [showAuth, authMode]);
 
   useEffect(() => {
-    if (!showAuth) {
-      setViewportMaxPx(null);
-      return;
-    }
+    if (!showAuth) return;
+
     const sync = () => {
       const vv = window.visualViewport;
-      const h = vv?.height ?? window.innerHeight;
-      const top = vv?.offsetTop ?? 0;
-      // Leave a little air under the keyboard / notch.
-      setViewportMaxPx(Math.max(240, Math.floor(h - top - 16)));
+      const offsetTop = vv?.offsetTop ?? 0;
+      const height = vv?.height ?? window.innerHeight;
+      const pad = 8;
+      setAuthFrame({
+        top: Math.max(0, Math.round(offsetTop + pad)),
+        height: Math.max(240, Math.floor(height - pad * 2)),
+      });
     };
+
     sync();
     const vv = window.visualViewport;
     vv?.addEventListener('resize', sync);
     vv?.addEventListener('scroll', sync);
     window.addEventListener('resize', sync);
+    // iOS sometimes updates offset after focus settles
+    const t1 = window.setTimeout(sync, 100);
+    const t2 = window.setTimeout(sync, 350);
     return () => {
       vv?.removeEventListener('resize', sync);
       vv?.removeEventListener('scroll', sync);
       window.removeEventListener('resize', sync);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [showAuth]);
+
+  // Lock background scroll while auth is open
+  useEffect(() => {
+    if (!showAuth) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
     };
   }, [showAuth]);
 
   const scrollFieldIntoView = (el: HTMLElement) => {
     window.setTimeout(() => {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }, 80);
+      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }, 120);
   };
 
   const buyingPass = authMode === 'signup-tourist' && pendingCheckout != null;
@@ -171,6 +193,8 @@ const AuthModal: React.FC = () => {
 
   const isSignup = authMode === 'signup' || authMode === 'signup-tourist' || authMode === 'signup-business';
   const isChooseType = authMode === 'signup';
+  /** Keyboard open → shorter visible frame; tighten chrome so fields stay on screen. */
+  const compactAuth = authFrame.height < 520;
 
   // ─── SIGN IN / SIGN UP FORM ───
   const isBizSignup = authMode === 'signup-business';
@@ -225,31 +249,36 @@ const AuthModal: React.FC = () => {
     onBack?: () => void;
   }) => {
     return (
-      <div className={`relative bg-gradient-to-r ${opts.gradient} px-6 py-7 text-white`}>
+      <div className={`relative bg-gradient-to-r ${opts.gradient} px-6 text-white ${compactAuth ? 'py-4' : 'py-7'}`}>
         {opts.showBack && (
           <button
             type="button"
             onClick={opts.onBack}
-            className="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
+            className="absolute top-3 left-3 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
         )}
-        <DialogClose asChild>
-          <button
-            type="button"
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </DialogClose>
-        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-3">
-          {opts.icon}
-        </div>
-        <h2 id={ids.title} className="text-2xl font-bold text-white">
+        <button
+          type="button"
+          onClick={() => {
+            setShowAuth(false);
+            resetForm();
+          }}
+          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors"
+          aria-label="Close"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        {!compactAuth && (
+          <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-3">
+            {opts.icon}
+          </div>
+        )}
+        <h2 id={ids.title} className={`font-bold text-white ${compactAuth ? 'text-xl pr-10' : 'text-2xl'}`}>
           {opts.title}
         </h2>
-        <p className="text-white/70 text-sm mt-1">{opts.subtitle}</p>
+        {!compactAuth && <p className="text-white/70 text-sm mt-1">{opts.subtitle}</p>}
       </div>
     );
   };
@@ -402,7 +431,6 @@ const AuthModal: React.FC = () => {
                     className={`pl-10 rounded-xl ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
                     placeholder="you@example.com"
                     autoComplete="email"
-                    autoFocus
                   />
                 </div>
                 {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
@@ -461,7 +489,7 @@ const AuthModal: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="px-6 py-6 space-y-3.5">
+        <form onSubmit={handleSubmit} className={`px-6 space-y-3.5 ${compactAuth ? 'py-3 pb-5' : 'py-6'}`}>
           {isSignup && (
             <div>
               <Label htmlFor={ids.name} className="block mb-1">
@@ -480,7 +508,6 @@ const AuthModal: React.FC = () => {
                   className={`pl-10 rounded-xl ${errors.name ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
                   placeholder={isBizSignup ? 'John Smith (Business Owner)' : 'John Smith'}
                   autoComplete="name"
-                  autoFocus
                 />
               </div>
               {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
@@ -500,7 +527,6 @@ const AuthModal: React.FC = () => {
                 className={`pl-10 rounded-xl ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}
                 placeholder={isBizSignup ? 'business@example.com' : 'you@example.com'}
                 autoComplete="email"
-                autoFocus={!isSignup}
               />
             </div>
             {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
@@ -578,6 +604,7 @@ const AuthModal: React.FC = () => {
           </p>
         </form>
 
+        {!compactAuth && (
         <div className="px-6 pb-5">
           <div className="flex items-start gap-2.5 p-3 rounded-xl bg-gray-50 border border-gray-100">
             <Shield className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
@@ -596,41 +623,51 @@ const AuthModal: React.FC = () => {
             </p>
           </div>
         </div>
+        )}
       </>
     );
   };
 
   if (!showAuth) return null;
 
-  return (
-    <Dialog open={showAuth} onOpenChange={onOpenChange}>
-      <DialogContent
+  const panel = (
+    <div className="fixed inset-0 z-[120]" role="presentation">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+        aria-label="Close"
+        onClick={() => {
+          setShowAuth(false);
+          resetForm();
+        }}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
         aria-labelledby={ids.title}
-        className="p-0 overflow-y-auto overscroll-contain w-[calc(100vw-2rem)] sm:w-full top-[max(0.75rem,env(safe-area-inset-top))] translate-y-0 sm:top-[50%] sm:translate-y-[-50%] max-h-[min(92dvh,95vh)]"
-        style={viewportMaxPx ? { maxHeight: viewportMaxPx } : undefined}
+        className="fixed left-1/2 z-[121] w-[calc(100vw-1.5rem)] max-w-lg -translate-x-1/2 overflow-y-auto overscroll-contain rounded-2xl border border-border/40 bg-background shadow-2xl"
+        style={{
+          top: authFrame.top,
+          maxHeight: authFrame.height,
+        }}
       >
-        <DialogTitle className="sr-only">
-          {language === 'en'
-            ? 'Sign in or create a StikmNek account'
-            : language === 'fr'
-              ? 'Connexion ou création de compte StikmNek'
-              : 'Saen in o mekem wan akaont StikmNek'}
-        </DialogTitle>
-        <DialogDescription className="sr-only">
+        <p id={`${ids.title}-desc`} className="sr-only">
           {language === 'en'
             ? 'Choose how to sign in or create an account, then enter your email and password.'
             : language === 'fr'
               ? 'Choisissez comment vous connecter ou créer un compte, puis saisissez votre e-mail et votre mot de passe.'
               : 'Jusum ao blong saen in o mekem akaont, afta putum email mo paswod.'}
-        </DialogDescription>
+        </p>
         {isChooseType
           ? renderChooseType()
           : authMode === 'signin' && (forgotPasswordMode || forgotPasswordSent)
             ? renderForgotPassword()
             : renderAuthForm()}
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
+
+  return createPortal(panel, document.body);
 };
 
 export default AuthModal;
