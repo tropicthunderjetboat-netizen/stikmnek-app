@@ -27,6 +27,7 @@ import {
   loadTripState,
   markTapHintSeen,
   saveTripState,
+  writePartySizeToStorage,
   type TripLength,
   type TripState,
 } from '@/lib/tripStorage';
@@ -51,34 +52,53 @@ type TipStep = {
   id: string;
   title: string;
   body: string;
+  icon: string;
   /** Insert this tip after this many place cards in the feed. */
   afterPlaces: number;
+  variant?: 'info' | 'party';
+  /** Bright tropical backdrop (blurred behind the frosted card). */
+  bgSrc: string;
+  /** Extra CSS filter so each tip feels like a different scene. */
+  bgFilter: string;
 };
 
 const FEED_TIP_STEPS: TipStep[] = [
   {
+    id: 'local',
+    title: "You're supporting local",
+    body: 'Every ♥ and every pass helps grassroots Vanuatu businesses — tours, cafes, and family-run spots.',
+    icon: '🌱',
+    afterPlaces: 2,
+    bgSrc: '/port-vila-harbour.png',
+    bgFilter: 'brightness(1.2) saturate(1.15)',
+  },
+  {
     id: 'save',
     title: 'Save places you love',
     body: 'Tap ♥ on a deal to add it to your trip. Browse free — no account needed yet.',
-    afterPlaces: 2,
+    icon: '♥',
+    afterPlaces: 5,
+    bgSrc: '/og.jpg',
+    bgFilter: 'brightness(1.25) saturate(1.2) hue-rotate(-6deg)',
+  },
+  {
+    id: 'party',
+    title: "Who's coming?",
+    body: 'Ages 6+ on the pass. Kids 5 and under are free — pick your crew.',
+    icon: '👥',
+    afterPlaces: 8,
+    variant: 'party',
+    bgSrc: '/port-vila-harbour.png',
+    bgFilter: 'brightness(1.22) saturate(1.25) hue-rotate(12deg)',
   },
   {
     id: 'pass',
-    title: 'Your pass unlocks WhatsApp',
-    body: 'Message places direct on WhatsApp. We never take the booking — you arrange it with them.',
-    afterPlaces: 5,
-  },
-  {
-    id: 'deal',
-    title: 'Show your QR for deals',
-    body: 'At the door, open your pass QR. Staff scan it for the passholder price.',
-    afterPlaces: 8,
-  },
-  {
-    id: 'local',
-    title: 'You’re supporting local',
-    body: 'Every pass helps grassroots Vanuatu businesses — tours, cafes, and family-run spots.',
+    title: 'Your pass unlocks everything',
+    body: 'WhatsApp places direct and show your QR for deals. We never take the booking.',
+    icon: '💬',
     afterPlaces: 12,
+    bgSrc: '/og.jpg',
+    bgFilter: 'brightness(1.18) saturate(1.1) hue-rotate(18deg)',
   },
 ];
 
@@ -90,6 +110,14 @@ type FeedItem =
 
 /** Real Port Vila harbour photo (vertical) — tourist welcome + end cards. */
 const WELCOME_HERO = '/port-vila-harbour.png';
+
+const PARTY_OPTIONS: { n: number; label: string }[] = [
+  { n: 1, label: 'Just me' },
+  { n: 2, label: 'Me + 1' },
+  { n: 3, label: 'Me + 2' },
+  { n: 4, label: 'Me + 3' },
+  { n: 5, label: 'Family 5+' },
+];
 
 function peopleWord(n: number): string {
   const p = clampPartySize(n);
@@ -385,9 +413,20 @@ export default function SwipeDiscover() {
   };
 
   const setPartyQuick = (n: number) => {
-    persist({ ...trip, paidPeople: clampPartySize(n), vibePartyDone: true });
+    const size = clampPartySize(n);
+    writePartySizeToStorage(size);
+    persist({ ...trip, paidPeople: size, vibePartyDone: true });
     setVibe(null);
   };
+
+  const setPartyFromTip = useCallback(
+    (n: number) => {
+      const size = clampPartySize(n);
+      writePartySizeToStorage(size);
+      persist({ ...trip, paidPeople: size, vibePartyDone: true });
+    },
+    [trip, persist],
+  );
 
   const openCheckout = useCallback(
     (override?: { partySize?: number; isExtended?: boolean }) => {
@@ -626,7 +665,12 @@ export default function SwipeDiscover() {
           />
         )}
         {current?.kind === 'tip' && (
-          <TipCard tip={current.tip} onContinue={goNext} />
+          <TipCard
+            tip={current.tip}
+            partySize={clampPartySize(trip.paidPeople || 1)}
+            onPartySize={setPartyFromTip}
+            onContinue={goNext}
+          />
         )}
         {current?.kind === 'end' && (
           <EndCard
@@ -809,13 +853,19 @@ function WelcomeCard({
         src={WELCOME_HERO}
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
+        style={{ filter: 'brightness(1.2) saturate(1.1)' }}
         draggable={false}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/35" />
+      <div
+        className="absolute inset-0"
+        style={{
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.35) 100%)',
+        }}
+      />
 
       <div className="relative z-10 h-full flex flex-col px-6 pt-[max(3.5rem,calc(env(safe-area-inset-top)+2.5rem))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full text-center">
-          <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-2xl shadow-black/40 ring-2 ring-white/25 mb-4 bg-white">
+          <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-xl shadow-black/20 ring-2 ring-white/60 mb-4 bg-white">
             <img
               src={APP_ICON}
               alt=""
@@ -838,28 +888,45 @@ function WelcomeCard({
               }}
             />
           </div>
-          <p className="text-2xl font-bold text-white tracking-tight drop-shadow-md">StikmNek</p>
-          <h1 className="mt-4 text-[28px] font-bold leading-tight text-white drop-shadow-md">
+          <p
+            className="text-2xl font-bold text-white tracking-tight"
+            style={{ textShadow: '0 1px 8px rgba(0,0,0,0.45)' }}
+          >
+            StikmNek
+          </p>
+          <h1
+            className="mt-4 text-[28px] font-bold leading-tight text-white"
+            style={{ textShadow: '0 1px 10px rgba(0,0,0,0.5)' }}
+          >
             Plan your trip. Support local.
           </h1>
-          <p className="mt-3 text-[15px] text-neutral-200 leading-relaxed">
+          <p
+            className="mt-3 text-[15px] text-white/95 leading-relaxed"
+            style={{ textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}
+          >
             Build your trip by tapping ♥. Your pass helps grassroots Vanuatu businesses thrive.
           </p>
 
           <button
             type="button"
             onClick={onStart}
-            className="mt-8 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base shadow-lg shadow-black/30 active:scale-[0.98] transition-transform"
+            className="mt-8 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base shadow-lg shadow-black/20 active:scale-[0.98] transition-transform"
           >
             Start exploring
           </button>
-          <p className="mt-3 text-center text-[14px] leading-snug text-[#A3A3A3]">{dealsMeta}</p>
+          <p
+            className="mt-3 text-center text-[14px] leading-snug text-white/85"
+            style={{ textShadow: '0 1px 4px rgba(0,0,0,0.35)' }}
+          >
+            {dealsMeta}
+          </p>
         </div>
 
         <button
           type="button"
           onClick={onPartnerSignIn}
-          className="mt-4 text-center text-[13px] text-white/45 hover:text-white/70 underline-offset-2 hover:underline"
+          className="mt-4 text-center text-[13px] text-white/70 hover:text-white underline-offset-2 hover:underline"
+          style={{ textShadow: '0 1px 4px rgba(0,0,0,0.35)' }}
         >
           Business login
         </button>
@@ -868,32 +935,81 @@ function WelcomeCard({
   );
 }
 
-function TipCard({ tip, onContinue }: { tip: TipStep; onContinue: () => void }) {
+function TipCard({
+  tip,
+  partySize,
+  onPartySize,
+  onContinue,
+}: {
+  tip: TipStep;
+  partySize: number;
+  onPartySize: (n: number) => void;
+  onContinue: () => void;
+}) {
+  const isParty = tip.variant === 'party';
+
   return (
     <div className="relative h-full w-full overflow-hidden">
       <img
-        src={WELCOME_HERO}
+        src={tip.bgSrc}
         alt=""
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-cover scale-110"
+        style={{ filter: `blur(12px) ${tip.bgFilter}` }}
         draggable={false}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-teal-950/80 to-black/55" />
+      <div className="absolute inset-0 bg-black/20" />
 
-      <div className="relative z-10 h-full flex flex-col justify-end px-6 pb-28">
-        <div className="max-w-sm mx-auto w-full text-center space-y-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0FB5B5]">
-            How StikmNek works
-          </p>
-          <h2 className="text-[26px] font-bold text-white leading-tight drop-shadow-md">{tip.title}</h2>
-          <p className="text-[15px] text-neutral-200 leading-relaxed">{tip.body}</p>
+      <div className="relative z-10 h-full flex flex-col items-center justify-center px-5 pb-16">
+        <div
+          className="w-full max-w-[340px] rounded-[24px] bg-white/85 border border-white/60 shadow-xl shadow-black/15 px-5 py-6 text-center"
+          style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+        >
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#0FB5B5] text-[22px] leading-none text-white shadow-md shadow-teal-500/30">
+            {tip.id === 'pass' ? (
+              <span className="relative text-[20px] leading-none" aria-hidden>
+                💬
+                <span className="absolute -bottom-1 -right-2 text-[10px] font-black tracking-tighter">
+                  QR
+                </span>
+              </span>
+            ) : (
+              tip.icon
+            )}
+          </div>
+          <h2 className="text-[22px] font-bold text-[#0A0A0A] leading-tight">{tip.title}</h2>
+          <p className="mt-2 text-[15px] text-[#555555] leading-relaxed">{tip.body}</p>
+
+          {isParty && (
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {PARTY_OPTIONS.map((opt) => {
+                const selected =
+                  opt.n === 5 ? partySize >= 5 : partySize === opt.n;
+                return (
+                  <button
+                    key={opt.label}
+                    type="button"
+                    onClick={() => onPartySize(opt.n)}
+                    className={`min-h-11 rounded-xl text-sm font-semibold transition-colors ${
+                      selected
+                        ? 'bg-[#0FB5B5] text-white'
+                        : 'bg-black/[0.04] text-[#0A0A0A] hover:bg-black/[0.07]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={onContinue}
-            className="w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base active:scale-[0.98] transition-transform"
+            className="mt-5 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base active:scale-[0.98] transition-transform"
           >
             Keep exploring
           </button>
-          <p className="text-[13px] text-[#A3A3A3]">Or swipe up</p>
+          <p className="mt-2 text-[12px] text-[#888888]">Or swipe up</p>
         </div>
       </div>
     </div>

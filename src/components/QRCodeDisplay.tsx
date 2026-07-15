@@ -1,12 +1,12 @@
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { getBasePeople, getShareBonusTotalPeople, getPassDisplayTitle } from '@/data/pricing';
-import type { PassProductId } from '@/data/passCatalog';
+import { getBasePeople, getShareBonusTotalPeople, clampPartySize } from '@/data/pricing';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { t, type Language } from '@/data/translations';
-import { QrCode, Calendar, Shield, Ticket, Copy, Check, Share2, Loader2 } from 'lucide-react';
+import { Calendar, Shield, Copy, Check, Share2, Loader2 } from 'lucide-react';
+import PassTicketCard from '@/components/PassTicketCard';
 
 function toDateOnly(v: unknown): string | null {
   if (v == null) return null;
@@ -98,7 +98,6 @@ const QRCodeDisplay: React.FC = () => {
     return user.passId;
   }, [user?.pass, user?.passId]);
 
-  // Generate QR code URL using qrserver.com API
   const qrCodeUrl = useMemo(() => {
     if (!qrPayload) return null;
     const encoded = encodeURIComponent(qrPayload);
@@ -215,7 +214,7 @@ const QRCodeDisplay: React.FC = () => {
     } finally {
       setShareBusy(false);
     }
-  }, [user?.id, shareBusy, refreshUserPass, language]);
+  }, [user?.id, shareBusy, refreshUserPass, passLang]);
 
   const handleCopyCode = () => {
     if (qrPayload) {
@@ -230,129 +229,75 @@ const QRCodeDisplay: React.FC = () => {
     return null;
   }
 
-  const passColors: Record<PassProductId, string> = {
-    dynamic: 'from-teal-500 to-emerald-600',
-  };
-
-  const passBgColors: Record<PassProductId, string> = {
-    dynamic: 'bg-teal-50 border-teal-200',
-  };
+  const partySize = clampPartySize(passPurchasedCapacity ?? user.passPeopleCount ?? 1);
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      {/* Header */}
-      <div className={`bg-gradient-to-r ${passColors[user.pass] ?? passColors.dynamic} p-5 text-white`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <QrCode className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-lg">Your Pass QR Code</h3>
-              <p className="text-white/90 text-xs font-semibold leading-snug">{getPassDisplayTitle(user.pass, language)}</p>
-              <p className="text-white/75 text-[11px] mt-0.5">Show this to businesses to redeem discounts</p>
-            </div>
+    <PassTicketCard partySize={partySize} qrCodeUrl={qrCodeUrl}>
+      <div className="mt-4 w-full space-y-2.5 text-left">
+        <div className="flex items-center justify-between p-3 rounded-xl bg-white/80 border border-teal-100">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-[#0FB5B5]" />
+            <span className="text-sm text-[#555555]">Pass Holder</span>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-xs font-bold">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-300 animate-pulse" />
-            Active
-          </div>
-        </div>
-      </div>
-
-      {/* QR Code */}
-      <div className="p-6 flex flex-col items-center">
-        <div className={`p-4 rounded-2xl border-2 ${passBgColors[user.pass] ?? passBgColors.dynamic} mb-4`}>
-          {qrCodeUrl ? (
-            <img
-              src={qrCodeUrl}
-              alt="Your StikmNek Pass QR Code"
-              className="w-[280px] h-[280px] rounded-xl"
-              loading="eager"
-            />
-          ) : (
-            <div className="w-[280px] h-[280px] rounded-xl bg-gray-100 flex items-center justify-center">
-              <QrCode className="w-16 h-16 text-gray-300" />
-            </div>
-          )}
+          <span className="text-sm font-bold text-[#0A0A0A]">{user.name}</span>
         </div>
 
-        {/* Pass Info */}
-        <div className="w-full space-y-3">
-          <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
-            <div className="flex items-center gap-2">
-              <Ticket className="w-4 h-4 text-teal-600" />
-              <span className="text-sm text-gray-600">Valid for</span>
-            </div>
-            <span className="text-sm font-bold text-gray-900">
-              {passPurchasedCapacity ?? getBasePeople(user.pass)} people
-              {shareApplied && (
-                <span className="ml-1.5 text-xs font-medium text-emerald-600">(Share bonus applied)</span>
+        <div className="flex items-center justify-between p-3 rounded-xl bg-white/80 border border-teal-100">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-[#0FB5B5]" />
+            <span className="text-sm text-[#555555]">Valid</span>
+          </div>
+          <span className="text-sm font-bold text-[#0A0A0A] text-right">
+            {fmtShort(validFrom)}
+            {' – '}
+            {fmtShort(displayValidUntil)}
+            {displayPeriodDays > 0 && (
+              <span className="block text-xs font-semibold text-teal-700 mt-0.5">
+                {displayPeriodDays} day{displayPeriodDays !== 1 ? 's' : ''}
+                {passMask.showFirstWeekOnly
+                  ? t('share.qr_period_bonus_hint', passLang)
+                  : shareApplied
+                    ? ' · Share bonus included'
+                    : ''}
+              </span>
+            )}
+          </span>
+        </div>
+
+        {passMask.isHolidayPass && passMask.showFirstWeekOnly && (
+          <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/90">
+            <p className="text-xs font-semibold text-amber-900 mb-2">
+              {t('share.qr_holiday_prompt', passLang)}
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleUnlockSecondWeek()}
+              disabled={shareBusy}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0FB5B5] text-white text-sm font-bold hover:bg-[#0da3a3] disabled:opacity-60"
+            >
+              {shareBusy ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {language === 'fr'
+                    ? 'Partage…'
+                    : language === 'bi'
+                      ? 'Plis raetem wan komen abaotem eksperiens blong yu'
+                      : 'Sharing…'}
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4" />
+                  {t('share.qr_unlock_button', passLang)}
+                </>
               )}
-            </span>
+            </button>
           </div>
+        )}
 
-          <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-teal-600" />
-              <span className="text-sm text-gray-600">Valid Period</span>
-            </div>
-            <span className="text-sm font-bold text-gray-900 text-right">
-              {fmtShort(validFrom)}
-              {' – '}
-              {fmtShort(displayValidUntil)}
-              {displayPeriodDays > 0 && (
-                <span className="block text-xs font-semibold text-teal-700 mt-0.5">
-                  {displayPeriodDays} day{displayPeriodDays !== 1 ? 's' : ''}
-                  {passMask.showFirstWeekOnly
-                    ? t('share.qr_period_bonus_hint', passLang)
-                    : shareApplied
-                      ? ' · Share bonus included'
-                      : ' total'}
-                </span>
-              )}
-            </span>
-          </div>
-
-          {passMask.isHolidayPass && passMask.showFirstWeekOnly && (
-            <div className="p-3 rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
-              <p className="text-xs font-semibold text-amber-900 mb-2">
-                {t('share.qr_holiday_prompt', passLang)}
-              </p>
-              <button
-                type="button"
-                onClick={() => void handleUnlockSecondWeek()}
-                disabled={shareBusy}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold hover:from-amber-600 hover:to-orange-600 disabled:opacity-60"
-              >
-                {shareBusy ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {language === 'fr' ? 'Partage…' : language === 'bi' ? 'Plis raetem wan komen abaotem eksperiens blong yu' : 'Sharing…'}
-                  </>
-                ) : (
-                  <>
-                    <Share2 className="w-4 h-4" />
-                    {t('share.qr_unlock_button', passLang)}
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-teal-600" />
-              <span className="text-sm text-gray-600">Pass Holder</span>
-            </div>
-            <span className="text-sm font-bold text-gray-900">{user.name}</span>
-          </div>
-        </div>
-
-        {/* Copy Button (for manual entry fallback) */}
         <button
+          type="button"
           onClick={handleCopyCode}
-          className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-teal-200/80 bg-white/70 text-sm text-[#555555] hover:bg-white transition-colors"
         >
           {copied ? (
             <>
@@ -367,18 +312,17 @@ const QRCodeDisplay: React.FC = () => {
           )}
         </button>
 
-        {/* Instructions */}
-        <div className="mt-4 p-4 rounded-xl bg-blue-50 border border-blue-100 w-full">
-          <p className="text-xs font-semibold text-blue-800 mb-1">How to use your QR code:</p>
-          <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+        <div className="p-3.5 rounded-xl bg-teal-50/80 border border-teal-100 w-full">
+          <p className="text-xs font-semibold text-teal-900 mb-1">How to use your QR:</p>
+          <ol className="text-xs text-teal-800 space-y-1 list-decimal list-inside">
             <li>Visit any participating business</li>
-            <li>Show this QR code to the staff</li>
-            <li>They will scan it to verify your pass</li>
-            <li>Enjoy your discount automatically!</li>
+            <li>Show this QR code to staff</li>
+            <li>They scan it to verify your pass</li>
+            <li>Enjoy your deal</li>
           </ol>
         </div>
       </div>
-    </div>
+    </PassTicketCard>
   );
 };
 

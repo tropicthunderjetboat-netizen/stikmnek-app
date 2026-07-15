@@ -7,6 +7,8 @@ import { clampPartySize } from '@/data/pricing';
 
 export const TRIP_STORAGE_KEY = 'stikmnek_trip_v1';
 export const PENDING_CHECKOUT_KEY = 'stikmnek_pending_checkout';
+/** Standalone party-size key used by feed explainer (Who’s coming?). */
+export const PARTY_SIZE_KEY = 'partySize';
 
 export type TripLength = 'day' | '2-4' | '5-7';
 
@@ -39,11 +41,36 @@ function canUseStorage(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
 
+export function readPartySizeFromStorage(): number | null {
+  if (!canUseStorage()) return null;
+  try {
+    const raw = window.localStorage.getItem(PARTY_SIZE_KEY);
+    if (raw == null || raw === '') return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 1) return null;
+    return clampPartySize(n);
+  } catch {
+    return null;
+  }
+}
+
+export function writePartySizeToStorage(n: number): void {
+  if (!canUseStorage()) return;
+  try {
+    window.localStorage.setItem(PARTY_SIZE_KEY, String(clampPartySize(n)));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function loadTripState(): TripState {
   if (!canUseStorage()) return { ...DEFAULT_TRIP };
   try {
     const raw = window.localStorage.getItem(TRIP_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_TRIP };
+    if (!raw) {
+      const fromParty = readPartySizeFromStorage();
+      return fromParty != null ? { ...DEFAULT_TRIP, paidPeople: fromParty } : { ...DEFAULT_TRIP };
+    }
     const parsed = JSON.parse(raw) as Partial<TripState>;
     const ids = Array.isArray(parsed.savedPlaceIds)
       ? parsed.savedPlaceIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
@@ -52,12 +79,16 @@ export function loadTripState(): TripState {
       parsed.tripLength === 'day' || parsed.tripLength === '2-4' || parsed.tripLength === '5-7'
         ? parsed.tripLength
         : null;
+    const fromParty = readPartySizeFromStorage();
+    const paidPeople = clampPartySize(
+      fromParty ?? (Number(parsed.paidPeople) || 1),
+    );
     return {
       savedPlaceIds: ids,
       tripLength,
-      paidPeople: clampPartySize(Number(parsed.paidPeople) || 1),
+      paidPeople,
       vibeTripLengthDone: Boolean(parsed.vibeTripLengthDone),
-      vibePartyDone: Boolean(parsed.vibePartyDone),
+      vibePartyDone: Boolean(parsed.vibePartyDone) || fromParty != null,
       softNudgeDismissed: Boolean(parsed.softNudgeDismissed),
     };
   } catch {
@@ -69,6 +100,7 @@ export function saveTripState(next: TripState): void {
   if (!canUseStorage()) return;
   try {
     window.localStorage.setItem(TRIP_STORAGE_KEY, JSON.stringify(next));
+    writePartySizeToStorage(next.paidPeople);
   } catch {
     /* quota / private mode */
   }

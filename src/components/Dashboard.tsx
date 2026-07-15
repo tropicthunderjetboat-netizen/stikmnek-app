@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
-import { getPassDisplayTitle } from '@/data/pricing';
-import type { PassProductId } from '@/data/passCatalog';
+import { clampPartySize } from '@/data/pricing';
 import { t } from '@/data/translations';
 import { businesses as localBusinesses } from '@/data/businesses';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
@@ -15,13 +14,14 @@ import type { Business } from '@/data/businesses';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
-  Ticket, Heart, History, QrCode, Calendar, ChevronRight, Wifi,
+  Ticket, Heart, History, ChevronRight, Wifi,
   LayoutDashboard, TrendingUp, BarChart3,
   MapPin, Star, Zap, Target, Clock, Flame, Users, Share2, Loader2, Pencil,
   Wallet, Sparkles, PartyPopper,
 } from 'lucide-react';
 
 import QRCodeDisplay from './QRCodeDisplay';
+import PassTicketCard from './PassTicketCard';
 
 type DashboardTab = 'overview' | 'analytics';
 
@@ -155,10 +155,6 @@ const Dashboard: React.FC = () => {
     };
   }, [redemptionsForAnalytics, allBusinesses, totalSaved]);
 
-  const passColors: Record<PassProductId, string> = {
-    dynamic: 'from-teal-500 to-emerald-600',
-  };
-
   const categoryLabels: Record<string, string> = {
     dining: language === 'en' ? 'Dining' : language === 'fr' ? 'Restauration' : 'Kakae',
     activities: language === 'en' ? 'Activities' : language === 'fr' ? 'Activités' : 'Aktiviti',
@@ -192,11 +188,6 @@ const Dashboard: React.FC = () => {
       }),
     [user?.passValidFrom, user?.passValidUntil, user?.shareBonusApplied],
   );
-
-  const displayPassExpiryLabel =
-    user && holidayPassUi.showFirstWeekOnly
-      ? holidayPassUi.displayUntilDateStr || user.passExpiry
-      : user?.passExpiry;
 
   const fmtPassDate = useCallback(
     (isoDate: string | null | undefined) => {
@@ -449,17 +440,10 @@ const Dashboard: React.FC = () => {
                   </div>
                   {user.pass ? (
                     <div className="p-5">
-                      <div className={`relative bg-gradient-to-r ${passColors[user.pass] ?? passColors.dynamic} rounded-2xl p-6 text-white overflow-hidden`}>
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-8 translate-x-8" />
-                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-6 -translate-x-6" />
-                        <div className="relative">
-                          <div className="flex items-center justify-between mb-4">
-                            <span className="text-white/80 text-sm font-medium uppercase tracking-wider">StikmNek Pass</span>
-                            <QrCode className="w-6 h-6 text-white/80" />
-                          </div>
-                          <h4 className="text-2xl font-bold mb-1 leading-snug">{user.pass ? getPassDisplayTitle(user.pass, language) : ''}</h4>
+                      <PassTicketCard partySize={clampPartySize(user.passPeopleCount || 1)}>
+                        <div className="mt-3 space-y-3 text-left">
                           {holidayPassUi.isHolidayPass && (
-                            <p className="text-xs font-bold text-white/90 mb-1">
+                            <p className="text-xs font-semibold text-teal-800">
                               {holidayPassUi.showFirstWeekOnly
                                 ? t('share.dashboard_coverage_pill', passLang)
                                 : language === 'fr'
@@ -469,72 +453,55 @@ const Dashboard: React.FC = () => {
                                     : `${holidayPassUi.truthSpanDays} days (bonus included)`}
                             </p>
                           )}
-                          <div className="flex items-center gap-4 text-sm text-white/80">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              {language === 'en' ? 'Expires: ' : language === 'fr' ? 'Expire le : ' : 'Expae: '}
-                              {fmtPassDate(displayPassExpiryLabel ?? null)}
-                            </span>
-                          </div>
                           {(user.passValidFrom || user.passValidUntil) && (
-                            <div className="mt-3 p-3 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20 ring-1 ring-white/10">
-                              <p className="text-[10px] font-bold text-white/70 uppercase tracking-wider mb-1.5">
-                                {language === 'en' ? 'Discount Validity Period' : language === 'fr' ? 'Période de validité' : 'Taem blong Diskount'}
+                            <div className="rounded-xl bg-white/80 border border-teal-100 px-3 py-2.5">
+                              <p className="text-[10px] font-bold text-[#888888] uppercase tracking-wider mb-1">
+                                {language === 'en' ? 'Valid' : language === 'fr' ? 'Valide' : 'Valit'}
                               </p>
                               {holidayPassUi.showFirstWeekOnly && (
-                                <p className="text-[10px] font-semibold text-white/85 mb-1.5">
+                                <p className="text-[10px] font-semibold text-teal-700 mb-1">
                                   {t('share.dashboard_week1_validity', passLang)}
                                 </p>
                               )}
-                              <div className="flex items-center gap-3 text-sm">
-                                <div className="flex-1">
-                                  <p className="text-[10px] text-white/60">{language === 'en' ? 'Valid From' : language === 'fr' ? 'Valide du' : 'Stat blong diskaon'}</p>
-                                  <p className="font-bold text-white">{fmtPassDate(user.passValidFrom)}</p>
-                                </div>
-                                <div className="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-bold">
-                                  {language === 'en' ? 'to' : language === 'fr' ? 'au' : 'go'}
-                                </div>
-                                <div className="flex-1 text-right">
-                                  <p className="text-[10px] text-white/60">{language === 'en' ? 'Valid Until' : language === 'fr' ? 'Valide jusqu\'au' : 'Diskaon valit kasem'}</p>
-                                  <p className="font-bold text-white">
-                                    {fmtPassDate(
-                                      holidayPassUi.showFirstWeekOnly
-                                        ? holidayPassUi.displayUntilDateStr
-                                        : user.passValidUntil,
-                                    )}
-                                  </p>
-                                </div>
-                              </div>
+                              <p className="text-sm font-semibold text-[#0A0A0A]">
+                                {fmtPassDate(user.passValidFrom)}
+                                {' → '}
+                                {fmtPassDate(
+                                  holidayPassUi.showFirstWeekOnly
+                                    ? holidayPassUi.displayUntilDateStr
+                                    : user.passValidUntil,
+                                )}
+                              </p>
                             </div>
                           )}
                           {holidayPassUi.isHolidayPass && holidayPassUi.showFirstWeekOnly && (
-                            <div className="mt-3">
-                              <button
-                                type="button"
-                                onClick={() => void handleUnlockSecondWeek()}
-                                disabled={shareBusy}
-                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/20 hover:bg-white/30 border border-white/30 text-white text-sm font-bold backdrop-blur-sm disabled:opacity-60 transition-colors"
-                              >
-                                {shareBusy ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    {language === 'fr' ? 'Partage…' : language === 'bi' ? 'Serem…' : 'Sharing…'}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Share2 className="w-4 h-4" />
-                                    {t('share.dashboard_unlock_button', passLang)}
-                                  </>
-                                )}
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void handleUnlockSecondWeek()}
+                              disabled={shareBusy}
+                              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white text-sm font-bold disabled:opacity-60 transition-colors"
+                            >
+                              {shareBusy ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  {language === 'fr' ? 'Partage…' : language === 'bi' ? 'Serem…' : 'Sharing…'}
+                                </>
+                              ) : (
+                                <>
+                                  <Share2 className="w-4 h-4" />
+                                  {t('share.dashboard_unlock_button', passLang)}
+                                </>
+                              )}
+                            </button>
                           )}
-                          <div className="mt-3 flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-green-300 animate-pulse" />
-                            <span className="text-xs text-white/70">{language === 'en' ? 'Active' : 'Actif'}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-xs text-[#555555]">
+                              {language === 'en' ? 'Active' : 'Actif'}
+                            </span>
                           </div>
                         </div>
-                      </div>
+                      </PassTicketCard>
                     </div>
                   ) : (
                     <div className="p-8 text-center">
