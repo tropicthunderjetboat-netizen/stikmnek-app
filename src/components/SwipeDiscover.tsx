@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MapPin, MessageCircle, Phone, X } from 'lucide-react';
+import { Heart, MapPin, MessageCircle, Phone, Star, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { useAppContext } from '@/contexts/AppContext';
+import { useAppContext, type DBReview } from '@/contexts/AppContext';
 import {
   businessListingHasWhatsApp,
   businessListingWhatsAppRaw,
@@ -31,6 +31,21 @@ import {
   type TripState,
 } from '@/lib/tripStorage';
 import { APP_ICON } from '@/lib/brand';
+
+function reviewsForBusiness(dbReviews: DBReview[], business: Business): DBReview[] {
+  const profileId = profileBusinessIdFor(business);
+  const offeringId = String(business.id || '').trim();
+  return dbReviews.filter((r) => {
+    if (String(r.business_id) !== profileId) return false;
+    const oid = r.offering_id != null ? String(r.offering_id).trim() : '';
+    return oid ? oid === offeringId : true;
+  });
+}
+
+function starCount(rating: number): number {
+  // Super-star reviews are stored as 6 — show as 5 filled stars
+  return Math.min(5, Math.max(0, Math.round(rating > 5 ? 5 : rating)));
+}
 
 type FeedItem = { kind: 'welcome' } | { kind: 'end' } | { kind: 'place'; business: Business };
 
@@ -115,6 +130,7 @@ export default function SwipeDiscover() {
   const navigate = useNavigate();
   const {
     dbBusinesses,
+    dbReviews,
     dataLoaded,
     user,
     favorites,
@@ -127,6 +143,7 @@ export default function SwipeDiscover() {
   const [index, setIndex] = useState(0);
   const [detail, setDetail] = useState<Business | null>(null);
   const [paywallBiz, setPaywallBiz] = useState<Business | null>(null);
+  const [reviewsBiz, setReviewsBiz] = useState<Business | null>(null);
   const [vibe, setVibe] = useState<'length' | 'party' | null>(null);
   const [dragY, setDragY] = useState(0);
   const [showTapCoach, setShowTapCoach] = useState(() => !hasSeenTapHint());
@@ -370,7 +387,7 @@ export default function SwipeDiscover() {
   };
 
   const onWheel = (e: React.WheelEvent) => {
-    if (detail || paywallBiz || vibe) return;
+    if (detail || paywallBiz || vibe || reviewsBiz) return;
     const now = Date.now();
     if (now - lastWheelAt.current < 450) return;
     if (Math.abs(e.deltaY) < 40) return;
@@ -446,6 +463,16 @@ export default function SwipeDiscover() {
           >
             List
           </button>
+          {hasPass && (
+            <button
+              type="button"
+              onClick={() => setCurrentView('dashboard')}
+              className="rounded-full bg-teal-600/90 backdrop-blur w-9 h-9 flex items-center justify-center"
+              aria-label="Your profile"
+            >
+              <User className="w-4 h-4 text-white" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -490,10 +517,13 @@ export default function SwipeDiscover() {
           <PlaceCard
             business={current.business}
             saved={isSaved(current.business)}
-            showTapCoach={showTapCoach && !detail && !vibe && !paywallBiz}
+            reviewCount={reviewsForBusiness(dbReviews, current.business).length || current.business.reviewCount || 0}
+            rating={current.business.rating || 0}
+            showTapCoach={showTapCoach && !detail && !vibe && !paywallBiz && !reviewsBiz}
             onDismissCoach={dismissTapCoach}
             onHeart={() => void heartPlace(current.business)}
             onOpen={() => openDetail(current.business)}
+            onReviews={() => setReviewsBiz(current.business)}
             onNext={goNext}
           />
         )}
@@ -539,7 +569,7 @@ export default function SwipeDiscover() {
         </div>
       )}
 
-      {savedBusinesses.length > 0 && !detail && !paywallBiz && !vibe && current?.kind === 'place' && (
+      {savedBusinesses.length > 0 && !detail && !paywallBiz && !vibe && !reviewsBiz && current?.kind === 'place' && (
         <div className="absolute bottom-0 inset-x-0 z-20 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none">
           <div className="pointer-events-auto flex gap-2 overflow-x-auto pb-1">
             {savedBusinesses.slice(0, 8).map((b) => (
@@ -573,11 +603,22 @@ export default function SwipeDiscover() {
           paidPeople={trip.paidPeople}
           pricePreview={pricePreview}
           isExtended={isExtended}
+          reviewCount={reviewsForBusiness(dbReviews, detail).length || detail.reviewCount || 0}
+          rating={detail.rating || 0}
           onClose={() => setDetail(null)}
           onHeart={() => void heartPlace(detail)}
           onGetPass={() => openCheckout()}
           onMessage={() => tryContact(detail, 'whatsapp')}
           onCall={() => tryContact(detail, 'call')}
+          onReviews={() => setReviewsBiz(detail)}
+        />
+      )}
+
+      {reviewsBiz && (
+        <ReviewsSheet
+          business={reviewsBiz}
+          reviews={reviewsForBusiness(dbReviews, reviewsBiz)}
+          onClose={() => setReviewsBiz(null)}
         />
       )}
 
@@ -757,18 +798,24 @@ function EndCard({
 function PlaceCard({
   business,
   saved,
+  reviewCount,
+  rating,
   showTapCoach,
   onDismissCoach,
   onHeart,
   onOpen,
+  onReviews,
   onNext,
 }: {
   business: Business;
   saved: boolean;
+  reviewCount: number;
+  rating: number;
   showTapCoach: boolean;
   onDismissCoach: () => void;
   onHeart: () => void;
   onOpen: () => void;
+  onReviews: () => void;
   onNext: () => void;
 }) {
   return (
@@ -840,6 +887,23 @@ function PlaceCard({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
+            onReviews();
+          }}
+          className="flex flex-col items-center gap-0.5 active:scale-95 transition-transform"
+          aria-label={`Reviews for ${business.name}`}
+        >
+          <span className="w-12 h-12 rounded-full bg-black/35 backdrop-blur flex items-center justify-center border border-white/20">
+            <Star className="w-5 h-5 text-amber-300 fill-amber-300" />
+          </span>
+          <span className="text-[10px] font-semibold text-white/90 drop-shadow">
+            {rating > 0 ? rating.toFixed(1) : 'Reviews'}
+            {reviewCount > 0 ? ` · ${reviewCount}` : ''}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
             onNext();
           }}
           className="text-[11px] text-neutral-300 font-medium px-2 py-1 rounded-full bg-black/30"
@@ -888,11 +952,14 @@ function DetailSheet({
   paidPeople,
   pricePreview,
   isExtended,
+  reviewCount,
+  rating,
   onClose,
   onHeart,
   onGetPass,
   onMessage,
   onCall,
+  onReviews,
 }: {
   business: Business;
   saved: boolean;
@@ -900,11 +967,14 @@ function DetailSheet({
   paidPeople: number;
   pricePreview: number;
   isExtended: boolean;
+  reviewCount: number;
+  rating: number;
   onClose: () => void;
   onHeart: () => void;
   onGetPass: () => void;
   onMessage: () => void;
   onCall: () => void;
+  onReviews: () => void;
 }) {
   const hasWa = businessListingHasWhatsApp(business);
   const price = customerFacingListPrice(business);
@@ -1038,6 +1108,20 @@ function DetailSheet({
             {business.location && <span>📍 {business.location}</span>}
           </div>
 
+          <button
+            type="button"
+            onClick={onReviews}
+            className="w-full flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3.5 py-3 text-left"
+          >
+            <span className="flex items-center gap-2 text-sm font-semibold text-white">
+              <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
+              {rating > 0 ? `${rating.toFixed(1)} rating` : 'Traveler reviews'}
+            </span>
+            <span className="text-xs text-teal-300 font-semibold">
+              {reviewCount > 0 ? `${reviewCount} review${reviewCount === 1 ? '' : 's'} →` : 'See reviews →'}
+            </span>
+          </button>
+
           {hasTierPricing && (
             <div className="rounded-xl border border-white/10 bg-white/5 overflow-hidden">
               <button
@@ -1128,6 +1212,95 @@ function DetailSheet({
             </p>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ReviewsSheet({
+  business,
+  reviews,
+  onClose,
+}: {
+  business: Business;
+  reviews: DBReview[];
+  onClose: () => void;
+}) {
+  const avg =
+    reviews.length > 0
+      ? reviews.reduce((sum, r) => sum + Math.min(5, Number(r.rating) || 0), 0) / reviews.length
+      : business.rating || 0;
+
+  return (
+    <div className="absolute inset-0 z-[60] flex items-end bg-black/60" onClick={onClose}>
+      <div
+        className="w-full max-h-[78vh] rounded-t-3xl bg-neutral-900 text-white flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 pt-4 pb-3 border-b border-white/10">
+          <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-3" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-lg font-bold truncate">{business.name}</h3>
+              <p className="text-sm text-neutral-400 mt-0.5 flex items-center gap-1.5">
+                <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                {avg > 0 ? avg.toFixed(1) : '—'}
+                <span className="text-neutral-500">·</span>
+                {reviews.length > 0
+                  ? `${reviews.length} review${reviews.length === 1 ? '' : 's'}`
+                  : 'No reviews yet'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-full bg-white/10 shrink-0"
+              aria-label="Close reviews"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y px-5 py-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] space-y-3">
+          {reviews.length === 0 ? (
+            <p className="text-sm text-neutral-400 text-center py-10">
+              No traveler reviews for this place yet.
+            </p>
+          ) : (
+            reviews.slice(0, 20).map((review) => {
+              const filled = starCount(Number(review.rating) || 0);
+              return (
+                <article
+                  key={review.id}
+                  className="rounded-2xl bg-white/5 border border-white/10 px-3.5 py-3"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <p className="text-sm font-semibold truncate">{review.user_name || 'Traveler'}</p>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-3 h-3 ${
+                            i < filled ? 'text-amber-300 fill-amber-300' : 'text-neutral-600'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {review.comment ? (
+                    <p className="text-sm text-neutral-300 leading-relaxed">{review.comment}</p>
+                  ) : null}
+                  {review.created_at ? (
+                    <p className="text-[11px] text-neutral-500 mt-2">
+                      {new Date(review.created_at).toLocaleDateString()}
+                    </p>
+                  ) : null}
+                </article>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
