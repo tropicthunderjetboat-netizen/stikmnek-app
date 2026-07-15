@@ -47,7 +47,46 @@ function starCount(rating: number): number {
   return Math.min(5, Math.max(0, Math.round(rating > 5 ? 5 : rating)));
 }
 
-type FeedItem = { kind: 'welcome' } | { kind: 'end' } | { kind: 'place'; business: Business };
+type TipStep = {
+  id: string;
+  title: string;
+  body: string;
+  /** Insert this tip after this many place cards in the feed. */
+  afterPlaces: number;
+};
+
+const FEED_TIP_STEPS: TipStep[] = [
+  {
+    id: 'save',
+    title: 'Save places you love',
+    body: 'Tap ♥ on a deal to add it to your trip. Browse free — no account needed yet.',
+    afterPlaces: 2,
+  },
+  {
+    id: 'pass',
+    title: 'Your pass unlocks WhatsApp',
+    body: 'Message places direct on WhatsApp. We never take the booking — you arrange it with them.',
+    afterPlaces: 5,
+  },
+  {
+    id: 'deal',
+    title: 'Show your QR for deals',
+    body: 'At the door, open your pass QR. Staff scan it for the passholder price.',
+    afterPlaces: 8,
+  },
+  {
+    id: 'local',
+    title: 'You’re supporting local',
+    body: 'Every pass helps grassroots Vanuatu businesses — tours, cafes, and family-run spots.',
+    afterPlaces: 12,
+  },
+];
+
+type FeedItem =
+  | { kind: 'welcome' }
+  | { kind: 'end' }
+  | { kind: 'place'; business: Business }
+  | { kind: 'tip'; tip: TipStep };
 
 /** Real Port Vila harbour photo (vertical) — tourist welcome + end cards. */
 const WELCOME_HERO = '/port-vila-harbour.png';
@@ -217,11 +256,19 @@ export default function SwipeDiscover() {
   const saveCount = trip.savedPlaceIds.length;
 
   const feed: FeedItem[] = useMemo(() => {
-    const places = listings.map((b) => ({ kind: 'place' as const, business: b }));
-    const withEnd: FeedItem[] =
-      places.length > 0 ? [...places, { kind: 'end' as const }] : places;
-    if (welcomeDismissed) return withEnd;
-    return [{ kind: 'welcome' as const }, ...withEnd];
+    const items: FeedItem[] = [];
+    if (!welcomeDismissed) items.push({ kind: 'welcome' });
+
+    let placeCount = 0;
+    for (const b of listings) {
+      items.push({ kind: 'place', business: b });
+      placeCount += 1;
+      const tip = FEED_TIP_STEPS.find((t) => t.afterPlaces === placeCount);
+      if (tip) items.push({ kind: 'tip', tip });
+    }
+
+    if (listings.length > 0) items.push({ kind: 'end' });
+    return items;
   }, [listings, welcomeDismissed]);
 
   const current = feed[Math.min(index, Math.max(0, feed.length - 1))] ?? null;
@@ -578,6 +625,9 @@ export default function SwipeDiscover() {
             onPartnerSignIn={openPartnerSignIn}
           />
         )}
+        {current?.kind === 'tip' && (
+          <TipCard tip={current.tip} onContinue={goNext} />
+        )}
         {current?.kind === 'end' && (
           <EndCard
             hasPass={hasPass}
@@ -753,12 +803,6 @@ function WelcomeCard({
       ? `${dealCount} local deals • Free to browse • Swipe up to start`
       : 'Free to browse • Swipe up to start';
 
-  const howItWorks = [
-    { icon: '♥', title: 'Save places', body: 'Tap the heart on spots you want to visit.' },
-    { icon: '1', title: 'Get a pass', body: 'One pass unlocks WhatsApp and member deals.' },
-    { icon: '✦', title: 'Support local', body: 'You book with them direct — we never take the booking.' },
-  ];
-
   return (
     <div className="relative h-full w-full overflow-hidden">
       <img
@@ -770,61 +814,42 @@ function WelcomeCard({
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-black/35" />
 
       <div className="relative z-10 h-full flex flex-col px-6 pt-[max(3.5rem,calc(env(safe-area-inset-top)+2.5rem))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-        <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
-          <div className="text-center">
-            <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-2xl shadow-black/40 ring-2 ring-white/25 mb-4 bg-white">
-              <img
-                src={APP_ICON}
-                alt=""
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  const el = e.currentTarget;
-                  el.style.display = 'none';
-                  const parent = el.parentElement;
-                  if (parent) {
-                    parent.classList.add(
-                      'bg-gradient-to-br',
-                      'from-teal-500',
-                      'to-emerald-600',
-                      'flex',
-                      'items-center',
-                      'justify-center',
-                    );
-                    parent.innerHTML = '<span class="text-white text-2xl font-bold">S</span>';
-                  }
-                }}
-              />
-            </div>
-            <p className="text-2xl font-bold text-white tracking-tight drop-shadow-md">StikmNek</p>
-            <h1 className="mt-4 text-[28px] font-bold leading-tight text-white drop-shadow-md">
-              Plan your trip. Support local.
-            </h1>
-            <p className="mt-3 text-[15px] text-neutral-200 leading-relaxed">
-              Build your trip by tapping ♥. Your pass helps grassroots Vanuatu businesses thrive.
-            </p>
+        <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full text-center">
+          <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-2xl shadow-black/40 ring-2 ring-white/25 mb-4 bg-white">
+            <img
+              src={APP_ICON}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const el = e.currentTarget;
+                el.style.display = 'none';
+                const parent = el.parentElement;
+                if (parent) {
+                  parent.classList.add(
+                    'bg-gradient-to-br',
+                    'from-teal-500',
+                    'to-emerald-600',
+                    'flex',
+                    'items-center',
+                    'justify-center',
+                  );
+                  parent.innerHTML = '<span class="text-white text-2xl font-bold">S</span>';
+                }
+              }}
+            />
           </div>
-
-          <div className="mt-7 space-y-2.5">
-            {howItWorks.map((step) => (
-              <div
-                key={step.title}
-                className="flex items-start gap-3 rounded-2xl bg-white/10 border border-white/15 px-3.5 py-3 backdrop-blur-sm"
-              >
-                <span className="w-8 h-8 shrink-0 rounded-full bg-[#0FB5B5]/25 text-[#0FB5B5] flex items-center justify-center text-sm font-bold">
-                  {step.icon}
-                </span>
-                <div className="min-w-0 pt-0.5">
-                  <p className="text-sm font-semibold text-white leading-tight">{step.title}</p>
-                  <p className="mt-0.5 text-[13px] text-neutral-300 leading-snug">{step.body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <p className="text-2xl font-bold text-white tracking-tight drop-shadow-md">StikmNek</p>
+          <h1 className="mt-4 text-[28px] font-bold leading-tight text-white drop-shadow-md">
+            Plan your trip. Support local.
+          </h1>
+          <p className="mt-3 text-[15px] text-neutral-200 leading-relaxed">
+            Build your trip by tapping ♥. Your pass helps grassroots Vanuatu businesses thrive.
+          </p>
 
           <button
             type="button"
             onClick={onStart}
-            className="mt-7 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base shadow-lg shadow-black/30 active:scale-[0.98] transition-transform"
+            className="mt-8 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base shadow-lg shadow-black/30 active:scale-[0.98] transition-transform"
           >
             Start exploring
           </button>
@@ -838,6 +863,38 @@ function WelcomeCard({
         >
           Business login
         </button>
+      </div>
+    </div>
+  );
+}
+
+function TipCard({ tip, onContinue }: { tip: TipStep; onContinue: () => void }) {
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      <img
+        src={WELCOME_HERO}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+        draggable={false}
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-teal-950/80 to-black/55" />
+
+      <div className="relative z-10 h-full flex flex-col justify-end px-6 pb-28">
+        <div className="max-w-sm mx-auto w-full text-center space-y-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0FB5B5]">
+            How StikmNek works
+          </p>
+          <h2 className="text-[26px] font-bold text-white leading-tight drop-shadow-md">{tip.title}</h2>
+          <p className="text-[15px] text-neutral-200 leading-relaxed">{tip.body}</p>
+          <button
+            type="button"
+            onClick={onContinue}
+            className="w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base active:scale-[0.98] transition-transform"
+          >
+            Keep exploring
+          </button>
+          <p className="text-[13px] text-[#A3A3A3]">Or swipe up</p>
+        </div>
       </div>
     </div>
   );
