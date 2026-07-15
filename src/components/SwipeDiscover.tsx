@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MapPin, MessageCircle, Phone, Search, Star, User, X } from 'lucide-react';
+import { Heart, MapPin, MessageCircle, Phone, QrCode, Search, Star, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
@@ -539,7 +539,7 @@ export default function SwipeDiscover() {
         onWheel={onWheel}
       >
         {current?.kind === 'welcome' && (
-          <WelcomeCard onStart={finishWelcome} />
+          <WelcomeCard onStart={finishWelcome} dealCount={listings.length} />
         )}
         {current?.kind === 'end' && (
           <EndCard
@@ -695,7 +695,15 @@ export default function SwipeDiscover() {
   );
 }
 
-function WelcomeCard({ onStart }: { onStart: () => void }) {
+const WELCOME_PASS_QR_URL =
+  'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=stikmnek-pass-example&color=0d9488&bgcolor=ffffff&margin=8';
+
+function WelcomeCard({ onStart, dealCount }: { onStart: () => void; dealCount: number }) {
+  const dealsLabel =
+    dealCount > 0
+      ? `${dealCount} local deal${dealCount === 1 ? '' : 's'} live right now`
+      : 'Local deals across Vanuatu';
+
   return (
     <div className="relative h-full w-full overflow-hidden">
       <img
@@ -729,17 +737,38 @@ function WelcomeCard({ onStart }: { onStart: () => void }) {
           <p className="mt-1 text-sm text-teal-200/90">Your Vanuatu trip starts here</p>
         </div>
 
-        <div className="max-w-sm mx-auto w-full space-y-5">
+        <div className="max-w-sm mx-auto w-full space-y-4">
           <div className="text-center">
             <h2 className="text-[26px] font-bold leading-tight text-white drop-shadow-md">
               Plan your trip in one place
             </h2>
             <p className="mt-2.5 text-neutral-200 text-sm leading-relaxed">
-              Browse beaches, tours and local spots. Tap the heart to save places for your trip. When you’re ready, a pass lets you message them direct — we never take the booking.
+              Get a pass and message places on WhatsApp — you book with them direct. We never take the booking.
             </p>
-            <p className="mt-2 text-teal-200/95 text-sm leading-relaxed font-medium">
-              You’re supporting local, grassroots businesses across Vanuatu.
-            </p>
+          </div>
+
+          <div className="flex items-stretch gap-3">
+            <div className="shrink-0 rounded-2xl bg-white p-2 shadow-lg shadow-black/30 ring-1 ring-white/20">
+              <img
+                src={WELCOME_PASS_QR_URL}
+                alt="Example pass QR code"
+                width={88}
+                height={88}
+                className="w-[88px] h-[88px] rounded-lg"
+                loading="lazy"
+              />
+            </div>
+            <div className="flex-1 min-w-0 rounded-2xl bg-black/35 backdrop-blur-md border border-white/10 px-3.5 py-3 flex flex-col justify-center gap-1.5">
+              <div className="flex items-center gap-2 text-teal-200">
+                <QrCode className="w-4 h-4 shrink-0" aria-hidden />
+                <span className="text-xs font-semibold leading-snug">Show your pass QR for deals in person</span>
+              </div>
+              <div className="flex items-center gap-2 text-white">
+                <MessageCircle className="w-4 h-4 shrink-0 text-teal-300" aria-hidden />
+                <span className="text-xs font-semibold leading-snug">WhatsApp unlocks with your pass</span>
+              </div>
+              <p className="text-[13px] font-bold text-teal-300 tabular-nums pt-0.5">{dealsLabel}</p>
+            </div>
           </div>
 
           <ul className="rounded-2xl bg-black/35 backdrop-blur-md border border-white/10 px-4 py-3.5 space-y-2.5 text-sm text-white/95">
