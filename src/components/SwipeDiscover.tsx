@@ -56,30 +56,27 @@ type TipStep = {
   /** Insert this tip after this many place cards in the feed. */
   afterPlaces: number;
   variant?: 'info' | 'party';
-  /** Bright tropical backdrop (blurred behind the frosted card). */
+  /** Bright illustration as full-bleed tip background. */
   bgSrc: string;
-  /** Extra CSS filter so each tip feels like a different scene. */
-  bgFilter: string;
 };
 
+/** Bright Vanuatu illustrations (from docs/social-cards/scenes) — one job each. */
 const FEED_TIP_STEPS: TipStep[] = [
   {
     id: 'local',
-    title: "You're supporting local",
-    body: 'Every ♥ and every pass helps grassroots Vanuatu businesses — tours, cafes, and family-run spots.',
+    title: 'Real Vanuatu, real families',
+    body: 'Your trip supports grassroots businesses — markets, tours, cafes, and family-run spots.',
     icon: '🌱',
     afterPlaces: 2,
-    bgSrc: '/port-vila-harbour.png',
-    bgFilter: 'brightness(1.2) saturate(1.15)',
+    bgSrc: '/tips/families.png',
   },
   {
     id: 'save',
-    title: 'Save places you love',
-    body: 'Tap ♥ on a deal to add it to your trip. Browse free — no account needed yet.',
+    title: 'Tap ♥ to save your trip',
+    body: 'Heart the places you love. Browse free — build your list as you go.',
     icon: '♥',
     afterPlaces: 5,
-    bgSrc: '/og.jpg',
-    bgFilter: 'brightness(1.25) saturate(1.2) hue-rotate(-6deg)',
+    bgSrc: '/tips/save.png',
   },
   {
     id: 'party',
@@ -88,17 +85,23 @@ const FEED_TIP_STEPS: TipStep[] = [
     icon: '👥',
     afterPlaces: 8,
     variant: 'party',
-    bgSrc: '/port-vila-harbour.png',
-    bgFilter: 'brightness(1.22) saturate(1.25) hue-rotate(12deg)',
+    bgSrc: '/tips/party.png',
   },
   {
-    id: 'pass',
-    title: 'Your pass unlocks everything',
-    body: 'WhatsApp places direct and show your QR for deals. We never take the booking.',
+    id: 'whatsapp',
+    title: 'Message for local prices',
+    body: 'WhatsApp places direct. You arrange the booking with them — we never take it.',
     icon: '💬',
-    afterPlaces: 12,
-    bgSrc: '/og.jpg',
-    bgFilter: 'brightness(1.18) saturate(1.1) hue-rotate(18deg)',
+    afterPlaces: 11,
+    bgSrc: '/tips/whatsapp.png',
+  },
+  {
+    id: 'qr',
+    title: 'Show QR for deals',
+    body: 'At the stall or door, open your pass QR. Staff scan it for passholder prices.',
+    icon: '📱',
+    afterPlaces: 14,
+    bgSrc: '/tips/qr.png',
   },
 ];
 
@@ -118,6 +121,9 @@ const PARTY_OPTIONS: { n: number; label: string }[] = [
   { n: 4, label: 'Me + 3' },
   { n: 5, label: 'Family 5+' },
 ];
+
+const TEXT_SHADOW_SOFT = '0 2px 10px rgba(0,0,0,0.35)';
+const TEXT_SHADOW_STRONG = '0 2px 12px rgba(0,0,0,0.4)';
 
 function peopleWord(n: number): string {
   const p = clampPartySize(n);
@@ -585,7 +591,7 @@ export default function SwipeDiscover() {
 
   return (
     <div className="fixed inset-0 z-40 bg-neutral-950 text-white overflow-hidden touch-none select-none">
-      <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
+      <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black/25 to-transparent pointer-events-none">
         <div className="pointer-events-auto">
           <button
             type="button"
@@ -745,14 +751,20 @@ export default function SwipeDiscover() {
       )}
 
       {savedBusinesses.length > 0 && !detail && !paywallBiz && !vibe && !reviewsBiz && !searchOpen && current?.kind === 'place' && (
-        <div className="absolute bottom-0 inset-x-0 z-20 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none">
+        <div
+          className="absolute bottom-0 inset-x-0 z-20 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.28) 100%)',
+          }}
+        >
           <div className="pointer-events-auto flex gap-2 overflow-x-auto pb-1">
             {savedBusinesses.slice(0, 8).map((b) => (
               <button
                 key={b.id}
                 type="button"
                 onClick={() => openDetail(b)}
-                className="shrink-0 w-14 h-14 rounded-xl overflow-hidden ring-2 ring-teal-500/60"
+                className="shrink-0 w-14 h-14 rounded-xl overflow-hidden ring-2 ring-white shadow-md"
               >
                 <FitPhoto src={b.image} className="h-full w-full" />
               </button>
@@ -761,7 +773,8 @@ export default function SwipeDiscover() {
               <button
                 type="button"
                 onClick={() => openCheckout()}
-                className="shrink-0 self-center rounded-full bg-teal-600 px-4 py-2.5 text-xs font-bold whitespace-nowrap"
+                className="shrink-0 self-center rounded-full bg-[#0FB5B5] px-4 py-2.5 text-xs font-bold whitespace-nowrap text-white border-2 border-white"
+                style={{ boxShadow: '0 4px 16px rgba(15,181,181,0.4)' }}
               >
                 Get pass · A${pricePreview}
               </button>
@@ -853,19 +866,20 @@ function WelcomeCard({
         src={WELCOME_HERO}
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
-        style={{ filter: 'brightness(1.2) saturate(1.1)' }}
+        style={{ filter: 'brightness(1.15) saturate(1.15)' }}
         draggable={false}
       />
       <div
         className="absolute inset-0"
         style={{
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.35) 100%)',
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.18) 100%)',
         }}
       />
 
       <div className="relative z-10 h-full flex flex-col px-6 pt-[max(3.5rem,calc(env(safe-area-inset-top)+2.5rem))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full text-center">
-          <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-xl shadow-black/20 ring-2 ring-white/60 mb-4 bg-white">
+          <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-xl shadow-black/15 ring-2 ring-white/70 mb-4 bg-white">
             <img
               src={APP_ICON}
               alt=""
@@ -888,21 +902,18 @@ function WelcomeCard({
               }}
             />
           </div>
-          <p
-            className="text-2xl font-bold text-white tracking-tight"
-            style={{ textShadow: '0 1px 8px rgba(0,0,0,0.45)' }}
-          >
+          <p className="text-2xl font-bold text-white tracking-tight" style={{ textShadow: TEXT_SHADOW_SOFT }}>
             StikmNek
           </p>
           <h1
             className="mt-4 text-[28px] font-bold leading-tight text-white"
-            style={{ textShadow: '0 1px 10px rgba(0,0,0,0.5)' }}
+            style={{ textShadow: TEXT_SHADOW_STRONG }}
           >
             Plan your trip. Support local.
           </h1>
           <p
-            className="mt-3 text-[15px] text-white/95 leading-relaxed"
-            style={{ textShadow: '0 1px 6px rgba(0,0,0,0.4)' }}
+            className="mt-3 text-[15px] text-white leading-relaxed"
+            style={{ textShadow: TEXT_SHADOW_SOFT }}
           >
             Build your trip by tapping ♥. Your pass helps grassroots Vanuatu businesses thrive.
           </p>
@@ -910,13 +921,14 @@ function WelcomeCard({
           <button
             type="button"
             onClick={onStart}
-            className="mt-8 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base shadow-lg shadow-black/20 active:scale-[0.98] transition-transform"
+            className="mt-8 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base active:scale-[0.98] transition-transform"
+            style={{ boxShadow: '0 6px 24px rgba(15,181,181,0.4)' }}
           >
             Start exploring
           </button>
           <p
-            className="mt-3 text-center text-[14px] leading-snug text-white/85"
-            style={{ textShadow: '0 1px 4px rgba(0,0,0,0.35)' }}
+            className="mt-3 text-center text-[14px] leading-snug text-white/90"
+            style={{ textShadow: TEXT_SHADOW_SOFT }}
           >
             {dealsMeta}
           </p>
@@ -925,8 +937,8 @@ function WelcomeCard({
         <button
           type="button"
           onClick={onPartnerSignIn}
-          className="mt-4 text-center text-[13px] text-white/70 hover:text-white underline-offset-2 hover:underline"
-          style={{ textShadow: '0 1px 4px rgba(0,0,0,0.35)' }}
+          className="mt-4 text-center text-[13px] text-white/90 hover:text-white underline-offset-2 hover:underline"
+          style={{ textShadow: TEXT_SHADOW_SOFT }}
         >
           Business login
         </button>
@@ -953,37 +965,37 @@ function TipCard({
       <img
         src={tip.bgSrc}
         alt=""
-        className="absolute inset-0 h-full w-full object-cover scale-110"
-        style={{ filter: `blur(12px) ${tip.bgFilter}` }}
+        className="absolute inset-0 h-full w-full object-cover"
         draggable={false}
       />
-      <div className="absolute inset-0 bg-black/20" />
+      {/* Tiny soft vignette only — keep illustration sunny */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0.06) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.12) 100%)',
+        }}
+      />
 
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-5 pb-16">
         <div
-          className="w-full max-w-[340px] rounded-[24px] bg-white/85 border border-white/60 shadow-xl shadow-black/15 px-5 py-6 text-center"
-          style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+          className="w-full max-w-[320px] rounded-[24px] border border-white/70 shadow-xl shadow-black/10 px-5 py-6 text-center"
+          style={{
+            background: 'rgba(255,255,255,0.92)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+          }}
         >
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#0FB5B5] text-[22px] leading-none text-white shadow-md shadow-teal-500/30">
-            {tip.id === 'pass' ? (
-              <span className="relative text-[20px] leading-none" aria-hidden>
-                💬
-                <span className="absolute -bottom-1 -right-2 text-[10px] font-black tracking-tighter">
-                  QR
-                </span>
-              </span>
-            ) : (
-              tip.icon
-            )}
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#0FB5B5] text-[22px] leading-none text-white shadow-md shadow-teal-500/25">
+            {tip.icon}
           </div>
-          <h2 className="text-[22px] font-bold text-[#0A0A0A] leading-tight">{tip.title}</h2>
-          <p className="mt-2 text-[15px] text-[#555555] leading-relaxed">{tip.body}</p>
+          <h2 className="text-[22px] font-bold text-[#0A1F2A] leading-tight">{tip.title}</h2>
+          <p className="mt-2 text-[15px] text-[#5A6D7A] leading-relaxed">{tip.body}</p>
 
           {isParty && (
             <div className="mt-4 grid grid-cols-2 gap-2">
               {PARTY_OPTIONS.map((opt) => {
-                const selected =
-                  opt.n === 5 ? partySize >= 5 : partySize === opt.n;
+                const selected = opt.n === 5 ? partySize >= 5 : partySize === opt.n;
                 return (
                   <button
                     key={opt.label}
@@ -992,7 +1004,7 @@ function TipCard({
                     className={`min-h-11 rounded-xl text-sm font-semibold transition-colors ${
                       selected
                         ? 'bg-[#0FB5B5] text-white'
-                        : 'bg-black/[0.04] text-[#0A0A0A] hover:bg-black/[0.07]'
+                        : 'bg-[#0A1F2A]/[0.05] text-[#0A1F2A] hover:bg-[#0A1F2A]/[0.08]'
                     }`}
                   >
                     {opt.label}
@@ -1006,10 +1018,11 @@ function TipCard({
             type="button"
             onClick={onContinue}
             className="mt-5 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base active:scale-[0.98] transition-transform"
+            style={{ boxShadow: '0 4px 20px rgba(15,181,181,0.35)' }}
           >
             Keep exploring
           </button>
-          <p className="mt-2 text-[12px] text-[#888888]">Or swipe up</p>
+          <p className="mt-2 text-[12px] text-[#5A6D7A]">Or swipe up</p>
         </div>
       </div>
     </div>
@@ -1032,17 +1045,31 @@ function EndCard({
   return (
     <div className="relative h-full w-full overflow-hidden">
       <img
-        src={WELCOME_HERO}
+        src="/tips/families.png"
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
+        style={{ filter: 'brightness(1.08) saturate(1.1)' }}
         draggable={false}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-teal-950/50" />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,0.08) 0%, transparent 40%, rgba(0,0,0,0.22) 100%)',
+        }}
+      />
 
       <div className="relative z-10 h-full flex flex-col justify-end px-6 pb-28">
-        <div className="max-w-sm mx-auto w-full space-y-5 text-center">
+        <div
+          className="max-w-sm mx-auto w-full space-y-4 text-center rounded-[24px] border border-white/70 px-5 py-6 shadow-xl"
+          style={{
+            background: 'rgba(255,255,255,0.92)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+          }}
+        >
           <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-xl ring-2 ring-white/30 bg-white">
+            <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-md ring-2 ring-white bg-white">
               <img
                 src={APP_ICON}
                 alt="StikmNek"
@@ -1053,27 +1080,24 @@ function EndCard({
               />
             </div>
           </div>
-          <div>
-            <p className="text-teal-300 text-xs font-semibold uppercase tracking-wide mb-2">You’ve reached the end</p>
-            <h2 className="text-[26px] font-bold text-white leading-tight">
-              That’s all the places — for now
-            </h2>
-            <p className="mt-2.5 text-sm text-neutral-200 leading-relaxed">
-              Swipe up to shuffle and browse again
-              {savedCount > 0 ? ` · ${savedCount} saved to Your Trip` : ''}.
-            </p>
-          </div>
+          <h2 className="text-2xl font-bold text-[#0A1F2A]">You’ve seen the best bits</h2>
+          <p className="text-[15px] text-[#5A6D7A] leading-relaxed">
+            {savedCount > 0
+              ? `${savedCount} place${savedCount === 1 ? '' : 's'} on your trip. Keep exploring or unlock WhatsApp.`
+              : 'Swipe again anytime — or get a pass to message places direct.'}
+          </p>
 
           {!hasPass && (
-            <div className="rounded-2xl bg-teal-600/90 px-4 py-3.5 text-left">
-              <p className="text-sm font-bold text-white">Don’t forget your pass</p>
-              <p className="mt-1 text-xs text-teal-50 leading-snug">
+            <div className="rounded-2xl bg-[#0FB5B5]/10 border border-[#0FB5B5]/25 px-4 py-3.5 text-left">
+              <p className="text-sm font-bold text-[#0A1F2A]">Don’t forget your pass</p>
+              <p className="mt-1 text-[13px] text-[#5A6D7A] leading-snug">
                 A pass unlocks WhatsApp so you can message these places and lock in dates.
               </p>
               <button
                 type="button"
                 onClick={onGetPass}
-                className="mt-3 w-full min-h-11 rounded-xl bg-white text-teal-800 text-sm font-bold active:scale-[0.98] transition-transform"
+                className="mt-3 w-full min-h-11 rounded-xl bg-[#0FB5B5] text-white font-bold text-sm border-2 border-white"
+                style={{ boxShadow: '0 4px 16px rgba(15,181,181,0.35)' }}
               >
                 {passLabel}
               </button>
@@ -1083,11 +1107,11 @@ function EndCard({
           <button
             type="button"
             onClick={onBrowseAgain}
-            className="w-full min-h-12 rounded-2xl bg-white/15 backdrop-blur border border-white/25 text-white font-bold text-sm active:scale-[0.98] transition-transform"
+            className="w-full min-h-12 rounded-2xl bg-[#0A1F2A]/[0.06] text-[#0A1F2A] font-bold text-sm active:scale-[0.98] transition-transform"
           >
             Shuffle &amp; browse again
           </button>
-          <p className="text-[11px] text-white/55">Or swipe up to continue</p>
+          <p className="text-[11px] text-[#5A6D7A]">Or swipe up to continue</p>
         </div>
       </div>
     </div>
@@ -1144,13 +1168,19 @@ function PlaceCard({
         aria-label={`Open ${business.name}`}
       >
         <FitPhoto src={business.image} className="absolute inset-0 h-full w-full" />
-        <div className="absolute inset-0 z-[2] bg-gradient-to-t from-black/85 via-black/15 to-black/35" />
+        <div
+          className="absolute inset-0 z-[2] pointer-events-none"
+          style={{
+            background:
+              'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.15) 75%, rgba(0,0,0,0.35) 100%)',
+          }}
+        />
       </button>
 
       {floatHintText && (
         <div className="absolute top-[max(4.5rem,calc(env(safe-area-inset-top)+3.5rem))] inset-x-0 z-20 flex justify-center px-6 pointer-events-none">
-          <div className="rounded-full bg-black/70 backdrop-blur-md border border-white/20 px-4 py-2.5 shadow-lg">
-            <p className="text-sm font-semibold text-white text-center leading-snug">{floatHintText}</p>
+          <div className="rounded-full bg-white/92 backdrop-blur-md border border-white/80 px-4 py-2.5 shadow-lg">
+            <p className="text-sm font-semibold text-[#0A1F2A] text-center leading-snug">{floatHintText}</p>
           </div>
         </div>
       )}
@@ -1158,18 +1188,25 @@ function PlaceCard({
       <div className="absolute bottom-24 left-4 right-24 z-10">
         <button type="button" onClick={onOpen} className="text-left pointer-events-auto group">
           <h2
-            className={`text-[20px] font-bold leading-tight drop-shadow-md underline decoration-white/40 underline-offset-4 group-active:decoration-teal-400 ${
+            className={`text-[20px] font-bold leading-tight text-white underline decoration-white/50 underline-offset-4 group-active:decoration-teal-300 ${
               showTapCoach ? 'ring-2 ring-teal-400/80 ring-offset-2 ring-offset-transparent rounded-sm' : ''
             }`}
+            style={{ textShadow: TEXT_SHADOW_STRONG }}
           >
             {business.name}
           </h2>
         </button>
-        <span className="inline-block mt-2 rounded-md bg-teal-600 text-white text-xs font-semibold px-2.5 py-1 pointer-events-none">
+        <span
+          className="inline-block mt-2 rounded-md bg-[#0FB5B5] text-white text-xs font-semibold px-2.5 py-1 pointer-events-none border-2 border-white"
+          style={{ boxShadow: '0 2px 10px rgba(15,181,181,0.35)' }}
+        >
           {dealPillText(business)}
         </span>
         {business.location ? (
-          <p className="mt-2 text-xs text-neutral-300 flex items-center gap-1 pointer-events-none">
+          <p
+            className="mt-2 text-xs text-white/95 flex items-center gap-1 pointer-events-none"
+            style={{ textShadow: TEXT_SHADOW_SOFT }}
+          >
             <MapPin className="w-3.5 h-3.5" /> {business.location}
           </p>
         ) : null}
@@ -1203,12 +1240,17 @@ function PlaceCard({
             e.stopPropagation();
             onHeart();
           }}
-          className={`w-16 h-16 rounded-full bg-black/35 backdrop-blur flex items-center justify-center border border-white/20 active:scale-95 transition-transform ${
+          className={`w-16 h-16 rounded-full flex items-center justify-center active:scale-95 transition-transform shadow-lg ${
             floatHint === 'heart' ? 'ring-2 ring-[#0FB5B5] ring-offset-2 ring-offset-transparent' : ''
           }`}
+          style={{ background: 'rgba(255,255,255,0.92)' }}
           aria-label={saved ? 'Remove from trip' : 'Save to trip'}
         >
-          <Heart className={`w-8 h-8 ${saved ? 'fill-teal-500 text-teal-500' : 'text-white'}`} />
+          <Heart
+            className={`w-8 h-8 ${
+              saved ? 'fill-[#FF6B6B] text-[#FF6B6B]' : 'text-[#0A0A0A] fill-none'
+            }`}
+          />
         </button>
         <button
           type="button"
@@ -1219,10 +1261,16 @@ function PlaceCard({
           className="flex flex-col items-center gap-0.5 active:scale-95 transition-transform"
           aria-label={`Reviews for ${business.name}`}
         >
-          <span className="w-12 h-12 rounded-full bg-black/35 backdrop-blur flex items-center justify-center border border-white/20">
-            <Star className="w-5 h-5 text-amber-300 fill-amber-300" />
+          <span
+            className="w-12 h-12 rounded-full flex items-center justify-center shadow-md"
+            style={{ background: 'rgba(255,255,255,0.92)' }}
+          >
+            <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
           </span>
-          <span className="text-[10px] font-semibold text-white/90 drop-shadow">
+          <span
+            className="text-[10px] font-semibold text-white"
+            style={{ textShadow: TEXT_SHADOW_SOFT }}
+          >
             {rating > 0 ? rating.toFixed(1) : 'Reviews'}
             {reviewCount > 0 ? ` · ${reviewCount}` : ''}
           </span>
@@ -1233,7 +1281,8 @@ function PlaceCard({
             e.stopPropagation();
             onNext();
           }}
-          className="text-[11px] text-neutral-300 font-medium px-2 py-1 rounded-full bg-black/30"
+          className="text-[11px] text-[#0A1F2A] font-semibold px-2.5 py-1 rounded-full shadow-md"
+          style={{ background: 'rgba(255,255,255,0.9)' }}
         >
           Next ↑
         </button>
@@ -1362,11 +1411,11 @@ function DetailSheet({
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-neutral-950 animate-in slide-in-from-bottom duration-200">
       <div className="flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
-        <button type="button" onClick={onClose} className="p-2 rounded-full bg-white/10" aria-label="Close">
+        <button type="button" onClick={onClose} className="p-2 rounded-full bg-white/92 text-[#0A0A0A] shadow-md" aria-label="Close">
           <X className="w-5 h-5" />
         </button>
-        <button type="button" onClick={onHeart} className="p-2 rounded-full bg-white/10" aria-label="Save">
-          <Heart className={`w-5 h-5 ${saved ? 'fill-teal-500 text-teal-500' : ''}`} />
+        <button type="button" onClick={onHeart} className="p-2 rounded-full bg-white/92 shadow-md" aria-label="Save">
+          <Heart className={`w-5 h-5 ${saved ? 'fill-[#FF6B6B] text-[#FF6B6B]' : 'text-[#0A0A0A]'}`} />
         </button>
       </div>
       <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y">
@@ -1501,7 +1550,8 @@ function DetailSheet({
             <button
               type="button"
               onClick={onGetPass}
-              className="w-full min-h-12 rounded-xl bg-teal-600 font-bold text-sm"
+              className="w-full min-h-12 rounded-xl bg-[#0FB5B5] font-bold text-sm text-white border-2 border-white"
+              style={{ boxShadow: '0 4px 20px rgba(15,181,181,0.35)' }}
             >
               {passCtaLabel(isExtended, paidPeople, pricePreview)}
             </button>
