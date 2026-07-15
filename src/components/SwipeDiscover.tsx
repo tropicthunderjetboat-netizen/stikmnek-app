@@ -226,6 +226,18 @@ export default function SwipeDiscover() {
     setDragY(0);
   }, []);
 
+  const goHome = useCallback(() => {
+    setDetail(null);
+    setPaywallBiz(null);
+    setReviewsBiz(null);
+    setSearchOpen(false);
+    setSearchQuery('');
+    setVibe(null);
+    setDragY(0);
+    setWelcomeDismissed(false);
+    setIndex(0);
+  }, []);
+
   const dismissTapCoach = useCallback(() => {
     setShowTapCoach(false);
     markTapHintSeen();
@@ -474,8 +486,15 @@ export default function SwipeDiscover() {
     <div className="fixed inset-0 z-40 bg-neutral-950 text-white overflow-hidden touch-none select-none">
       <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
         <div className="pointer-events-auto">
-          <p className="text-sm font-bold tracking-tight">StikmNek</p>
-          <p className="text-[11px] text-neutral-300">Plan your Vanuatu trip</p>
+          <button
+            type="button"
+            onClick={goHome}
+            className="text-left rounded-lg active:opacity-80 -ml-1 px-1 py-0.5"
+            aria-label="Back to home"
+          >
+            <p className="text-sm font-bold tracking-tight">StikmNek</p>
+            <p className="text-[11px] text-neutral-300">Plan your Vanuatu trip</p>
+          </button>
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
           {saveCount > 0 && (
