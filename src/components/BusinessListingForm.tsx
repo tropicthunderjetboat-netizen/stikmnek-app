@@ -2517,8 +2517,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
             </label>
             <p className="text-sm text-gray-700 mb-2">
               {language === 'en'
-                ? 'At least one photo is required. Drag to reorder or use Set cover — the first photo is your listing cover.'
-                : 'Au moins une photo est requise. Glissez pour réordonner ou « Définir couverture » — la première est l’image principale.'}
+                ? 'At least one photo is required. Photos are cropped to vertical (phone screen) — first photo is your cover on the swipe feed.'
+                : 'Au moins une photo est requise. Cadrez en vertical (écran téléphone) — la première est la couverture du fil.'}
             </p>
             <div className={fieldErrors.photos ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
               <PhotoUploader

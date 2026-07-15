@@ -90,6 +90,7 @@ export const STAFF_ALLOWED_ACTIONS = new Set([
   'get_all_photos',
   'approve_photo',
   'reject_photo',
+  'replace_photo',
   'get_analytics',
   'upsert_business_credentials',
   'admin_verify_credential',

@@ -3138,6 +3138,65 @@ Deno.serve(async (req) => {
       return jsonResponse(req, { success: true });
     }
 
+    // ─── REPLACE_PHOTO ─── (admin/staff: re-crop vertical feed image in place)
+    if (action === 'replace_photo') {
+      const photoId = String(body.photoId || '').trim();
+      const url = String(body.url || '').trim();
+      const filePath = String(body.filePath || '').trim();
+      if (!photoId || !url || !filePath) {
+        return errorResponse(req, 'Missing photoId, url, or filePath');
+      }
+
+      const denied = await assertAdminOrStaff(supabase, authUser, req, action);
+      if (denied) return denied;
+
+      const { data: existing, error: fetchErr } = await supabase
+        .from('business_photos')
+        .select('id, url, file_path, is_main, offering_id, business_id, pending_id, submission_pending_id')
+        .eq('id', photoId)
+        .maybeSingle();
+
+      if (fetchErr) return errorResponse(req, fetchErr.message, 500);
+      if (!existing?.id) return errorResponse(req, 'Photo not found', 404);
+
+      const oldPath = String(existing.file_path || '').trim();
+
+      const { error: updateErr } = await supabase
+        .from('business_photos')
+        .update({ url, file_path: filePath })
+        .eq('id', photoId);
+
+      if (updateErr) return errorResponse(req, updateErr.message, 500);
+
+      if (existing.is_main) {
+        const offeringId = String(existing.offering_id || '').trim();
+        if (offeringId) {
+          await supabase.from('business_offerings').update({ image: url }).eq('id', offeringId);
+        }
+        const pendingId = String(
+          existing.submission_pending_id || existing.pending_id || '',
+        ).trim();
+        if (pendingId) {
+          await supabase.from('pending_businesses').update({ image: url }).eq('id', pendingId);
+        }
+        // Cover on profile-linked live business row (legacy single-image listings)
+        const bizId = String(existing.business_id || '').trim();
+        if (bizId && !offeringId) {
+          await supabase.from('businesses').update({ image: url }).eq('id', bizId);
+        }
+      }
+
+      if (oldPath && oldPath !== filePath && !oldPath.startsWith('legacy/')) {
+        try {
+          await supabase.storage.from('business-photos').remove([oldPath]);
+        } catch {
+          // non-critical
+        }
+      }
+
+      return jsonResponse(req, { success: true, url, filePath });
+    }
+
     // ─── GET_ANALYTICS ───
     if (action === 'get_analytics') {
       const businessId = body.businessId;

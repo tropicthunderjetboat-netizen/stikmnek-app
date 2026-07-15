@@ -12,9 +12,10 @@ import {
   CheckCircle, XCircle, AlertCircle, Clock, FileText, MessageSquare,
   Image as ImageIcon, Calendar, Loader2, RefreshCw, Edit3, ArrowRight,
   Wifi, WifiOff, Mail, Trash2, AlertTriangle, X, MapPin, Phone, Tag, Save,
-  Globe, Percent, CreditCard, UserPlus, ShieldCheck, Building2
+  Globe, Percent, CreditCard, UserPlus, ShieldCheck, Building2, Crop
 } from 'lucide-react';
 import { formatVT, getPhotoDisplayUrl } from '@/lib/utils';
+import LogoCropDialog from '@/components/LogoCropDialog';
 import { pricingTiersFromDb } from '@/lib/pricingTiers';
 import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 import {
@@ -194,6 +195,8 @@ const AdminPanel: React.FC = () => {
   const [deletingPendingId, setDeletingPendingId] = useState<string | null>(null);
   const [approvalListFilter, setApprovalListFilter] = useState<'all' | 'pending' | 'archived'>('all');
   const [processingPhotoId, setProcessingPhotoId] = useState<string | null>(null);
+  const [recropPhoto, setRecropPhoto] = useState<BusinessPhoto | null>(null);
+  const [recropSaving, setRecropSaving] = useState(false);
   const [loadingPending, setLoadingPending] = useState(false);
   const [incompleteProfiles, setIncompleteProfiles] = useState<IncompleteBusinessProfile[]>([]);
   const [loadingIncompleteProfiles, setLoadingIncompleteProfiles] = useState(false);
@@ -1432,6 +1435,90 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  const uploadRecroppedAdminPhoto = async (
+    dataUrl: string,
+  ): Promise<{ url: string; filePath: string }> => {
+    const uid = user?.id;
+    if (!uid) throw new Error('Not signed in');
+
+    const base64Data = dataUrl.replace(/^data:image\/[^;]+;base64,/, '');
+    let binary: Uint8Array;
+    try {
+      binary = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+    } catch {
+      throw new Error('Invalid cropped image data');
+    }
+    const filePath = `${uid}/${crypto.randomUUID()}.jpg`;
+    const blob = new Blob([binary], { type: 'image/jpeg' });
+
+    const { error: storageErr } = await supabase.storage
+      .from('business-photos')
+      .upload(filePath, blob, { contentType: 'image/jpeg', upsert: false });
+
+    if (!storageErr) {
+      const { data: urlData } = supabase.storage.from('business-photos').getPublicUrl(filePath);
+      return { url: urlData.publicUrl, filePath };
+    }
+
+    const headers = await getEdgeAuthHeaders();
+    const { data, error } = await supabase.functions.invoke('upload-photo', {
+      body: {
+        fileBase64: dataUrl,
+        fileName: 'recrop.jpg',
+        contentType: 'image/jpeg',
+        userId: uid,
+      },
+      headers,
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(String(data.error));
+    if (!data?.url || !data?.filePath) throw new Error('Upload failed');
+    return { url: data.url as string, filePath: data.filePath as string };
+  };
+
+  const handleAdminPhotoRecropped = async (file: File, previewDataUrl: string) => {
+    if (!recropPhoto) return;
+    setRecropSaving(true);
+    try {
+      const uploaded = await uploadRecroppedAdminPhoto(previewDataUrl);
+      const { data, error } = await supabase.functions.invoke('manage-business', {
+        headers: await getEdgeAuthHeaders(),
+        body: {
+          action: 'replace_photo',
+          userId: user?.id,
+          photoId: recropPhoto.id,
+          url: uploaded.url,
+          filePath: uploaded.filePath,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(String(data.error));
+
+      const nextUrl = String(data?.url || uploaded.url);
+      const nextPath = String(data?.filePath || uploaded.filePath);
+      const photoId = recropPhoto.id;
+
+      const patchMap = (prev: Record<string, BusinessPhoto[]>) => {
+        const updated = { ...prev };
+        for (const bizId of Object.keys(updated)) {
+          updated[bizId] = updated[bizId].map((p) =>
+            p.id === photoId ? { ...p, url: nextUrl, file_path: nextPath } : p,
+          );
+        }
+        return updated;
+      };
+      setBusinessPhotos(patchMap);
+      setRpcPhotoMap(patchMap);
+
+      toast.success('Photo cropped for the vertical feed. Save is live.');
+      setRecropPhoto(null);
+    } catch (err: any) {
+      toast.error('Recrop failed: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setRecropSaving(false);
+    }
+  };
+
   // Bulk photo actions
   const handleBulkPhotoReview = async (photos: BusinessPhoto[], decision: 'approved' | 'rejected') => {
     const pendingPhotos = photos.filter(p => p.status === 'pending');
@@ -2477,11 +2564,11 @@ const AdminPanel: React.FC = () => {
                                   photo.status === 'rejected' ? 'border-red-300' : 'border-yellow-300'
                                 }`}>
                                   {/* Photo */}
-                                  <div className="relative">
+                                  <div className="relative bg-gray-900 aspect-[9/16]">
                                     <img
                                       src={getPhotoDisplayUrl(photo, SUPABASE_URL) || photo.url || '/placeholder.svg'}
                                       alt={`Photo ${idx + 1}`}
-                                      className="w-full h-40 object-cover"
+                                      className="w-full h-full object-contain"
                                       onError={(e) => {
                                         (e.target as HTMLImageElement).src = '/placeholder.svg';
                                       }}
@@ -2503,11 +2590,21 @@ const AdminPanel: React.FC = () => {
                                   </div>
 
                                   {/* Action buttons - ALWAYS visible below the photo */}
-                                  <div className={`p-2 ${
+                                  <div className={`p-2 space-y-2 ${
                                     photo.status === 'pending' ? 'bg-yellow-50' :
                                     photo.status === 'approved' ? 'bg-green-50' :
                                     'bg-red-50'
                                   }`}>
+                                    <button
+                                      type="button"
+                                      onClick={() => setRecropPhoto(photo)}
+                                      disabled={recropSaving || processingPhotoId === photo.id}
+                                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition-colors disabled:opacity-50 shadow-sm"
+                                      title="Crop to vertical for the phone swipe feed"
+                                    >
+                                      <Crop className="w-3.5 h-3.5" />
+                                      Crop for feed
+                                    </button>
                                     {photo.status === 'pending' ? (
                                       <div className="flex items-center gap-2">
                                         <button
@@ -3539,6 +3636,22 @@ const AdminPanel: React.FC = () => {
             </div>
           );
         })()}
+
+      {recropPhoto && (
+        <LogoCropDialog
+          open
+          imageSrc={getPhotoDisplayUrl(recropPhoto, SUPABASE_URL) || recropPhoto.url}
+          fileName={`photo-${recropPhoto.id}.jpg`}
+          language={language}
+          variant="portrait"
+          onClose={() => {
+            if (!recropSaving) setRecropPhoto(null);
+          }}
+          onCropped={async (file, preview) => {
+            await handleAdminPhotoRecropped(file, preview);
+          }}
+        />
+      )}
       </div>
     </div>
   );

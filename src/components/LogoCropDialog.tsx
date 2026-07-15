@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Cropper, { type Area } from 'react-easy-crop';
 import {
   Dialog,
@@ -11,8 +11,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Loader2, ZoomIn } from 'lucide-react';
-import { dataUrlToFile, getCroppedImageDataUrl } from '@/lib/cropImage';
+import {
+  dataUrlToFile,
+  getCroppedImageDataUrl,
+  PORTRAIT_ASPECT,
+  PORTRAIT_OUTPUT_HEIGHT,
+  PORTRAIT_OUTPUT_WIDTH,
+} from '@/lib/cropImage';
 import type { Language } from '@/data/translations';
+
+export type CropVariant = 'logo' | 'portrait';
 
 type LogoCropDialogProps = {
   open: boolean;
@@ -20,7 +28,9 @@ type LogoCropDialogProps = {
   fileName: string;
   language: Language;
   onClose: () => void;
-  onCropped: (file: File, previewDataUrl: string) => void;
+  onCropped: (file: File, previewDataUrl: string) => void | Promise<void>;
+  /** Square logo (default) or vertical feed photo. */
+  variant?: CropVariant;
 };
 
 const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
@@ -30,49 +40,78 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
   language,
   onClose,
   onCropped,
+  variant = 'logo',
 }) => {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+  }, [imageSrc]);
+
   const onCropComplete = useCallback((_area: Area, pixels: Area) => {
     setCroppedAreaPixels(pixels);
   }, []);
 
-  const t = {
-    title:
-      language === 'en'
-        ? 'Adjust your logo'
-        : language === 'fr'
-          ? 'Ajuster votre logo'
-          : 'Adjustem logo',
-    hint:
-      language === 'en'
-        ? 'Drag to reposition and use the slider to zoom — like a profile photo. This is how it will appear on your listing.'
-        : language === 'fr'
-          ? 'Glissez pour repositionner et zoomez. C’est ainsi qu’il apparaîtra sur votre annonce.'
-          : 'Drag mo zoom — olsem bae i luk long listing.',
-    zoom: language === 'en' ? 'Zoom' : language === 'fr' ? 'Zoom' : 'Zoom',
-    cancel: language === 'en' ? 'Cancel' : language === 'fr' ? 'Annuler' : 'Kanselem',
-    save: language === 'en' ? 'Save logo' : language === 'fr' ? 'Enregistrer' : 'Sevem logo',
-  };
+  const isPortrait = variant === 'portrait';
+
+  const t = isPortrait
+    ? {
+        title:
+          language === 'en'
+            ? 'Frame your photo'
+            : language === 'fr'
+              ? 'Cadrez votre photo'
+              : 'Frameem foto',
+        hint:
+          language === 'en'
+            ? 'Crop to vertical — this is how it looks on the phone swipe feed. Drag to reposition, zoom to fill.'
+            : language === 'fr'
+              ? 'Cadrez en vertical — comme sur le fil mobile. Glissez et zoomez.'
+              : 'Crop vertical — olsem long phone feed. Drag mo zoom.',
+        zoom: language === 'en' ? 'Zoom' : language === 'fr' ? 'Zoom' : 'Zoom',
+        cancel: language === 'en' ? 'Cancel' : language === 'fr' ? 'Annuler' : 'Kanselem',
+        save: language === 'en' ? 'Use photo' : language === 'fr' ? 'Utiliser' : 'Yusem foto',
+      }
+    : {
+        title:
+          language === 'en'
+            ? 'Adjust your logo'
+            : language === 'fr'
+              ? 'Ajuster votre logo'
+              : 'Adjustem logo',
+        hint:
+          language === 'en'
+            ? 'Drag to reposition and use the slider to zoom — like a profile photo. This is how it will appear on your listing.'
+            : language === 'fr'
+              ? 'Glissez pour repositionner et zoomez. C’est ainsi qu’il apparaîtra sur votre annonce.'
+              : 'Drag mo zoom — olsem bae i luk long listing.',
+        zoom: language === 'en' ? 'Zoom' : language === 'fr' ? 'Zoom' : 'Zoom',
+        cancel: language === 'en' ? 'Cancel' : language === 'fr' ? 'Annuler' : 'Kanselem',
+        save: language === 'en' ? 'Save logo' : language === 'fr' ? 'Enregistrer' : 'Sevem logo',
+      };
 
   const handleSave = async () => {
     if (!croppedAreaPixels) return;
     setSaving(true);
     try {
-      const dataUrl = await getCroppedImageDataUrl(imageSrc, croppedAreaPixels, 800);
-      const file = await dataUrlToFile(dataUrl, fileName.replace(/\.[^.]+$/, '') + '-logo.jpg');
-      onCropped(file, dataUrl);
-      onClose();
+      const outW = isPortrait ? PORTRAIT_OUTPUT_WIDTH : 800;
+      const outH = isPortrait ? PORTRAIT_OUTPUT_HEIGHT : 800;
+      const dataUrl = await getCroppedImageDataUrl(imageSrc, croppedAreaPixels, outW, outH);
+      const suffix = isPortrait ? '-photo.jpg' : '-logo.jpg';
+      const file = await dataUrlToFile(dataUrl, fileName.replace(/\.[^.]+$/, '') + suffix);
+      await onCropped(file, dataUrl);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+    <Dialog open={open} onOpenChange={(v) => !v && !saving && onClose()}>
       <DialogContent
         className="max-w-lg p-0 gap-0 overflow-hidden sm:rounded-2xl z-[120]"
         overlayClassName="z-[120]"
@@ -82,12 +121,16 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
           <DialogDescription>{t.hint}</DialogDescription>
         </DialogHeader>
 
-        <div className="relative w-full h-[min(52vw,280px)] bg-gray-900">
+        <div
+          className={`relative w-full bg-gray-900 ${
+            isPortrait ? 'h-[min(68vh,440px)]' : 'h-[min(52vw,280px)]'
+          }`}
+        >
           <Cropper
             image={imageSrc}
             crop={crop}
             zoom={zoom}
-            aspect={1}
+            aspect={isPortrait ? PORTRAIT_ASPECT : 1}
             cropShape="rect"
             showGrid
             onCropChange={setCrop}

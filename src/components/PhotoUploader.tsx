@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
+  Crop,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import LogoCropDialog from '@/components/LogoCropDialog';
@@ -38,6 +39,11 @@ interface PhotoUploaderProps {
   allowReorder?: boolean;
   /** Square crop + zoom before upload (business logo). */
   logoCrop?: boolean;
+  /**
+   * Vertical 9:16 crop before upload (matches tourist swipe feed).
+   * Defaults on for listing photos when not using logoCrop.
+   */
+  portraitCrop?: boolean;
 }
 
 interface UploadingFile {
@@ -246,20 +252,36 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   maxSizeMB = 5,
   userId,
   label = 'Upload Photos',
-  sublabel = 'Drag & drop or click to browse. PNG, JPG up to 5MB each.',
+  sublabel,
   compact = false,
   allowReorder: allowReorderProp,
   logoCrop = false,
+  portraitCrop: portraitCropProp,
 }) => {
   const { language } = useAppContext();
   const [uploading, setUploading] = useState<UploadingFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [dragPhotoIndex, setDragPhotoIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
-  const [cropDialog, setCropDialog] = useState<{ src: string; fileName: string } | null>(null);
+  const [cropDialog, setCropDialog] = useState<{
+    src: string;
+    fileName: string;
+    replaceIndex?: number;
+  } | null>(null);
+  const [cropQueue, setCropQueue] = useState<{ src: string; fileName: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
   const allowReorder = allowReorderProp ?? maxPhotos > 1;
   const isSingleSlot = maxPhotos === 1;
+  const portraitCrop = portraitCropProp ?? (!logoCrop && maxPhotos > 1);
+  const resolvedSublabel =
+    sublabel ??
+    (portraitCrop
+      ? 'Vertical crop for the phone feed. PNG, JPG up to 5MB. First photo = cover.'
+      : logoCrop
+        ? 'Drag & drop or click. Square crop for your logo.'
+        : 'Drag & drop or click to browse. PNG, JPG up to 5MB each.');
 
   const maxSizeBytes = maxSizeMB * 1024 * 1024;
 
@@ -609,6 +631,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       const file = validFiles[0];
       try {
         const src = await readFileAsDataUrl(file);
+        setCropQueue([]);
         setCropDialog({ src, fileName: file.name });
       } catch {
         toast.error('Could not read image — try another file.');
@@ -664,8 +687,32 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       preReads.push(preReadDataUrl);
     }
 
+    if (portraitCrop) {
+      const queue: { src: string; fileName: string }[] = [];
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const src = preReads[i];
+        if (!src) {
+          toast.error(`Could not read "${filesToUpload[i].name}" — skipped.`);
+          continue;
+        }
+        queue.push({ src, fileName: filesToUpload[i].name });
+      }
+      if (queue.length === 0) {
+        toast.error('Could not read selected images — try again.');
+        return;
+      }
+      setCropQueue(queue.slice(1));
+      setCropDialog(queue[0]);
+      return;
+    }
+
     await uploadFilesAfterCrop(filesToUpload, preReads);
-  }, [photos, maxPhotos, isSingleSlot, uploading, logoCrop, uploadFilesAfterCrop]);
+  }, [photos, maxPhotos, isSingleSlot, uploading, logoCrop, portraitCrop, uploadFilesAfterCrop, onPhotosChange]);
+
+  const handleCropDialogClose = useCallback(() => {
+    setCropDialog(null);
+    setCropQueue([]);
+  }, []);
 
   const handleLogoCropped = useCallback(
     async (file: File, previewDataUrl: string) => {
@@ -687,6 +734,68 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       }
     },
     [photos, uploadFile, onPhotosChange, language],
+  );
+
+  const handlePortraitCropped = useCallback(
+    async (file: File, previewDataUrl: string) => {
+      const replaceIndex = cropDialog?.replaceIndex;
+
+      // Re-crop existing photo — replace at same slot (admin / edit listing).
+      if (typeof replaceIndex === 'number' && replaceIndex >= 0 && replaceIndex < photosRef.current.length) {
+        const old = photosRef.current[replaceIndex];
+        const result = await uploadFile(file, previewDataUrl);
+        if (!result) return;
+        if (old?.filePath) {
+          try {
+            await supabase.storage.from('business-photos').remove([old.filePath]);
+          } catch (err) {
+            console.warn('Failed to remove previous photo (non-critical):', err);
+          }
+        }
+        const next = [...photosRef.current];
+        next[replaceIndex] = { ...result, id: old?.id || result.id };
+        photosRef.current = next;
+        onPhotosChange(next);
+        setCropDialog(null);
+        toast.success(
+          language === 'en'
+            ? 'Photo re-cropped for the feed!'
+            : language === 'fr'
+              ? 'Photo recadrée pour le fil !'
+              : 'Foto i re-crop!',
+        );
+        return;
+      }
+
+      const result = await uploadFile(file, previewDataUrl);
+      if (result) {
+        const next = [...photosRef.current, result];
+        photosRef.current = next;
+        onPhotosChange(next);
+      }
+      // Advance queue or close — avoid unmounting mid-save (that would clear the queue via onClose).
+      await new Promise<void>((resolve) => {
+        setCropQueue((prev) => {
+          if (prev.length === 0) {
+            setCropDialog(null);
+            toast.success(
+              language === 'en'
+                ? 'Photo ready for the feed!'
+                : language === 'fr'
+                  ? 'Photo prête pour le fil !'
+                  : 'Foto i redi!',
+            );
+            resolve();
+            return prev;
+          }
+          const [nextCrop, ...rest] = prev;
+          setCropDialog(nextCrop);
+          resolve();
+          return rest;
+        });
+      });
+    },
+    [uploadFile, onPhotosChange, language, cropDialog?.replaceIndex],
   );
 
   const reorderPhotos = useCallback(
@@ -820,7 +929,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               {isDragging ? 'Drop photos here' : label}
             </p>
             <p className={`text-gray-400 mt-0.5 ${compact ? 'text-[10px]' : 'text-xs'}`}>
-              {sublabel}
+              {resolvedSublabel}
             </p>
             <p className={`text-gray-300 mt-1 ${compact ? 'text-[10px]' : 'text-xs'}`}>
               {isSingleSlot
@@ -888,10 +997,21 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
         <div className="space-y-2">
           {allowReorder && photos.length > 1 && (
             <p className="text-xs text-gray-500">
-              Drag to reorder, or tap <span className="font-medium">Set cover</span>. The first photo is your listing cover.
+              Drag to reorder, or tap <span className="font-medium">Set cover</span>. The first photo is your listing cover
+              {portraitCrop ? ' on the vertical phone feed' : ''}.
             </p>
           )}
-          <div className={`grid gap-3 ${compact ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
+          <div
+            className={`grid gap-3 ${
+              portraitCrop
+                ? compact
+                  ? 'grid-cols-3 sm:grid-cols-4'
+                  : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5'
+                : compact
+                  ? 'grid-cols-3 sm:grid-cols-4'
+                  : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'
+            }`}
+          >
           {photos.map((photo, index) => (
             <div
               key={photo.id}
@@ -922,7 +1042,9 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
                 setDragPhotoIndex(null);
                 setDropTargetIndex(null);
               }}
-              className={`group relative rounded-xl overflow-hidden bg-gray-100 aspect-square border transition-all ${
+              className={`group relative rounded-xl overflow-hidden bg-gray-100 border transition-all ${
+                portraitCrop ? 'aspect-[9/16]' : 'aspect-square'
+              } ${
                 dropTargetIndex === index && dragPhotoIndex !== null && dragPhotoIndex !== index
                   ? 'border-teal-500 ring-2 ring-teal-300 scale-[1.02]'
                   : dragPhotoIndex === index
@@ -949,6 +1071,25 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
 
               {/* Overlay on hover / focus-within */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/45 group-focus-within:bg-black/45 transition-all flex flex-col items-center justify-center gap-1.5 p-2">
+                {portraitCrop && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCropQueue([]);
+                      setCropDialog({
+                        src: photo.url || photo.preview,
+                        fileName: photo.name || `photo-${index + 1}.jpg`,
+                        replaceIndex: index,
+                      });
+                    }}
+                    className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all px-2 py-1 rounded-lg bg-white text-teal-800 text-[10px] font-semibold flex items-center gap-1 shadow"
+                    title="Crop to vertical for the phone feed"
+                  >
+                    <Crop className="w-3 h-3" />
+                    Recrop
+                  </button>
+                )}
                 {allowReorder && index > 0 && (
                   <button
                     type="button"
@@ -1025,7 +1166,9 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           {canUploadMore && (
             <div
               onClick={handleClick}
-              className="rounded-xl border-2 border-dashed border-gray-200 aspect-square flex flex-col items-center justify-center hover:border-teal-300 hover:bg-teal-50/30 transition-all cursor-pointer"
+              className={`rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center hover:border-teal-300 hover:bg-teal-50/30 transition-all cursor-pointer ${
+                portraitCrop ? 'aspect-[9/16]' : 'aspect-square'
+              }`}
             >
               <Upload className="w-6 h-6 text-gray-300 mb-1" />
               <span className="text-[10px] text-gray-400 font-medium">Add More</span>
@@ -1064,10 +1207,15 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           imageSrc={cropDialog.src}
           fileName={cropDialog.fileName}
           language={language}
-          onClose={() => setCropDialog(null)}
-          onCropped={(file, preview) => {
-            setCropDialog(null);
-            void handleLogoCropped(file, preview);
+          variant={logoCrop ? 'logo' : 'portrait'}
+          onClose={handleCropDialogClose}
+          onCropped={async (file, preview) => {
+            if (logoCrop) {
+              await handleLogoCropped(file, preview);
+              setCropDialog(null);
+            } else {
+              await handlePortraitCropped(file, preview);
+            }
           }}
         />
       )}
