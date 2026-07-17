@@ -59,11 +59,11 @@ const Hero: React.FC = () => {
         <img
           src="https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1770856886882_dff396d7.jpg"
           alt="Vanuatu"
-
           className="w-full h-full object-cover"
+          style={{ filter: 'brightness(0.78) saturate(1.05) contrast(1.04)' }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-teal-950/80 via-teal-900/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-teal-950/50 via-transparent to-teal-950/30" />
+        <div className="absolute inset-0 bg-gradient-to-r from-teal-950/90 via-teal-950/70 to-teal-950/35" />
+        <div className="absolute inset-0 bg-gradient-to-t from-teal-950/75 via-teal-950/20 to-teal-950/45" />
       </div>
 
       {/* Decorative Elements */}
@@ -85,7 +85,7 @@ const Hero: React.FC = () => {
           </div>
 
           <h1
-            className={`font-extrabold text-white leading-tight ${
+            className={`font-extrabold text-white leading-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.55)] ${
               signedInTourist
                 ? 'text-3xl sm:text-4xl lg:text-6xl mb-3'
                 : 'text-4xl sm:text-5xl lg:text-6xl mb-6'
@@ -95,7 +95,7 @@ const Hero: React.FC = () => {
           </h1>
 
           <p
-            className={`text-white/80 leading-relaxed max-w-xl ${
+            className={`text-white/95 leading-relaxed max-w-xl drop-shadow-[0_1px_8px_rgba(0,0,0,0.5)] ${
               signedInTourist ? 'text-base sm:text-lg mb-5' : 'text-lg sm:text-xl mb-8'
             }`}
           >
@@ -103,7 +103,32 @@ const Hero: React.FC = () => {
           </p>
 
           <div className={`flex flex-col gap-3 w-full max-w-md ${signedInTourist ? 'mb-6' : 'mb-12'}`}>
-            {signedInTourist ? (
+            {user?.type === 'business' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentView('business-dashboard');
+                    navigate('/hub');
+                  }}
+                  className="group flex w-full items-center justify-center gap-2 px-8 py-4 rounded-xl bg-orange-500 text-white font-bold text-lg hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/35 hover:shadow-orange-500/50 hover:-translate-y-0.5 min-h-[3.25rem]"
+                >
+                  <Sparkles className="w-5 h-5 shrink-0 text-amber-100 opacity-95 group-hover:scale-110 transition-transform" aria-hidden />
+                  {language === 'en'
+                    ? 'Go to my dashboard'
+                    : language === 'fr'
+                      ? 'Aller à mon tableau de bord'
+                      : 'Go long dasbod blong mi'}
+                </button>
+                <button
+                  type="button"
+                  onClick={scrollToListBusiness}
+                  className="flex w-full items-center justify-center gap-2 px-8 py-3.5 rounded-xl border-2 border-white/90 bg-white/5 text-white font-semibold text-base hover:bg-white/15 transition-all min-h-[3rem] backdrop-blur-[2px]"
+                >
+                  {t('hero.ctaBusiness', language)}
+                </button>
+              </>
+            ) : signedInTourist ? (
               <>
                 <button
                   type="button"
@@ -134,7 +159,7 @@ const Hero: React.FC = () => {
                   <Sparkles className="w-5 h-5 shrink-0 text-amber-100 opacity-95 group-hover:scale-110 transition-transform" aria-hidden />
                   {t('hero.ctaTourist', language)}
                 </button>
-                <p className="text-center text-xs text-white/55 sm:text-left sm:pl-1">
+                <p className="text-center text-xs text-white/70 sm:text-left sm:pl-1">
                   {t('hero.businessOwnersHint', language)}
                 </p>
                 <button

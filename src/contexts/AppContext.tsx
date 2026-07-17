@@ -1326,14 +1326,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // When auth modal opens but user is already logged in (session restored from localStorage),
-  // close the modal and show a toast. Do NOT redirect — user may have clicked "Sign In" by accident
-  // or may want to stay on the current page. Role redirect runs only when `authIntentRedirectRef` was set by sign-in / sign-up-with-session.
+  // close the modal. Business / staff users who hit "Sign in" or "Business login" get sent to
+  // their hub; tourists stay put with a short toast (they may have opened Sign In by accident).
   useEffect(() => {
-    if (showAuth && user) {
-      setShowAuth(false);
-      toast.info('You\'re already signed in.');
+    if (!showAuth || !user) return;
+    setShowAuth(false);
+    if (user.type === 'business') {
+      void redirectBusinessUserAfterAuth(user.id, { silent: true });
+      toast.info('You\'re already signed in — opening your dashboard.');
+      return;
     }
-  }, [showAuth, user]);
+    if (user.type === 'admin' || user.type === 'staff') {
+      setCurrentView('admin');
+      toast.info('You\'re already signed in — opening the admin panel.');
+      return;
+    }
+    toast.info('You\'re already signed in.');
+  }, [showAuth, user, redirectBusinessUserAfterAuth, setCurrentView]);
 
   // Realtime: refetch reviews instead of merging payload — merging raced with loadReviews()
   // after submit and could still show duplicates when ids/shapes differ slightly.

@@ -122,8 +122,8 @@ const PARTY_OPTIONS: { n: number; label: string }[] = [
   { n: 5, label: 'Family 5+' },
 ];
 
-const TEXT_SHADOW_SOFT = '0 2px 10px rgba(0,0,0,0.35)';
-const TEXT_SHADOW_STRONG = '0 2px 12px rgba(0,0,0,0.4)';
+const TEXT_SHADOW_SOFT = '0 2px 14px rgba(0,0,0,0.65), 0 1px 3px rgba(0,0,0,0.45)';
+const TEXT_SHADOW_STRONG = '0 2px 18px rgba(0,0,0,0.75), 0 1px 4px rgba(0,0,0,0.5)';
 
 function peopleWord(n: number): string {
   const p = clampPartySize(n);
@@ -211,6 +211,7 @@ export default function SwipeDiscover() {
     setCurrentView,
     setShowAuth,
     setAuthMode,
+    signOut,
   } = useAppContext();
 
   const [trip, setTrip] = useState<TripState>(() => loadTripState());
@@ -550,9 +551,32 @@ export default function SwipeDiscover() {
   );
 
   const openPartnerSignIn = useCallback(() => {
+    if (user) {
+      if (user.type === 'business') {
+        setCurrentView('business-dashboard');
+        navigate('/hub');
+        return;
+      }
+      if (user.type === 'admin' || user.type === 'staff') {
+        setCurrentView('admin');
+        return;
+      }
+      toast.info('You are signed in as a tourist. Sign out to log in with a business account.', {
+        action: {
+          label: 'Sign out',
+          onClick: () => {
+            void signOut().then(() => {
+              setAuthMode('signin');
+              setShowAuth(true);
+            });
+          },
+        },
+      });
+      return;
+    }
     setAuthMode('signin');
     setShowAuth(true);
-  }, [setAuthMode, setShowAuth]);
+  }, [user, setAuthMode, setShowAuth, setCurrentView, navigate, signOut]);
 
   const dismissFloatHint = useCallback((which: 0 | 1) => {
     setDismissedFloatHints((prev) => ({ ...prev, [which]: true }));
@@ -668,6 +692,9 @@ export default function SwipeDiscover() {
             onStart={finishWelcome}
             dealCount={listings.length}
             onPartnerSignIn={openPartnerSignIn}
+            partnerLabel={
+              user?.type === 'business' ? 'Go to my business dashboard' : 'Business login'
+            }
           />
         )}
         {current?.kind === 'tip' && (
@@ -850,10 +877,12 @@ function WelcomeCard({
   onStart,
   dealCount,
   onPartnerSignIn,
+  partnerLabel,
 }: {
   onStart: () => void;
   dealCount: number;
   onPartnerSignIn: () => void;
+  partnerLabel: string;
 }) {
   const dealsMeta =
     dealCount > 0
@@ -866,20 +895,28 @@ function WelcomeCard({
         src={WELCOME_HERO}
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
-        style={{ filter: 'brightness(1.15) saturate(1.15)' }}
+        style={{ filter: 'brightness(0.72) saturate(1.05) contrast(1.05)' }}
         draggable={false}
       />
       <div
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.18) 100%)',
+            'linear-gradient(180deg, rgba(4,24,32,0.72) 0%, rgba(4,24,32,0.45) 42%, rgba(4,24,32,0.78) 100%)',
         }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(ellipse 80% 55% at 50% 40%, transparent 0%, rgba(0,0,0,0.35) 100%)',
+        }}
+        aria-hidden
       />
 
       <div className="relative z-10 h-full flex flex-col px-6 pt-[max(3.5rem,calc(env(safe-area-inset-top)+2.5rem))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
         <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full text-center">
-          <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-xl shadow-black/15 ring-2 ring-white/70 mb-4 bg-white">
+          <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-xl shadow-black/40 ring-2 ring-white/80 mb-4 bg-white">
             <img
               src={APP_ICON}
               alt=""
@@ -912,7 +949,7 @@ function WelcomeCard({
             Plan your trip. Support local.
           </h1>
           <p
-            className="mt-3 text-[15px] text-white leading-relaxed"
+            className="mt-3 text-[15px] text-white/95 leading-relaxed"
             style={{ textShadow: TEXT_SHADOW_SOFT }}
           >
             Build your trip by tapping ♥. Your pass helps grassroots Vanuatu businesses thrive.
@@ -937,10 +974,10 @@ function WelcomeCard({
         <button
           type="button"
           onClick={onPartnerSignIn}
-          className="mt-4 text-center text-[13px] text-white/90 hover:text-white underline-offset-2 hover:underline"
+          className="mt-4 text-center text-[13px] font-semibold text-white hover:text-teal-100 underline-offset-2 hover:underline"
           style={{ textShadow: TEXT_SHADOW_SOFT }}
         >
-          Business login
+          {partnerLabel}
         </button>
       </div>
     </div>
