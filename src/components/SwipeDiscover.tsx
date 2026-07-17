@@ -895,23 +895,15 @@ function WelcomeCard({
         src={WELCOME_HERO}
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
-        style={{ filter: 'brightness(0.72) saturate(1.05) contrast(1.05)' }}
+        style={{ filter: 'brightness(0.88) saturate(1.08) contrast(1.02)' }}
         draggable={false}
       />
       <div
         className="absolute inset-0"
         style={{
           background:
-            'linear-gradient(180deg, rgba(4,24,32,0.72) 0%, rgba(4,24,32,0.45) 42%, rgba(4,24,32,0.78) 100%)',
+            'linear-gradient(180deg, rgba(4,24,32,0.48) 0%, rgba(4,24,32,0.22) 45%, rgba(4,24,32,0.55) 100%)',
         }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 80% 55% at 50% 40%, transparent 0%, rgba(0,0,0,0.35) 100%)',
-        }}
-        aria-hidden
       />
 
       <div className="relative z-10 h-full flex flex-col px-6 pt-[max(3.5rem,calc(env(safe-area-inset-top)+2.5rem))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">

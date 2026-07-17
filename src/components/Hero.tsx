@@ -60,10 +60,10 @@ const Hero: React.FC = () => {
           src="https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1770856886882_dff396d7.jpg"
           alt="Vanuatu"
           className="w-full h-full object-cover"
-          style={{ filter: 'brightness(0.78) saturate(1.05) contrast(1.04)' }}
+          style={{ filter: 'brightness(0.9) saturate(1.05) contrast(1.02)' }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-teal-950/90 via-teal-950/70 to-teal-950/35" />
-        <div className="absolute inset-0 bg-gradient-to-t from-teal-950/75 via-teal-950/20 to-teal-950/45" />
+        <div className="absolute inset-0 bg-gradient-to-r from-teal-950/82 via-teal-950/55 to-teal-950/25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-teal-950/60 via-transparent to-teal-950/35" />
       </div>
 
       {/* Decorative Elements */}
