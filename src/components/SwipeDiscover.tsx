@@ -55,29 +55,28 @@ type TipStep = {
   icon: string;
   /** Insert this tip after this many place cards in the feed. */
   afterPlaces: number;
-  variant?: 'info' | 'party' | 'length';
+  variant?: 'info' | 'party' | 'length' | 'qr';
 };
-
 /** Short how-to tips inserted between places — calm copy, no promo art. */
 const FEED_TIP_STEPS: TipStep[] = [
   {
     id: 'local',
-    title: 'Real Vanuatu, real families',
-    body: 'Your trip supports grassroots businesses — markets, tours, cafés, and family-run spots.',
+    title: 'These are local businesses',
+    body: 'Family-run tours, markets, cafés, and little spots around Vanuatu — your visit helps them out.',
     icon: '🌱',
     afterPlaces: 2,
   },
   {
     id: 'save',
     title: 'Tap ♥ to save your trip',
-    body: 'Heart the places you love. Browse free — build your list as you go.',
+    body: 'Like a place? Hit the heart and we’ll keep it on your list while you browse.',
     icon: '♥',
     afterPlaces: 5,
   },
   {
     id: 'length',
     title: 'How long are you staying?',
-    body: 'This helps us suggest the right pass — day trip or a longer holiday.',
+    body: 'Just so we can point you at the right pass later — a day trip, or a longer stay.',
     icon: '📅',
     afterPlaces: 7,
     variant: 'length',
@@ -85,26 +84,31 @@ const FEED_TIP_STEPS: TipStep[] = [
   {
     id: 'party',
     title: "Who's coming?",
-    body: 'Ages 6+ on the pass. Kids 5 and under are free — pick your crew.',
+    body: 'Anyone 6 and up needs a spot on the pass. Kids 5 and under come free.',
     icon: '👥',
     afterPlaces: 9,
     variant: 'party',
   },
   {
     id: 'whatsapp',
-    title: 'Message for local prices',
-    body: 'WhatsApp places direct. You arrange the booking with them — we never take it.',
+    title: 'Contact them direct',
+    body: 'Like a place? Message them on WhatsApp or email — you sort the booking with them, not through us.',
     icon: '💬',
     afterPlaces: 12,
   },
   {
     id: 'qr',
-    title: 'Show QR for deals',
-    body: 'At the stall or door, open your pass QR. Staff scan it for passholder prices.',
+    title: 'One pass, every deal',
+    body: 'Buy one pass and you get the deals at every place on StikmNek — that can save you a lot on your holiday. Show your QR when you arrive; businesses check it’s valid, then give you the deal.',
     icon: '📱',
     afterPlaces: 15,
+    variant: 'qr',
   },
 ];
+
+/** Sample QR for the pass tip — same generator as real passes, demo payload only. */
+const TIP_SAMPLE_QR_URL =
+  'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STIKMNEK-SAMPLE-PASS&color=0d9488&bgcolor=ffffff&margin=10';
 
 const LENGTH_OPTIONS: { id: TripLength; label: string }[] = [
   { id: 'day', label: 'Day trip' },
@@ -128,6 +132,9 @@ const PARTY_OPTIONS: { n: number; label: string }[] = [
   { n: 4, label: 'Me + 3' },
   { n: 5, label: 'Family 5+' },
 ];
+
+/** Exact headcounts offered after choosing Family 5+. */
+const FAMILY_SIZE_OPTIONS = [5, 6, 7, 8, 10, 12] as const;
 
 const TEXT_SHADOW_SOFT = '0 2px 14px rgba(0,0,0,0.65), 0 1px 3px rgba(0,0,0,0.45)';
 const TEXT_SHADOW_STRONG = '0 2px 18px rgba(0,0,0,0.75), 0 1px 4px rgba(0,0,0,0.5)';
@@ -923,17 +930,53 @@ function TipCard({
 }) {
   const isParty = tip.variant === 'party';
   const isLength = tip.variant === 'length';
+  const isQr = tip.variant === 'qr';
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#F4F7F8]">
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-8 pb-20 pt-16">
         <div className="w-full max-w-[300px] text-center">
-          <div
-            className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-white text-[26px] leading-none ring-1 ring-[#0A1F2A]/[0.06]"
-            aria-hidden
-          >
-            {tip.icon}
-          </div>
+          {isQr ? (
+            <div className="mx-auto mb-5 w-[148px] rounded-2xl bg-white p-3 ring-1 ring-[#0A1F2A]/[0.08] shadow-sm">
+              <img
+                src={TIP_SAMPLE_QR_URL}
+                alt="Example StikmNek pass QR code"
+                className="h-[124px] w-[124px] mx-auto"
+                draggable={false}
+              />
+              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-[#8A9BA8]">
+                Your pass QR
+              </p>
+            </div>
+          ) : (
+            <div
+              className={`mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full ring-1 ${
+                tip.id === 'save'
+                  ? 'bg-[#0FB5B5]/10 ring-[#0FB5B5]/25'
+                  : 'bg-white text-[26px] leading-none ring-[#0A1F2A]/[0.06]'
+              }`}
+              aria-hidden
+            >
+              {tip.id === 'save' ? (
+                <span className="relative inline-flex h-7 w-7 items-center justify-center">
+                  <Heart
+                    className="h-7 w-7 text-[#0FB5B5]"
+                    strokeWidth={2.4}
+                    fill="none"
+                    aria-hidden
+                  />
+                  <Heart
+                    className="pointer-events-none absolute inset-0 m-auto h-7 w-7 text-[#0FB5B5] tip-heart-pulse"
+                    strokeWidth={0}
+                    fill="currentColor"
+                    aria-hidden
+                  />
+                </span>
+              ) : (
+                tip.icon
+              )}
+            </div>
+          )}
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0FB5B5] mb-2">
             Quick tip
           </p>
@@ -963,24 +1006,54 @@ function TipCard({
           )}
 
           {isParty && (
-            <div className="mt-6 grid grid-cols-2 gap-2">
-              {PARTY_OPTIONS.map((opt) => {
-                const selected = opt.n === 5 ? partySize >= 5 : partySize === opt.n;
-                return (
-                  <button
-                    key={opt.label}
-                    type="button"
-                    onClick={() => onPartySize(opt.n)}
-                    className={`min-h-11 rounded-xl text-sm font-semibold transition-colors ${
-                      selected
-                        ? 'bg-[#0FB5B5] text-white'
-                        : 'bg-white text-[#0A1F2A] ring-1 ring-[#0A1F2A]/[0.08] hover:bg-[#0A1F2A]/[0.03]'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
+            <div className="mt-6 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                {PARTY_OPTIONS.map((opt) => {
+                  const isFamily = opt.n === 5;
+                  const selected = isFamily ? partySize >= 5 : partySize === opt.n;
+                  return (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => onPartySize(isFamily && partySize < 5 ? 5 : isFamily ? partySize : opt.n)}
+                      className={`min-h-11 rounded-xl text-sm font-semibold transition-colors ${
+                        isFamily ? 'col-span-2' : ''
+                      } ${
+                        selected
+                          ? 'bg-[#0FB5B5] text-white'
+                          : 'bg-white text-[#0A1F2A] ring-1 ring-[#0A1F2A]/[0.08] hover:bg-[#0A1F2A]/[0.03]'
+                      }`}
+                    >
+                      {isFamily && partySize >= 5 ? `Family · ${partySize}` : opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {partySize >= 5 && (
+                <div className="rounded-2xl bg-white ring-1 ring-[#0A1F2A]/[0.06] px-3 py-3">
+                  <p className="text-[12px] font-semibold text-[#5A6D7A] mb-2">How many people (ages 6+)?</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {FAMILY_SIZE_OPTIONS.map((n) => {
+                      const selected = partySize === n;
+                      return (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => onPartySize(n)}
+                          className={`min-h-11 min-w-11 rounded-full text-sm font-semibold transition-colors ${
+                            selected
+                              ? 'bg-[#0FB5B5] text-white'
+                              : 'bg-[#F4F7F8] text-[#0A1F2A] ring-1 ring-[#0A1F2A]/[0.08] hover:bg-[#0A1F2A]/[0.04]'
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
