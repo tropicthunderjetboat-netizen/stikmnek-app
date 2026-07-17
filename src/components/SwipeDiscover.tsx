@@ -55,20 +55,17 @@ type TipStep = {
   icon: string;
   /** Insert this tip after this many place cards in the feed. */
   afterPlaces: number;
-  variant?: 'info' | 'party';
-  /** Bright illustration as full-bleed tip background. */
-  bgSrc: string;
+  variant?: 'info' | 'party' | 'length';
 };
 
-/** Bright Vanuatu illustrations (from docs/social-cards/scenes) — one job each. */
+/** Short how-to tips inserted between places — calm copy, no promo art. */
 const FEED_TIP_STEPS: TipStep[] = [
   {
     id: 'local',
     title: 'Real Vanuatu, real families',
-    body: 'Your trip supports grassroots businesses — markets, tours, cafes, and family-run spots.',
+    body: 'Your trip supports grassroots businesses — markets, tours, cafés, and family-run spots.',
     icon: '🌱',
     afterPlaces: 2,
-    bgSrc: '/tips/families.png',
   },
   {
     id: 'save',
@@ -76,33 +73,43 @@ const FEED_TIP_STEPS: TipStep[] = [
     body: 'Heart the places you love. Browse free — build your list as you go.',
     icon: '♥',
     afterPlaces: 5,
-    bgSrc: '/tips/save.png',
+  },
+  {
+    id: 'length',
+    title: 'How long are you staying?',
+    body: 'This helps us suggest the right pass — day trip or a longer holiday.',
+    icon: '📅',
+    afterPlaces: 7,
+    variant: 'length',
   },
   {
     id: 'party',
     title: "Who's coming?",
     body: 'Ages 6+ on the pass. Kids 5 and under are free — pick your crew.',
     icon: '👥',
-    afterPlaces: 8,
+    afterPlaces: 9,
     variant: 'party',
-    bgSrc: '/tips/party.png',
   },
   {
     id: 'whatsapp',
     title: 'Message for local prices',
     body: 'WhatsApp places direct. You arrange the booking with them — we never take it.',
     icon: '💬',
-    afterPlaces: 11,
-    bgSrc: '/tips/whatsapp.png',
+    afterPlaces: 12,
   },
   {
     id: 'qr',
     title: 'Show QR for deals',
     body: 'At the stall or door, open your pass QR. Staff scan it for passholder prices.',
     icon: '📱',
-    afterPlaces: 14,
-    bgSrc: '/tips/qr.png',
+    afterPlaces: 15,
   },
+];
+
+const LENGTH_OPTIONS: { id: TripLength; label: string }[] = [
+  { id: 'day', label: 'Day trip' },
+  { id: '2-4', label: '2–4 days' },
+  { id: '5-7', label: '5–7 days' },
 ];
 
 type FeedItem =
@@ -221,21 +228,13 @@ export default function SwipeDiscover() {
   const [reviewsBiz, setReviewsBiz] = useState<Business | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [vibe, setVibe] = useState<'length' | 'party' | null>(null);
   const [dragY, setDragY] = useState(0);
   const [showTapCoach, setShowTapCoach] = useState(() => !hasSeenTapHint());
   /** Session-only: welcome shows again every fresh visit / page load */
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [shuffleKey, setShuffleKey] = useState(0);
-  /** Session: first two place cards show a floating tip once. */
-  const [dismissedFloatHints, setDismissedFloatHints] = useState<Record<0 | 1, boolean>>({
-    0: false,
-    1: false,
-  });
   const touchStartY = useRef<number | null>(null);
   const preloaded = useRef<Set<string>>(new Set());
-  const lengthPrompted = useRef(false);
-  const partyPrompted = useRef(false);
   const lastWheelAt = useRef(0);
   /** Stable random order for this browser visit */
   const shuffleOrderRef = useRef<string[] | null>(null);
@@ -320,7 +319,6 @@ export default function SwipeDiscover() {
     setReviewsBiz(null);
     setSearchOpen(false);
     setSearchQuery('');
-    setVibe(null);
     setDragY(0);
     setWelcomeDismissed(false);
     setIndex(0);
@@ -338,19 +336,6 @@ export default function SwipeDiscover() {
     },
     [dismissTapCoach],
   );
-
-  useEffect(() => {
-    if (detail || paywallBiz || vibe) return;
-    if (!trip.vibeTripLengthDone && saveCount >= 2 && !lengthPrompted.current) {
-      lengthPrompted.current = true;
-      setVibe('length');
-      return;
-    }
-    if (!trip.vibePartyDone && saveCount >= 4 && !partyPrompted.current) {
-      partyPrompted.current = true;
-      setVibe('party');
-    }
-  }, [saveCount, trip.vibeTripLengthDone, trip.vibePartyDone, detail, paywallBiz, vibe]);
 
   useEffect(() => {
     for (let i = index; i < Math.min(index + 4, feed.length); i++) {
@@ -414,17 +399,12 @@ export default function SwipeDiscover() {
     [trip, persist, user, favorites, toggleFavorite],
   );
 
-  const setTripLength = (len: TripLength) => {
-    persist({ ...trip, tripLength: len, vibeTripLengthDone: true });
-    setVibe(null);
-  };
-
-  const setPartyQuick = (n: number) => {
-    const size = clampPartySize(n);
-    writePartySizeToStorage(size);
-    persist({ ...trip, paidPeople: size, vibePartyDone: true });
-    setVibe(null);
-  };
+  const setTripLengthFromTip = useCallback(
+    (len: TripLength) => {
+      persist({ ...trip, tripLength: len, vibeTripLengthDone: true });
+    },
+    [trip, persist],
+  );
 
   const setPartyFromTip = useCallback(
     (n: number) => {
@@ -499,7 +479,7 @@ export default function SwipeDiscover() {
   };
 
   const onWheel = (e: React.WheelEvent) => {
-    if (detail || paywallBiz || vibe || reviewsBiz || searchOpen) return;
+    if (detail || paywallBiz || reviewsBiz || searchOpen) return;
     const now = Date.now();
     if (now - lastWheelAt.current < 450) return;
     if (Math.abs(e.deltaY) < 40) return;
@@ -578,12 +558,6 @@ export default function SwipeDiscover() {
     setShowAuth(true);
   }, [user, setAuthMode, setShowAuth, setCurrentView, navigate, signOut]);
 
-  const dismissFloatHint = useCallback((which: 0 | 1) => {
-    setDismissedFloatHints((prev) => ({ ...prev, [which]: true }));
-  }, []);
-
-  const showSoftNudge = saveCount >= 5 && !trip.softNudgeDismissed && !hasPass;
-
   if (!dataLoaded) {
     return (
       <div className="fixed inset-0 z-40 bg-neutral-950 flex items-center justify-center">
@@ -612,10 +586,15 @@ export default function SwipeDiscover() {
 
   const isExtended = trip.tripLength === '2-4' || trip.tripLength === '5-7';
   const pricePreview = calculatePassPrice(clampPartySize(trip.paidPeople || 1), isExtended);
+  const lightChrome = current?.kind === 'tip' || current?.kind === 'end';
 
   return (
     <div className="fixed inset-0 z-40 bg-neutral-950 text-white overflow-hidden touch-none select-none">
-      <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black/25 to-transparent pointer-events-none">
+      <div
+        className={`absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 pointer-events-none ${
+          lightChrome ? 'bg-gradient-to-b from-[#F4F7F8] to-transparent' : 'bg-gradient-to-b from-black/25 to-transparent'
+        }`}
+      >
         <div className="pointer-events-auto">
           <button
             type="button"
@@ -623,8 +602,12 @@ export default function SwipeDiscover() {
             className="text-left rounded-lg active:opacity-80 -ml-1 px-1 py-0.5"
             aria-label="Back to home"
           >
-            <p className="text-sm font-bold tracking-tight">StikmNek</p>
-            <p className="text-[11px] text-neutral-300">Plan your Vanuatu trip</p>
+            <p className={`text-sm font-bold tracking-tight ${lightChrome ? 'text-[#0A1F2A]' : 'text-white'}`}>
+              StikmNek
+            </p>
+            <p className={`text-[11px] ${lightChrome ? 'text-[#5A6D7A]' : 'text-neutral-300'}`}>
+              Plan your Vanuatu trip
+            </p>
           </button>
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
@@ -635,7 +618,11 @@ export default function SwipeDiscover() {
                 const first = listings.find((b) => trip.savedPlaceIds.includes(b.id));
                 if (first) openDetail(first);
               }}
-              className="rounded-full bg-white/15 backdrop-blur px-3 py-1.5 text-xs font-semibold"
+              className={`rounded-full backdrop-blur px-3 py-1.5 text-xs font-semibold ${
+                lightChrome
+                  ? 'bg-[#0A1F2A]/[0.06] text-[#0A1F2A]'
+                  : 'bg-white/15 text-white'
+              }`}
               aria-label="Your trip"
             >
               ✈️ {saveCount}
@@ -644,10 +631,12 @@ export default function SwipeDiscover() {
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
-            className="rounded-full bg-white/15 backdrop-blur w-9 h-9 flex items-center justify-center"
+            className={`rounded-full backdrop-blur w-9 h-9 flex items-center justify-center ${
+              lightChrome ? 'bg-[#0A1F2A]/[0.06]' : 'bg-white/15'
+            }`}
             aria-label="Search places"
           >
-            <Search className="w-4 h-4 text-white" />
+            <Search className={`w-4 h-4 ${lightChrome ? 'text-[#0A1F2A]' : 'text-white'}`} />
           </button>
           {hasPass && (
             <button
@@ -661,20 +650,6 @@ export default function SwipeDiscover() {
           )}
         </div>
       </div>
-
-      {showSoftNudge && !searchOpen && (
-        <div className="absolute top-14 inset-x-3 z-30 rounded-xl bg-teal-600 text-white text-sm px-3 py-2.5 flex items-start gap-2 shadow-lg">
-          <p className="flex-1 leading-snug">Trip looking good 👍 Message these places with a pass.</p>
-          <button
-            type="button"
-            className="shrink-0 text-white/80 text-lg leading-none px-1"
-            aria-label="Dismiss"
-            onClick={() => persist({ ...trip, softNudgeDismissed: true })}
-          >
-            ×
-          </button>
-        </div>
-      )}
 
       <div
         className="absolute inset-0"
@@ -701,7 +676,9 @@ export default function SwipeDiscover() {
           <TipCard
             tip={current.tip}
             partySize={clampPartySize(trip.paidPeople || 1)}
+            tripLength={trip.tripLength}
             onPartySize={setPartyFromTip}
+            onTripLength={setTripLengthFromTip}
             onContinue={goNext}
           />
         )}
@@ -720,15 +697,8 @@ export default function SwipeDiscover() {
             saved={isSaved(current.business)}
             reviewCount={reviewsForBusiness(dbReviews, current.business).length || current.business.reviewCount || 0}
             rating={current.business.rating || 0}
-            showTapCoach={showTapCoach && !detail && !vibe && !paywallBiz && !reviewsBiz && !searchOpen}
+            showTapCoach={showTapCoach && !detail && !paywallBiz && !reviewsBiz && !searchOpen}
             onDismissCoach={dismissTapCoach}
-            floatHint={(() => {
-              const placeIdx = feed.slice(0, index).filter((i) => i.kind === 'place').length;
-              if (placeIdx === 0 && !dismissedFloatHints[0]) return 'swipe' as const;
-              if (placeIdx === 1 && !dismissedFloatHints[1]) return 'heart' as const;
-              return null;
-            })()}
-            onDismissFloatHint={dismissFloatHint}
             onHeart={() => void heartPlace(current.business)}
             onOpen={() => openDetail(current.business)}
             onReviews={() => setReviewsBiz(current.business)}
@@ -737,47 +707,7 @@ export default function SwipeDiscover() {
         )}
       </div>
 
-      {vibe === 'length' && (
-        <div className="absolute inset-0 z-50">
-          <VibeShell title="Quick one ✋" subtitle="How long are you in Vanuatu?">
-            {(
-              [
-                ['day', 'Day trip'],
-                ['2-4', '2–4 days'],
-                ['5-7', '5–7 days'],
-              ] as const
-            ).map(([id, label]) => (
-              <VibeButton key={id} onClick={() => setTripLength(id)}>
-                {label}
-              </VibeButton>
-            ))}
-          </VibeShell>
-        </div>
-      )}
-      {vibe === 'party' && (
-        <div className="absolute inset-0 z-50">
-          <VibeShell title="Who’s with you?" subtitle="Ages 6+ on the pass. Kids 5 and under free.">
-            <VibeButton onClick={() => setPartyQuick(1)}>Just me</VibeButton>
-            <VibeButton onClick={() => setPartyQuick(2)}>Me + 1</VibeButton>
-            <VibeButton onClick={() => setPartyQuick(3)}>Me + 2</VibeButton>
-            <VibeButton onClick={() => setPartyQuick(4)}>Family / group (4)</VibeButton>
-            <div className="flex flex-wrap gap-2 justify-center pt-2">
-              {[5, 6, 8, 10].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPartyQuick(n)}
-                  className="min-h-11 min-w-11 rounded-full bg-white/10 text-sm font-semibold hover:bg-teal-600 transition-colors"
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </VibeShell>
-        </div>
-      )}
-
-      {savedBusinesses.length > 0 && !detail && !paywallBiz && !vibe && !reviewsBiz && !searchOpen && current?.kind === 'place' && (
+      {savedBusinesses.length > 0 && !detail && !paywallBiz && !reviewsBiz && !searchOpen && current?.kind === 'place' && (
         <div
           className="absolute bottom-0 inset-x-0 z-20 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 pointer-events-none"
           style={{
@@ -979,50 +909,61 @@ function WelcomeCard({
 function TipCard({
   tip,
   partySize,
+  tripLength,
   onPartySize,
+  onTripLength,
   onContinue,
 }: {
   tip: TipStep;
   partySize: number;
+  tripLength: TripLength | null;
   onPartySize: (n: number) => void;
+  onTripLength: (len: TripLength) => void;
   onContinue: () => void;
 }) {
   const isParty = tip.variant === 'party';
+  const isLength = tip.variant === 'length';
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <img
-        src={tip.bgSrc}
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover"
-        draggable={false}
-      />
-      {/* Tiny soft vignette only — keep illustration sunny */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'linear-gradient(180deg, rgba(0,0,0,0.06) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.12) 100%)',
-        }}
-      />
-
-      <div className="relative z-10 h-full flex flex-col items-center justify-center px-5 pb-16">
-        <div
-          className="w-full max-w-[320px] rounded-[24px] border border-white/70 shadow-xl shadow-black/10 px-5 py-6 text-center"
-          style={{
-            background: 'rgba(255,255,255,0.92)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-          }}
-        >
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#0FB5B5] text-[22px] leading-none text-white shadow-md shadow-teal-500/25">
+    <div className="relative h-full w-full overflow-hidden bg-[#F4F7F8]">
+      <div className="relative z-10 h-full flex flex-col items-center justify-center px-8 pb-20 pt-16">
+        <div className="w-full max-w-[300px] text-center">
+          <div
+            className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-white text-[26px] leading-none ring-1 ring-[#0A1F2A]/[0.06]"
+            aria-hidden
+          >
             {tip.icon}
           </div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0FB5B5] mb-2">
+            Quick tip
+          </p>
           <h2 className="text-[22px] font-bold text-[#0A1F2A] leading-tight">{tip.title}</h2>
-          <p className="mt-2 text-[15px] text-[#5A6D7A] leading-relaxed">{tip.body}</p>
+          <p className="mt-3 text-[15px] text-[#5A6D7A] leading-relaxed">{tip.body}</p>
+
+          {isLength && (
+            <div className="mt-6 flex flex-col gap-2">
+              {LENGTH_OPTIONS.map((opt) => {
+                const selected = tripLength === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => onTripLength(opt.id)}
+                    className={`min-h-11 rounded-xl text-sm font-semibold transition-colors ${
+                      selected
+                        ? 'bg-[#0FB5B5] text-white'
+                        : 'bg-white text-[#0A1F2A] ring-1 ring-[#0A1F2A]/[0.08] hover:bg-[#0A1F2A]/[0.03]'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {isParty && (
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-6 grid grid-cols-2 gap-2">
               {PARTY_OPTIONS.map((opt) => {
                 const selected = opt.n === 5 ? partySize >= 5 : partySize === opt.n;
                 return (
@@ -1033,7 +974,7 @@ function TipCard({
                     className={`min-h-11 rounded-xl text-sm font-semibold transition-colors ${
                       selected
                         ? 'bg-[#0FB5B5] text-white'
-                        : 'bg-[#0A1F2A]/[0.05] text-[#0A1F2A] hover:bg-[#0A1F2A]/[0.08]'
+                        : 'bg-white text-[#0A1F2A] ring-1 ring-[#0A1F2A]/[0.08] hover:bg-[#0A1F2A]/[0.03]'
                     }`}
                   >
                     {opt.label}
@@ -1046,12 +987,11 @@ function TipCard({
           <button
             type="button"
             onClick={onContinue}
-            className="mt-5 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base active:scale-[0.98] transition-transform"
-            style={{ boxShadow: '0 4px 20px rgba(15,181,181,0.35)' }}
+            className="mt-8 w-full min-h-12 rounded-2xl bg-[#0A1F2A] text-white font-semibold text-[15px] active:scale-[0.98] transition-transform"
           >
-            Keep exploring
+            Got it
           </button>
-          <p className="mt-2 text-[12px] text-[#5A6D7A]">Or swipe up</p>
+          <p className="mt-3 text-[12px] text-[#8A9BA8]">Or swipe up to continue</p>
         </div>
       </div>
     </div>
@@ -1072,61 +1012,36 @@ function EndCard({
   onGetPass: () => void;
 }) {
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <img
-        src="/tips/families.png"
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover"
-        style={{ filter: 'brightness(1.08) saturate(1.1)' }}
-        draggable={false}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'linear-gradient(180deg, rgba(0,0,0,0.08) 0%, transparent 40%, rgba(0,0,0,0.22) 100%)',
-        }}
-      />
-
-      <div className="relative z-10 h-full flex flex-col justify-end px-6 pb-28">
-        <div
-          className="max-w-sm mx-auto w-full space-y-4 text-center rounded-[24px] border border-white/70 px-5 py-6 shadow-xl"
-          style={{
-            background: 'rgba(255,255,255,0.92)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-          }}
-        >
-          <div className="flex justify-center">
-            <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-md ring-2 ring-white bg-white">
-              <img
-                src={APP_ICON}
-                alt="StikmNek"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            </div>
+    <div className="relative h-full w-full overflow-hidden bg-[#F4F7F8]">
+      <div className="relative z-10 h-full flex flex-col items-center justify-center px-8 pb-24 pt-16">
+        <div className="w-full max-w-[300px] text-center space-y-4">
+          <div className="mx-auto w-12 h-12 rounded-2xl overflow-hidden ring-1 ring-[#0A1F2A]/[0.08] bg-white">
+            <img
+              src={APP_ICON}
+              alt=""
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
           </div>
-          <h2 className="text-2xl font-bold text-[#0A1F2A]">You’ve seen the best bits</h2>
+          <h2 className="text-[22px] font-bold text-[#0A1F2A] leading-tight">You’ve seen the best bits</h2>
           <p className="text-[15px] text-[#5A6D7A] leading-relaxed">
             {savedCount > 0
-              ? `${savedCount} place${savedCount === 1 ? '' : 's'} on your trip. Keep exploring or unlock WhatsApp.`
+              ? `${savedCount} place${savedCount === 1 ? '' : 's'} on your trip. Shuffle for more, or unlock WhatsApp with a pass.`
               : 'Swipe again anytime — or get a pass to message places direct.'}
           </p>
 
           {!hasPass && (
-            <div className="rounded-2xl bg-[#0FB5B5]/10 border border-[#0FB5B5]/25 px-4 py-3.5 text-left">
-              <p className="text-sm font-bold text-[#0A1F2A]">Don’t forget your pass</p>
+            <div className="rounded-2xl bg-white ring-1 ring-[#0A1F2A]/[0.06] px-4 py-3.5 text-left">
+              <p className="text-sm font-semibold text-[#0A1F2A]">Need WhatsApp access?</p>
               <p className="mt-1 text-[13px] text-[#5A6D7A] leading-snug">
-                A pass unlocks WhatsApp so you can message these places and lock in dates.
+                A pass lets you message these places and lock in dates.
               </p>
               <button
                 type="button"
                 onClick={onGetPass}
-                className="mt-3 w-full min-h-11 rounded-xl bg-[#0FB5B5] text-white font-bold text-sm border-2 border-white"
-                style={{ boxShadow: '0 4px 16px rgba(15,181,181,0.35)' }}
+                className="mt-3 w-full min-h-11 rounded-xl bg-[#0FB5B5] text-white font-semibold text-sm"
               >
                 {passLabel}
               </button>
@@ -1136,11 +1051,11 @@ function EndCard({
           <button
             type="button"
             onClick={onBrowseAgain}
-            className="w-full min-h-12 rounded-2xl bg-[#0A1F2A]/[0.06] text-[#0A1F2A] font-bold text-sm active:scale-[0.98] transition-transform"
+            className="w-full min-h-12 rounded-2xl bg-[#0A1F2A] text-white font-semibold text-[15px] active:scale-[0.98] transition-transform"
           >
             Shuffle &amp; browse again
           </button>
-          <p className="text-[11px] text-[#5A6D7A]">Or swipe up to continue</p>
+          <p className="text-[12px] text-[#8A9BA8]">Or swipe up to continue</p>
         </div>
       </div>
     </div>
@@ -1154,8 +1069,6 @@ function PlaceCard({
   rating,
   showTapCoach,
   onDismissCoach,
-  floatHint,
-  onDismissFloatHint,
   onHeart,
   onOpen,
   onReviews,
@@ -1167,27 +1080,11 @@ function PlaceCard({
   rating: number;
   showTapCoach: boolean;
   onDismissCoach: () => void;
-  floatHint: 'swipe' | 'heart' | null;
-  onDismissFloatHint: (which: 0 | 1) => void;
   onHeart: () => void;
   onOpen: () => void;
   onReviews: () => void;
   onNext: () => void;
 }) {
-  useEffect(() => {
-    if (!floatHint) return;
-    const which: 0 | 1 = floatHint === 'swipe' ? 0 : 1;
-    const t = window.setTimeout(() => onDismissFloatHint(which), 3000);
-    return () => window.clearTimeout(t);
-  }, [floatHint, onDismissFloatHint]);
-
-  const floatHintText =
-    floatHint === 'swipe'
-      ? 'Swipe up for the next place'
-      : floatHint === 'heart'
-        ? 'Tap ♥ to save this place'
-        : null;
-
   return (
     <div className="relative h-full w-full">
       <button
@@ -1205,14 +1102,6 @@ function PlaceCard({
           }}
         />
       </button>
-
-      {floatHintText && (
-        <div className="absolute top-[max(4.5rem,calc(env(safe-area-inset-top)+3.5rem))] inset-x-0 z-20 flex justify-center px-6 pointer-events-none">
-          <div className="rounded-full bg-white/92 backdrop-blur-md border border-white/80 px-4 py-2.5 shadow-lg">
-            <p className="text-sm font-semibold text-[#0A1F2A] text-center leading-snug">{floatHintText}</p>
-          </div>
-        </div>
-      )}
 
       <div className="absolute bottom-24 left-4 right-24 z-10">
         <button type="button" onClick={onOpen} className="text-left pointer-events-auto group">
@@ -1269,9 +1158,7 @@ function PlaceCard({
             e.stopPropagation();
             onHeart();
           }}
-          className={`w-16 h-16 rounded-full flex items-center justify-center active:scale-95 transition-transform shadow-lg ${
-            floatHint === 'heart' ? 'ring-2 ring-[#0FB5B5] ring-offset-2 ring-offset-transparent' : ''
-          }`}
+          className="w-16 h-16 rounded-full flex items-center justify-center active:scale-95 transition-transform shadow-lg"
           style={{ background: 'rgba(255,255,255,0.92)' }}
           aria-label={saved ? 'Remove from trip' : 'Save to trip'}
         >
@@ -1317,36 +1204,6 @@ function PlaceCard({
         </button>
       </div>
     </div>
-  );
-}
-
-function VibeShell({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="h-full w-full flex flex-col items-center justify-center px-6 bg-gradient-to-b from-neutral-900 to-neutral-950">
-      <h2 className="text-2xl font-bold text-center mb-2">{title}</h2>
-      <p className="text-neutral-400 text-center text-sm mb-8 max-w-xs">{subtitle}</p>
-      <div className="w-full max-w-sm flex flex-col gap-3">{children}</div>
-    </div>
-  );
-}
-
-function VibeButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full min-h-14 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white text-base font-semibold px-4 transition-colors active:scale-[0.98]"
-    >
-      {children}
-    </button>
   );
 }
 
