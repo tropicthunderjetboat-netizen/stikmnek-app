@@ -706,6 +706,18 @@ export default function SwipeDiscover() {
           </div>
         </div>
 
+        {/* Map toggle sits under header actions, above category pills — clears bottom CTA zone */}
+        {!searchOpen && !detail && !paywallBiz && !reviewsBiz && (
+          <div className="pointer-events-none flex justify-end px-4 pb-1">
+            <MapToggleFab
+              isMapMode={isMapMode}
+              onToggle={toggleMapMode}
+              language={language}
+              light={lightChrome}
+            />
+          </div>
+        )}
+
         {!searchOpen && !detail && !paywallBiz && !reviewsBiz && (
           <HomeCategoryPills
             value={feedCategory}
@@ -718,7 +730,7 @@ export default function SwipeDiscover() {
 
       {isMapMode ? (
         <div
-          className="absolute inset-0 z-[5] flex flex-col bg-white pt-[7.5rem] touch-auto"
+          className="absolute inset-0 z-[5] flex flex-col bg-white pt-[9rem] touch-auto"
           style={{ paddingBottom: 0 }}
         >
           <Suspense
@@ -888,18 +900,6 @@ export default function SwipeDiscover() {
           }}
         />
       )}
-
-      <MapToggleFab
-        isMapMode={isMapMode}
-        onToggle={toggleMapMode}
-        language={language}
-        hidden={Boolean(detail || paywallBiz || reviewsBiz || searchOpen)}
-        liftForTripStrip={
-          !isMapMode &&
-          savedBusinesses.length > 0 &&
-          current?.kind === 'place'
-        }
-      />
     </div>
   );
 }
@@ -1281,116 +1281,120 @@ function PlaceCard({
         />
       </button>
 
-      {/* Typography + actions — feed already clears BottomNav via --hub-nav-offset */}
+      {/* Bottom-right interaction stack (Heart → Reviews) */}
+      <div
+        className={`pointer-events-auto absolute right-4 z-20 flex flex-col items-center gap-3 ${
+          reserveTripStrip ? 'bottom-[8.5rem]' : 'bottom-[5.25rem]'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onHeart();
+          }}
+          className={`flex h-14 w-14 items-center justify-center rounded-full active:scale-95 transition-transform shadow-lg ${
+            saved
+              ? 'bg-[#FF6B6B] text-white'
+              : 'bg-white/20 text-white backdrop-blur-md ring-2 ring-white/70'
+          }`}
+          aria-label={saved ? 'Remove from trip' : 'Save to trip'}
+          aria-pressed={saved}
+        >
+          <Heart
+            className={`w-7 h-7 ${saved ? 'fill-white text-white' : 'fill-none text-white'}`}
+            strokeWidth={2.25}
+          />
+        </button>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onReviews();
+          }}
+          className="flex flex-col items-center gap-0.5 active:scale-95 transition-transform"
+          aria-label={`Reviews for ${business.name}`}
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-md ring-1 ring-white/50 shadow-md">
+            <Star className="h-[18px] w-[18px] text-amber-300 fill-amber-300" />
+          </span>
+          <span
+            className="max-w-[3.5rem] truncate text-center text-[10px] font-semibold text-white"
+            style={{ textShadow: TEXT_SHADOW_SOFT }}
+          >
+            {rating > 0 ? rating.toFixed(1) : 'Reviews'}
+          </span>
+        </button>
+      </div>
+
+      {/* Typography + CTAs — feed already clears BottomNav via --hub-nav-offset */}
       <div
         className={`absolute inset-x-0 bottom-0 z-10 flex flex-col gap-3 px-4 pt-16 pointer-events-none ${
           reserveTripStrip ? 'pb-[4.75rem]' : 'pb-4'
         }`}
       >
-        <div className="flex items-end gap-3">
-          {/* Left: info hierarchy */}
-          <div className="min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={onOpen}
-              className={`pointer-events-auto text-left group ${
-                showTapCoach ? 'ring-2 ring-teal-400/80 ring-offset-2 ring-offset-transparent rounded-md' : ''
-              }`}
+        {/* Left info column — leave room for right action stack */}
+        <div className="min-w-0 pr-[4.5rem]">
+          <button
+            type="button"
+            onClick={onOpen}
+            className={`pointer-events-auto text-left group block w-full ${
+              showTapCoach ? 'ring-2 ring-teal-400/80 ring-offset-2 ring-offset-transparent rounded-md' : ''
+            }`}
+          >
+            <h2
+              className="line-clamp-2 text-xl sm:text-2xl font-bold leading-tight text-white tracking-tight"
+              style={{ textShadow: TEXT_SHADOW_STRONG }}
             >
-              <h2
-                className="text-xl sm:text-2xl font-bold leading-tight text-white tracking-tight"
-                style={{ textShadow: TEXT_SHADOW_STRONG }}
-              >
-                {business.name}
-              </h2>
-            </button>
+              {business.name}
+            </h2>
+          </button>
 
+          {/* Discount on its own row — never overlaps the title */}
+          <div className="mt-2">
             <span
-              className="mt-2 inline-block max-w-full truncate rounded-md bg-emerald-400 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wide text-neutral-950 pointer-events-none border border-white/80"
+              className="inline-block max-w-full truncate rounded-md bg-emerald-400 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wide text-neutral-950 pointer-events-none border border-white/80"
               style={{ boxShadow: '0 2px 12px rgba(16,185,129,0.45)' }}
             >
               {dealPillText(business)}
             </span>
+          </div>
 
-            {locationLine ? (
-              <p
-                className="mt-2 text-sm text-white/95 flex items-center gap-1.5 pointer-events-none truncate"
-                style={{ textShadow: TEXT_SHADOW_SOFT }}
-              >
-                <MapPin className="w-3.5 h-3.5 shrink-0 opacity-90" aria-hidden />
-                <span className="truncate">{locationLine}</span>
-              </p>
-            ) : null}
+          {locationLine ? (
+            <p
+              className="mt-2 text-sm text-white/95 flex items-center gap-1.5 pointer-events-none truncate"
+              style={{ textShadow: TEXT_SHADOW_SOFT }}
+            >
+              <MapPin className="w-3.5 h-3.5 shrink-0 opacity-90" aria-hidden />
+              <span className="truncate">{locationLine}</span>
+            </p>
+          ) : null}
 
-            {showTapCoach && (
-              <div className="mt-3 pointer-events-auto relative max-w-[14rem]">
-                <div className="absolute -top-1.5 left-6 w-3 h-3 bg-white rotate-45" />
-                <div className="relative rounded-2xl bg-white text-neutral-900 px-3 py-2.5 shadow-lg">
-                  <p className="text-xs font-semibold leading-snug">
-                    Tap the name to see photos &amp; more about this place
-                  </p>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDismissCoach();
-                    }}
-                    className="mt-1.5 text-[11px] font-bold text-teal-700"
-                  >
-                    Got it
-                  </button>
-                </div>
+          {showTapCoach && (
+            <div className="mt-3 pointer-events-auto relative max-w-[14rem]">
+              <div className="absolute -top-1.5 left-6 w-3 h-3 bg-white rotate-45" />
+              <div className="relative rounded-2xl bg-white text-neutral-900 px-3 py-2.5 shadow-lg">
+                <p className="text-xs font-semibold leading-snug">
+                  Tap the name to see photos &amp; more about this place
+                </p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDismissCoach();
+                  }}
+                  className="mt-1.5 text-[11px] font-bold text-teal-700"
+                >
+                  Got it
+                </button>
               </div>
-            )}
-          </div>
-
-          {/* Right rail: Heart + reviews */}
-          <div className="pointer-events-auto flex shrink-0 flex-col items-center gap-3 pb-0.5">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onHeart();
-              }}
-              className={`flex h-14 w-14 items-center justify-center rounded-full active:scale-95 transition-transform shadow-lg ${
-                saved
-                  ? 'bg-[#FF6B6B] text-white'
-                  : 'bg-white/20 text-white backdrop-blur-md ring-2 ring-white/70'
-              }`}
-              aria-label={saved ? 'Remove from trip' : 'Save to trip'}
-              aria-pressed={saved}
-            >
-              <Heart
-                className={`w-7 h-7 ${saved ? 'fill-white text-white' : 'fill-none text-white'}`}
-                strokeWidth={2.25}
-              />
-            </button>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onReviews();
-              }}
-              className="flex flex-col items-center gap-0.5 active:scale-95 transition-transform"
-              aria-label={`Reviews for ${business.name}`}
-            >
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 backdrop-blur-md ring-1 ring-white/50 shadow-md">
-                <Star className="w-5 h-5 text-amber-300 fill-amber-300" />
-              </span>
-              <span
-                className="text-[10px] font-semibold text-white"
-                style={{ textShadow: TEXT_SHADOW_SOFT }}
-              >
-                {rating > 0 ? rating.toFixed(1) : 'Reviews'}
-                {reviewCount > 0 ? ` · ${reviewCount}` : ''}
-              </span>
-            </button>
-          </div>
+            </div>
+          )}
         </div>
 
-        {/* Thumb-zone primary CTA + next */}
-        <div className="pointer-events-auto flex items-center gap-2">
+        {/* Thumb-zone: View Deal + icon-only Next */}
+        <div className="pointer-events-auto flex items-center gap-2 pr-0">
           <button
             type="button"
             onClick={(e) => {
@@ -1408,10 +1412,10 @@ function PlaceCard({
               e.stopPropagation();
               onNext();
             }}
-            className="min-h-12 shrink-0 rounded-2xl bg-white/20 px-3.5 text-xs font-semibold text-white backdrop-blur-md ring-1 ring-white/40 active:scale-95 transition-transform"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-lg font-bold leading-none text-white backdrop-blur-md ring-1 ring-white/40 active:scale-95 transition-transform"
             aria-label="Next place"
           >
-            Next ↑
+            ↑
           </button>
         </div>
       </div>
