@@ -22,6 +22,7 @@ import {
 } from '@/data/pricing';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
+import { loadTripState, tripLengthToIsExtended } from '@/lib/tripStorage';
 import CheckoutPricingSummary from '@/components/CheckoutPricingSummary';
 import { loadPayPalButtonsSdk, renderPayPalCheckoutButtons, type PayPalSdkNamespace } from '@/lib/paypalSdk';
 import { t } from '@/data/translations';
@@ -229,7 +230,7 @@ const CardBrandIcon: React.FC<{ brand: string; className?: string }> = ({ brand,
 
 const PaymentCheckout: React.FC = () => {
   const navigate = useNavigate();
-  const { user, userProfile, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass, language } =
+  const { user, userProfile, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass, refreshUserProfile, language } =
     useAppContext();
   const checkoutLang: Language = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
   const [processing, setProcessing] = useState(false);
@@ -341,6 +342,74 @@ const PaymentCheckout: React.FC = () => {
   );
   const [showPartyEditor, setShowPartyEditor] = useState(false);
 
+  // Traveller details deferred from hub browsing — collected here at checkout.
+  const [travellerName, setTravellerName] = useState('');
+  const [travellerWhatsapp, setTravellerWhatsapp] = useState('');
+  const [travellerResort, setTravellerResort] = useState('');
+  const [travellerErrors, setTravellerErrors] = useState<{ name?: string; whatsapp?: string; resort?: string }>({});
+  const [savingTraveller, setSavingTraveller] = useState(false);
+
+  useEffect(() => {
+    const name =
+      (userProfile?.full_name || userProfile?.name || userProfile?.display_name || user?.name || '').trim();
+    const wa = (userProfile?.whatsapp_number || userProfile?.phone || '').trim();
+    const resort = (userProfile?.resort_name || '').trim();
+    setTravellerName((prev) => prev || name);
+    setTravellerWhatsapp((prev) => prev || wa);
+    setTravellerResort((prev) => prev || resort);
+  }, [userProfile, user?.name]);
+
+  const showTravellerDetails = user?.type === 'tourist';
+
+  const saveTravellerDetailsIfNeeded = async (): Promise<boolean> => {
+    if (user?.type !== 'tourist' || !user?.id) return true;
+
+    const nameTrim = travellerName.trim();
+    const waTrim = travellerWhatsapp.trim();
+    const resortTrim = travellerResort.trim();
+    const errs: { name?: string; whatsapp?: string; resort?: string } = {};
+    if (!nameTrim) errs.name = 'Enter your name';
+    if (!waTrim) errs.whatsapp = 'Enter a WhatsApp number';
+    if (!resortTrim) errs.resort = 'Enter your resort or accommodation';
+    if (Object.keys(errs).length) {
+      setTravellerErrors(errs);
+      toast.error('Add your name, WhatsApp, and resort to continue');
+      return false;
+    }
+    setTravellerErrors({});
+
+    const alreadySaved =
+      (userProfile?.full_name || userProfile?.name || userProfile?.display_name || '').trim() === nameTrim &&
+      (userProfile?.whatsapp_number || '').trim() === waTrim &&
+      (userProfile?.resort_name || '').trim() === resortTrim;
+    if (alreadySaved) return true;
+
+    setSavingTraveller(true);
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          name: nameTrim,
+          full_name: nameTrim,
+          display_name: nameTrim,
+          whatsapp_number: waTrim,
+          preferred_contact_method: 'whatsapp',
+          resort_name: resortTrim,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id);
+      if (error) throw error;
+      await refreshUserProfile();
+      return true;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Could not save your details';
+      toast.error(msg);
+      return false;
+    } finally {
+      setSavingTraveller(false);
+    }
+  };
+
   const paySessionRef = useRef({
     startDate,
     partySize,
@@ -386,25 +455,37 @@ const PaymentCheckout: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!cart || !userProfile || profileCheckoutSyncedRef.current || checkoutTouchedRef.current) return;
+    if (!cart || profileCheckoutSyncedRef.current || checkoutTouchedRef.current) return;
 
     let nextParty = cart.partySize;
     let nextExtended = cart.isExtended;
 
-    const adults = userProfile.num_adults ?? 0;
-    const children = userProfile.num_children ?? 0;
-    const combined = adults + children;
-    if (combined > 0) {
-      nextParty = clampPartySize(combined);
-    } else if (
-      userProfile.party_size != null &&
-      Number.isFinite(Number(userProfile.party_size)) &&
-      Number(userProfile.party_size) >= 1
-    ) {
-      nextParty = clampPartySize(Number(userProfile.party_size));
+    const trip = loadTripState();
+    // Prefer in-feed tip-card selections over profile demographics.
+    if (trip.vibePartyDone) {
+      nextParty = clampPartySize(trip.paidPeople || 1);
+    } else if (userProfile) {
+      const adults = userProfile.num_adults ?? 0;
+      const children = userProfile.num_children ?? 0;
+      const combined = adults + children;
+      if (combined > 0) {
+        nextParty = clampPartySize(combined);
+      } else if (
+        userProfile.party_size != null &&
+        Number.isFinite(Number(userProfile.party_size)) &&
+        Number(userProfile.party_size) >= 1
+      ) {
+        nextParty = clampPartySize(Number(userProfile.party_size));
+      }
     }
 
-    if (userProfile.preferred_pass_duration !== 'short' && inferIsExtendedPassFromTripDates(userProfile)) {
+    if (trip.vibeTripLengthDone && trip.tripLength) {
+      nextExtended = tripLengthToIsExtended(trip.tripLength);
+    } else if (
+      userProfile &&
+      userProfile.preferred_pass_duration !== 'short' &&
+      inferIsExtendedPassFromTripDates(userProfile)
+    ) {
       nextExtended = true;
     }
 
@@ -1287,6 +1368,78 @@ const PaymentCheckout: React.FC = () => {
               ) : null}
             </div>
 
+            {showTravellerDetails ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-semibold">Your details</p>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">
+                    So places can confirm bookings with you
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-1.5" htmlFor="checkout-name">
+                    Name
+                  </label>
+                  <input
+                    id="checkout-name"
+                    type="text"
+                    autoComplete="name"
+                    value={travellerName}
+                    onChange={(e) => {
+                      setTravellerName(e.target.value);
+                      setTravellerErrors((p) => ({ ...p, name: undefined }));
+                    }}
+                    placeholder="e.g. Jane Smith"
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 placeholder:text-neutral-600"
+                  />
+                  {travellerErrors.name ? (
+                    <p className="text-xs text-amber-300 mt-1">{travellerErrors.name}</p>
+                  ) : null}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-1.5" htmlFor="checkout-whatsapp">
+                    WhatsApp
+                  </label>
+                  <input
+                    id="checkout-whatsapp"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={travellerWhatsapp}
+                    onChange={(e) => {
+                      setTravellerWhatsapp(e.target.value);
+                      setTravellerErrors((p) => ({ ...p, whatsapp: undefined }));
+                    }}
+                    placeholder="e.g. +678 12345"
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 placeholder:text-neutral-600"
+                  />
+                  {travellerErrors.whatsapp ? (
+                    <p className="text-xs text-amber-300 mt-1">{travellerErrors.whatsapp}</p>
+                  ) : null}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-400 mb-1.5" htmlFor="checkout-resort">
+                    Resort / accommodation
+                  </label>
+                  <input
+                    id="checkout-resort"
+                    type="text"
+                    autoComplete="organization"
+                    value={travellerResort}
+                    onChange={(e) => {
+                      setTravellerResort(e.target.value);
+                      setTravellerErrors((p) => ({ ...p, resort: undefined }));
+                    }}
+                    placeholder="Where are you staying?"
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/15 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 placeholder:text-neutral-600"
+                  />
+                  {travellerErrors.resort ? (
+                    <p className="text-xs text-amber-300 mt-1">{travellerErrors.resort}</p>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
             {showGroupSizeWarning ? (
               <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
                 Max {MAX_PARTY_SIZE} people per pass. Need more? Buy a second pass after this one.
@@ -1295,18 +1448,23 @@ const PaymentCheckout: React.FC = () => {
 
             <button
               type="button"
+              disabled={savingTraveller}
               onClick={() => {
-                syncPaySessionRef({
-                  startDate,
-                  partySize,
-                  cartPartySize: cart?.partySize,
-                  isExtended,
-                });
-                setStep('payment');
+                void (async () => {
+                  const ok = await saveTravellerDetailsIfNeeded();
+                  if (!ok) return;
+                  syncPaySessionRef({
+                    startDate,
+                    partySize,
+                    cartPartySize: cart?.partySize,
+                    isExtended,
+                  });
+                  setStep('payment');
+                })();
               }}
-              className="w-full min-h-12 rounded-xl bg-teal-500 hover:bg-teal-400 text-white font-bold text-base active:scale-[0.99] transition-transform"
+              className="w-full min-h-12 rounded-xl bg-teal-500 hover:bg-teal-400 text-white font-bold text-base active:scale-[0.99] transition-transform disabled:opacity-60"
             >
-              Continue · A${priceAud.toFixed(2)}
+              {savingTraveller ? 'Saving…' : `Continue · A$${priceAud.toFixed(2)}`}
             </button>
             <p className="text-center text-[11px] text-neutral-500">Receipt to {user.email}</p>
           </div>

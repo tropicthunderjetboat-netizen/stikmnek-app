@@ -1776,11 +1776,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch {
         authMeta = null;
       }
+      const { checkoutFromTrip, loadTripState } = await import('@/lib/tripStorage');
+      const trip = loadTripState();
+      const fromTrip = checkoutFromTrip(trip);
       const defaults = defaultPassCartFromProfile(userProfile, authMeta);
+      // Prefer in-feed tip-card party size / trip length over profile defaults when set.
       const nextCart = {
-        ...defaults,
-        ...(opts?.isExtended !== undefined ? { isExtended: opts.isExtended } : {}),
-        ...(opts?.partySize !== undefined ? { partySize: clampPartySize(opts.partySize) } : {}),
+        partySize:
+          opts?.partySize !== undefined
+            ? clampPartySize(opts.partySize)
+            : trip.vibePartyDone
+              ? fromTrip.partySize
+              : defaults.partySize,
+        isExtended:
+          opts?.isExtended !== undefined
+            ? opts.isExtended
+            : trip.vibeTripLengthDone
+              ? fromTrip.isExtended
+              : defaults.isExtended,
       };
       setCart(nextCart);
       setCurrentView('checkout');

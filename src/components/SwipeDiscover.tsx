@@ -68,15 +68,15 @@ type TipStep = {
 const FEED_TIP_STEPS: TipStep[] = [
   {
     id: 'local',
-    title: 'These are local businesses',
-    body: 'Family-run tours, markets, cafés, and little spots around Vanuatu — your visit helps them out.',
+    title: 'Grassroots & Family-Run',
+    body: 'Every spot on StikmNek is 100% local — from hidden beach cafes to island guides. Your visit directly supports local families.',
     icon: '🌱',
     afterPlaces: 2,
   },
   {
     id: 'save',
-    title: 'Tap ♥ to save your trip',
-    body: 'Like a place? Hit the heart and we’ll keep it on your list while you browse.',
+    title: 'Build Your Itinerary',
+    body: 'Love a spot? Tap the heart to save it to your trip list for easy comparing later.',
     icon: '♥',
     afterPlaces: 5,
   },
@@ -98,15 +98,15 @@ const FEED_TIP_STEPS: TipStep[] = [
   },
   {
     id: 'whatsapp',
-    title: 'Contact them direct',
-    body: 'Like a place? Message them on WhatsApp or email — you sort the booking with them, not through us.',
+    title: 'Book Direct, Zero Fees',
+    body: 'No middleman markups. Use your pass to contact operators directly on WhatsApp or email to lock in your dates.',
     icon: '💬',
     afterPlaces: 12,
   },
   {
     id: 'qr',
-    title: 'One pass, every deal',
-    body: 'Buy one pass and you get the deals at every place on StikmNek — that can save you a lot on your holiday. Show your QR when you arrive; businesses check it’s valid, then give you the deal.',
+    title: 'One Pass. Unlimited Deals.',
+    body: 'One pass unlocks every single discount on StikmNek. Just show your digital QR code when you arrive to claim your savings.',
     icon: '📱',
     afterPlaces: 15,
     variant: 'qr',
@@ -634,7 +634,8 @@ export default function SwipeDiscover() {
 
   const isExtended = trip.tripLength === '2-4' || trip.tripLength === '5-7';
   const pricePreview = calculatePassPrice(clampPartySize(trip.paidPeople || 1), isExtended);
-  const lightChrome = isMapMode || current?.kind === 'tip' || current?.kind === 'end';
+  // Tip/end use dark frosted panels — keep top chrome dark for contrast.
+  const lightChrome = isMapMode;
 
   return (
     <div
@@ -937,67 +938,56 @@ function WelcomeCard({
         }}
       />
 
-      <div className="relative z-10 h-full flex flex-col px-6 pt-[max(3.5rem,calc(env(safe-area-inset-top)+2.5rem))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-        <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full text-center">
-          <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-xl shadow-black/40 ring-2 ring-white/80 mb-4 bg-white">
-            <img
-              src={APP_ICON}
-              alt=""
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const el = e.currentTarget;
-                el.style.display = 'none';
-                const parent = el.parentElement;
-                if (parent) {
-                  parent.classList.add(
-                    'bg-gradient-to-br',
-                    'from-teal-500',
-                    'to-emerald-600',
-                    'flex',
-                    'items-center',
-                    'justify-center',
-                  );
-                  parent.innerHTML = '<span class="text-white text-2xl font-bold">S</span>';
-                }
-              }}
-            />
-          </div>
-          <p className="text-2xl font-bold text-white tracking-tight" style={{ textShadow: TEXT_SHADOW_SOFT }}>
-            StikmNek
-          </p>
-          <h1
-            className="mt-4 text-[28px] font-bold leading-tight text-white"
-            style={{ textShadow: TEXT_SHADOW_STRONG }}
-          >
-            Plan your trip. Support local.
-          </h1>
-          <p
-            className="mt-3 text-[15px] text-white/95 leading-relaxed"
-            style={{ textShadow: TEXT_SHADOW_SOFT }}
-          >
-            Build your trip by tapping ♥. Your pass helps grassroots Vanuatu businesses thrive.
-          </p>
+      <div className="relative z-10 h-full flex flex-col px-5 pt-[max(3.5rem,calc(env(safe-area-inset-top)+2.5rem))] pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+        <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
+          <div className="rounded-3xl bg-neutral-900/90 backdrop-blur-md border border-white/10 text-white shadow-2xl p-6 text-center">
+            <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-xl shadow-black/40 ring-2 ring-white/80 mb-4 bg-white">
+              <img
+                src={APP_ICON}
+                alt=""
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.style.display = 'none';
+                  const parent = el.parentElement;
+                  if (parent) {
+                    parent.classList.add(
+                      'bg-gradient-to-br',
+                      'from-teal-500',
+                      'to-emerald-600',
+                      'flex',
+                      'items-center',
+                      'justify-center',
+                    );
+                    parent.innerHTML = '<span class="text-white text-2xl font-bold">S</span>';
+                  }
+                }}
+              />
+            </div>
+            <p className="text-2xl font-bold text-white tracking-tight">StikmNek</p>
+            <h1 className="mt-4 text-[28px] font-bold leading-tight text-white">
+              Discover Vanuatu. Support Local.
+            </h1>
+            <p className="mt-3 text-[15px] text-white/85 leading-relaxed">
+              Tap ♥ on your favorites. Grab a StikmNek Pass to unlock direct discounts across the islands.
+            </p>
 
-          <button
-            type="button"
-            onClick={onStart}
-            className="mt-8 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base active:scale-[0.98] transition-transform"
-            style={{ boxShadow: '0 6px 24px rgba(15,181,181,0.4)' }}
-          >
-            Start exploring
-          </button>
-          <p
-            className="mt-3 text-center text-[14px] leading-snug text-white/90"
-            style={{ textShadow: TEXT_SHADOW_SOFT }}
-          >
-            {dealsMeta}
-          </p>
+            <button
+              type="button"
+              onClick={onStart}
+              className="mt-8 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-bold text-base active:scale-[0.98] transition-transform"
+              style={{ boxShadow: '0 6px 24px rgba(15,181,181,0.4)' }}
+            >
+              Start Exploring
+            </button>
+            <p className="mt-3 text-center text-[14px] leading-snug text-white/75">{dealsMeta}</p>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={onPartnerSignIn}
-          className="mt-4 text-center text-[13px] font-semibold text-white hover:text-teal-100 underline-offset-2 hover:underline"
+          className="mt-4 text-center text-[13px] font-semibold text-white/90 hover:text-white underline-offset-2 hover:underline"
           style={{ textShadow: TEXT_SHADOW_SOFT }}
         >
           {partnerLabel}
@@ -1027,18 +1017,18 @@ function TipCard({
   const isQr = tip.variant === 'qr';
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#F4F7F8]">
-      <div className="relative z-10 h-full flex flex-col items-center justify-center px-8 pb-20 pt-16">
-        <div className="w-full max-w-[300px] text-center">
+    <div className="relative h-full w-full overflow-hidden bg-neutral-950">
+      <div className="relative z-10 h-full flex flex-col items-center justify-center px-5 pb-20 pt-16">
+        <div className="w-full max-w-[320px] rounded-3xl bg-neutral-900/90 backdrop-blur-md border border-white/10 text-white shadow-2xl p-6 text-center">
           {isQr ? (
-            <div className="mx-auto mb-5 w-[148px] rounded-2xl bg-white p-3 ring-1 ring-[#0A1F2A]/[0.08] shadow-sm">
+            <div className="mx-auto mb-5 w-[148px] rounded-2xl bg-white p-3 ring-1 ring-white/20 shadow-sm">
               <img
                 src={TIP_SAMPLE_QR_URL}
                 alt="Example StikmNek pass QR code"
                 className="h-[124px] w-[124px] mx-auto"
                 draggable={false}
               />
-              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-[#8A9BA8]">
+              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-600">
                 Your pass QR
               </p>
             </div>
@@ -1046,8 +1036,8 @@ function TipCard({
             <div
               className={`mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full ring-1 ${
                 tip.id === 'save'
-                  ? 'bg-[#0FB5B5]/10 ring-[#0FB5B5]/25'
-                  : 'bg-white text-[26px] leading-none ring-[#0A1F2A]/[0.06]'
+                  ? 'bg-[#0FB5B5]/20 ring-[#0FB5B5]/40'
+                  : 'bg-white/10 text-[26px] leading-none ring-white/15'
               }`}
               aria-hidden
             >
@@ -1071,11 +1061,11 @@ function TipCard({
               )}
             </div>
           )}
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0FB5B5] mb-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5EEAD4] mb-2">
             Quick tip
           </p>
-          <h2 className="text-[22px] font-bold text-[#0A1F2A] leading-tight">{tip.title}</h2>
-          <p className="mt-3 text-[15px] text-[#5A6D7A] leading-relaxed">{tip.body}</p>
+          <h2 className="text-[22px] font-bold text-white leading-tight">{tip.title}</h2>
+          <p className="mt-3 text-[15px] text-white/80 leading-relaxed">{tip.body}</p>
 
           {isLength && (
             <div className="mt-6 flex flex-col gap-2">
@@ -1089,7 +1079,7 @@ function TipCard({
                     className={`min-h-11 rounded-xl text-sm font-semibold transition-colors ${
                       selected
                         ? 'bg-[#0FB5B5] text-white'
-                        : 'bg-white text-[#0A1F2A] ring-1 ring-[#0A1F2A]/[0.08] hover:bg-[#0A1F2A]/[0.03]'
+                        : 'bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/15'
                     }`}
                   >
                     {opt.label}
@@ -1115,7 +1105,7 @@ function TipCard({
                       } ${
                         selected
                           ? 'bg-[#0FB5B5] text-white'
-                          : 'bg-white text-[#0A1F2A] ring-1 ring-[#0A1F2A]/[0.08] hover:bg-[#0A1F2A]/[0.03]'
+                          : 'bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/15'
                       }`}
                     >
                       {isFamily && partySize >= 5 ? `Family · ${partySize}` : opt.label}
@@ -1125,8 +1115,8 @@ function TipCard({
               </div>
 
               {partySize >= 5 && (
-                <div className="rounded-2xl bg-white ring-1 ring-[#0A1F2A]/[0.06] px-3 py-3">
-                  <p className="text-[12px] font-semibold text-[#5A6D7A] mb-2">How many people (ages 6+)?</p>
+                <div className="rounded-2xl bg-white/5 ring-1 ring-white/10 px-3 py-3">
+                  <p className="text-[12px] font-semibold text-white/70 mb-2">How many people (ages 6+)?</p>
                   <div className="flex flex-wrap justify-center gap-2">
                     {FAMILY_SIZE_OPTIONS.map((n) => {
                       const selected = partySize === n;
@@ -1138,7 +1128,7 @@ function TipCard({
                           className={`min-h-11 min-w-11 rounded-full text-sm font-semibold transition-colors ${
                             selected
                               ? 'bg-[#0FB5B5] text-white'
-                              : 'bg-[#F4F7F8] text-[#0A1F2A] ring-1 ring-[#0A1F2A]/[0.08] hover:bg-[#0A1F2A]/[0.04]'
+                              : 'bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/15'
                           }`}
                         >
                           {n}
@@ -1154,11 +1144,11 @@ function TipCard({
           <button
             type="button"
             onClick={onContinue}
-            className="mt-8 w-full min-h-12 rounded-2xl bg-[#0A1F2A] text-white font-semibold text-[15px] active:scale-[0.98] transition-transform"
+            className="mt-8 w-full min-h-12 rounded-2xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white font-semibold text-[15px] active:scale-[0.98] transition-transform"
           >
             Got it
           </button>
-          <p className="mt-3 text-[12px] text-[#8A9BA8]">Or swipe up to continue</p>
+          <p className="mt-3 text-[12px] text-white/55">Or swipe up to continue</p>
         </div>
       </div>
     </div>
@@ -1179,10 +1169,10 @@ function EndCard({
   onGetPass: () => void;
 }) {
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#F4F7F8]">
-      <div className="relative z-10 h-full flex flex-col items-center justify-center px-8 pb-24 pt-16">
-        <div className="w-full max-w-[300px] text-center space-y-4">
-          <div className="mx-auto w-12 h-12 rounded-2xl overflow-hidden ring-1 ring-[#0A1F2A]/[0.08] bg-white">
+    <div className="relative h-full w-full overflow-hidden bg-neutral-950">
+      <div className="relative z-10 h-full flex flex-col items-center justify-center px-5 pb-24 pt-16">
+        <div className="w-full max-w-[320px] rounded-3xl bg-neutral-900/90 backdrop-blur-md border border-white/10 text-white shadow-2xl p-6 text-center space-y-4">
+          <div className="mx-auto w-12 h-12 rounded-2xl overflow-hidden ring-1 ring-white/20 bg-white">
             <img
               src={APP_ICON}
               alt=""
@@ -1192,17 +1182,17 @@ function EndCard({
               }}
             />
           </div>
-          <h2 className="text-[22px] font-bold text-[#0A1F2A] leading-tight">You’ve seen the best bits</h2>
-          <p className="text-[15px] text-[#5A6D7A] leading-relaxed">
+          <h2 className="text-[22px] font-bold text-white leading-tight">You’ve seen the best bits</h2>
+          <p className="text-[15px] text-white/80 leading-relaxed">
             {savedCount > 0
               ? `${savedCount} place${savedCount === 1 ? '' : 's'} on your trip. Shuffle for more, or unlock WhatsApp with a pass.`
               : 'Swipe again anytime — or get a pass to message places direct.'}
           </p>
 
           {!hasPass && (
-            <div className="rounded-2xl bg-white ring-1 ring-[#0A1F2A]/[0.06] px-4 py-3.5 text-left">
-              <p className="text-sm font-semibold text-[#0A1F2A]">Need WhatsApp access?</p>
-              <p className="mt-1 text-[13px] text-[#5A6D7A] leading-snug">
+            <div className="rounded-2xl bg-white/5 ring-1 ring-white/10 px-4 py-3.5 text-left">
+              <p className="text-sm font-semibold text-white">Need WhatsApp access?</p>
+              <p className="mt-1 text-[13px] text-white/70 leading-snug">
                 A pass lets you message these places and lock in dates.
               </p>
               <button
@@ -1218,11 +1208,11 @@ function EndCard({
           <button
             type="button"
             onClick={onBrowseAgain}
-            className="w-full min-h-12 rounded-2xl bg-[#0A1F2A] text-white font-semibold text-[15px] active:scale-[0.98] transition-transform"
+            className="w-full min-h-12 rounded-2xl bg-white text-neutral-950 font-semibold text-[15px] active:scale-[0.98] transition-transform"
           >
             Shuffle &amp; browse again
           </button>
-          <p className="text-[12px] text-[#8A9BA8]">Or swipe up to continue</p>
+          <p className="text-[12px] text-white/55">Or swipe up to continue</p>
         </div>
       </div>
     </div>
@@ -1376,7 +1366,7 @@ function PlaceCard({
               <div className="absolute -top-1.5 left-6 w-3 h-3 bg-white rotate-45" />
               <div className="relative rounded-2xl bg-white text-neutral-900 px-3 py-2.5 shadow-lg">
                 <p className="text-xs font-semibold leading-snug">
-                  Tap the name to see photos &amp; more about this place
+                    Tap anywhere on the card to see full photos, pricing & details.
                 </p>
                 <button
                   type="button"
@@ -1905,9 +1895,9 @@ function PaywallSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto" />
-        <h3 className="text-lg font-bold text-center">Want to chat with {businessName}?</h3>
+        <h3 className="text-lg font-bold text-center">Connect with {businessName}</h3>
         <p className="text-sm text-neutral-400 text-center">
-          Get your pass to unlock WhatsApp + deals. You’ll message them direct — we never take bookings.
+          Unlock direct WhatsApp messaging & exclusive discounts with a StikmNek Pass. 100% direct — no booking fees.
         </p>
         <button type="button" onClick={onBuy} className="w-full min-h-12 rounded-xl bg-teal-600 font-bold">
           {passCtaLabel(isExtended, paidPeople, price)}

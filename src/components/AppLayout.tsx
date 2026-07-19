@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Store, ArrowRight } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
-import { useAppContext, isTouristProfileCompleteForGate } from '@/contexts/AppContext';
+import { useAppContext } from '@/contexts/AppContext';
 import { canAccessAdminPanel } from '@/lib/adminRoles';
 import {
   dealSlugFromPathname,
@@ -51,26 +51,6 @@ const MapView = React.lazy(() => import('./MapView'));
 const BusinessDetail = React.lazy(() => import('./BusinessDetail'));
 const BusinessProfilePage = React.lazy(() => import('./BusinessProfilePage'));
 const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
-
-/**
- * Tourists with an incomplete profile may still open these views (soft gate).
- * All other views keep hard redirect to complete-profile until the gate passes.
- * To expand browsing later, add view names here and optionally show a nav link to complete-profile.
- */
-const TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
-  'home',
-  'deals',
-  'map',
-  'my-favorites',
-  'business-detail',
-  'business-profile',
-  'checkout',
-  'payment-confirmation',
-  'help',
-  'faq',
-  'business-guide',
-  'business-join',
-];
 
 /**
  * Business partners without a `businesses` row yet may leave the setup form and browse
@@ -341,26 +321,6 @@ const AppLayout: React.FC = () => {
     }
   }, [currentView, user, userProfile, authLoading, businessOwnerHasBusinessRow, setCurrentView]);
 
-  // ─── Profile-First gating (Tourists) ───
-  useEffect(() => {
-    if (!user || authLoading) return;
-    const role = userProfile?.role || user.type || 'tourist';
-    // Staff and admins are not tourists — skip traveller profile gate.
-    if (canAccessAdminPanel(role, user.email)) return;
-    if (user.type !== 'tourist') return;
-    if (userProfileLoadError) return;
-    if (!userProfile) return; // wait for profile load
-
-    const profileDone = isTouristProfileCompleteForGate(userProfile);
-
-    if (!profileDone && currentView !== 'complete-profile') {
-      if (TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE.includes(currentView)) {
-        return;
-      }
-      setCurrentView('complete-profile');
-    }
-  }, [user, userProfile, authLoading, currentView, setCurrentView, userProfileLoadError]);
-
   // ─── Profile-First gating (Business owners — businesses.owner_id row) ───
   useEffect(() => {
     if (!user || authLoading) return;
@@ -532,13 +492,6 @@ const AppLayout: React.FC = () => {
     user?.type !== 'staff' &&
     isHubBottomNavView(currentView);
 
-  const showTouristProfileNudge =
-    user?.type === 'tourist' &&
-    userProfile &&
-    !userProfileLoadError &&
-    !isTouristProfileCompleteForGate(userProfile) &&
-    TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE.includes(currentView);
-
   return (
     <div className={`min-h-screen bg-white${showHubBottomNav ? ' has-hub-bottom-nav' : ''}`}>
       {/* Skip Navigation Link - Accessibility */}
@@ -571,25 +524,6 @@ const AppLayout: React.FC = () => {
               {language === 'en' ? 'Try again' : language === 'fr' ? 'Réessayer' : 'Traem bakeken'}
             </button>
           </div>
-        </div>
-      )}
-
-      {showTouristProfileNudge && (
-        <div className="bg-amber-50 border-b border-amber-200 text-amber-950 text-sm px-4 py-2.5 text-center">
-          <span>
-            {language === 'en'
-              ? 'Finish your travel profile to unlock passes and the full app.'
-              : language === 'fr'
-                ? 'Terminez votre profil voyage pour débloquer les pass et toute l’application.'
-                : 'Finisim travel profil blong yu blong save anlokem pas mo yusum ful ap.'}{' '}
-          </span>
-          <button
-            type="button"
-            onClick={() => setCurrentView('complete-profile')}
-            className="font-semibold text-amber-900 underline underline-offset-2 hover:text-amber-800"
-          >
-            {language === 'en' ? 'Continue setup' : language === 'fr' ? 'Poursuivre' : 'Go hed blong set ap'}
-          </button>
         </div>
       )}
 
