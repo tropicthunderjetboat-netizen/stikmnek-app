@@ -1,103 +1,411 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, ChevronRight, MapPin } from 'lucide-react';
+import { Check, Copy, Heart, MapPin, Ticket, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAppContext } from '@/contexts/AppContext';
-import { businesses as localBusinesses } from '@/data/businesses';
-import { t } from '@/data/translations';
-import { businessesMatchingFavoriteKeys } from '@/lib/favoritesUi';
+import {
+  businesses as localBusinesses,
+  listingOfferBadgeText,
+  touristFacingOfferings,
+  type Business,
+} from '@/data/businesses';
+import { clampPartySize } from '@/data/pricing';
+import { businessesMatchingFavoriteKeys, isListingFavorited } from '@/lib/favoritesUi';
 import { dealPathForBusiness } from '@/lib/dealUrl';
+import { getBusinessImageUrl } from '@/lib/utils';
+import { loadTripState, saveTripState } from '@/lib/tripStorage';
+import { SUPABASE_URL } from '@/lib/supabase';
+import PassTicketCard from '@/components/PassTicketCard';
 
+function fmtPassDate(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  try {
+    return new Date(iso.includes('T') ? iso : `${iso}T00:00:00`).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function dealLabel(biz: Business): string {
+  const badge = listingOfferBadgeText(biz);
+  if (badge) return badge;
+  if (biz.discount) return String(biz.discount);
+  return 'Pass deal';
+}
+
+/**
+ * Hybrid Hub "Saved" tab — digital pass wallet + favorited deals comparison list.
+ * Logged-in: Supabase `favorites` + local trip hearts. Guests: local trip hearts only.
+ */
 const MyFavoritesList: React.FC = () => {
   const navigate = useNavigate();
   const {
     language,
+    user,
     favorites,
     dbBusinesses,
+    toggleFavorite,
+    purchasePass,
     setCurrentView,
     setSelectedBusiness,
+    setShowAuth,
+    setAuthMode,
   } = useAppContext();
 
-  const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
-  const favBizs = useMemo(
-    () => businessesMatchingFavoriteKeys(allBusinesses, favorites),
-    [allBusinesses, favorites],
+  const [tripSavedIds, setTripSavedIds] = useState<string[]>(() => loadTripState().savedPlaceIds);
+  const [copied, setCopied] = useState(false);
+
+  const allBusinesses = useMemo(() => {
+    const live = touristFacingOfferings(dbBusinesses);
+    return live.length > 0 ? live : localBusinesses;
+  }, [dbBusinesses]);
+
+  const savedDeals = useMemo(() => {
+    const fromCloud = user ? businessesMatchingFavoriteKeys(allBusinesses, favorites) : [];
+    const fromTrip = allBusinesses.filter((b) => tripSavedIds.includes(b.id));
+    const seen = new Set<string>();
+    const merged: Business[] = [];
+    for (const b of [...fromCloud, ...fromTrip]) {
+      if (seen.has(b.id)) continue;
+      seen.add(b.id);
+      merged.push(b);
+    }
+    return merged;
+  }, [user, allBusinesses, favorites, tripSavedIds]);
+
+  const hasPass = Boolean(user?.pass && user?.passId);
+  const partySize = clampPartySize(user?.passPeopleCount || 1);
+  const qrCodeUrl = hasPass
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(user!.passId!)}&color=0d9488&bgcolor=ffffff&margin=8`
+    : null;
+
+  const goHome = useCallback(() => {
+    setCurrentView('home');
+    navigate('/');
+  }, [navigate, setCurrentView]);
+
+  const openDeal = useCallback(
+    (biz: Business) => {
+      setSelectedBusiness(biz);
+      setCurrentView('business-detail');
+      navigate(dealPathForBusiness(biz));
+    },
+    [navigate, setCurrentView, setSelectedBusiness],
   );
 
+  const removeFromSaved = useCallback(
+    async (biz: Business) => {
+      const nextTrip = loadTripState();
+      if (nextTrip.savedPlaceIds.includes(biz.id)) {
+        const updated = {
+          ...nextTrip,
+          savedPlaceIds: nextTrip.savedPlaceIds.filter((id) => id !== biz.id),
+        };
+        saveTripState(updated);
+        setTripSavedIds(updated.savedPlaceIds);
+      }
+
+      if (user && isListingFavorited(favorites, biz)) {
+        await toggleFavorite(biz, { silent: true });
+        toast.success(
+          language === 'fr'
+            ? 'Retiré des favoris'
+            : language === 'bi'
+              ? 'Tekemaot long sevem'
+              : 'Removed from saved',
+        );
+      } else if (!user) {
+        toast.success(
+          language === 'fr'
+            ? 'Retiré de votre voyage'
+            : language === 'bi'
+              ? 'Tekemaot long trip'
+              : 'Removed from your trip',
+        );
+      }
+    },
+    [user, favorites, toggleFavorite, language],
+  );
+
+  const handleGetPass = useCallback(() => {
+    if (!user) {
+      setAuthMode('signin');
+      setShowAuth(true);
+      return;
+    }
+    void purchasePass();
+  }, [user, purchasePass, setAuthMode, setShowAuth]);
+
+  const handleCopyPassId = useCallback(() => {
+    if (!user?.passId) return;
+    void navigator.clipboard.writeText(user.passId).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [user?.passId]);
+
+  const title =
+    language === 'fr' ? 'Sauvé · Mon Pass' : language === 'bi' ? 'Sevem · Pas Blong Mi' : 'Saved · My Pass';
+
+  const exploreLabel =
+    language === 'fr' ? 'Explorer les offres' : language === 'bi' ? 'Lukluk ol deal' : 'Explore Deals';
+
+  const detailsLabel =
+    language === 'fr' ? 'Détails' : language === 'bi' ? 'Detail' : 'View Deal';
+
+  const getPassLabel =
+    language === 'fr' ? 'Obtenir le Pass' : language === 'bi' ? 'Karem Pas' : 'Get Pass';
+
   return (
-    <div className="min-h-screen bg-gray-50 pt-20 pb-16">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6">
-        <button
-          type="button"
-          onClick={() => setCurrentView('dashboard')}
-          className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-teal-700 hover:text-teal-900 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          {t('dash.favorites_back_dashboard', language)}
-        </button>
+    <div className="min-h-screen bg-gray-50 pt-20">
+      <div className="mx-auto max-w-2xl px-4 sm:px-6 pb-8">
+        <header className="mb-5">
+          <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">{title}</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {language === 'fr'
+              ? 'Votre pass et vos deals enregistrés, au même endroit.'
+              : language === 'bi'
+                ? 'Pas blong yu mo ol deal we yu sevem — wan ples.'
+                : 'Your pass and saved deals — one place to compare and redeem.'}
+          </p>
+        </header>
 
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center border border-red-100">
-            <Heart className="w-6 h-6 text-red-500 fill-red-500/20" aria-hidden />
-          </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">{t('dash.favorites', language)}</h1>
-            <p className="text-sm text-gray-500">{t('dash.favorites_list_heading', language)}</p>
-          </div>
-        </div>
+        {/* ── Pass wallet hero ── */}
+        <section className="mb-8" aria-label="StikmNek Pass">
+          {hasPass ? (
+            <PassTicketCard partySize={partySize} qrCodeUrl={qrCodeUrl} size="compact">
+              <div className="mt-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-emerald-700">
+                    {language === 'fr' ? 'Pass actif' : language === 'bi' ? 'Aktiv pas' : 'Active pass'}
+                  </span>
+                </div>
 
-        <p className="text-sm text-gray-600 mb-6">
-          {favBizs.length}{' '}
-          {language === 'en' ? 'saved' : language === 'fr' ? 'enregistré(s)' : 'we i sevem'}
-        </p>
+                {(user?.passValidFrom || user?.passValidUntil) && (
+                  <div className="rounded-xl border border-teal-100 bg-white/80 px-3 py-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#888888]">
+                      {language === 'en' ? 'Valid' : language === 'fr' ? 'Valide' : 'Valit'}
+                    </p>
+                    <p className="text-sm font-semibold text-[#0A0A0A]">
+                      {fmtPassDate(user?.passValidFrom)} → {fmtPassDate(user?.passValidUntil)}
+                    </p>
+                  </div>
+                )}
 
-        {favBizs.length === 0 ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-            <Heart className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-600 text-sm leading-relaxed">{t('dash.favorites_list_empty', language)}</p>
-            <button
-              type="button"
-              onClick={() => setCurrentView('deals')}
-              className="mt-6 px-5 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-colors"
-            >
-              {language === 'en' ? 'Browse deals' : language === 'fr' ? 'Voir les offres' : 'Lukluk ol diskaon'}
-            </button>
-          </div>
-        ) : (
-          <ul className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden divide-y divide-gray-100">
-            {favBizs.map((biz) => (
-              <li key={biz.id}>
+                <p className="text-center text-xs text-[#555555]">
+                  {language === 'en' ? 'Holder' : language === 'fr' ? 'Titulaire' : 'Holda'} ·{' '}
+                  <span className="font-semibold text-[#0A0A0A]">{user?.name}</span>
+                </p>
+
                 <button
                   type="button"
-                  onClick={() => {
-                    setSelectedBusiness(biz);
-                    setCurrentView('business-detail');
-                    navigate(dealPathForBusiness(biz));
-                  }}
-                  className="w-full flex items-center gap-4 p-4 text-left hover:bg-teal-50/50 transition-colors"
+                  onClick={handleCopyPassId}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-teal-200/80 bg-white/70 py-2.5 text-sm text-[#555555] transition-colors hover:bg-white"
                 >
-                  <img
-                    src={biz.image}
-                    alt=""
-                    className="w-14 h-14 rounded-xl object-cover shrink-0 border border-gray-100"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-900 truncate">{biz.name}</p>
-                    {biz.discount ? (
-                      <p className="text-xs font-semibold text-teal-700 truncate mt-0.5">{biz.discount}</p>
-                    ) : null}
-                    {biz.location ? (
-                      <p className="text-xs text-gray-500 flex items-center gap-1 mt-1 truncate">
-                        <MapPin className="w-3 h-3 shrink-0" />
-                        {biz.location}
-                      </p>
-                    ) : null}
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" aria-hidden />
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span className="font-medium text-green-600">
+                        {language === 'fr' ? 'Copié !' : language === 'bi' ? 'Kopi!' : 'Copied!'}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      <span>
+                        {language === 'fr'
+                          ? 'Copier le code pass'
+                          : language === 'bi'
+                            ? 'Kopi pas kod'
+                            : 'Copy pass code'}
+                      </span>
+                    </>
+                  )}
                 </button>
-              </li>
-            ))}
-          </ul>
-        )}
+              </div>
+            </PassTicketCard>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 via-white to-emerald-50 shadow-sm">
+              <div className="p-5 sm:p-6">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[#0FB5B5] text-white shadow-md shadow-teal-600/25">
+                  <Ticket className="h-5 w-5" aria-hidden />
+                </div>
+                <h2 className="text-lg font-extrabold tracking-tight text-gray-900">
+                  {language === 'fr'
+                    ? 'Débloquez toutes les réductions ci-dessous'
+                    : language === 'bi'
+                      ? 'Anlokem olgeta diskaon daon'
+                      : 'Unlock all discounts below'}
+                </h2>
+                <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                  {language === 'fr'
+                    ? 'Avec un StikmNek Tourist Pass, présentez votre QR chez les partenaires locaux et économisez sur vos deals enregistrés.'
+                    : language === 'bi'
+                      ? 'Wetem StikmNek Tourist Pass, soem QR long ol lokal bisnis mo sevem long ol deal we yu laikem.'
+                      : 'Unlock all discounts below with a StikmNek Tourist Pass — show your QR to local operators and save on every deal you’ve hearted.'}
+                </p>
+                <ul className="mt-3 space-y-1.5 text-sm text-gray-700">
+                  <li className="flex gap-2">
+                    <span className="text-teal-600" aria-hidden>
+                      ✓
+                    </span>
+                    {language === 'fr'
+                      ? 'Réductions partenaires partout à Port Vila et au-delà'
+                      : language === 'bi'
+                        ? 'Diskaon long ol bisnis long Port Vila mo narafala aelan'
+                        : 'Partner discounts across Port Vila & beyond'}
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-teal-600" aria-hidden>
+                      ✓
+                    </span>
+                    {language === 'fr'
+                      ? 'Un pass pour tout le groupe (6 ans et +)'
+                      : language === 'bi'
+                        ? 'Wan pas i kava long olgeta (6 yia mo antap)'
+                        : 'One pass covers your whole crew (ages 6+)'}
+                  </li>
+                </ul>
+                <button
+                  type="button"
+                  onClick={handleGetPass}
+                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0FB5B5] px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-teal-600/25 transition-colors hover:bg-[#0da3a3] active:scale-[0.99]"
+                >
+                  {getPassLabel}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* ── Favorited deals comparison list ── */}
+        <section aria-label="Saved deals">
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-gray-900">
+                {language === 'fr'
+                  ? 'Deals enregistrés'
+                  : language === 'bi'
+                    ? 'Ol deal we yu sevem'
+                    : 'Saved deals'}
+              </h2>
+              <p className="text-xs text-gray-500">
+                {savedDeals.length}{' '}
+                {language === 'en'
+                  ? savedDeals.length === 1
+                    ? 'place'
+                    : 'places'
+                  : language === 'fr'
+                    ? 'lieu(x)'
+                    : 'ples'}
+              </p>
+            </div>
+          </div>
+
+          {savedDeals.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-10 text-center shadow-sm">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50">
+                <Heart className="h-7 w-7 text-red-400" aria-hidden />
+              </div>
+              <p className="text-sm font-semibold text-gray-900">
+                {language === 'fr'
+                  ? 'Aucun deal enregistré pour l’instant'
+                  : language === 'bi'
+                    ? 'No gat deal we yu sevem yet'
+                    : 'No saved deals yet'}
+              </p>
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-gray-500">
+                {language === 'fr'
+                  ? 'Parcourez le fil découverte et appuyez sur ♥ pour constituer votre itinéraire.'
+                  : language === 'bi'
+                    ? 'Swipe long hom mo tap ♥ blong bildimap trip blong yu.'
+                    : 'Swipe the discovery feed and tap ♥ to build your itinerary.'}
+              </p>
+              <button
+                type="button"
+                onClick={goHome}
+                className="mt-6 inline-flex items-center justify-center rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-teal-700"
+              >
+                {exploreLabel}
+              </button>
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {savedDeals.map((biz) => {
+                const img = getBusinessImageUrl(biz.image, SUPABASE_URL) || biz.image;
+                return (
+                  <li
+                    key={biz.id}
+                    className="flex gap-3 overflow-hidden rounded-2xl border border-gray-100 bg-white p-3 shadow-sm"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openDeal(biz)}
+                      className="shrink-0 overflow-hidden rounded-xl border border-gray-100"
+                      aria-label={biz.name}
+                    >
+                      {img ? (
+                        <img src={img} alt="" className="h-20 w-20 object-cover" loading="lazy" />
+                      ) : (
+                        <div className="flex h-20 w-20 items-center justify-center bg-gray-100 text-gray-400">
+                          <Heart className="h-5 w-5" />
+                        </div>
+                      )}
+                    </button>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-bold text-gray-900">{biz.name}</p>
+                          {biz.location ? (
+                            <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-gray-500">
+                              <MapPin className="h-3 w-3 shrink-0" aria-hidden />
+                              {biz.location}
+                            </p>
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void removeFromSaved(biz)}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                          aria-label={
+                            language === 'fr'
+                              ? 'Retirer des favoris'
+                              : language === 'bi'
+                                ? 'Tekemaot'
+                                : 'Remove from favorites'
+                          }
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <span className="mt-2 inline-block max-w-full truncate rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-emerald-800">
+                        {dealLabel(biz)}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => openDeal(biz)}
+                        className="mt-2.5 inline-flex min-h-9 items-center justify-center rounded-lg bg-teal-600 px-3.5 text-xs font-bold text-white transition-colors hover:bg-teal-700"
+                      >
+                        {detailsLabel}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   );

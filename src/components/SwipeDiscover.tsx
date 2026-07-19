@@ -1,11 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MapPin, MessageCircle, Phone, Search, Star, User, X } from 'lucide-react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Heart, MapPin, MessageCircle, Phone, Search, Star, User, X, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
 import {
   businessListingHasWhatsApp,
   businessListingWhatsAppRaw,
+  categoryLabelForKey,
   customerFacingListPrice,
   effectiveListingDealPrice,
   listingOfferBadgeText,
@@ -32,6 +33,12 @@ import {
   type TripState,
 } from '@/lib/tripStorage';
 import { APP_ICON } from '@/lib/brand';
+import HomeCategoryPills, { type HomeCategoryKey } from '@/components/HomeCategoryPills';
+import MapToggleFab from '@/components/MapToggleFab';
+import DealOgHelmet from '@/components/DealOgHelmet';
+import { loadMapView, prefetchChunk } from '@/lib/heavyChunks';
+
+const LazyMapView = React.lazy(() => import('./MapView'));
 
 function reviewsForBusiness(dbReviews: DBReview[], business: Business): DBReview[] {
   const profileId = profileBusinessIdFor(business);
@@ -226,10 +233,13 @@ export default function SwipeDiscover() {
     setShowAuth,
     setAuthMode,
     signOut,
+    language,
   } = useAppContext();
 
   const [trip, setTrip] = useState<TripState>(() => loadTripState());
   const [index, setIndex] = useState(0);
+  const [feedCategory, setFeedCategory] = useState<HomeCategoryKey>('all');
+  const [isMapMode, setIsMapMode] = useState(false);
   const [detail, setDetail] = useState<Business | null>(null);
   const [paywallBiz, setPaywallBiz] = useState<Business | null>(null);
   const [reviewsBiz, setReviewsBiz] = useState<Business | null>(null);
@@ -272,6 +282,28 @@ export default function SwipeDiscover() {
     return shuffleOrderRef.current.map((id) => byId.get(id)!).filter(Boolean);
   }, [dbBusinesses, shuffleKey]);
 
+  /** In-memory category filter — never refetches Supabase; preserves shuffle order. */
+  const filteredListings = useMemo(() => {
+    if (feedCategory === 'all') return listings;
+    return listings.filter((b) => b.category === feedCategory);
+  }, [listings, feedCategory]);
+
+  const onFeedCategoryChange = useCallback((key: HomeCategoryKey) => {
+    setFeedCategory(key);
+    setIndex(0);
+    setDragY(0);
+    // Skip welcome so the user lands on the first deal of the selected category.
+    if (key !== 'all') setWelcomeDismissed(true);
+  }, []);
+
+  const toggleMapMode = useCallback(() => {
+    setIsMapMode((prev) => {
+      const next = !prev;
+      if (next) prefetchChunk(loadMapView);
+      return next;
+    });
+  }, []);
+
   const reshuffleFeed = useCallback(() => {
     const base = touristFacingOfferings(dbBusinesses);
     shuffleOrderRef.current = shuffleBusinesses(base).map((b) => b.id);
@@ -301,16 +333,17 @@ export default function SwipeDiscover() {
     if (!welcomeDismissed) items.push({ kind: 'welcome' });
 
     let placeCount = 0;
-    for (const b of listings) {
+    for (const b of filteredListings) {
       items.push({ kind: 'place', business: b });
       placeCount += 1;
       const tip = FEED_TIP_STEPS.find((t) => t.afterPlaces === placeCount);
       if (tip) items.push({ kind: 'tip', tip });
     }
 
-    if (listings.length > 0) items.push({ kind: 'end' });
+    if (filteredListings.length > 0) items.push({ kind: 'end' });
+    else if (welcomeDismissed) items.push({ kind: 'end' });
     return items;
-  }, [listings, welcomeDismissed]);
+  }, [filteredListings, welcomeDismissed]);
 
   const current = feed[Math.min(index, Math.max(0, feed.length - 1))] ?? null;
 
@@ -327,6 +360,8 @@ export default function SwipeDiscover() {
     setSearchOpen(false);
     setSearchQuery('');
     setDragY(0);
+    setFeedCategory('all');
+    setIsMapMode(false);
     setWelcomeDismissed(false);
     setIndex(0);
   }, []);
@@ -567,7 +602,10 @@ export default function SwipeDiscover() {
 
   if (!dataLoaded) {
     return (
-      <div className="fixed inset-0 z-40 bg-neutral-950 flex items-center justify-center">
+      <div
+        className="fixed inset-x-0 top-0 z-40 bg-neutral-950 flex items-center justify-center"
+        style={{ bottom: 'var(--hub-nav-offset, 0px)' }}
+      >
         <div className="w-12 h-12 rounded-full border-2 border-teal-500 border-t-transparent animate-spin" />
       </div>
     );
@@ -575,7 +613,10 @@ export default function SwipeDiscover() {
 
   if (listings.length === 0) {
     return (
-      <div className="fixed inset-0 z-40 bg-neutral-950 text-white flex flex-col items-center justify-center gap-4 px-6 text-center">
+      <div
+        className="fixed inset-x-0 top-0 z-40 bg-neutral-950 text-white flex flex-col items-center justify-center gap-4 px-6 text-center"
+        style={{ bottom: 'var(--hub-nav-offset, 0px)' }}
+      >
         <p className="text-lg font-semibold">Places are loading in…</p>
         <button
           type="button"
@@ -593,71 +634,109 @@ export default function SwipeDiscover() {
 
   const isExtended = trip.tripLength === '2-4' || trip.tripLength === '5-7';
   const pricePreview = calculatePassPrice(clampPartySize(trip.paidPeople || 1), isExtended);
-  const lightChrome = current?.kind === 'tip' || current?.kind === 'end';
+  const lightChrome = isMapMode || current?.kind === 'tip' || current?.kind === 'end';
 
   return (
-    <div className="fixed inset-0 z-40 bg-neutral-950 text-white overflow-hidden touch-none select-none">
+    <div
+      className="fixed inset-x-0 top-0 z-40 bg-neutral-950 text-white overflow-hidden touch-none select-none"
+      style={{ bottom: 'var(--hub-nav-offset, 0px)' }}
+    >
+      {/* Top chrome: branding + sticky category pills (above feed; pointer-events isolated) */}
       <div
-        className={`absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 pointer-events-none ${
-          lightChrome ? 'bg-gradient-to-b from-[#F4F7F8] to-transparent' : 'bg-gradient-to-b from-black/25 to-transparent'
+        className={`absolute top-0 inset-x-0 z-30 pointer-events-none ${
+          lightChrome ? 'bg-gradient-to-b from-[#F4F7F8] via-[#F4F7F8]/90 to-transparent' : 'bg-gradient-to-b from-black/40 via-black/20 to-transparent'
         }`}
       >
-        <div className="pointer-events-auto">
-          <button
-            type="button"
-            onClick={goHome}
-            className="text-left rounded-lg active:opacity-80 -ml-1 px-1 py-0.5"
-            aria-label="Back to home"
-          >
-            <p className={`text-sm font-bold tracking-tight ${lightChrome ? 'text-[#0A1F2A]' : 'text-white'}`}>
-              StikmNek
-            </p>
-            <p className={`text-[11px] ${lightChrome ? 'text-[#5A6D7A]' : 'text-neutral-300'}`}>
-              Plan your Vanuatu trip
-            </p>
-          </button>
-        </div>
-        <div className="pointer-events-auto flex items-center gap-2">
-          {saveCount > 0 && (
+        <div
+          className="flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-1"
+        >
+          <div className="pointer-events-auto">
             <button
               type="button"
-              onClick={() => {
-                const first = listings.find((b) => trip.savedPlaceIds.includes(b.id));
-                if (first) openDetail(first);
-              }}
-              className={`rounded-full backdrop-blur px-3 py-1.5 text-xs font-semibold ${
-                lightChrome
-                  ? 'bg-[#0A1F2A]/[0.06] text-[#0A1F2A]'
-                  : 'bg-white/15 text-white'
+              onClick={goHome}
+              className="text-left rounded-lg active:opacity-80 -ml-1 px-1 py-0.5"
+              aria-label="Back to home"
+            >
+              <p className={`text-sm font-bold tracking-tight ${lightChrome ? 'text-[#0A1F2A]' : 'text-white'}`}>
+                StikmNek
+              </p>
+              <p className={`text-[11px] ${lightChrome ? 'text-[#5A6D7A]' : 'text-neutral-300'}`}>
+                Plan your Vanuatu trip
+              </p>
+            </button>
+          </div>
+          <div className="pointer-events-auto flex items-center gap-2">
+            {saveCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const first = listings.find((b) => trip.savedPlaceIds.includes(b.id));
+                  if (first) openDetail(first);
+                }}
+                className={`rounded-full backdrop-blur px-3 py-1.5 text-xs font-semibold ${
+                  lightChrome
+                    ? 'bg-[#0A1F2A]/[0.06] text-[#0A1F2A]'
+                    : 'bg-white/15 text-white'
+                }`}
+                aria-label="Your trip"
+              >
+                ✈️ {saveCount}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className={`rounded-full backdrop-blur w-9 h-9 flex items-center justify-center ${
+                lightChrome ? 'bg-[#0A1F2A]/[0.06]' : 'bg-white/15'
               }`}
-              aria-label="Your trip"
+              aria-label="Search places"
             >
-              ✈️ {saveCount}
+              <Search className={`w-4 h-4 ${lightChrome ? 'text-[#0A1F2A]' : 'text-white'}`} />
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            className={`rounded-full backdrop-blur w-9 h-9 flex items-center justify-center ${
-              lightChrome ? 'bg-[#0A1F2A]/[0.06]' : 'bg-white/15'
-            }`}
-            aria-label="Search places"
-          >
-            <Search className={`w-4 h-4 ${lightChrome ? 'text-[#0A1F2A]' : 'text-white'}`} />
-          </button>
-          {hasPass && (
-            <button
-              type="button"
-              onClick={() => setCurrentView('dashboard')}
-              className="rounded-full bg-teal-600/90 backdrop-blur w-9 h-9 flex items-center justify-center"
-              aria-label="Your profile"
-            >
-              <User className="w-4 h-4 text-white" />
-            </button>
-          )}
+            {hasPass && (
+              <button
+                type="button"
+                onClick={() => setCurrentView('dashboard')}
+                className="rounded-full bg-teal-600/90 backdrop-blur w-9 h-9 flex items-center justify-center"
+                aria-label="Your profile"
+              >
+                <User className="w-4 h-4 text-white" />
+              </button>
+            )}
+          </div>
         </div>
+
+        {!searchOpen && !detail && !paywallBiz && !reviewsBiz && (
+          <HomeCategoryPills
+            value={feedCategory}
+            onChange={onFeedCategoryChange}
+            language={language}
+            light={lightChrome || isMapMode}
+          />
+        )}
       </div>
 
+      {isMapMode ? (
+        <div
+          className="absolute inset-0 z-[5] flex flex-col bg-white pt-[7.5rem] touch-auto"
+          style={{ paddingBottom: 0 }}
+        >
+          <Suspense
+            fallback={
+              <div className="flex flex-1 items-center justify-center bg-neutral-100">
+                <div className="h-10 w-10 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+              </div>
+            }
+          >
+            <LazyMapView
+              embedded
+              categoryFilter={feedCategory}
+              onSelectBusiness={openDetail}
+              sizeBumpKey={isMapMode ? 'open' : 'closed'}
+            />
+          </Suspense>
+        </div>
+      ) : (
       <div
         className="absolute inset-0"
         style={{
@@ -704,6 +783,8 @@ export default function SwipeDiscover() {
             saved={isSaved(current.business)}
             reviewCount={reviewsForBusiness(dbReviews, current.business).length || current.business.reviewCount || 0}
             rating={current.business.rating || 0}
+            language={language}
+            reserveTripStrip={savedBusinesses.length > 0}
             showTapCoach={showTapCoach && !detail && !paywallBiz && !reviewsBiz && !searchOpen}
             onDismissCoach={dismissTapCoach}
             onHeart={() => void heartPlace(current.business)}
@@ -713,10 +794,11 @@ export default function SwipeDiscover() {
           />
         )}
       </div>
+      )}
 
-      {savedBusinesses.length > 0 && !detail && !paywallBiz && !reviewsBiz && !searchOpen && current?.kind === 'place' && (
+      {!isMapMode && savedBusinesses.length > 0 && !detail && !paywallBiz && !reviewsBiz && !searchOpen && current?.kind === 'place' && (
         <div
-          className="absolute bottom-0 inset-x-0 z-20 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-8 pointer-events-none"
+          className="absolute bottom-0 inset-x-0 z-20 px-3 pb-3 pt-8 pointer-events-none"
           style={{
             background:
               'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.28) 100%)',
@@ -806,6 +888,18 @@ export default function SwipeDiscover() {
           }}
         />
       )}
+
+      <MapToggleFab
+        isMapMode={isMapMode}
+        onToggle={toggleMapMode}
+        language={language}
+        hidden={Boolean(detail || paywallBiz || reviewsBiz || searchOpen)}
+        liftForTripStrip={
+          !isMapMode &&
+          savedBusinesses.length > 0 &&
+          current?.kind === 'place'
+        }
+      />
     </div>
   );
 }
@@ -1140,6 +1234,8 @@ function PlaceCard({
   saved,
   reviewCount,
   rating,
+  language,
+  reserveTripStrip,
   showTapCoach,
   onDismissCoach,
   onHeart,
@@ -1151,6 +1247,9 @@ function PlaceCard({
   saved: boolean;
   reviewCount: number;
   rating: number;
+  language: 'en' | 'fr' | 'bi';
+  /** Leave space for the bottom trip-thumbnail strip when it is visible. */
+  reserveTripStrip: boolean;
   showTapCoach: boolean;
   onDismissCoach: () => void;
   onHeart: () => void;
@@ -1158,8 +1257,16 @@ function PlaceCard({
   onReviews: () => void;
   onNext: () => void;
 }) {
+  const locationLine = [business.location, categoryLabelForKey(business.category || '', language)]
+    .filter(Boolean)
+    .join(' · ');
+
+  const viewDealLabel =
+    language === 'fr' ? 'Voir l’offre' : language === 'bi' ? 'Luk deal' : 'View Deal';
+
   return (
     <div className="relative h-full w-full">
+      {/* Full-bleed media — tap opens details */}
       <button
         type="button"
         className="absolute inset-0 w-full h-full"
@@ -1167,114 +1274,146 @@ function PlaceCard({
         aria-label={`Open ${business.name}`}
       >
         <FitPhoto src={business.image} className="absolute inset-0 h-full w-full" />
+        {/* Lower ~45–50% continuous dark gradient for white-text legibility */}
         <div
-          className="absolute inset-0 z-[2] pointer-events-none"
-          style={{
-            background:
-              'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.15) 75%, rgba(0,0,0,0.35) 100%)',
-          }}
+          className="absolute inset-x-0 bottom-0 z-[2] h-[48%] pointer-events-none bg-gradient-to-t from-black/90 via-black/40 to-transparent"
+          aria-hidden
         />
       </button>
 
-      <div className="absolute bottom-24 left-4 right-24 z-10">
-        <button type="button" onClick={onOpen} className="text-left pointer-events-auto group">
-          <h2
-            className={`text-[20px] font-bold leading-tight text-white underline decoration-white/50 underline-offset-4 group-active:decoration-teal-300 ${
-              showTapCoach ? 'ring-2 ring-teal-400/80 ring-offset-2 ring-offset-transparent rounded-sm' : ''
-            }`}
-            style={{ textShadow: TEXT_SHADOW_STRONG }}
-          >
-            {business.name}
-          </h2>
-        </button>
-        <span
-          className="inline-block mt-2 rounded-md bg-[#0FB5B5] text-white text-xs font-semibold px-2.5 py-1 pointer-events-none border-2 border-white"
-          style={{ boxShadow: '0 2px 10px rgba(15,181,181,0.35)' }}
-        >
-          {dealPillText(business)}
-        </span>
-        {business.location ? (
-          <p
-            className="mt-2 text-xs text-white/95 flex items-center gap-1 pointer-events-none"
-            style={{ textShadow: TEXT_SHADOW_SOFT }}
-          >
-            <MapPin className="w-3.5 h-3.5" /> {business.location}
-          </p>
-        ) : null}
-
-        {showTapCoach && (
-          <div className="mt-3 pointer-events-auto relative max-w-[14rem]">
-            <div className="absolute -top-1.5 left-6 w-3 h-3 bg-white rotate-45" />
-            <div className="relative rounded-2xl bg-white text-neutral-900 px-3 py-2.5 shadow-lg">
-              <p className="text-xs font-semibold leading-snug">
-                Tap the name to see photos &amp; more about this place
-              </p>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDismissCoach();
-                }}
-                className="mt-1.5 text-[11px] font-bold text-teal-700"
+      {/* Typography + actions — feed already clears BottomNav via --hub-nav-offset */}
+      <div
+        className={`absolute inset-x-0 bottom-0 z-10 flex flex-col gap-3 px-4 pt-16 pointer-events-none ${
+          reserveTripStrip ? 'pb-[4.75rem]' : 'pb-4'
+        }`}
+      >
+        <div className="flex items-end gap-3">
+          {/* Left: info hierarchy */}
+          <div className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={onOpen}
+              className={`pointer-events-auto text-left group ${
+                showTapCoach ? 'ring-2 ring-teal-400/80 ring-offset-2 ring-offset-transparent rounded-md' : ''
+              }`}
+            >
+              <h2
+                className="text-xl sm:text-2xl font-bold leading-tight text-white tracking-tight"
+                style={{ textShadow: TEXT_SHADOW_STRONG }}
               >
-                Got it
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+                {business.name}
+              </h2>
+            </button>
 
-      <div className="absolute bottom-24 right-4 z-10 flex flex-col items-center gap-3">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onHeart();
-          }}
-          className="w-16 h-16 rounded-full flex items-center justify-center active:scale-95 transition-transform shadow-lg"
-          style={{ background: 'rgba(255,255,255,0.92)' }}
-          aria-label={saved ? 'Remove from trip' : 'Save to trip'}
-        >
-          <Heart
-            className={`w-8 h-8 ${
-              saved ? 'fill-[#FF6B6B] text-[#FF6B6B]' : 'text-[#0A0A0A] fill-none'
-            }`}
-          />
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onReviews();
-          }}
-          className="flex flex-col items-center gap-0.5 active:scale-95 transition-transform"
-          aria-label={`Reviews for ${business.name}`}
-        >
-          <span
-            className="w-12 h-12 rounded-full flex items-center justify-center shadow-md"
-            style={{ background: 'rgba(255,255,255,0.92)' }}
+            <span
+              className="mt-2 inline-block max-w-full truncate rounded-md bg-emerald-400 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wide text-neutral-950 pointer-events-none border border-white/80"
+              style={{ boxShadow: '0 2px 12px rgba(16,185,129,0.45)' }}
+            >
+              {dealPillText(business)}
+            </span>
+
+            {locationLine ? (
+              <p
+                className="mt-2 text-sm text-white/95 flex items-center gap-1.5 pointer-events-none truncate"
+                style={{ textShadow: TEXT_SHADOW_SOFT }}
+              >
+                <MapPin className="w-3.5 h-3.5 shrink-0 opacity-90" aria-hidden />
+                <span className="truncate">{locationLine}</span>
+              </p>
+            ) : null}
+
+            {showTapCoach && (
+              <div className="mt-3 pointer-events-auto relative max-w-[14rem]">
+                <div className="absolute -top-1.5 left-6 w-3 h-3 bg-white rotate-45" />
+                <div className="relative rounded-2xl bg-white text-neutral-900 px-3 py-2.5 shadow-lg">
+                  <p className="text-xs font-semibold leading-snug">
+                    Tap the name to see photos &amp; more about this place
+                  </p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDismissCoach();
+                    }}
+                    className="mt-1.5 text-[11px] font-bold text-teal-700"
+                  >
+                    Got it
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right rail: Heart + reviews */}
+          <div className="pointer-events-auto flex shrink-0 flex-col items-center gap-3 pb-0.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onHeart();
+              }}
+              className={`flex h-14 w-14 items-center justify-center rounded-full active:scale-95 transition-transform shadow-lg ${
+                saved
+                  ? 'bg-[#FF6B6B] text-white'
+                  : 'bg-white/20 text-white backdrop-blur-md ring-2 ring-white/70'
+              }`}
+              aria-label={saved ? 'Remove from trip' : 'Save to trip'}
+              aria-pressed={saved}
+            >
+              <Heart
+                className={`w-7 h-7 ${saved ? 'fill-white text-white' : 'fill-none text-white'}`}
+                strokeWidth={2.25}
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onReviews();
+              }}
+              className="flex flex-col items-center gap-0.5 active:scale-95 transition-transform"
+              aria-label={`Reviews for ${business.name}`}
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 backdrop-blur-md ring-1 ring-white/50 shadow-md">
+                <Star className="w-5 h-5 text-amber-300 fill-amber-300" />
+              </span>
+              <span
+                className="text-[10px] font-semibold text-white"
+                style={{ textShadow: TEXT_SHADOW_SOFT }}
+              >
+                {rating > 0 ? rating.toFixed(1) : 'Reviews'}
+                {reviewCount > 0 ? ` · ${reviewCount}` : ''}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Thumb-zone primary CTA + next */}
+        <div className="pointer-events-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen();
+            }}
+            className="flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl bg-[#0FB5B5] px-4 text-sm font-bold text-white shadow-lg shadow-teal-900/30 active:scale-[0.98] transition-transform"
           >
-            <Star className="w-5 h-5 text-amber-500 fill-amber-400" />
-          </span>
-          <span
-            className="text-[10px] font-semibold text-white"
-            style={{ textShadow: TEXT_SHADOW_SOFT }}
+            {viewDealLabel}
+            <ChevronRight className="w-4 h-4 shrink-0 opacity-90" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onNext();
+            }}
+            className="min-h-12 shrink-0 rounded-2xl bg-white/20 px-3.5 text-xs font-semibold text-white backdrop-blur-md ring-1 ring-white/40 active:scale-95 transition-transform"
+            aria-label="Next place"
           >
-            {rating > 0 ? rating.toFixed(1) : 'Reviews'}
-            {reviewCount > 0 ? ` · ${reviewCount}` : ''}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onNext();
-          }}
-          className="text-[11px] text-[#0A1F2A] font-semibold px-2.5 py-1 rounded-full shadow-md"
-          style={{ background: 'rgba(255,255,255,0.9)' }}
-        >
-          Next ↑
-        </button>
+            Next ↑
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1369,6 +1508,7 @@ function DetailSheet({
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-neutral-950 animate-in slide-in-from-bottom duration-200">
+      <DealOgHelmet business={business} imageUrl={gallery[photoIdx] || business.image} />
       <div className="flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
         <button type="button" onClick={onClose} className="p-2 rounded-full bg-white/92 text-[#0A0A0A] shadow-md" aria-label="Close">
           <X className="w-5 h-5" />

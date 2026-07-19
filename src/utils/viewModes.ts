@@ -40,6 +40,8 @@ export const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/deals': 'deals',
   '/map': 'map',
   '/passes': 'passes',
+  '/saved': 'my-favorites',
+  '/profile': 'dashboard',
   '/business/new': 'business-new',
   '/for-business': 'business-join',
   '/hub': 'business-dashboard',
@@ -47,6 +49,40 @@ export const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/faq': 'faq',
   '/business-guide': 'business-guide',
 };
+
+/**
+ * Tourist Hybrid Hub bottom tabs. Saved maps to `my-favorites` (favorites + pass holder in later steps);
+ * Profile maps to `dashboard` (user_profiles settings).
+ */
+export const HUB_BOTTOM_NAV_VIEWS: readonly ViewMode[] = [
+  'home',
+  'map',
+  'my-favorites',
+  'dashboard',
+] as const;
+
+/** Fixed chrome height of the hub bottom tab bar (excludes iOS home-indicator inset). */
+export const HUB_BOTTOM_NAV_HEIGHT_PX = 56;
+
+export function isHubBottomNavView(view: ViewMode): boolean {
+  return (HUB_BOTTOM_NAV_VIEWS as readonly string[]).includes(view);
+}
+
+/** Path used when switching hub tabs (keeps URL shareable). */
+export function pathForHubView(view: ViewMode): string | null {
+  switch (view) {
+    case 'home':
+      return '/';
+    case 'map':
+      return '/map';
+    case 'my-favorites':
+      return '/saved';
+    case 'dashboard':
+      return '/profile';
+    default:
+      return null;
+  }
+}
 
 /** Shareable per-deal route: `/deal/<readable-title>-<offeringId>`. */
 export const DEAL_PATH_RE = /^\/deal\/(.+)$/;

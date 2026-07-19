@@ -5,6 +5,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import { fetchBusinessProfilePage, type BusinessProfilePageData } from '@/lib/loadListings';
 import { absoluteBusinessProfileUrl, businessProfilePath } from '@/lib/businessProfileUrl';
+import { absoluteAssetUrl, DEFAULT_OG_IMAGE_PATH, resolveDealOgImageUrl } from '@/lib/shareMeta';
 import BusinessProfileLogo from '@/components/BusinessProfileLogo';
 import BusinessCard from '@/components/BusinessCard';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
@@ -99,11 +100,10 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({ profileBusine
     `${profile.offerings.length} live dil from ${profile.name}. Bukim tour, kakae mo aktiviti long Vanuatu.`,
   );
   const metaUrl = absoluteBusinessProfileUrl({ id: profile.id, name: profile.name });
-  const metaImage = (profile.logoUrl || profile.offerings[0]?.image || '').trim();
-  const coverImage =
-    metaImage && !metaImage.startsWith('http')
-      ? `${typeof window !== 'undefined' ? window.location.origin : 'https://www.stikmnek.com'}${metaImage.startsWith('/') ? '' : '/'}${metaImage}`
-      : metaImage;
+  const rawImage = (profile.logoUrl || profile.offerings[0]?.image || '').trim();
+  const coverImage = rawImage
+    ? resolveDealOgImageUrl(rawImage)
+    : absoluteAssetUrl(DEFAULT_OG_IMAGE_PATH);
 
   return (
     <div className="pt-16 pb-16 min-h-screen bg-gray-50/80">
@@ -116,11 +116,12 @@ const BusinessProfilePage: React.FC<BusinessProfilePageProps> = ({ profileBusine
         <meta property="og:title" content={metaTitle} />
         <meta property="og:description" content={metaDescription} />
         <meta property="og:url" content={metaUrl} />
-        {coverImage && <meta property="og:image" content={coverImage} />}
-        <meta name="twitter:card" content={coverImage ? 'summary_large_image' : 'summary'} />
+        <meta property="og:image" content={coverImage} />
+        <meta property="og:image:secure_url" content={coverImage} />
+        <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={metaTitle} />
         <meta name="twitter:description" content={metaDescription} />
-        {coverImage && <meta name="twitter:image" content={coverImage} />}
+        <meta name="twitter:image" content={coverImage} />
       </Helmet>
 
       <div className="relative overflow-hidden text-white">

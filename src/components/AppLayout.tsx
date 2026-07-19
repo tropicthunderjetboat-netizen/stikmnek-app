@@ -6,6 +6,7 @@ import { canAccessAdminPanel } from '@/lib/adminRoles';
 import {
   dealSlugFromPathname,
   partnerSlugFromPathname,
+  isHubBottomNavView,
   isRoutableAppPath,
   viewFromPathname,
   type ViewMode,
@@ -33,6 +34,7 @@ import InstallPrompt from './InstallPrompt';
 import ListingsLoadBanner from './ListingsLoadBanner';
 import PaymentConfirmation from './PaymentConfirmation';
 import FloatingPassButton from './FloatingPassButton';
+import BottomNav from './BottomNav';
 import LoadingSkeleton from './LoadingSkeleton';
 import CompleteTouristProfile from './CompleteTouristProfile';
 import CompleteBusinessProfile from './CompleteBusinessProfile';
@@ -59,6 +61,7 @@ const TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE: ViewMode[] = [
   'home',
   'deals',
   'map',
+  'my-favorites',
   'business-detail',
   'business-profile',
   'checkout',
@@ -508,6 +511,7 @@ const AppLayout: React.FC = () => {
     currentView === 'complete-profile' ||
     currentView === 'complete-business-profile' ||
     currentView === 'checkout' ||
+    // Tourist home keeps SwipeDiscover's own branding/login chrome (not the full Navbar).
     (currentView === 'home' && user?.type !== 'business');
   const hideFooter =
     currentView === 'admin' ||
@@ -517,7 +521,16 @@ const AppLayout: React.FC = () => {
     currentView === 'business-join' ||
     currentView === 'complete-profile' ||
     currentView === 'complete-business-profile' ||
-    (currentView === 'home' && user?.type !== 'business');
+    (currentView === 'home' && user?.type !== 'business') ||
+    // Hub tabs use bottom nav — hide marketing footer on those surfaces.
+    (user?.type !== 'business' && isHubBottomNavView(currentView));
+
+  // Hybrid Hub bottom tabs for tourists + anonymous visitors (not business/admin shells).
+  const showHubBottomNav =
+    user?.type !== 'business' &&
+    user?.type !== 'admin' &&
+    user?.type !== 'staff' &&
+    isHubBottomNavView(currentView);
 
   const showTouristProfileNudge =
     user?.type === 'tourist' &&
@@ -527,7 +540,7 @@ const AppLayout: React.FC = () => {
     TOURIST_BROWSE_VIEWS_WHILE_INCOMPLETE.includes(currentView);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className={`min-h-screen bg-white${showHubBottomNav ? ' has-hub-bottom-nav' : ''}`}>
       {/* Skip Navigation Link - Accessibility */}
       <a
         href="#main-content"
@@ -580,7 +593,12 @@ const AppLayout: React.FC = () => {
         </div>
       )}
 
-      <main id="main-content" role="main" aria-label="Main content">
+      <main
+        id="main-content"
+        role="main"
+        aria-label="Main content"
+        className={showHubBottomNav ? 'pb-[var(--hub-nav-offset)]' : undefined}
+      >
         <Suspense fallback={<LoadingSkeleton />}>
           {renderView()}
         </Suspense>
@@ -591,6 +609,7 @@ const AppLayout: React.FC = () => {
       <CookieConsent />
       <InstallPrompt />
       <FloatingPassButton />
+      {showHubBottomNav && <BottomNav />}
     </div>
   );
 };

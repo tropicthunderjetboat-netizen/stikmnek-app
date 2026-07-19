@@ -18,8 +18,14 @@ const FloatingPassButton: React.FC = () => {
   // Only show for tourists with an active pass — not on the pre-purchase homepage feed
   if (!user || user.type !== 'tourist' || !user.pass || !user.passId) return null;
 
-  // Hide during checkout / admin — QR is for account + post-purchase (incl. home after buy)
-  if (currentView === 'checkout' || currentView === 'payment-confirmation' || currentView === 'admin') {
+  // Hide on Home (Map FAB owns the hub), Saved wallet, checkout / admin
+  if (
+    currentView === 'home' ||
+    currentView === 'checkout' ||
+    currentView === 'payment-confirmation' ||
+    currentView === 'admin' ||
+    currentView === 'my-favorites'
+  ) {
     return null;
   }
 
@@ -38,7 +44,8 @@ const FloatingPassButton: React.FC = () => {
     <>
       <button
         onClick={() => setShowPass(true)}
-        className="fixed bottom-6 right-6 z-50 group flex items-center gap-2.5 pl-4 pr-5 py-3.5 rounded-full bg-[#0FB5B5] text-white font-bold shadow-xl shadow-teal-300/40 hover:bg-[#0da3a3] active:scale-95 transition-all duration-200"
+        className="fixed right-6 z-50 group flex items-center gap-2.5 pl-4 pr-5 py-3.5 rounded-full bg-[#0FB5B5] text-white font-bold shadow-xl shadow-teal-300/40 hover:bg-[#0da3a3] active:scale-95 transition-all duration-200"
+        style={{ bottom: 'calc(1.5rem + var(--hub-nav-offset, 0px))' }}
         title="Show my Pass"
         aria-label="Show my StikmNek Pass"
       >

@@ -17,6 +17,7 @@ export const loadMapView = () => import('@/components/MapView');
 export const loadAdminPanel = () => import('@/components/AdminPanel');
 export const loadBusinessOwnerDashboard = () => import('@/components/BusinessOwnerDashboard');
 export const loadTouristDashboard = () => import('@/components/Dashboard');
+export const loadMyFavoritesList = () => import('@/components/MyFavoritesList');
 
 // ── Heavy sub-components (library drivers) ─────────────────────────────────
 export const loadAdminPurchaseOverview = () => import('@/components/AdminPurchaseOverview'); // recharts

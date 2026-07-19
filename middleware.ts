@@ -26,8 +26,7 @@ const SUPABASE_ANON_KEY =
   process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYWZsYm1mcHRvYnlmcWJ1ZHJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3MTMwMTIsImV4cCI6MjA4NzI4OTAxMn0.Ukdx0PKI6cpoEdKGcV4LgcgumkhDIfiIXbmVMgbqKL0';
 
-const DEFAULT_IMAGE =
-  'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1771292371796_03759d98.jpg';
+const DEFAULT_IMAGE = 'https://www.stikmnek.com/og-facebook-preview.jpg';
 
 const CRAWLER_RE =
   /facebookexternalhit|facebookcatalog|facebot|twitterbot|whatsapp|slackbot|slack-imgproxy|linkedinbot|discordbot|telegrambot|pinterest|redditbot|googlebot|bingbot|applebot|embedly|quora link preview|outbrain|vkshare|skypeuripreview|nuzzel|google-structured-data-testing-tool|bitlybot|tumblr/i;

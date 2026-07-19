@@ -235,7 +235,40 @@ const MapController: React.FC<{
   return null;
 };
 
+/**
+ * Leaflet often mounts before the hub flex layout finishes sizing the container.
+ * Re-run invalidateSize on mount + short delays so tiles fill instead of grey boxes.
+ */
+const InvalidateMapSize: React.FC<{ bumpKey?: string | number }> = ({ bumpKey = 0 }) => {
+  const map = useMap();
 
+  useEffect(() => {
+    const run = () => {
+      try {
+        map.invalidateSize({ animate: false });
+      } catch {
+        /* map may be torn down mid-timeout */
+      }
+    };
+
+    run();
+    const t0 = window.setTimeout(run, 0);
+    const t1 = window.setTimeout(run, 100);
+    const t2 = window.setTimeout(run, 300);
+    const t3 = window.setTimeout(run, 600);
+    window.addEventListener('resize', run);
+
+    return () => {
+      window.clearTimeout(t0);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+      window.removeEventListener('resize', run);
+    };
+  }, [map, bumpKey]);
+
+  return null;
+};
 
 // ─── Tile layer options ───
 const tileLayers = {
@@ -255,8 +288,26 @@ const tileLayers = {
 
 type TileLayerKey = keyof typeof tileLayers;
 
+export type MapViewProps = {
+  /** Hub embedding: fill parent height, skip marketing chrome. */
+  embedded?: boolean;
+  /** Match Home category pills (`all` or a Category key). */
+  categoryFilter?: string;
+  /** Hub: open deal detail in parent instead of navigating away. */
+  onSelectBusiness?: (biz: Business) => void;
+  /** Change to re-trigger invalidateSize (e.g. when hub map mode opens). */
+  sizeBumpKey?: string | number;
+  className?: string;
+};
+
 // ─── Main MapView Component ───
-const MapView: React.FC = () => {
+const MapView: React.FC<MapViewProps> = ({
+  embedded = false,
+  categoryFilter = 'all',
+  onSelectBusiness,
+  sizeBumpKey = 0,
+  className = '',
+}) => {
   const navigate = useNavigate();
   const {
     language, setSelectedBusiness, setCurrentView, dbBusinesses,
@@ -273,9 +324,13 @@ const MapView: React.FC = () => {
 
   const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
-  // Filter businesses by radius and favorites
+  // Filter businesses by category (hub), radius, and favorites — in-memory only
   const filteredBusinesses = useMemo(() => {
     let result = allBusinesses;
+
+    if (categoryFilter && categoryFilter !== 'all') {
+      result = result.filter((biz) => biz.category === categoryFilter);
+    }
 
     // Apply favorites filter
     if (showFavoritesOnly) {
@@ -293,7 +348,7 @@ const MapView: React.FC = () => {
     }
 
     return result;
-  }, [allBusinesses, radiusFilter, userLocation, getDistanceTo, showFavoritesOnly, favorites]);
+  }, [allBusinesses, categoryFilter, radiusFilter, userLocation, getDistanceTo, showFavoritesOnly, favorites]);
 
   const businessesWithMapCoords = useMemo(
     () =>
@@ -320,9 +375,21 @@ const MapView: React.FC = () => {
   const mapZoom = getZoomForRadius(radiusFilter);
 
   const handleViewDeal = (biz: Business) => {
+    if (onSelectBusiness) {
+      onSelectBusiness(biz);
+      return;
+    }
     setSelectedBusiness(biz);
     setCurrentView('business-detail');
     navigate(dealPathForBusiness(biz));
+  };
+
+  const handlePinClick = (biz: Business) => {
+    if (embedded && onSelectBusiness) {
+      onSelectBusiness(biz);
+      return;
+    }
+    setSelectedMapBiz(biz);
   };
 
   const handleLocateMe = () => {
@@ -349,17 +416,26 @@ const MapView: React.FC = () => {
   const currentTile = tileLayers[tileLayer];
 
   return (
-    <section className="py-16 bg-white" id="map">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-10">
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-3">
-            {t('map.title', language)}
-          </h2>
-          <p className="text-gray-500 max-w-lg mx-auto">{t('map.subtitle', language)}</p>
-        </div>
+    <section
+      className={
+        embedded
+          ? `flex h-full w-full flex-col bg-white overflow-hidden ${className}`.trim()
+          : `py-16 bg-white ${className}`.trim()
+      }
+      id={embedded ? 'map-hub' : 'map'}
+    >
+      <div className={embedded ? 'flex min-h-0 flex-1 flex-col' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'}>
+        {!embedded && (
+          <div className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-3">
+              {t('map.title', language)}
+            </h2>
+            <p className="text-gray-500 max-w-lg mx-auto">{t('map.subtitle', language)}</p>
+          </div>
+        )}
 
         {/* Controls Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className={`flex flex-wrap items-center justify-between gap-3 ${embedded ? 'mb-2 shrink-0 px-3 pt-2' : 'mb-4'}`}>
           {/* Locate Me Button */}
           <button
             onClick={handleLocateMe}
@@ -469,7 +545,7 @@ const MapView: React.FC = () => {
         )}
 
         {/* Leaflet Map */}
-        <div className="relative rounded-2xl overflow-hidden shadow-xl border border-gray-200">
+        <div className={`relative overflow-hidden ${embedded ? 'min-h-0 flex-1 rounded-none border-0 shadow-none' : 'rounded-2xl shadow-xl border border-gray-200'}`}>
           {/* Layer Switcher */}
           <div className="absolute top-4 right-4 z-[1000]">
             <button
@@ -505,9 +581,9 @@ const MapView: React.FC = () => {
             center={mapCenter}
             zoom={mapZoom}
             scrollWheelZoom={true}
-            className="w-full h-[400px] sm:h-[500px] lg:h-[600px]"
+            className={embedded ? 'w-full h-full' : 'w-full h-[400px] sm:h-[500px] lg:h-[600px]'}
             zoomControl={false}
-            style={{ background: '#e8f4f8' }}
+            style={{ background: '#e8f4f8', ...(embedded ? { height: '100%', width: '100%' } : {}) }}
           >
             <TileLayer
               key={tileLayer}
@@ -524,6 +600,7 @@ const MapView: React.FC = () => {
               flyToUser={flyToUser}
               onFlyComplete={() => setFlyToUser(false)}
             />
+            <InvalidateMapSize bumpKey={`${embedded ? 'hub' : 'page'}-${sizeBumpKey}-${categoryFilter}`} />
 
             {/* Radius circle */}
             {userLocation && radiusFilter !== 'all' && (
@@ -578,7 +655,7 @@ const MapView: React.FC = () => {
                   position={[c.lat, c.lng]}
                   icon={createCategoryIcon(biz.category, biz.featured)}
                   eventHandlers={{
-                    click: () => setSelectedMapBiz(biz),
+                    click: () => handlePinClick(biz),
                   }}
                 />
               ))}
