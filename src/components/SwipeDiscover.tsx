@@ -130,9 +130,9 @@ type FeedItem =
   | { kind: 'place'; business: Business }
   | { kind: 'tip'; tip: TipStep };
 
-/** Original AI-generated Vanuatu hero (same asset as marketing Hero). */
-const WELCOME_HERO =
-  'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1770856886882_dff396d7.jpg';
+/** Original Vanuatu hero (same asset as marketing Hero / CloudFront). Local copy for reliable LCP. */
+const WELCOME_HERO_WEBP = '/welcome-hero.webp';
+const WELCOME_HERO_JPG = '/welcome-hero.jpg';
 
 const PARTY_OPTIONS: { n: number; label: string }[] = [
   { n: 1, label: 'Just me' },
@@ -932,17 +932,20 @@ function WelcomeCard({
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <img
-        src={WELCOME_HERO}
-        alt=""
-        width={1200}
-        height={800}
-        fetchPriority="high"
-        decoding="async"
-        className="absolute inset-0 h-full w-full object-cover"
-        style={{ filter: 'brightness(0.88) saturate(1.08) contrast(1.02)' }}
-        draggable={false}
-      />
+      <picture className="absolute inset-0 block h-full w-full">
+        <source srcSet={WELCOME_HERO_WEBP} type="image/webp" />
+        <img
+          src={WELCOME_HERO_JPG}
+          alt=""
+          width={1200}
+          height={509}
+          fetchPriority="high"
+          decoding="async"
+          className="h-full w-full object-cover object-center"
+          style={{ filter: 'brightness(0.88) saturate(1.08) contrast(1.02)' }}
+          draggable={false}
+        />
+      </picture>
       <div
         className="absolute inset-0"
         style={{

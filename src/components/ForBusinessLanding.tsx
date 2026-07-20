@@ -117,7 +117,7 @@ const ForBusinessLanding: React.FC = () => {
         {/* Hero */}
         <section className="relative px-4 pt-24 pb-10 sm:px-6 sm:pt-28 sm:pb-14 overflow-hidden">
           <img
-            src="/port-vila-harbour.png"
+            src="/welcome-hero.jpg"
             alt=""
             className="absolute inset-0 h-full w-full object-cover opacity-35"
             aria-hidden

@@ -57,7 +57,7 @@ const Hero: React.FC = () => {
       {/* Background Image */}
       <div className="absolute inset-0">
         <img
-          src="https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1770856886882_dff396d7.jpg"
+          src="/welcome-hero.jpg"
           alt="Vanuatu"
           className="w-full h-full object-cover"
           style={{ filter: 'brightness(0.9) saturate(1.05) contrast(1.02)' }}
