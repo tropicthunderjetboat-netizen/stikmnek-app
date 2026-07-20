@@ -613,7 +613,7 @@ export default function SwipeDiscover() {
   if (!dataLoaded) {
     return (
       <div
-        className="fixed inset-x-0 top-0 z-40 bg-neutral-950 flex items-center justify-center"
+        className="hub-phone-fixed fixed top-0 z-40 bg-neutral-950 flex items-center justify-center"
         style={{ bottom: 'var(--hub-nav-offset, 0px)' }}
       >
         <div className="w-12 h-12 rounded-full border-2 border-teal-500 border-t-transparent animate-spin" />
@@ -624,7 +624,7 @@ export default function SwipeDiscover() {
   if (listings.length === 0) {
     return (
       <div
-        className="fixed inset-x-0 top-0 z-40 bg-neutral-950 text-white flex flex-col items-center justify-center gap-4 px-6 text-center"
+        className="hub-phone-fixed fixed top-0 z-40 bg-neutral-950 text-white flex flex-col items-center justify-center gap-4 px-6 text-center"
         style={{ bottom: 'var(--hub-nav-offset, 0px)' }}
       >
         <p className="text-lg font-semibold">Places are loading in…</p>
@@ -648,7 +648,7 @@ export default function SwipeDiscover() {
 
   return (
     <div
-      className="fixed inset-x-0 top-0 z-40 bg-neutral-950 text-white overflow-hidden touch-none select-none"
+      className="hub-phone-fixed fixed top-0 z-40 bg-neutral-950 text-white overflow-hidden touch-none select-none"
       style={{ bottom: 'var(--hub-nav-offset, 0px)' }}
     >
       {/* Top chrome: branding + sticky category pills (above feed; pointer-events isolated) */}

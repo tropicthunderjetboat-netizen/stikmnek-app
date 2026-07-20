@@ -499,7 +499,20 @@ const AppLayout: React.FC = () => {
     isHubBottomNavView(currentView);
 
   return (
-    <div className={`min-h-screen bg-white${showHubBottomNav ? ' has-hub-bottom-nav' : ''}`}>
+    <div
+      className={
+        showHubBottomNav
+          ? 'has-hub-bottom-nav min-h-screen bg-white md:bg-slate-950 md:flex md:justify-center'
+          : 'min-h-screen bg-white'
+      }
+    >
+      <div
+        className={
+          showHubBottomNav
+            ? 'relative w-full min-h-screen md:max-w-[480px] md:shadow-2xl md:overflow-x-hidden md:bg-neutral-950'
+            : undefined
+        }
+      >
       {/* Skip Navigation Link - Accessibility */}
       <a
         href="#main-content"
@@ -537,7 +550,7 @@ const AppLayout: React.FC = () => {
         id="main-content"
         role="main"
         aria-label="Main content"
-        className={showHubBottomNav ? 'pb-[var(--hub-nav-offset)]' : undefined}
+        className={showHubBottomNav ? 'pb-[var(--hub-nav-offset)] relative min-h-screen' : undefined}
       >
         <Suspense fallback={<LoadingSkeleton />}>
           {renderView()}
@@ -550,6 +563,7 @@ const AppLayout: React.FC = () => {
       <InstallPrompt />
       <FloatingPassButton />
       {showHubBottomNav && <BottomNav />}
+      </div>
     </div>
   );
 };

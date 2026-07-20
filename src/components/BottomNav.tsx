@@ -80,7 +80,7 @@ const BottomNav: React.FC = () => {
             ? 'Meni blong go long'
             : 'Main navigation'
       }
-      className="fixed bottom-0 inset-x-0 z-[55] border-t border-teal-100/90 bg-white/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(15,23,42,0.06)]"
+      className="hub-phone-fixed fixed bottom-0 z-[55] border-t border-teal-100/90 bg-white/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(15,23,42,0.06)]"
       style={{
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}

@@ -53,6 +53,25 @@
     --hub-nav-offset: calc(var(--hub-bottom-nav-height) + env(safe-area-inset-bottom, 0px));
   }
 
+  /**
+   * Hub overlays that are `position: fixed`: full-bleed on mobile, snapped to the
+   * centered 480px phone frame on desktop (md+).
+   */
+  .hub-phone-fixed {
+    left: 0;
+    right: 0;
+    width: 100%;
+  }
+  @media (min-width: 768px) {
+    .hub-phone-fixed {
+      left: 50%;
+      right: auto;
+      width: 100%;
+      max-width: 480px;
+      transform: translateX(-50%);
+    }
+  }
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;

@@ -44,7 +44,7 @@ const FloatingPassButton: React.FC = () => {
     <>
       <button
         onClick={() => setShowPass(true)}
-        className="fixed right-6 z-50 group flex items-center gap-2.5 pl-4 pr-5 py-3.5 rounded-full bg-[#0FB5B5] text-white font-bold shadow-xl shadow-teal-300/40 hover:bg-[#0da3a3] active:scale-95 transition-all duration-200"
+        className="fixed z-50 group flex items-center gap-2.5 pl-4 pr-5 py-3.5 rounded-full bg-[#0FB5B5] text-white font-bold shadow-xl shadow-teal-300/40 hover:bg-[#0da3a3] active:scale-95 transition-all duration-200 right-6 md:right-[max(1.5rem,calc((100vw-480px)/2+1.5rem))]"
         style={{ bottom: 'calc(1.5rem + var(--hub-nav-offset, 0px))' }}
         title="Show my Pass"
         aria-label="Show my StikmNek Pass"
