@@ -5,7 +5,7 @@ import { getBusinessImageUrl } from '@/lib/utils';
 import { SUPABASE_URL } from '@/lib/supabase';
 
 /** Site-relative fallback when a listing has no usable primary image. */
-export const DEFAULT_OG_IMAGE_PATH = '/og-facebook-preview.jpg';
+export const DEFAULT_OG_IMAGE_PATH = '/og-facebook-preview.jpg?v=20260720';
 
 const SITE_ORIGIN_FALLBACK = 'https://www.stikmnek.com';
 
