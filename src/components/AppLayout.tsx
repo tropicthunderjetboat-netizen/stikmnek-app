@@ -18,29 +18,29 @@ import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import LegalDocumentPage from './LegalDocumentPage';
 import NotFound from '@/pages/NotFound';
 
-// ── Eagerly-loaded components ──
+// ── Eager shell (tourist home critical path) ──
 import Navbar from './Navbar';
-import Hero from './Hero';
-import HowItWorks from './HowItWorks';
-import BusinessGrid from './BusinessGrid';
-import PassCards from './PassCards';
 import PassesEntryGate from './PassesEntryGate';
-import ListYourBusinessCta from './ListYourBusinessCta';
-import ForBusinessLanding from './ForBusinessLanding';
 import Footer from './Footer';
 import AuthModal from './AuthModal';
 import CookieConsent from './CookieConsent';
 import InstallPrompt from './InstallPrompt';
 import ListingsLoadBanner from './ListingsLoadBanner';
-import PaymentConfirmation from './PaymentConfirmation';
 import FloatingPassButton from './FloatingPassButton';
 import BottomNav from './BottomNav';
 import LoadingSkeleton from './LoadingSkeleton';
-import CompleteTouristProfile from './CompleteTouristProfile';
-import CompleteBusinessProfile from './CompleteBusinessProfile';
 import SwipeDiscover from './SwipeDiscover';
 
-// ── Lazy-loaded route components ──
+// ── Lazy route / marketing screens (keeps Leaflet, charts, checkout out of tourist first paint) ──
+const Hero = React.lazy(() => import('./Hero'));
+const HowItWorks = React.lazy(() => import('./HowItWorks'));
+const BusinessGrid = React.lazy(() => import('./BusinessGrid'));
+const PassCards = React.lazy(() => import('./PassCards'));
+const ListYourBusinessCta = React.lazy(() => import('./ListYourBusinessCta'));
+const ForBusinessLanding = React.lazy(() => import('./ForBusinessLanding'));
+const CompleteTouristProfile = React.lazy(() => import('./CompleteTouristProfile'));
+const CompleteBusinessProfile = React.lazy(() => import('./CompleteBusinessProfile'));
+const PaymentConfirmation = React.lazy(() => import('./PaymentConfirmation'));
 const Dashboard = React.lazy(() => import('./Dashboard'));
 const MyFavoritesList = React.lazy(() => import('./MyFavoritesList'));
 const AdminPanel = React.lazy(() => import('./AdminPanel'));
@@ -166,12 +166,12 @@ function HomePage() {
   const { user } = useAppContext();
   if (user?.type === 'business') {
     return (
-      <>
+      <Suspense fallback={<LoadingSkeleton />}>
         <Hero />
         <HowItWorks />
         <PassCards embeddedOnHome />
         <ListYourBusinessCta />
-      </>
+      </Suspense>
     );
   }
   return <SwipeDiscover />;
@@ -423,7 +423,9 @@ const AppLayout: React.FC = () => {
       case 'deals':
         return (
           <div className="pt-16">
-            <BusinessGrid />
+            <Suspense fallback={<LoadingSkeleton />}>
+              <BusinessGrid />
+            </Suspense>
           </div>
         );
       case 'map':
@@ -459,7 +461,11 @@ const AppLayout: React.FC = () => {
       case 'business-new':
         return <BusinessListingFormInLayout padded />;
       case 'business-join':
-        return <ForBusinessLanding />;
+        return (
+          <Suspense fallback={<LoadingSkeleton />}>
+            <ForBusinessLanding />
+          </Suspense>
+        );
       case 'home':
       default:
         return <HomePage />;

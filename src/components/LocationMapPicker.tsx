@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import { MapPin, Crosshair } from 'lucide-react';

@@ -22,6 +22,7 @@ import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { isListingFavorited } from '@/lib/favoritesUi';
 import { dealPathForBusiness } from '@/lib/dealUrl';
 import { effectiveBusinessCoords } from '@/lib/urlHelpers';
+import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import MarkerClusterGroupImport from 'react-leaflet-cluster';

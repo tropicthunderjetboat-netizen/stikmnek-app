@@ -32,7 +32,7 @@ import {
   type TripLength,
   type TripState,
 } from '@/lib/tripStorage';
-import { APP_ICON } from '@/lib/brand';
+import { APP_ICON_192 } from '@/lib/brand';
 import HomeCategoryPills, { type HomeCategoryKey } from '@/components/HomeCategoryPills';
 import MapToggleFab from '@/components/MapToggleFab';
 import DealOgHelmet from '@/components/DealOgHelmet';
@@ -130,8 +130,9 @@ type FeedItem =
   | { kind: 'place'; business: Business }
   | { kind: 'tip'; tip: TipStep };
 
-/** Real Port Vila harbour photo (vertical) — tourist welcome + end cards. */
-const WELCOME_HERO = '/port-vila-harbour.png';
+/** Original AI-generated Vanuatu hero (same asset as marketing Hero). */
+const WELCOME_HERO =
+  'https://d64gsuwffb70l.cloudfront.net/698d2153e3f311f6bf471393_1770856886882_dff396d7.jpg';
 
 const PARTY_OPTIONS: { n: number; label: string }[] = [
   { n: 1, label: 'Just me' },
@@ -190,30 +191,38 @@ function placeKey(b: Business): string {
   return b.id;
 }
 
-/** Full photo visible (no crop) + soft blurred fill behind for letterboxing. */
+/** Full photo visible (no crop) + soft blurred fill behind for letterboxing.
+ *  Blur layer uses CSS background (same URL as the img) so the browser only
+ *  fetches the image once.
+ */
 function FitPhoto({
   src,
   className = '',
   imgClassName = '',
+  priority = false,
 }: {
   src: string;
   className?: string;
   imgClassName?: string;
+  /** When true, eager-load for the visible card (LCP / first place). */
+  priority?: boolean;
 }) {
   if (!src) return <div className={`bg-neutral-900 ${className}`} />;
+  const safeUrl = src.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   return (
     <div className={`relative overflow-hidden bg-neutral-950 ${className}`}>
-      <img
-        src={src}
-        alt=""
+      <div
         aria-hidden
-        draggable={false}
-        className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl opacity-50"
+        className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl opacity-50"
+        style={{ backgroundImage: `url("${safeUrl}")` }}
       />
       <img
         src={src}
         alt=""
         draggable={false}
+        decoding={priority ? 'sync' : 'async'}
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
         className={`relative z-[1] h-full w-full object-contain object-center ${imgClassName}`}
       />
     </div>
@@ -926,6 +935,10 @@ function WelcomeCard({
       <img
         src={WELCOME_HERO}
         alt=""
+        width={1200}
+        height={800}
+        fetchPriority="high"
+        decoding="async"
         className="absolute inset-0 h-full w-full object-cover"
         style={{ filter: 'brightness(0.88) saturate(1.08) contrast(1.02)' }}
         draggable={false}
@@ -942,8 +955,11 @@ function WelcomeCard({
         <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full text-center">
           <div className="w-[4.5rem] h-[4.5rem] mx-auto rounded-2xl overflow-hidden shadow-xl shadow-black/40 ring-2 ring-white/80 mb-4 bg-white">
             <img
-              src={APP_ICON}
+              src={APP_ICON_192}
               alt=""
+              width={192}
+              height={192}
+              decoding="async"
               className="w-full h-full object-cover"
               onError={(e) => {
                 const el = e.currentTarget;
@@ -1185,7 +1201,7 @@ function EndCard({
         <div className="w-full max-w-[300px] text-center space-y-4">
           <div className="mx-auto w-12 h-12 rounded-2xl overflow-hidden ring-1 ring-[#0A1F2A]/[0.08] bg-white">
             <img
-              src={APP_ICON}
+              src={APP_ICON_192}
               alt=""
               className="w-full h-full object-cover"
               onError={(e) => {
@@ -1274,7 +1290,7 @@ function PlaceCard({
         onClick={onOpen}
         aria-label={`Open ${business.name}`}
       >
-        <FitPhoto src={business.image} className="absolute inset-0 h-full w-full" />
+        <FitPhoto src={business.image} className="absolute inset-0 h-full w-full" priority />
         {/* Lower ~45–50% continuous dark gradient for white-text legibility */}
         <div
           className="absolute inset-x-0 bottom-0 z-[2] h-[48%] pointer-events-none bg-gradient-to-t from-black/90 via-black/40 to-transparent"

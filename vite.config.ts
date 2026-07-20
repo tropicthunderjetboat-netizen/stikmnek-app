@@ -23,6 +23,15 @@ function manualChunks(id: string): string | undefined {
   }
 }
 
+/** Skip modulepreload for heavy admin/editor/map chunks on the tourist entry HTML. */
+function shouldPreloadDep(dep: string): boolean {
+  const base = dep.split("/").pop() || dep;
+  if (base.includes("vendor-recharts")) return false;
+  if (base.includes("vendor-quill")) return false;
+  if (base.includes("vendor-maps")) return false;
+  return true;
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(async ({ mode }) => {
   const analyze = mode === "analyze" || process.env.ANALYZE === "true";
@@ -40,24 +49,38 @@ export default defineConfig(async ({ mode }) => {
     );
   }
 
-  return {
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  plugins,
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+  // Vite may still list async-chunk CSS in index.html; strip map/editor CSS so
+  // tourists don't pay for Leaflet/Quill styles on first paint.
+  plugins.push({
+    name: "strip-heavy-async-css-from-html",
+    transformIndexHtml(html) {
+      return html
+        .replace(/<link rel="stylesheet"[^>]*vendor-maps[^>]*>\s*/gi, "")
+        .replace(/<link rel="stylesheet"[^>]*vendor-quill[^>]*>\s*/gi, "");
     },
-  },
-  build: {
-    chunkSizeWarningLimit: 600,
-    rollupOptions: {
-      output: {
-        manualChunks,
+  });
+
+  return {
+    server: {
+      host: "::",
+      port: 8080,
+    },
+    plugins,
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
       },
     },
-  },
+    build: {
+      chunkSizeWarningLimit: 600,
+      modulePreload: {
+        resolveDependencies: (_filename, deps) => deps.filter(shouldPreloadDep),
+      },
+      rollupOptions: {
+        output: {
+          manualChunks,
+        },
+      },
+    },
   };
 });
