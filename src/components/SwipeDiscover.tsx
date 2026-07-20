@@ -36,6 +36,7 @@ import { APP_ICON } from '@/lib/brand';
 import HomeCategoryPills, { type HomeCategoryKey } from '@/components/HomeCategoryPills';
 import MapToggleFab from '@/components/MapToggleFab';
 import DealOgHelmet from '@/components/DealOgHelmet';
+import ShareButton from '@/components/ShareButton';
 import { loadMapView, prefetchChunk } from '@/lib/heavyChunks';
 
 const LazyMapView = React.lazy(() => import('./MapView'));
@@ -1517,9 +1518,12 @@ function DetailSheet({
         <button type="button" onClick={onClose} className="p-2 rounded-full bg-white/92 text-[#0A0A0A] shadow-md" aria-label="Close">
           <X className="w-5 h-5" />
         </button>
-        <button type="button" onClick={onHeart} className="p-2 rounded-full bg-white/92 shadow-md" aria-label="Save">
-          <Heart className={`w-5 h-5 ${saved ? 'fill-[#FF6B6B] text-[#FF6B6B]' : 'text-[#0A0A0A]'}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <ShareButton business={business} discountText={dealPillText(business)} variant="icon-light" />
+          <button type="button" onClick={onHeart} className="p-2 rounded-full bg-white/92 shadow-md" aria-label="Save">
+            <Heart className={`w-5 h-5 ${saved ? 'fill-[#FF6B6B] text-[#FF6B6B]' : 'text-[#0A0A0A]'}`} />
+          </button>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y">
         <div className="relative h-[42vh] bg-neutral-900">

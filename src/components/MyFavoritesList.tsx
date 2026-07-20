@@ -16,6 +16,7 @@ import { getBusinessImageUrl } from '@/lib/utils';
 import { loadTripState, saveTripState } from '@/lib/tripStorage';
 import { SUPABASE_URL } from '@/lib/supabase';
 import PassTicketCard from '@/components/PassTicketCard';
+import ShareButton from '@/components/ShareButton';
 
 function fmtPassDate(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -31,10 +32,40 @@ function fmtPassDate(iso: string | null | undefined): string {
 }
 
 function dealLabel(biz: Business): string {
-  const badge = listingOfferBadgeText(biz);
-  if (badge) return badge;
-  if (biz.discount) return String(biz.discount);
+  try {
+    const badge = listingOfferBadgeText(biz);
+    if (badge) return badge;
+  } catch {
+    /* ignore */
+  }
+  if (biz?.discount) return String(biz.discount);
   return 'Pass deal';
+}
+
+/** Safe cover URL — never throws; always returns a displayable src. */
+function safeCoverSrc(biz: Business | null | undefined): string {
+  if (!biz) return '/placeholder.svg';
+  const row = biz as Business & {
+    cover_image_url?: string | null;
+    image_url?: string | null;
+    photos?: unknown;
+  };
+  const photo0 = Array.isArray(row.photos) ? row.photos[0] : null;
+  const photoSrc =
+    typeof photo0 === 'string'
+      ? photo0
+      : photo0 && typeof photo0 === 'object' && photo0 !== null && 'url' in photo0
+        ? String((photo0 as { url?: unknown }).url ?? '')
+        : '';
+  const raw = String(
+    row.image || row.cover_image_url || row.image_url || photoSrc || '',
+  ).trim();
+  if (!raw) return '/placeholder.svg';
+  try {
+    return getBusinessImageUrl(raw, SUPABASE_URL) || raw || '/placeholder.svg';
+  } catch {
+    return raw || '/placeholder.svg';
+  }
 }
 
 /**
@@ -340,7 +371,10 @@ const MyFavoritesList: React.FC = () => {
           ) : (
             <ul className="space-y-3">
               {savedDeals.map((biz) => {
-                const img = getBusinessImageUrl(biz.image, SUPABASE_URL) || biz.image;
+                if (!biz?.id) return null;
+                const img = safeCoverSrc(biz);
+                const name = String(biz.name || 'Saved place').trim() || 'Saved place';
+                const discount = dealLabel(biz);
                 return (
                   <li
                     key={biz.id}
@@ -350,21 +384,23 @@ const MyFavoritesList: React.FC = () => {
                       type="button"
                       onClick={() => openDeal(biz)}
                       className="shrink-0 overflow-hidden rounded-xl border border-gray-100"
-                      aria-label={biz.name}
+                      aria-label={name}
                     >
-                      {img ? (
-                        <img src={img} alt="" className="h-20 w-20 object-cover" loading="lazy" />
-                      ) : (
-                        <div className="flex h-20 w-20 items-center justify-center bg-gray-100 text-gray-400">
-                          <Heart className="h-5 w-5" />
-                        </div>
-                      )}
+                      <img
+                        src={img}
+                        alt=""
+                        className="h-20 w-20 object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder.svg';
+                        }}
+                      />
                     </button>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="truncate font-bold text-gray-900">{biz.name}</p>
+                          <p className="truncate font-bold text-gray-900">{name}</p>
                           {biz.location ? (
                             <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-gray-500">
                               <MapPin className="h-3 w-3 shrink-0" aria-hidden />
@@ -389,16 +425,23 @@ const MyFavoritesList: React.FC = () => {
                       </div>
 
                       <span className="mt-2 inline-block max-w-full truncate rounded-md bg-emerald-100 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-emerald-800">
-                        {dealLabel(biz)}
+                        {discount}
                       </span>
 
-                      <button
-                        type="button"
-                        onClick={() => openDeal(biz)}
-                        className="mt-2.5 inline-flex min-h-9 items-center justify-center rounded-lg bg-teal-600 px-3.5 text-xs font-bold text-white transition-colors hover:bg-teal-700"
-                      >
-                        {detailsLabel}
-                      </button>
+                      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openDeal(biz)}
+                          className="inline-flex min-h-9 items-center justify-center rounded-lg bg-teal-600 px-3.5 text-xs font-bold text-white transition-colors hover:bg-teal-700"
+                        >
+                          {detailsLabel}
+                        </button>
+                        <ShareButton
+                          business={biz}
+                          discountText={discount}
+                          variant="button-compact"
+                        />
+                      </div>
                     </div>
                   </li>
                 );

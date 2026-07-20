@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
-import { absoluteDealUrl, dealPathForBusiness } from '@/lib/dealUrl';
+import { dealPathForBusiness } from '@/lib/dealUrl';
 import DealOgHelmet from '@/components/DealOgHelmet';
 import { t } from '@/data/translations';
-import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, Share2, MessageSquarePlus, Sparkles, ExternalLink, Store, Layers, Globe } from 'lucide-react';
+import { ArrowLeft, Star, MapPin, Clock, Phone, Heart, CalendarDays, MessageSquarePlus, Sparkles, ExternalLink, Store, Layers, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import ReviewForm from '@/components/ReviewForm';
 import PhotoGallery from '@/components/PhotoGallery';
-import { formatVT, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
+import { formatVT, getBusinessImageUrl, getBusinessWhatsAppRaw, digitsForWaMe } from '@/lib/utils';
 import { resolveListingCoverImageUrl } from '@/lib/fetchApprovedPhotosForOffering';
+import ShareButton from '@/components/ShareButton';
 import { shortPriceUnitSuffix } from '@/lib/categoryPricing';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { trackInteractionEvent } from '@/lib/interactionEvents';
@@ -564,29 +565,15 @@ const BusinessDetail: React.FC = () => {
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleShare = async () => {
-    const shareBody = plainTextFromHtml(desc || '') || biz.name;
-    const shareData = { title: biz.name, text: shareBody, url: absoluteDealUrl(biz) };
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-        return;
-      }
-    } catch {
-      // Share API denied or cancelled — fall through to clipboard
-    }
-    try {
-      await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
-      toast.success(language === 'en' ? 'Link copied to clipboard!' : language === 'fr' ? 'Lien copié !' : 'Link i kopi finis long clipboard!');
-    } catch {
-      toast.info(language === 'en' ? 'Copy this link to share:' : 'Copiez ce lien :', { description: absoluteDealUrl(biz), duration: 6000 });
-    }
-  };
-
+  const heroCoverSrc =
+    displayCoverImage ||
+    getBusinessImageUrl(biz.image, SUPABASE_URL) ||
+    String(biz.image || '').trim() ||
+    '/placeholder.svg';
 
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
-      <DealOgHelmet business={biz} imageUrl={displayCoverImage || biz.image} />
+      <DealOgHelmet business={biz} imageUrl={heroCoverSrc} />
       <div className="max-w-4xl mx-auto px-4 py-4">
         <button onClick={handleBack} className="flex items-center gap-2 text-gray-600 hover:text-teal-700 transition-colors text-sm font-medium">
           <ArrowLeft className="w-4 h-4" />
@@ -1235,10 +1222,12 @@ const BusinessDetail: React.FC = () => {
                   <Heart className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
                   {t('biz.save', language)}
                 </button>
-                <button onClick={handleShare} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold flex items-center justify-center gap-1.5 hover:border-teal-300 transition-colors">
-                  <Share2 className="w-4 h-4" />
-                  Share
-                </button>
+                <ShareButton
+                  business={biz}
+                  discountText={detailDiscountBadge || undefined}
+                  variant="button"
+                  stopPropagation={false}
+                />
               </div>
               </div>
 
