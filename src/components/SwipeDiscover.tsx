@@ -908,7 +908,6 @@ export default function SwipeDiscover() {
             reviewCount={reviewsForBusiness(dbReviews, current.business).length || current.business.reviewCount || 0}
             rating={current.business.rating || 0}
             language={language}
-            reserveTripStrip={savedBusinesses.length > 0}
             showTapCoach={showTapCoach && !detail && !paywallBiz && !reviewsBiz && !searchOpen && !showSoftNudge}
             onDismissCoach={dismissTapCoach}
             onHeart={() => void heartPlace(current.business)}
@@ -918,70 +917,6 @@ export default function SwipeDiscover() {
           />
         )}
       </div>
-      )}
-
-      {!isMapMode && savedBusinesses.length > 0 && !detail && !paywallBiz && !reviewsBiz && !searchOpen && current?.kind === 'place' && (
-        <div
-          className="absolute bottom-0 inset-x-0 z-20 px-3 pb-3 pt-8 pointer-events-none"
-          style={{
-            background:
-              'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.28) 100%)',
-          }}
-        >
-          <div className="pointer-events-auto space-y-1.5">
-            <div className="flex items-center justify-between gap-2 px-0.5">
-              <p className="text-[11px] font-semibold text-white/90 drop-shadow-sm">
-                Your trip · {saveCount} place{saveCount === 1 ? '' : 's'}
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentView('my-favorites');
-                  navigate('/saved');
-                }}
-                className="inline-flex items-center gap-0.5 text-[11px] font-bold text-white drop-shadow-sm"
-              >
-                Open saved
-                <ChevronRight className="w-3.5 h-3.5" aria-hidden />
-              </button>
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {savedBusinesses.slice(0, 8).map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => openDetail(b)}
-                  className="shrink-0 w-14 h-14 rounded-xl overflow-hidden ring-2 ring-white shadow-md"
-                  aria-label={b.name || 'Saved place'}
-                >
-                  <FitPhoto src={b.image} className="h-full w-full" />
-                </button>
-              ))}
-              {savedBusinesses.length > 8 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentView('my-favorites');
-                    navigate('/saved');
-                  }}
-                  className="shrink-0 w-14 h-14 rounded-xl bg-white/20 backdrop-blur ring-2 ring-white/80 text-white text-[10px] font-bold flex items-center justify-center"
-                >
-                  +{savedBusinesses.length - 8}
-                </button>
-              )}
-              {!hasPass && (
-                <button
-                  type="button"
-                  onClick={() => openCheckout()}
-                  className="shrink-0 self-center rounded-full bg-[#0FB5B5] px-4 py-2.5 text-xs font-bold whitespace-nowrap text-white border-2 border-white"
-                  style={{ boxShadow: '0 4px 16px rgba(15,181,181,0.4)' }}
-                >
-                  Get pass · A${pricePreview}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
       )}
 
       {detail && (
@@ -1411,7 +1346,6 @@ function PlaceCard({
   reviewCount,
   rating,
   language,
-  reserveTripStrip,
   showTapCoach,
   onDismissCoach,
   onHeart,
@@ -1425,8 +1359,6 @@ function PlaceCard({
   reviewCount: number;
   rating: number;
   language: 'en' | 'fr' | 'bi';
-  /** Leave space for the bottom trip-thumbnail strip when it is visible. */
-  reserveTripStrip: boolean;
   showTapCoach: boolean;
   onDismissCoach: () => void;
   onHeart: () => void;
@@ -1464,11 +1396,7 @@ function PlaceCard({
       </button>
 
       {/* Bottom-right interaction stack (Heart → Reviews) */}
-      <div
-        className={`pointer-events-auto absolute right-4 z-20 flex flex-col items-center gap-3 ${
-          reserveTripStrip ? 'bottom-[8.5rem]' : 'bottom-[5.25rem]'
-        }`}
-      >
+      <div className="pointer-events-auto absolute right-4 bottom-[5.25rem] z-20 flex flex-col items-center gap-3">
         <button
           type="button"
           onClick={(e) => {
@@ -1511,11 +1439,7 @@ function PlaceCard({
       </div>
 
       {/* Typography + CTAs — feed already clears BottomNav via --hub-nav-offset */}
-      <div
-        className={`absolute inset-x-0 bottom-0 z-10 flex flex-col gap-3 px-4 pt-16 pointer-events-none ${
-          reserveTripStrip ? 'pb-[4.75rem]' : 'pb-4'
-        }`}
-      >
+      <div className="absolute inset-x-0 bottom-0 z-10 flex flex-col gap-3 px-4 pt-16 pb-4 pointer-events-none">
         {/* Left info column — leave room for right action stack */}
         <div className="min-w-0 pr-[4.5rem]">
           <button

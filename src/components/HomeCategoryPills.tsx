@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Car,
-  ChevronRight,
   Compass,
   Heart,
   Home,
@@ -37,6 +36,7 @@ type HomeCategoryPillsProps = {
 /**
  * Sticky horizontal category pills for the Hybrid Hub home feed.
  * Controlled — parent owns filter state so SwipeDiscover can memoize without remounting.
+ * Scroll affordance: soft edge fades only (no extra “More” chip).
  */
 const HomeCategoryPills: React.FC<HomeCategoryPillsProps> = ({
   value,
@@ -82,12 +82,6 @@ const HomeCategoryPills: React.FC<HomeCategoryPillsProps> = ({
     e.stopPropagation();
   }, []);
 
-  const scrollMore = useCallback(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    el.scrollBy({ left: Math.min(160, el.clientWidth * 0.55), behavior: 'smooth' });
-  }, []);
-
   const labelFor = (key: HomeCategoryKey): string => {
     if (key === 'all') return t('cat.all', language);
     const cat = categories.find((c) => c.key === key);
@@ -98,9 +92,6 @@ const HomeCategoryPills: React.FC<HomeCategoryPillsProps> = ({
   };
 
   const pills: HomeCategoryKey[] = ['all', ...categories.map((c) => c.key)];
-
-  const moreLabel =
-    language === 'fr' ? 'Plus' : language === 'bi' ? 'Moa' : 'More';
 
   return (
     <div
@@ -119,7 +110,7 @@ const HomeCategoryPills: React.FC<HomeCategoryPillsProps> = ({
               ? 'Filtrer par catégorie — glissez pour voir plus'
               : language === 'bi'
                 ? 'Filta long kategori — slide blong luk moa'
-                : 'Filter by category — swipe for more'
+                : 'Filter by category — swipe sideways for more'
           }
           className="flex gap-2 overflow-x-auto overscroll-x-contain touch-pan-x px-4 pb-2 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
@@ -145,54 +136,28 @@ const HomeCategoryPills: React.FC<HomeCategoryPillsProps> = ({
               </button>
             );
           })}
-          {/* Spacer so last pill isn't hidden under the More chip */}
-          {canScrollRight ? <div className="shrink-0 w-14" aria-hidden /> : null}
         </div>
 
-        {/* Left edge fade when scrolled */}
         <div
           aria-hidden
-          className={`pointer-events-none absolute inset-y-0 left-0 w-8 transition-opacity duration-200 ${
+          className={`pointer-events-none absolute inset-y-0 left-0 w-7 transition-opacity duration-200 ${
             canScrollLeft ? 'opacity-100' : 'opacity-0'
           } ${
             light
               ? 'bg-gradient-to-r from-[#F4F7F8] to-transparent'
-              : 'bg-gradient-to-r from-black/50 to-transparent'
+              : 'bg-gradient-to-r from-black/45 to-transparent'
           }`}
         />
-
-        {/* Right fade + More control — makes horizontal scroll obvious */}
-        {canScrollRight ? (
-          <div className="absolute inset-y-0 right-0 flex items-center pl-6 pr-1">
-            <div
-              aria-hidden
-              className={`pointer-events-none absolute inset-0 ${
-                light
-                  ? 'bg-gradient-to-l from-[#F4F7F8] via-[#F4F7F8]/90 to-transparent'
-                  : 'bg-gradient-to-l from-black/55 via-black/35 to-transparent'
-              }`}
-            />
-            <button
-              type="button"
-              onClick={scrollMore}
-              className={`relative z-[1] inline-flex items-center gap-0.5 rounded-full px-2 py-1 text-[10px] font-bold shadow-sm ${
-                light
-                  ? 'bg-white/95 text-[#0A1F2A] ring-1 ring-[#0A1F2A]/10'
-                  : 'bg-white/90 text-neutral-900'
-              }`}
-              aria-label={
-                language === 'fr'
-                  ? 'Voir plus de catégories'
-                  : language === 'bi'
-                    ? 'Luk moa kategori'
-                    : 'See more categories'
-              }
-            >
-              {moreLabel}
-              <ChevronRight className="w-3 h-3" aria-hidden />
-            </button>
-          </div>
-        ) : null}
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-y-0 right-0 w-10 transition-opacity duration-200 ${
+            canScrollRight ? 'opacity-100' : 'opacity-0'
+          } ${
+            light
+              ? 'bg-gradient-to-l from-[#F4F7F8] to-transparent'
+              : 'bg-gradient-to-l from-black/50 to-transparent'
+          }`}
+        />
       </div>
     </div>
   );
