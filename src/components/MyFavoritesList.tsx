@@ -8,11 +8,23 @@ import {
   touristFacingOfferings,
   type Business,
 } from '@/data/businesses';
-import { clampPartySize } from '@/data/pricing';
+import { calculatePassPrice, clampPartySize } from '@/data/pricing';
 import { businessesMatchingFavoriteKeys, isListingFavorited } from '@/lib/favoritesUi';
 import { dealPathForBusiness } from '@/lib/dealUrl';
 import { getBusinessImageUrl } from '@/lib/utils';
-import { checkoutFromTrip, loadTripState, savePendingCheckout, saveTripState, TRIP_STORAGE_KEY } from '@/lib/tripStorage';
+import {
+  checkoutFromTrip,
+  loadTripState,
+  savePendingCheckout,
+  saveTripState,
+  tripLengthToIsExtended,
+  TRIP_STORAGE_KEY,
+} from '@/lib/tripStorage';
+import {
+  estimateTripSavings,
+  tripSavingsSummaryLine,
+  tripSavingsVsPassLine,
+} from '@/lib/tripSavingsEstimate';
 import { SUPABASE_URL } from '@/lib/supabase';
 import PassTicketCard from '@/components/PassTicketCard';
 import ShareButton from '@/components/ShareButton';
@@ -88,6 +100,10 @@ const MyFavoritesList: React.FC = () => {
   } = useAppContext();
 
   const [tripSavedIds, setTripSavedIds] = useState<string[]>(() => loadTripState().savedPlaceIds);
+  const [tripPaidPeople, setTripPaidPeople] = useState(() => loadTripState().paidPeople || 1);
+  const [tripIsExtended, setTripIsExtended] = useState(
+    () => tripLengthToIsExtended(loadTripState().tripLength),
+  );
   const [copied, setCopied] = useState(false);
   const [showTripFocusBanner, setShowTripFocusBanner] = useState(() => peekPostPurchaseTripFocus());
 
@@ -101,7 +117,12 @@ const MyFavoritesList: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const sync = () => setTripSavedIds(loadTripState().savedPlaceIds);
+    const sync = () => {
+      const t = loadTripState();
+      setTripSavedIds(t.savedPlaceIds);
+      setTripPaidPeople(t.paidPeople || 1);
+      setTripIsExtended(tripLengthToIsExtended(t.tripLength));
+    };
     sync();
     const onStorage = (e: StorageEvent) => {
       if (e.key === TRIP_STORAGE_KEY || e.key == null) sync();
@@ -137,6 +158,28 @@ const MyFavoritesList: React.FC = () => {
   }, [user, allBusinesses, favorites, tripSavedIds]);
 
   const partySize = clampPartySize(user?.passPeopleCount || 1);
+
+  const lang = (language === 'fr' || language === 'bi' ? language : 'en') as 'en' | 'fr' | 'bi';
+
+  const tripSavings = useMemo(
+    () => estimateTripSavings(savedDeals, tripPaidPeople || 1),
+    [savedDeals, tripPaidPeople],
+  );
+
+  const passPriceAud = useMemo(
+    () => calculatePassPrice(clampPartySize(tripPaidPeople || 1), tripIsExtended),
+    [tripPaidPeople, tripIsExtended],
+  );
+
+  const savingsSummary = useMemo(
+    () => tripSavingsSummaryLine(tripSavings, lang),
+    [tripSavings, lang],
+  );
+
+  const savingsVsPass = useMemo(
+    () => tripSavingsVsPassLine(tripSavings.totalVt, passPriceAud, lang),
+    [tripSavings.totalVt, passPriceAud, lang],
+  );
 
   const goHome = useCallback(() => {
     setCurrentView('home');
@@ -337,6 +380,21 @@ const MyFavoritesList: React.FC = () => {
                       ? 'Wetem StikmNek Tourist Pass, soem QR long ol lokal bisnis mo sevem long ol deal we yu laikem.'
                       : 'Unlock all discounts below with a StikmNek Tourist Pass — show your QR to local operators and save on every deal you’ve hearted.'}
                 </p>
+                {savingsSummary ? (
+                  <div className="mt-3 rounded-xl border border-teal-200 bg-white/80 px-3 py-2.5">
+                    <p className="text-sm font-semibold text-teal-900 leading-snug">{savingsSummary}</p>
+                    {savingsVsPass ? (
+                      <p className="mt-1 text-xs text-teal-700/80 leading-snug">{savingsVsPass}</p>
+                    ) : null}
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      {language === 'fr'
+                        ? 'Estimatif — basé sur les tarifs affichés · 6 ans et +'
+                        : language === 'bi'
+                          ? 'Estimet — blong praes we i so · 6 yia mo antap'
+                          : 'Estimate only — based on listed prices · ages 6+'}
+                    </p>
+                  </div>
+                ) : null}
                 <ul className="mt-3 space-y-1.5 text-sm text-gray-700">
                   <li className="flex gap-2">
                     <span className="text-teal-600" aria-hidden>

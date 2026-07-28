@@ -24,6 +24,11 @@ import { digitsForWaMe, formatVT, getPhotoDisplayUrl } from '@/lib/utils';
 import { fetchApprovedPhotosForOffering } from '@/lib/fetchApprovedPhotosForOffering';
 import { pricingTiersForDisplay } from '@/lib/pricingTiers';
 import { averageStarRating } from '@/lib/reviewStats';
+import {
+  estimateTripSavings,
+  tripSavingsSummaryLine,
+  tripSavingsVsPassLine,
+} from '@/lib/tripSavingsEstimate';
 import { useQrDataUrl } from '@/lib/qrCode';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import {
@@ -621,6 +626,11 @@ export default function SwipeDiscover() {
     [listings, trip.savedPlaceIds],
   );
 
+  const tripSavingsEstimate = useMemo(
+    () => estimateTripSavings(savedBusinesses, trip.paidPeople || 1),
+    [savedBusinesses, trip.paidPeople],
+  );
+
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (q.length < 2) return [];
@@ -993,6 +1003,8 @@ export default function SwipeDiscover() {
           paidPeople={clampPartySize(trip.paidPeople || 1)}
           isExtended={isExtended}
           price={pricePreview}
+          savingsLine={tripSavingsSummaryLine(tripSavingsEstimate)}
+          savingsVsPassLine={tripSavingsVsPassLine(tripSavingsEstimate.totalVt, pricePreview)}
           onDismiss={dismissSoftNudge}
           onBuy={() => {
             dismissSoftNudge();
@@ -2138,6 +2150,8 @@ function SoftNudgeSheet({
   paidPeople,
   isExtended,
   price,
+  savingsLine,
+  savingsVsPassLine: vsPassLine,
   onDismiss,
   onBuy,
 }: {
@@ -2145,6 +2159,8 @@ function SoftNudgeSheet({
   paidPeople: number;
   isExtended: boolean;
   price: number;
+  savingsLine?: string;
+  savingsVsPassLine?: string;
   onDismiss: () => void;
   onBuy: () => void;
 }) {
@@ -2163,6 +2179,14 @@ function SoftNudgeSheet({
         <h3 className="text-lg font-bold text-center text-white">
           Your trip has {tripCount} place{tripCount === 1 ? '' : 's'}
         </h3>
+        {savingsLine ? (
+          <div className="rounded-xl bg-teal-500/15 border border-teal-400/30 px-3 py-2.5 text-center">
+            <p className="text-sm font-semibold text-teal-200 leading-snug">{savingsLine}</p>
+            {vsPassLine ? (
+              <p className="mt-1 text-xs text-teal-100/70 leading-snug">{vsPassLine}</p>
+            ) : null}
+          </div>
+        ) : null}
         <p className="text-sm text-neutral-400 text-center leading-relaxed">
           Unlock WhatsApp + QR check-in so you can use the member prices on every saved spot. {plan}.
         </p>
