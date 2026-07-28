@@ -1664,22 +1664,51 @@ function DetailSheet({
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-neutral-950 animate-in slide-in-from-bottom duration-200">
       <DealOgHelmet business={business} imageUrl={gallery[photoIdx] || business.image} />
-      <div className="flex items-center justify-between px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2">
-        <button type="button" onClick={onClose} className="p-2 rounded-full bg-white/92 text-[#0A0A0A] shadow-md" aria-label="Close">
-          <X className="w-5 h-5" />
-        </button>
-        <div className="flex items-center gap-2">
-          <ShareButton business={business} discountText={dealPillText(business)} variant="icon-light" />
-          <button type="button" onClick={onHeart} className="p-2 rounded-full bg-white/92 shadow-md" aria-label="Save">
-            <Heart className={`w-5 h-5 ${saved ? 'fill-[#FF6B6B] text-[#FF6B6B]' : 'text-[#0A0A0A]'}`} />
-          </button>
-        </div>
-      </div>
       <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y">
-        <div className="relative h-[42vh] bg-neutral-900">
+        <div className="relative h-[min(48vh,22rem)] bg-neutral-900">
           {gallery[photoIdx] ? (
             <FitPhoto src={gallery[photoIdx]!} className="absolute inset-0 h-full w-full" />
           ) : null}
+
+          {/* Top scrim so controls stay readable on dark photos / letterboxing */}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 z-[4] h-28 bg-gradient-to-b from-black/70 via-black/35 to-transparent"
+            aria-hidden
+          />
+
+          {/* Back + share/heart overlaid on the hero — high-contrast pills */}
+          <div className="absolute inset-x-0 top-0 z-[5] flex items-center justify-between gap-3 px-3 pt-[max(0.65rem,env(safe-area-inset-top))] pb-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 min-h-11 rounded-full bg-white px-3.5 py-2 text-sm font-bold text-neutral-900 shadow-lg ring-1 ring-black/10 active:scale-[0.98]"
+              aria-label="Back to feed"
+            >
+              <ChevronRight className="w-5 h-5 rotate-180 shrink-0" aria-hidden />
+              Back
+            </button>
+            <div className="flex items-center gap-2">
+              <ShareButton
+                business={business}
+                discountText={dealPillText(business)}
+                variant="icon-light"
+                className="!bg-white !text-neutral-900 shadow-lg ring-1 ring-black/10 min-h-11 min-w-11"
+              />
+              <button
+                type="button"
+                onClick={onHeart}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-lg ring-1 ring-black/10 active:scale-[0.98]"
+                aria-label={saved ? 'Remove from trip' : 'Save to trip'}
+              >
+                <Heart
+                  className={`w-5 h-5 ${
+                    saved ? 'fill-[#FF6B6B] text-[#FF6B6B]' : 'text-neutral-900'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
           {gallery.length > 1 && (
             <>
               <div className="absolute inset-y-0 left-0 z-[3] w-1/3" onClick={() => setPhotoIdx((i) => Math.max(0, i - 1))} />
