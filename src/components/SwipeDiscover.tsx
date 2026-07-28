@@ -189,6 +189,12 @@ function dealPillText(b: Business): string {
   return 'Passholder deal';
 }
 
+/** Clear savings copy — show the math so tourists want the pass. */
+function passSavingsLabel(origPx: number, dealPx: number): string | null {
+  if (!(origPx > 0 && dealPx > 0 && dealPx < origPx)) return null;
+  return `Save ${formatVT(origPx - dealPx)}`;
+}
+
 function placeKey(b: Business): string {
   return b.id;
 }
@@ -1378,7 +1384,7 @@ function PlaceCard({
   const dealPx = effectiveListingDealPrice(business);
   const origPx = effectiveListingOriginalPrice(business);
   const hasDiscount = listingHasActiveDiscount(business);
-  const memberLocked = !hasPass && hasDiscount && dealPx > 0;
+  const savings = passSavingsLabel(origPx, dealPx);
 
   return (
     <div className="relative h-full w-full">
@@ -1467,7 +1473,7 @@ function PlaceCard({
             </h2>
           </button>
 
-          {/* Discount / locked member price */}
+          {/* Clear savings — show the math so people want a pass */}
           <div className="mt-2 flex flex-col items-start gap-1.5">
             <span
               className="inline-block max-w-full truncate rounded-md bg-emerald-400 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wide text-neutral-950 pointer-events-none border border-white/80"
@@ -1475,36 +1481,21 @@ function PlaceCard({
             >
               {dealPillText(business)}
             </span>
-            {memberLocked ? (
+            {hasDiscount && dealPx > 0 ? (
               <div
-                className="inline-flex items-center gap-2 rounded-lg bg-black/45 backdrop-blur-sm px-2.5 py-1.5 pointer-events-none"
-                style={{ textShadow: TEXT_SHADOW_SOFT }}
-              >
-                {origPx > dealPx ? (
-                  <span className="text-[11px] text-white/70 line-through">{formatVT(origPx)}</span>
-                ) : null}
-                <span className="relative inline-flex items-center gap-1">
-                  <Lock className="w-3 h-3 text-amber-300" aria-hidden />
-                  <span className="text-sm font-bold text-white/40 blur-[3px] select-none tabular-nums">
-                    {formatVT(dealPx)}
-                  </span>
-                </span>
-                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-200">
-                  Member price
-                </span>
-              </div>
-            ) : hasPass && hasDiscount && dealPx > 0 ? (
-              <div
-                className="inline-flex items-center gap-2 rounded-lg bg-teal-600/90 px-2.5 py-1.5 pointer-events-none"
+                className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg bg-black/45 px-2.5 py-1.5 pointer-events-none"
                 style={{ textShadow: TEXT_SHADOW_SOFT }}
               >
                 {origPx > dealPx ? (
                   <span className="text-[11px] text-white/70 line-through">{formatVT(origPx)}</span>
                 ) : null}
                 <span className="text-sm font-bold text-white tabular-nums">{formatVT(dealPx)}</span>
-                <span className="text-[10px] font-bold uppercase tracking-wide text-teal-100">
-                  Unlocked
+                <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-200">
+                  {hasPass ? 'Your member price' : 'Pass price'}
                 </span>
+                {savings ? (
+                  <span className="w-full text-[11px] font-semibold text-amber-200">{savings} with a pass</span>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -1607,6 +1598,7 @@ function DetailSheet({
   const dealPx = effectiveListingDealPrice(business);
   const origPx = effectiveListingOriginalPrice(business);
   const hasDiscount = listingHasActiveDiscount(business);
+  const savings = passSavingsLabel(origPx, dealPx);
   const fullText = plainDescription(business);
   const [expanded, setExpanded] = useState(false);
   const [showMorePricing, setShowMorePricing] = useState(false);
@@ -1754,22 +1746,23 @@ function DetailSheet({
             <span className="inline-block mt-2 rounded-md bg-teal-600 text-xs font-semibold px-2.5 py-1">
               {dealPillText(business)}
             </span>
-            {!hasPass && hasDiscount && dealPx > 0 ? (
-              <div className="mt-2 flex items-center gap-2 text-sm text-neutral-300">
-                {origPx > dealPx ? (
-                  <span className="line-through text-neutral-500">{formatVT(origPx)}</span>
+            {hasDiscount && dealPx > 0 ? (
+              <div className="mt-2 space-y-1">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+                  {origPx > dealPx ? (
+                    <span className="text-neutral-500 line-through">{formatVT(origPx)}</span>
+                  ) : null}
+                  <span className="font-bold tabular-nums text-white text-base">{formatVT(dealPx)}</span>
+                  <span className="text-teal-300 text-xs font-semibold">
+                    {hasPass ? 'Your member price' : 'Pass price'}
+                  </span>
+                </div>
+                {savings ? (
+                  <p className="text-sm font-semibold text-amber-300">
+                    {savings} here with a StikmNek pass
+                    {!hasPass ? ' — use it when you message or check in' : ''}
+                  </p>
                 ) : null}
-                <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="blur-[3px] select-none text-neutral-500 tabular-nums">{formatVT(dealPx)}</span>
-                <span className="text-amber-300 text-xs font-semibold">Member price — unlock with pass</span>
-              </div>
-            ) : hasPass && hasDiscount && dealPx > 0 ? (
-              <div className="mt-2 flex items-center gap-2 text-sm text-teal-300">
-                {origPx > dealPx ? (
-                  <span className="line-through text-neutral-500">{formatVT(origPx)}</span>
-                ) : null}
-                <span className="font-bold tabular-nums text-white">{formatVT(dealPx)}</span>
-                <span className="text-xs font-semibold">Your member price</span>
               </div>
             ) : null}
             <p className="mt-3 text-neutral-300 text-base leading-relaxed">{blurb}</p>
@@ -1784,7 +1777,18 @@ function DetailSheet({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm text-neutral-300">
-            {price > 0 && <span>💰 {formatVT(price)}{hasTierPricing ? ' from' : ''}</span>}
+            {hasDiscount && origPx > 0 && dealPx > 0 ? (
+              <span>
+                💰 {formatVT(origPx)} → <span className="text-teal-300 font-semibold">{formatVT(dealPx)}</span>
+                {hasTierPricing ? ' from' : ''}
+                {savings ? ` · ${savings}` : ''}
+              </span>
+            ) : price > 0 ? (
+              <span>
+                💰 {formatVT(price)}
+                {hasTierPricing ? ' from' : ''}
+              </span>
+            ) : null}
             {business.location && <span>📍 {business.location}</span>}
           </div>
 
@@ -1813,7 +1817,7 @@ function DetailSheet({
                   {showMorePricing ? 'Hide pricing' : 'More pricing'}
                 </span>
                 <span className="text-xs text-neutral-400">
-                  {showMorePricing ? '▲' : '▼'} Adults, kids &amp; more
+                  {showMorePricing ? '▲' : '▼'} Adults, kids &amp; pass savings
                 </span>
               </button>
               {showMorePricing && (
@@ -1824,10 +1828,16 @@ function DetailSheet({
                     const showDeal = deal > 0 && (orig <= 0 || deal < orig);
                     const showOrig = orig > 0;
                     if (!showDeal && !showOrig) return null;
+                    const tierSave = passSavingsLabel(orig, deal);
                     return (
                       <li key={`${tier.label}-${i}`} className="flex items-center justify-between gap-3 px-3.5 py-2.5 text-sm">
-                        <span className="text-neutral-200 font-medium">{tier.label || `Option ${i + 1}`}</span>
-                        <span className="tabular-nums text-right">
+                        <span className="text-neutral-200 font-medium min-w-0">
+                          {tier.label || `Option ${i + 1}`}
+                          {tierSave ? (
+                            <span className="block text-[11px] font-semibold text-amber-300/90">{tierSave}</span>
+                          ) : null}
+                        </span>
+                        <span className="tabular-nums text-right shrink-0">
                           {showOrig && showDeal ? (
                             <>
                               <span className="text-neutral-500 line-through mr-2">{formatVT(orig)}</span>
@@ -1844,6 +1854,15 @@ function DetailSheet({
                   })}
                 </ul>
               )}
+              {!hasPass && hasDiscount ? (
+                <button
+                  type="button"
+                  onClick={onGetPass}
+                  className="w-full border-t border-white/10 px-3.5 py-3 text-left text-xs font-bold text-teal-300 hover:bg-white/5"
+                >
+                  Get a pass to WhatsApp this place at the member rate →
+                </button>
+              ) : null}
             </div>
           )}
         </div>
@@ -1859,7 +1878,9 @@ function DetailSheet({
             >
               {passCtaLabel(isExtended, paidPeople, pricePreview)}
             </button>
-            <p className="text-center text-[11px] text-neutral-500">Message direct + unlock deals</p>
+            <p className="text-center text-[11px] text-neutral-500">
+              Pass unlocks WhatsApp + QR check-in at these prices
+            </p>
             {hasWa && (
               <button
                 type="button"
@@ -2143,7 +2164,7 @@ function SoftNudgeSheet({
           Your trip has {tripCount} place{tripCount === 1 ? '' : 's'}
         </h3>
         <p className="text-sm text-neutral-400 text-center leading-relaxed">
-          Unlock WhatsApp + member prices for every saved spot. {plan}.
+          Unlock WhatsApp + QR check-in so you can use the member prices on every saved spot. {plan}.
         </p>
         <button
           type="button"
@@ -2187,20 +2208,20 @@ function PaywallSheet({
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto" />
         <h3 className="text-lg font-bold text-center text-white">Connect with {businessName}</h3>
         <p className="text-sm text-neutral-400 text-center leading-relaxed">
-          Unlock direct WhatsApp + the member price. Partners scan your QR at the venue — 100% direct, no booking fees.
+          You’ve seen the savings — get a pass to WhatsApp {businessName} at the member rate and show your QR at check-in. No booking fees.
           {tripCount > 0
             ? ` Your trip already has ${tripCount} saved place${tripCount === 1 ? '' : 's'}.`
             : ''}
         </p>
         <ul className="text-xs text-neutral-300 space-y-1.5 px-1">
           <li className="flex items-center gap-2">
-            <Lock className="w-3.5 h-3.5 text-teal-400 shrink-0" /> Member rates on every listing
+            <Sparkles className="w-3.5 h-3.5 text-teal-400 shrink-0" /> Keep the pass prices you just saw
           </li>
           <li className="flex items-center gap-2">
             <MessageCircle className="w-3.5 h-3.5 text-teal-400 shrink-0" /> WhatsApp operators directly
           </li>
           <li className="flex items-center gap-2">
-            <Sparkles className="w-3.5 h-3.5 text-teal-400 shrink-0" /> One QR · unlimited deals
+            <Lock className="w-3.5 h-3.5 text-teal-400 shrink-0" /> One QR · redeem at every partner
           </li>
         </ul>
         <button
