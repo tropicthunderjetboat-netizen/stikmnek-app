@@ -249,7 +249,7 @@ const MyFavoritesList: React.FC = () => {
   }, [user?.passId]);
 
   const title =
-    language === 'fr' ? 'Sauvé · Mon Pass' : language === 'bi' ? 'Sevem · Pas Blong Mi' : 'Saved · My Pass';
+    language === 'fr' ? 'Mon voyage' : language === 'bi' ? 'Trip blong mi' : 'My Trip';
 
   const exploreLabel =
     language === 'fr' ? 'Explorer les offres' : language === 'bi' ? 'Lukluk ol deal' : 'Explore Deals';
@@ -267,10 +267,10 @@ const MyFavoritesList: React.FC = () => {
           <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">{title}</h1>
           <p className="mt-1 text-sm text-gray-500">
             {language === 'fr'
-              ? 'Votre pass et vos deals enregistrés, au même endroit.'
+              ? 'Vos lieux enregistrés et votre pass — pour planifier et réserver.'
               : language === 'bi'
-                ? 'Pas blong yu mo ol deal we yu sevem — wan ples.'
-                : 'Your pass and saved deals — one place to compare and redeem.'}
+                ? 'Ol ples we yu sevem mo pas blong yu — blong planem trip.'
+                : 'Your wishlist of places and your pass — plan what to do, then redeem.'}
           </p>
         </header>
 
@@ -435,10 +435,10 @@ const MyFavoritesList: React.FC = () => {
             <div>
               <h2 className="text-base font-bold text-gray-900">
                 {language === 'fr'
-                  ? 'Deals enregistrés'
+                  ? 'Choses à faire'
                   : language === 'bi'
-                    ? 'Ol deal we yu sevem'
-                    : 'Saved deals'}
+                    ? 'Ol samting blong mekem'
+                    : 'Things to do'}
               </h2>
               <p className="text-xs text-gray-500">
                 {savedDeals.length}{' '}

@@ -14,7 +14,7 @@ import { t } from '@/data/translations';
 
 export type HomeCategoryKey = 'all' | Category;
 
-const CATEGORY_ICONS: Record<HomeCategoryKey, React.ReactNode> = {
+export const CATEGORY_ICONS: Record<HomeCategoryKey, React.ReactNode> = {
   all: <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" aria-hidden />,
   dining: <Utensils className="w-3.5 h-3.5 shrink-0" aria-hidden />,
   activities: <Waves className="w-3.5 h-3.5 shrink-0" aria-hidden />,
@@ -24,6 +24,18 @@ const CATEGORY_ICONS: Record<HomeCategoryKey, React.ReactNode> = {
   spa: <Heart className="w-3.5 h-3.5 shrink-0" aria-hidden />,
   accommodation: <Home className="w-3.5 h-3.5 shrink-0" aria-hidden />,
 };
+
+export function categoryLabel(
+  key: HomeCategoryKey,
+  language: 'en' | 'fr' | 'bi',
+): string {
+  if (key === 'all') return t('cat.all', language);
+  const cat = categories.find((c) => c.key === key);
+  if (!cat) return key;
+  if (language === 'fr') return cat.labelFr;
+  if (language === 'bi') return cat.labelBi;
+  return cat.label;
+}
 
 type HomeCategoryPillsProps = {
   value: HomeCategoryKey;

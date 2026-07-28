@@ -39,7 +39,7 @@ const TABS: HubTab[] = [
   {
     id: 'saved',
     view: 'my-favorites',
-    label: { en: 'Saved', fr: 'Sauvé', bi: 'Sevem' },
+    label: { en: 'My Trip', fr: 'Mon voyage', bi: 'Trip blong mi' },
     icon: <Heart className="w-5 h-5" strokeWidth={2.25} aria-hidden />,
     prefetch: loadMyFavoritesList,
   },

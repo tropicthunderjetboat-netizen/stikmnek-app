@@ -1,11 +1,12 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, Lock, MapPin, MessageCircle, Phone, Plane, Search, Sparkles, Star, User, X, ChevronRight } from 'lucide-react';
+import { Heart, List, Lock, Map, MapPin, MessageCircle, Phone, Plane, Search, Sparkles, Star, User, X, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
 import {
   businessListingHasWhatsApp,
   businessListingWhatsAppRaw,
+  categories,
   categoryLabelForKey,
   customerFacingListPrice,
   effectiveListingDealPrice,
@@ -42,8 +43,7 @@ import {
   type TripState,
 } from '@/lib/tripStorage';
 import { APP_ICON_192 } from '@/lib/brand';
-import HomeCategoryPills, { type HomeCategoryKey } from '@/components/HomeCategoryPills';
-import MapToggleFab from '@/components/MapToggleFab';
+import { CATEGORY_ICONS, categoryLabel, type HomeCategoryKey } from '@/components/HomeCategoryPills';
 import DealOgHelmet from '@/components/DealOgHelmet';
 import ShareButton from '@/components/ShareButton';
 import { loadMapView, prefetchChunk } from '@/lib/heavyChunks';
@@ -490,12 +490,12 @@ export default function SwipeDiscover() {
         if (inTrip) {
           persist({ ...trip, savedPlaceIds: trip.savedPlaceIds.filter((x) => x !== id) });
         }
-        toast.success('Removed from Your Trip', { style: tripToastStyle });
+        toast.success('Removed from My Trip', { style: tripToastStyle });
         if (user && inFav) void toggleFavorite(b, { silent: true });
       } else {
         const nextIds = [...trip.savedPlaceIds, id];
         persist({ ...trip, savedPlaceIds: nextIds });
-        toast.success('Saved to Your Trip', {
+        toast.success('Saved to My Trip', {
           style: tripToastStyle,
           action: {
             label: 'Open',
@@ -783,10 +783,10 @@ export default function SwipeDiscover() {
                     ? 'bg-[#0A1F2A]/[0.08] text-[#0A1F2A] ring-1 ring-[#0A1F2A]/10'
                     : 'bg-white/18 text-white ring-1 ring-white/25'
                 }`}
-                aria-label={`Open your trip · ${saveCount} saved place${saveCount === 1 ? '' : 's'}`}
+                aria-label={`Open My Trip · ${saveCount} place${saveCount === 1 ? '' : 's'}`}
               >
                 <Plane className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                <span>Trip</span>
+                <span>My Trip</span>
                 <span
                   className={`min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold leading-none ${
                     lightChrome ? 'bg-teal-600 text-white' : 'bg-[#0FB5B5] text-white'
@@ -802,7 +802,7 @@ export default function SwipeDiscover() {
               className={`rounded-full backdrop-blur w-9 h-9 flex items-center justify-center ${
                 lightChrome ? 'bg-[#0A1F2A]/[0.06]' : 'bg-white/15'
               }`}
-              aria-label="Search places"
+              aria-label="Search, categories, and map"
             >
               <Search className={`w-4 h-4 ${lightChrome ? 'text-[#0A1F2A]' : 'text-white'}`} />
             </button>
@@ -819,31 +819,45 @@ export default function SwipeDiscover() {
           </div>
         </div>
 
-        {/* Map toggle sits under header actions, above category pills — clears bottom CTA zone */}
-        {!searchOpen && !detail && !paywallBiz && !reviewsBiz && (
-          <div className="pointer-events-none flex justify-end px-4 pb-1">
-            <MapToggleFab
-              isMapMode={isMapMode}
-              onToggle={toggleMapMode}
-              language={language}
-              light={lightChrome}
-            />
+        {/* Active filter chip only — full category grid lives in Search */}
+        {!searchOpen && !detail && !paywallBiz && !reviewsBiz && feedCategory !== 'all' && (
+          <div className="pointer-events-auto flex items-center gap-2 px-4 pb-2">
+            <button
+              type="button"
+              onClick={() => onFeedCategoryChange('all')}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold ${
+                lightChrome
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-teal-600 text-white shadow-md shadow-teal-900/30'
+              }`}
+              aria-label={`Clear ${categoryLabel(feedCategory, language)} filter`}
+            >
+              {CATEGORY_ICONS[feedCategory]}
+              <span>{categoryLabel(feedCategory, language)}</span>
+              <X className="w-3 h-3 opacity-90" aria-hidden />
+            </button>
           </div>
         )}
 
-        {!searchOpen && !detail && !paywallBiz && !reviewsBiz && (
-          <HomeCategoryPills
-            value={feedCategory}
-            onChange={onFeedCategoryChange}
-            language={language}
-            light={lightChrome || isMapMode}
-          />
+        {/* Exit map without reopening Search */}
+        {isMapMode && !searchOpen && !detail && (
+          <div className="pointer-events-none flex justify-end px-4 pb-2">
+            <button
+              type="button"
+              onClick={toggleMapMode}
+              className="pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-3 text-[11px] font-semibold text-neutral-900 shadow-md ring-1 ring-black/5"
+              aria-label="Back to swipe list"
+            >
+              <List className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              List
+            </button>
+          </div>
         )}
       </div>
 
       {isMapMode ? (
         <div
-          className="absolute inset-0 z-[5] flex flex-col bg-white pt-[9rem] touch-auto"
+          className="absolute inset-0 z-[5] flex flex-col bg-white pt-[5.5rem] touch-auto"
           style={{ paddingBottom: 0 }}
         >
           <Suspense
@@ -943,6 +957,9 @@ export default function SwipeDiscover() {
           query={searchQuery}
           onQueryChange={setSearchQuery}
           results={searchResults}
+          language={language}
+          feedCategory={feedCategory}
+          isMapMode={isMapMode}
           onClose={() => {
             setSearchOpen(false);
             setSearchQuery('');
@@ -953,6 +970,17 @@ export default function SwipeDiscover() {
             setSearchQuery('');
             setCurrentView('deals');
             navigate('/deals');
+          }}
+          onPickCategory={(key) => {
+            onFeedCategoryChange(key);
+            if (isMapMode) toggleMapMode();
+            setSearchOpen(false);
+            setSearchQuery('');
+          }}
+          onToggleMap={() => {
+            toggleMapMode();
+            setSearchOpen(false);
+            setSearchQuery('');
           }}
         />
       )}
@@ -1305,7 +1333,7 @@ function EndCard({
           <h2 className="text-[22px] font-bold text-[#0A1F2A] leading-tight">You’ve seen the best bits</h2>
           <p className="text-[15px] text-[#5A6D7A] leading-relaxed">
             {savedCount > 0
-              ? `${savedCount} place${savedCount === 1 ? '' : 's'} on your trip. Shuffle for more, or unlock WhatsApp with a pass.`
+              ? `${savedCount} place${savedCount === 1 ? '' : 's'} on My Trip. Shuffle for more, or unlock WhatsApp with a pass.`
               : 'Swipe again anytime — or get a pass to message places direct.'}
           </p>
 
@@ -1918,16 +1946,26 @@ function SearchSheet({
   query,
   onQueryChange,
   results,
+  language,
+  feedCategory,
+  isMapMode,
   onClose,
   onSelect,
   onBrowseList,
+  onPickCategory,
+  onToggleMap,
 }: {
   query: string;
   onQueryChange: (q: string) => void;
   results: Business[];
+  language: 'en' | 'fr' | 'bi';
+  feedCategory: HomeCategoryKey;
+  isMapMode: boolean;
   onClose: () => void;
   onSelect: (b: Business) => void;
   onBrowseList: () => void;
+  onPickCategory: (key: HomeCategoryKey) => void;
+  onToggleMap: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -1935,10 +1973,23 @@ function SearchSheet({
     return () => window.clearTimeout(t);
   }, []);
 
+  const browseKeys: HomeCategoryKey[] = ['all', ...categories.map((c) => c.key)];
+  const mapTileLabel = isMapMode
+    ? language === 'fr'
+      ? 'Liste'
+      : language === 'bi'
+        ? 'List'
+        : 'List'
+    : language === 'fr'
+      ? 'Carte'
+      : language === 'bi'
+        ? 'Map'
+        : 'Map';
+
   return (
     <div className="absolute inset-0 z-[60] flex flex-col bg-black/70" onClick={onClose}>
       <div
-        className="pt-[max(0.75rem,env(safe-area-inset-top))] px-3 pb-3"
+        className="pt-[max(0.75rem,env(safe-area-inset-top))] px-3 pb-3 space-y-3"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 rounded-2xl bg-neutral-900 border border-white/15 px-3 py-2.5 shadow-xl">
@@ -1960,6 +2011,65 @@ function SearchSheet({
           >
             Close
           </button>
+        </div>
+
+        <div>
+          <p className="px-0.5 mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+            Browse
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {browseKeys.map((key) => {
+              const active = feedCategory === key && !isMapMode;
+              const short =
+                key === 'transportation'
+                  ? language === 'fr'
+                    ? 'Transport'
+                    : 'Transport'
+                  : key === 'accommodation'
+                    ? language === 'fr'
+                      ? 'Héberg.'
+                      : language === 'bi'
+                        ? 'Sleep'
+                        : 'Stay'
+                    : key === 'spa'
+                      ? 'Spa'
+                      : categoryLabel(key, language);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onPickCategory(key)}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-1.5 py-2.5 min-h-[4.25rem] transition-colors ${
+                    active
+                      ? 'bg-teal-600 text-white shadow-md shadow-teal-900/30'
+                      : 'bg-neutral-900/95 text-neutral-200 border border-white/10'
+                  }`}
+                >
+                  <span className="[&>svg]:w-4 [&>svg]:h-4">{CATEGORY_ICONS[key]}</span>
+                  <span className="text-[10px] font-semibold leading-tight text-center line-clamp-2">
+                    {short}
+                  </span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={onToggleMap}
+              className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-1.5 py-2.5 min-h-[4.25rem] transition-colors ${
+                isMapMode
+                  ? 'bg-teal-600 text-white shadow-md shadow-teal-900/30'
+                  : 'bg-neutral-900/95 text-neutral-200 border border-white/10'
+              }`}
+              aria-pressed={isMapMode}
+            >
+              {isMapMode ? (
+                <List className="w-4 h-4" aria-hidden />
+              ) : (
+                <Map className="w-4 h-4" aria-hidden />
+              )}
+              <span className="text-[10px] font-semibold leading-tight text-center">{mapTileLabel}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2149,7 +2259,7 @@ function SoftNudgeSheet({
       >
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto" />
         <h3 className="text-lg font-bold text-center text-white">
-          Your trip has {tripCount} place{tripCount === 1 ? '' : 's'}
+          My Trip has {tripCount} place{tripCount === 1 ? '' : 's'}
         </h3>
         {savingsLine ? (
           <div className="rounded-xl bg-teal-500/15 border border-teal-400/30 px-3 py-2.5 text-center">
@@ -2206,7 +2316,7 @@ function PaywallSheet({
         <p className="text-sm text-neutral-400 text-center leading-relaxed">
           You’ve seen the savings — get a pass to WhatsApp {businessName} at the member rate and show your QR at check-in. No booking fees.
           {tripCount > 0
-            ? ` Your trip already has ${tripCount} saved place${tripCount === 1 ? '' : 's'}.`
+            ? ` My Trip already has ${tripCount} saved place${tripCount === 1 ? '' : 's'}.`
             : ''}
         </p>
         <ul className="text-xs text-neutral-300 space-y-1.5 px-1">
