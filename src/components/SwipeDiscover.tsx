@@ -1,5 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, Lock, MapPin, MessageCircle, Phone, Search, Sparkles, Star, User, X, ChevronRight } from 'lucide-react';
+import { Heart, Lock, MapPin, MessageCircle, Phone, Plane, Search, Sparkles, Star, User, X, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
@@ -495,7 +495,16 @@ export default function SwipeDiscover() {
       } else {
         const nextIds = [...trip.savedPlaceIds, id];
         persist({ ...trip, savedPlaceIds: nextIds });
-        toast.success('Saved to Your Trip ✈️', { style: tripToastStyle });
+        toast.success('Saved to Your Trip', {
+          style: tripToastStyle,
+          action: {
+            label: 'Open',
+            onClick: () => {
+              setCurrentView('my-favorites');
+              navigate('/saved');
+            },
+          },
+        });
         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
           try {
             navigator.vibrate(12);
@@ -513,7 +522,7 @@ export default function SwipeDiscover() {
         }
       }
     },
-    [trip, persist, user, favorites, toggleFavorite, hasPass],
+    [trip, persist, user, favorites, toggleFavorite, hasPass, setCurrentView, navigate],
   );
 
   const dismissSoftNudge = useCallback(() => {
@@ -769,14 +778,22 @@ export default function SwipeDiscover() {
                   setCurrentView('my-favorites');
                   navigate('/saved');
                 }}
-                className={`rounded-full backdrop-blur px-3 py-1.5 text-xs font-semibold ${
+                className={`inline-flex items-center gap-1.5 rounded-full backdrop-blur pl-2.5 pr-3 py-1.5 text-xs font-semibold ${
                   lightChrome
-                    ? 'bg-[#0A1F2A]/[0.06] text-[#0A1F2A]'
-                    : 'bg-white/15 text-white'
+                    ? 'bg-[#0A1F2A]/[0.08] text-[#0A1F2A] ring-1 ring-[#0A1F2A]/10'
+                    : 'bg-white/18 text-white ring-1 ring-white/25'
                 }`}
-                aria-label="Your trip"
+                aria-label={`Open your trip · ${saveCount} saved place${saveCount === 1 ? '' : 's'}`}
               >
-                ✈️ {saveCount}
+                <Plane className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                <span>Trip</span>
+                <span
+                  className={`min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold leading-none ${
+                    lightChrome ? 'bg-teal-600 text-white' : 'bg-[#0FB5B5] text-white'
+                  }`}
+                >
+                  {saveCount}
+                </span>
               </button>
             )}
             <button
@@ -911,27 +928,58 @@ export default function SwipeDiscover() {
               'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.28) 100%)',
           }}
         >
-          <div className="pointer-events-auto flex gap-2 overflow-x-auto pb-1">
-            {savedBusinesses.slice(0, 8).map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => openDetail(b)}
-                className="shrink-0 w-14 h-14 rounded-xl overflow-hidden ring-2 ring-white shadow-md"
-              >
-                <FitPhoto src={b.image} className="h-full w-full" />
-              </button>
-            ))}
-            {!hasPass && (
+          <div className="pointer-events-auto space-y-1.5">
+            <div className="flex items-center justify-between gap-2 px-0.5">
+              <p className="text-[11px] font-semibold text-white/90 drop-shadow-sm">
+                Your trip · {saveCount} place{saveCount === 1 ? '' : 's'}
+              </p>
               <button
                 type="button"
-                onClick={() => openCheckout()}
-                className="shrink-0 self-center rounded-full bg-[#0FB5B5] px-4 py-2.5 text-xs font-bold whitespace-nowrap text-white border-2 border-white"
-                style={{ boxShadow: '0 4px 16px rgba(15,181,181,0.4)' }}
+                onClick={() => {
+                  setCurrentView('my-favorites');
+                  navigate('/saved');
+                }}
+                className="inline-flex items-center gap-0.5 text-[11px] font-bold text-white drop-shadow-sm"
               >
-                Get pass · A${pricePreview}
+                Open saved
+                <ChevronRight className="w-3.5 h-3.5" aria-hidden />
               </button>
-            )}
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {savedBusinesses.slice(0, 8).map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => openDetail(b)}
+                  className="shrink-0 w-14 h-14 rounded-xl overflow-hidden ring-2 ring-white shadow-md"
+                  aria-label={b.name || 'Saved place'}
+                >
+                  <FitPhoto src={b.image} className="h-full w-full" />
+                </button>
+              ))}
+              {savedBusinesses.length > 8 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentView('my-favorites');
+                    navigate('/saved');
+                  }}
+                  className="shrink-0 w-14 h-14 rounded-xl bg-white/20 backdrop-blur ring-2 ring-white/80 text-white text-[10px] font-bold flex items-center justify-center"
+                >
+                  +{savedBusinesses.length - 8}
+                </button>
+              )}
+              {!hasPass && (
+                <button
+                  type="button"
+                  onClick={() => openCheckout()}
+                  className="shrink-0 self-center rounded-full bg-[#0FB5B5] px-4 py-2.5 text-xs font-bold whitespace-nowrap text-white border-2 border-white"
+                  style={{ boxShadow: '0 4px 16px rgba(15,181,181,0.4)' }}
+                >
+                  Get pass · A${pricePreview}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
