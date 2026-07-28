@@ -80,13 +80,29 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
 
   const validate = (): boolean => {
     const newErrors: { rating?: string; comment?: string } = {};
-    if (rating === 0) {
-      newErrors.rating = language === 'en' ? 'Please select a star rating' : language === 'fr' ? 'Veuillez sélectionner une note' : 'Komen i mas gat 10 karakta o moa';
+    const baseRating = rating === 6 ? 5 : rating;
+    if (baseRating < 1 || baseRating > 5) {
+      newErrors.rating =
+        language === 'en'
+          ? 'Please select a star rating'
+          : language === 'fr'
+            ? 'Veuillez sélectionner une note'
+            : 'Plis jusem wan sta reting';
     }
     if (!comment.trim()) {
-      newErrors.comment = language === 'en' ? 'Please write a comment about your experience' : language === 'fr' ? 'Veuillez écrire un commentaire sur votre expérience' : 'Tangkiu tumas!';
+      newErrors.comment =
+        language === 'en'
+          ? 'Please write a comment about your experience'
+          : language === 'fr'
+            ? 'Veuillez écrire un commentaire sur votre expérience'
+            : 'Plis raetem wan komen abaot eksperiens blong yu';
     } else if (comment.trim().length < 10) {
-      newErrors.comment = language === 'en' ? 'Comment must be at least 10 characters' : language === 'fr' ? 'Le commentaire doit contenir au moins 10 caractères' : 'Supa Sta riviu blong yu i go finis!';
+      newErrors.comment =
+        language === 'en'
+          ? 'Comment must be at least 10 characters'
+          : language === 'fr'
+            ? 'Le commentaire doit contenir au moins 10 caractères'
+            : 'Komen i mas gat 10 karakta o moa';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -97,20 +113,30 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
 
   const handleSuperStarClick = async () => {
     if (!user) { setShowAuth(true); setAuthMode('signin'); return; }
-    // If already selected, deselect
+    // Toggle tip off — keep the base 1–5 star rating
     if (wantsSuperStar || superStarPurchased || rating === 6) {
       setWantsSuperStar(false);
       setSuperStarPurchased(false);
-      setRating(0);
+      if (rating === 6) setRating(5);
       return;
     }
-    // Has credits: allow 6-star without purchase (redemption still enforced at submitReview)
+    // Require a base star rating before attaching a paid tip
+    if (rating < 1 || rating > 5) {
+      setErrors((prev) => ({
+        ...prev,
+        rating:
+          language === 'en'
+            ? 'Choose a 1–5 star rating first, then add a Super Star tip.'
+            : language === 'fr'
+              ? 'Choisissez d’abord une note de 1 à 5, puis ajoutez une Super Étoile.'
+              : 'Jusem 1–5 sta festaem, afta adem Super Star tip.',
+      }));
+      return;
+    }
     if (superstarCredits > 0) {
       setWantsSuperStar(true);
-      setRating(6);
       return;
     }
-    // No credits: require redemption before any payment UI / card charge
     try {
       await validateSuperStarPaymentPrerequisites(businessId);
     } catch {
@@ -185,7 +211,6 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
               setSsPaymentStep('success');
               setSuperStarPurchased(true);
               setWantsSuperStar(true);
-              setRating(6);
               toast.success('Super Star purchased!');
               void refreshUserProfile?.();
 
@@ -246,9 +271,16 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
     setSubmitting(true);
     setErrors({});
     try {
-      // Standard 1-5: rating is 1-5. Superstar: rating is 6 (after purchase). Pass as-is.
-      const wasSuperStar = rating === 6;
-      await submitReview(businessId, rating, comment.trim(), wasSuperStar, offeringId);
+      const baseRating = rating === 6 ? 5 : rating;
+      const wasSuperStar = Boolean(wantsSuperStar || superStarPurchased || rating === 6);
+      // DB still stores Super Star as rating 6 via RPC; pass flag separately from base stars.
+      await submitReview(
+        businessId,
+        wasSuperStar ? 6 : baseRating,
+        comment.trim(),
+        wasSuperStar,
+        offeringId,
+      );
       setSubmitted(true);
       setLastSubmittedSuperStar(wasSuperStar);
       setRating(0);
@@ -309,10 +341,10 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           </h4>
         )}
 
-        {/* Star Rating Selector */}
+        {/* Star Rating Selector — base 1–5 only */}
         <div className="mb-4">
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            {language === 'en' ? 'Your Rating' : language === 'fr' ? 'Votre note' : 'Super Star hem i wan premium 6th sta we i kostem $5. Hem i wan spesel wei blong soem se bisnis i nambawan tumas.'}
+            {language === 'en' ? 'Your Rating' : language === 'fr' ? 'Votre note' : 'Reting blong yu'}
             <span className="text-red-500 ml-0.5">*</span>
           </label>
           <div className="flex items-center gap-1 flex-wrap">
@@ -320,101 +352,28 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
               <button
                 key={starValue}
                 type="button"
-                onClick={() => { setRating(starValue); setWantsSuperStar(false); setErrors((prev) => ({ ...prev, rating: undefined })); }}
+                onClick={() => {
+                  setRating(starValue);
+                  setErrors((prev) => ({ ...prev, rating: undefined }));
+                }}
                 onMouseEnter={() => setHoveredRating(starValue)}
                 onMouseLeave={() => setHoveredRating(0)}
                 className="group relative p-0.5 transition-transform hover:scale-125 focus:outline-none focus:scale-125"
                 aria-label={`${starValue} star${starValue > 1 ? 's' : ''}`}
               >
                 <Star className={`w-8 h-8 transition-colors duration-150 ${
-                  starValue <= (wantsSuperStar ? 5 : activeRating)
+                  starValue <= (activeRating === 6 ? 5 : activeRating)
                     ? 'text-amber-400 fill-amber-400 drop-shadow-sm'
                     : 'text-gray-300 hover:text-amber-200'
                 }`} />
               </button>
             ))}
-
-            <div className="w-px h-8 bg-gray-200 mx-1" />
-
-            {/* 6th Super Star */}
-            <button
-              type="button"
-              onClick={handleSuperStarClick}
-              onMouseEnter={() => setHoveredRating(6)}
-              onMouseLeave={() => setHoveredRating(0)}
-              className="group relative p-0.5 transition-all hover:scale-130 focus:outline-none focus:scale-130"
-              aria-label="Super Star - $5 bonus star"
-            >
-              <div className="relative">
-                <Star className={`w-10 h-10 transition-all duration-300 ${
-                  wantsSuperStar || superStarPurchased || rating === 6
-                    ? 'text-amber-500 fill-amber-500 drop-shadow-lg'
-                    : hoveredRating === 6
-                    ? 'text-amber-400 fill-amber-200 drop-shadow-md'
-                    : 'text-purple-200 hover:text-purple-300'
-                }`} />
-                <Sparkles className={`absolute -top-1 -right-1 w-4 h-4 transition-all duration-300 ${
-                  wantsSuperStar || superStarPurchased || rating === 6
-                    ? 'text-yellow-400 animate-pulse'
-                    : hoveredRating === 6
-                    ? 'text-yellow-300 opacity-80'
-                    : 'text-gray-300 opacity-40'
-                }`} />
-                {!hasSuperStarCredit && (
-                  <span className={`absolute -bottom-1 -right-1 px-1 py-0.5 rounded-full text-[8px] font-bold transition-all ${
-                    hoveredRating === 6 ? 'bg-purple-600 text-white scale-110' : 'bg-purple-100 text-purple-600'
-                  }`}>$5</span>
-                )}
-                {hasSuperStarCredit && (
-                  <CheckCircle2 className="absolute -bottom-1 -right-1 w-4 h-4 text-green-500 bg-white rounded-full" />
-                )}
-              </div>
-            </button>
-
-            <button type="button" onClick={() => setShowSuperStarInfo(!showSuperStarInfo)} className="p-1 text-gray-400 hover:text-purple-500 transition-colors ml-1" aria-label="Learn about Super Star">
-              <Info className="w-4 h-4" />
-            </button>
-
-            {activeRating > 0 && (
-              <span className={`ml-2 text-sm font-medium animate-in fade-in ${
-                activeRating === 6 || wantsSuperStar ? 'text-purple-600' : 'text-gray-600'
-              }`}>
-                {wantsSuperStar || superStarPurchased || rating === 6
-                  ? (ratingLabels[6]?.[language] || ratingLabels[6]?.en)
-                  : (ratingLabels[activeRating]?.[language] || ratingLabels[activeRating]?.en)}
+            {activeRating > 0 && activeRating <= 5 && (
+              <span className="ml-2 text-sm font-medium text-gray-600 animate-in fade-in">
+                {ratingLabels[activeRating]?.[language] || ratingLabels[activeRating]?.en}
               </span>
             )}
           </div>
-
-          {showSuperStarInfo && (
-            <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-100 text-sm">
-              <div className="flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-semibold text-purple-800 mb-1">
-                    {language === 'en' ? 'What is a Super Star?' : language === 'fr' ? "Qu'est-ce qu'une Super Étoile ?" : 'Supa Sta i joen long riviu blong yu!'}
-                  </p>
-                  <p className="text-purple-700 text-xs leading-relaxed">
-                    {language === 'en'
-                      ? "The Super Star is a premium 6th star that costs $5. It's a special way to show exceptional appreciation for a business. Super Stars are displayed prominently on business profiles and help them stand out."
-                      : language === 'fr'
-                      ? "La Super Étoile est une 6ème étoile premium qui coûte 5$. C'est une façon spéciale de montrer une appréciation exceptionnelle."
-                      : 'Riviu blong yu'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {hasSuperStarCredit && (
-            <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-50 border border-purple-200">
-              <Sparkles className="w-4 h-4 text-purple-500" />
-              <span className="text-sm font-semibold text-purple-700">
-                {language === 'en' ? 'Super Star added to your review!' : language === 'fr' ? 'Super Étoile ajoutée !' : 'Searem ditel abaotem eksperiens blong yu...'}
-              </span>
-            </div>
-          )}
-
           {errors.rating && (
             <div className="flex items-center gap-1.5 mt-1.5 text-red-500">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -423,16 +382,100 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
           )}
         </div>
 
+        {/* Super Star tip — visually & functionally separate from base rating */}
+        <div className="mb-4 rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50 to-violet-50 p-3">
+          <div className="flex items-start gap-3">
+            <button
+              type="button"
+              onClick={handleSuperStarClick}
+              className="shrink-0 p-0.5 transition-transform hover:scale-110 focus:outline-none"
+              aria-label="Super Star tip - $5 support"
+              aria-pressed={wantsSuperStar || superStarPurchased || rating === 6}
+            >
+              <div className="relative">
+                <Star className={`w-9 h-9 transition-all duration-300 ${
+                  wantsSuperStar || superStarPurchased || rating === 6
+                    ? 'text-purple-500 fill-purple-500 drop-shadow-lg'
+                    : 'text-purple-200 hover:text-purple-400'
+                }`} />
+                <Sparkles className={`absolute -top-1 -right-1 w-4 h-4 ${
+                  wantsSuperStar || superStarPurchased || rating === 6
+                    ? 'text-yellow-400 animate-pulse'
+                    : 'text-gray-300 opacity-40'
+                }`} />
+                {!hasSuperStarCredit && (
+                  <span className="absolute -bottom-1 -right-1 px-1 py-0.5 rounded-full text-[8px] font-bold bg-purple-600 text-white">
+                    $5
+                  </span>
+                )}
+                {hasSuperStarCredit && (
+                  <CheckCircle2 className="absolute -bottom-1 -right-1 w-4 h-4 text-green-500 bg-white rounded-full" />
+                )}
+              </div>
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold text-purple-900">
+                  {language === 'en'
+                    ? 'Add a Super Star tip'
+                    : language === 'fr'
+                      ? 'Ajouter un pourboire Super Étoile'
+                      : 'Adem Super Star tip'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowSuperStarInfo(!showSuperStarInfo)}
+                  className="p-1 text-gray-400 hover:text-purple-500 transition-colors"
+                  aria-label="Learn about Super Star"
+                >
+                  <Info className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-purple-700 leading-relaxed mt-0.5">
+                {language === 'en'
+                  ? 'Optional $5 tip to support this business — separate from your star rating.'
+                  : language === 'fr'
+                    ? 'Pourboire optionnel de 5$ pour soutenir l’entreprise — séparé de votre note.'
+                    : 'Opsenol $5 tip blong sapotem bisnis — i narafala long sta reting.'}
+              </p>
+              {showSuperStarInfo && (
+                <p className="mt-2 text-xs text-purple-700 leading-relaxed">
+                  {language === 'en'
+                    ? 'Super Stars appear on the business profile and help partners stand out. You need a recent redemption before purchasing.'
+                    : language === 'fr'
+                      ? 'Les Super Étoiles apparaissent sur le profil et aident les partenaires à se démarquer. Une utilisation récente est requise avant l’achat.'
+                      : 'Super Star i so long profil blong bisnis. Yu mas redeem wan deal fastaem bifo yu pei.'}
+                </p>
+              )}
+              {hasSuperStarCredit && (
+                <p className="mt-2 text-xs font-semibold text-purple-700">
+                  {language === 'en'
+                    ? 'Super Star tip will be attached to this review.'
+                    : language === 'fr'
+                      ? 'Le pourboire Super Étoile sera joint à cet avis.'
+                      : 'Super Star tip bae i go wetem riviu ia.'}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Comment Field */}
         <div className="mb-4">
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            {language === 'en' ? 'Your Review' : language === 'fr' ? 'Votre avis' : 'Minimum 10 karakta'}
+            {language === 'en' ? 'Your Review' : language === 'fr' ? 'Votre avis' : 'Riviu blong yu'}
             <span className="text-red-500 ml-0.5">*</span>
           </label>
           <textarea
             value={comment}
             onChange={(e) => { setComment(e.target.value); setErrors((prev) => ({ ...prev, comment: undefined })); }}
-            placeholder={language === 'en' ? 'Share details about your experience...' : language === 'fr' ? 'Partagez les détails de votre expérience...' : 'Sendem...'}
+            placeholder={
+              language === 'en'
+                ? 'Share details about your experience...'
+                : language === 'fr'
+                  ? 'Partagez les détails de votre expérience...'
+                  : 'Serem ditel abaot eksperiens blong yu...'
+            }
             className={`w-full p-3 rounded-xl border text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none transition-colors ${
               errors.comment ? 'border-red-300 bg-red-50/50' : 'border-gray-200 bg-white'
             }`}
@@ -447,7 +490,11 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
               </div>
             ) : (
               <span className="text-xs text-gray-400">
-                {language === 'en' ? 'Minimum 10 characters' : language === 'fr' ? 'Minimum 10 caractères' : 'Supa Sta'}
+                {language === 'en'
+                  ? 'Minimum 10 characters'
+                  : language === 'fr'
+                    ? 'Minimum 10 caractères'
+                    : 'Minimum 10 karakta'}
               </span>
             )}
             <span className={`text-xs ${comment.length > 900 ? 'text-amber-500' : 'text-gray-400'}`}>
@@ -466,7 +513,7 @@ const ReviewForm: React.FC<ReviewFormProps> = ({
             {submitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                {language === 'en' ? 'Submitting...' : language === 'fr' ? 'Envoi...' : 'Premium 6th Sta Riviu'}
+                {language === 'en' ? 'Submitting...' : language === 'fr' ? 'Envoi...' : 'Sending...'}
               </>
             ) : (
               <>

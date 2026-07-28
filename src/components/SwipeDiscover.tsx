@@ -1,5 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MapPin, MessageCircle, Phone, Search, Star, User, X, ChevronRight } from 'lucide-react';
+import { Heart, MapPin, MessageCircle, Phone, Search, Sparkles, Star, User, X, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
@@ -15,12 +15,13 @@ import {
   type Business,
 } from '@/data/businesses';
 import { calculatePassPrice, clampPartySize } from '@/data/pricing';
-import { favoriteKeyForOffering, favoriteKeyForProfile, isListingFavorited } from '@/lib/favoritesUi';
+import { isListingFavorited } from '@/lib/favoritesUi';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { buildBookingInquiryWhatsAppUrl } from '@/lib/bookingInquiry';
 import { digitsForWaMe, formatVT, getPhotoDisplayUrl } from '@/lib/utils';
 import { fetchApprovedPhotosForOffering } from '@/lib/fetchApprovedPhotosForOffering';
 import { pricingTiersForDisplay } from '@/lib/pricingTiers';
+import { averageStarRating } from '@/lib/reviewStats';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import {
   checkoutFromTrip,
@@ -255,16 +256,33 @@ export default function SwipeDiscover() {
   const [reviewsBiz, setReviewsBiz] = useState<Business | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [dragY, setDragY] = useState(0);
+  /** Visual drag offset — updated via ref + rAF to avoid re-rendering the feed every touchmove. */
   const [showTapCoach, setShowTapCoach] = useState(() => !hasSeenTapHint());
   /** Session-only: welcome shows again every fresh visit / page load */
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [shuffleKey, setShuffleKey] = useState(0);
   const touchStartY = useRef<number | null>(null);
+  const dragYRef = useRef(0);
+  const dragRafRef = useRef<number | null>(null);
+  const feedSurfaceRef = useRef<HTMLDivElement | null>(null);
   const preloaded = useRef<Set<string>>(new Set());
   const lastWheelAt = useRef(0);
   /** Stable random order for this browser visit */
   const shuffleOrderRef = useRef<string[] | null>(null);
+
+  const applyDragVisual = useCallback((y: number) => {
+    dragYRef.current = y;
+    const el = feedSurfaceRef.current;
+    if (el) {
+      el.style.transform = `translateY(${y * 0.35}px)`;
+      el.style.transition = y === 0 ? 'transform 0.2s ease' : 'none';
+    }
+  }, []);
+
+  const resetDragVisual = useCallback(() => {
+    dragYRef.current = 0;
+    applyDragVisual(0);
+  }, [applyDragVisual]);
 
   const hasPass = Boolean(user?.pass);
 
@@ -301,10 +319,10 @@ export default function SwipeDiscover() {
   const onFeedCategoryChange = useCallback((key: HomeCategoryKey) => {
     setFeedCategory(key);
     setIndex(0);
-    setDragY(0);
+    resetDragVisual();
     // Skip welcome so the user lands on the first deal of the selected category.
     if (key !== 'all') setWelcomeDismissed(true);
-  }, []);
+  }, [resetDragVisual]);
 
   const toggleMapMode = useCallback(() => {
     setIsMapMode((prev) => {
@@ -320,8 +338,8 @@ export default function SwipeDiscover() {
     setWelcomeDismissed(true);
     setShuffleKey((k) => k + 1);
     setIndex(0);
-    setDragY(0);
-  }, [dbBusinesses]);
+    resetDragVisual();
+  }, [dbBusinesses, resetDragVisual]);
 
   const persist = useCallback((next: TripState) => {
     setTrip(next);
@@ -336,7 +354,35 @@ export default function SwipeDiscover() {
     [trip.savedPlaceIds, favorites],
   );
 
-  const saveCount = trip.savedPlaceIds.length;
+  const saveCount = useMemo(() => {
+    const ids = new Set(trip.savedPlaceIds);
+    for (const b of listings) {
+      if (isListingFavorited(favorites, b)) ids.add(b.id);
+    }
+    return ids.size;
+  }, [trip.savedPlaceIds, listings, favorites]);
+
+  // Migrate anonymous trip hearts into cloud favorites once after login.
+  useEffect(() => {
+    if (!user?.id || !dataLoaded || listings.length === 0) return;
+    if (user.type === 'business' || user.type === 'admin' || user.type === 'staff') return;
+    const key = `stikmnek_trip_fav_migrated_${user.id}`;
+    try {
+      if (sessionStorage.getItem(key) === '1') return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      /* private mode — still attempt once via in-memory guard below */
+    }
+    const tripState = loadTripState();
+    for (const id of tripState.savedPlaceIds) {
+      const b = listings.find((row) => row.id === id);
+      if (!b) continue;
+      if (isListingFavorited(favorites, b)) continue;
+      void toggleFavorite(b, { silent: true });
+    }
+    // favorites intentionally omitted — run once per login session
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.type, dataLoaded, listings, toggleFavorite]);
 
   const feed: FeedItem[] = useMemo(() => {
     const items: FeedItem[] = [];
@@ -360,8 +406,8 @@ export default function SwipeDiscover() {
   const finishWelcome = useCallback(() => {
     setWelcomeDismissed(true);
     setIndex(0);
-    setDragY(0);
-  }, []);
+    resetDragVisual();
+  }, [resetDragVisual]);
 
   const goHome = useCallback(() => {
     setDetail(null);
@@ -369,12 +415,12 @@ export default function SwipeDiscover() {
     setReviewsBiz(null);
     setSearchOpen(false);
     setSearchQuery('');
-    setDragY(0);
+    resetDragVisual();
     setFeedCategory('all');
     setIsMapMode(false);
     setWelcomeDismissed(false);
     setIndex(0);
-  }, []);
+  }, [resetDragVisual]);
 
   const dismissTapCoach = useCallback(() => {
     setShowTapCoach(false);
@@ -402,7 +448,7 @@ export default function SwipeDiscover() {
   }, [index, feed]);
 
   const goNext = useCallback(() => {
-    setDragY(0);
+    resetDragVisual();
     if (current?.kind === 'welcome') {
       finishWelcome();
       return;
@@ -412,21 +458,27 @@ export default function SwipeDiscover() {
       return;
     }
     setIndex((i) => Math.min(i + 1, Math.max(0, feed.length - 1)));
-  }, [feed.length, current?.kind, finishWelcome, reshuffleFeed]);
+  }, [feed.length, current?.kind, finishWelcome, reshuffleFeed, resetDragVisual]);
 
   const goPrev = useCallback(() => {
-    setDragY(0);
+    resetDragVisual();
     setIndex((i) => Math.max(0, i - 1));
-  }, []);
+  }, [resetDragVisual]);
 
   const heartPlace = useCallback(
     async (b: Business) => {
       const id = placeKey(b);
-      const already = trip.savedPlaceIds.includes(id);
+      const inTrip = trip.savedPlaceIds.includes(id);
+      const inFav = user ? isListingFavorited(favorites, b) : false;
+      const currentlySaved = inTrip || inFav;
       const tripToastStyle = { background: '#FF6B6B', color: '#fff', border: 'none' } as const;
-      if (already) {
-        persist({ ...trip, savedPlaceIds: trip.savedPlaceIds.filter((x) => x !== id) });
+
+      if (currentlySaved) {
+        if (inTrip) {
+          persist({ ...trip, savedPlaceIds: trip.savedPlaceIds.filter((x) => x !== id) });
+        }
         toast.success('Removed from Your Trip', { style: tripToastStyle });
+        if (user && inFav) void toggleFavorite(b, { silent: true });
       } else {
         persist({ ...trip, savedPlaceIds: [...trip.savedPlaceIds, id] });
         toast.success('Saved to Your Trip ✈️', { style: tripToastStyle });
@@ -437,15 +489,7 @@ export default function SwipeDiscover() {
             /* ignore */
           }
         }
-      }
-      if (user) {
-        const key =
-          b.id !== profileBusinessIdFor(b)
-            ? favoriteKeyForOffering(b.id)
-            : favoriteKeyForProfile(profileBusinessIdFor(b));
-        const favNow = favorites.includes(key) || isListingFavorited(favorites, b);
-        if (!already && !favNow) void toggleFavorite(b, { silent: true });
-        if (already && favNow) void toggleFavorite(b, { silent: true });
+        if (user && !inFav) void toggleFavorite(b, { silent: true });
       }
     },
     [trip, persist, user, favorites, toggleFavorite],
@@ -517,16 +561,27 @@ export default function SwipeDiscover() {
   const onTouchMove = (e: React.TouchEvent) => {
     if (touchStartY.current == null) return;
     const y = e.touches[0]?.clientY ?? touchStartY.current;
-    setDragY(y - touchStartY.current);
+    const next = y - touchStartY.current;
+    dragYRef.current = next;
+    if (dragRafRef.current != null) return;
+    dragRafRef.current = requestAnimationFrame(() => {
+      dragRafRef.current = null;
+      applyDragVisual(dragYRef.current);
+    });
   };
   const onTouchEnd = () => {
+    if (dragRafRef.current != null) {
+      cancelAnimationFrame(dragRafRef.current);
+      dragRafRef.current = null;
+    }
     if (touchStartY.current == null) {
-      setDragY(0);
+      resetDragVisual();
       return;
     }
-    if (dragY < -56) goNext();
-    else if (dragY > 56) goPrev();
-    setDragY(0);
+    const y = dragYRef.current;
+    if (y < -56) goNext();
+    else if (y > 56) goPrev();
+    else resetDragVisual();
     touchStartY.current = null;
   };
 
@@ -571,7 +626,7 @@ export default function SwipeDiscover() {
       const placeIndex = feed.findIndex((item) => item.kind === 'place' && item.business.id === b.id);
       if (placeIndex >= 0) {
         setIndex(placeIndex);
-        setDragY(0);
+        resetDragVisual();
       }
       setSearchOpen(false);
       setSearchQuery('');
@@ -579,7 +634,7 @@ export default function SwipeDiscover() {
       setReviewsBiz(null);
       setPaywallBiz(null);
     },
-    [feed],
+    [feed, resetDragVisual],
   );
 
   const openPartnerSignIn = useCallback(() => {
@@ -680,8 +735,8 @@ export default function SwipeDiscover() {
               <button
                 type="button"
                 onClick={() => {
-                  const first = listings.find((b) => trip.savedPlaceIds.includes(b.id));
-                  if (first) openDetail(first);
+                  setCurrentView('my-favorites');
+                  navigate('/saved');
                 }}
                 className={`rounded-full backdrop-blur px-3 py-1.5 text-xs font-semibold ${
                   lightChrome
@@ -760,11 +815,9 @@ export default function SwipeDiscover() {
         </div>
       ) : (
       <div
+        ref={feedSurfaceRef}
         className="absolute inset-0"
-        style={{
-          transform: `translateY(${dragY * 0.35}px)`,
-          transition: dragY === 0 ? 'transform 0.2s ease' : undefined,
-        }}
+        style={{ touchAction: 'pan-y' }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -1682,13 +1735,24 @@ function DetailSheet({
               {passCtaLabel(isExtended, paidPeople, pricePreview)}
             </button>
             <p className="text-center text-[11px] text-neutral-500">Message direct + unlock deals</p>
-            <button
-              type="button"
-              disabled
-              className="w-full min-h-11 rounded-xl bg-neutral-800 text-neutral-500 text-sm font-semibold cursor-not-allowed"
-            >
-              Message on WhatsApp
-            </button>
+            {hasWa && (
+              <button
+                type="button"
+                onClick={onMessage}
+                className="w-full min-h-11 rounded-xl bg-[#25D366]/90 text-white text-sm font-semibold flex items-center justify-center gap-2"
+              >
+                <MessageCircle className="w-4 h-4" /> Message on WhatsApp
+              </button>
+            )}
+            {business.phone && (
+              <button
+                type="button"
+                onClick={onCall}
+                className="w-full min-h-11 rounded-xl border border-teal-600/70 text-teal-300 font-semibold text-sm flex items-center justify-center gap-2"
+              >
+                <Phone className="w-4 h-4" /> Call
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -1826,10 +1890,8 @@ function ReviewsSheet({
   reviews: DBReview[];
   onClose: () => void;
 }) {
-  const avg =
-    reviews.length > 0
-      ? reviews.reduce((sum, r) => sum + Math.min(5, Number(r.rating) || 0), 0) / reviews.length
-      : business.rating || 0;
+  const avg = averageStarRating(reviews) ?? (business.rating || 0);
+  const superCount = reviews.filter((r) => r.has_super_star).length;
 
   return (
     <div className="absolute inset-0 z-[60] flex items-end bg-black/60" onClick={onClose}>
@@ -1842,13 +1904,22 @@ function ReviewsSheet({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="text-lg font-bold truncate">{business.name}</h3>
-              <p className="text-sm text-neutral-400 mt-0.5 flex items-center gap-1.5">
+              <p className="text-sm text-neutral-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
                 <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
                 {avg > 0 ? avg.toFixed(1) : '—'}
                 <span className="text-neutral-500">·</span>
                 {reviews.length > 0
                   ? `${reviews.length} review${reviews.length === 1 ? '' : 's'}`
                   : 'No reviews yet'}
+                {superCount > 0 && (
+                  <>
+                    <span className="text-neutral-500">·</span>
+                    <span className="inline-flex items-center gap-1 text-purple-300">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      {superCount} Super Star{superCount === 1 ? '' : 's'}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
             <button
@@ -1870,13 +1941,23 @@ function ReviewsSheet({
           ) : (
             reviews.slice(0, 20).map((review) => {
               const filled = starCount(Number(review.rating) || 0);
+              const isSuper = Boolean(review.has_super_star);
               return (
                 <article
                   key={review.id}
-                  className="rounded-2xl bg-white/5 border border-white/10 px-3.5 py-3"
+                  className={`rounded-2xl bg-white/5 border px-3.5 py-3 ${
+                    isSuper ? 'border-purple-400/40' : 'border-white/10'
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <p className="text-sm font-semibold truncate">{review.user_name || 'Traveler'}</p>
+                    <p className="text-sm font-semibold truncate flex items-center gap-1.5">
+                      {review.user_name || 'Traveler'}
+                      {isSuper && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-purple-300">
+                          <Sparkles className="w-3 h-3" /> Super Star
+                        </span>
+                      )}
+                    </p>
                     <div className="flex items-center gap-0.5 shrink-0">
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Star

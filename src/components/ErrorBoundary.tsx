@@ -26,33 +26,6 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     console.error('[ErrorBoundary] Caught error:', error);
     console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
 
-    // #region agent log
-    try {
-      const path = typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '';
-      fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '68da6b' },
-        body: JSON.stringify({
-          sessionId: '68da6b',
-          runId: 'pre-fix',
-          hypothesisId: 'R130',
-          location: 'ErrorBoundary.tsx:componentDidCatch',
-          message: 'Render error (incl. invalid element type / #130)',
-          data: {
-            errorMessage: error.message,
-            errorName: error.name,
-            stackHead: (error.stack || '').slice(0, 1200),
-            componentStack: (errorInfo.componentStack || '').slice(0, 4000),
-            path,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-    } catch {
-      /* ignore */
-    }
-    // #endregion agent log
-
     // Try to log to error logger (non-blocking)
     try {
       import('@/lib/errorLogger').then(({ errorLogger }) => {

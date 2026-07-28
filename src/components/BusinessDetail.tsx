@@ -17,6 +17,10 @@ import { trackInteractionEvent } from '@/lib/interactionEvents';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import BookingInquiryModal from '@/components/BookingInquiryModal';
 import { categoryUsesTieredPricing, pricingTiersForDisplay } from '@/lib/pricingTiers';
+import { partyCountsFromTouristProfile } from '@/lib/redemptionSavings';
+import { clampPartySize } from '@/data/pricing';
+import { loadTripState } from '@/lib/tripStorage';
+import { averageStarRating } from '@/lib/reviewStats';
 const BusinessDetailMap = React.lazy(() => import('@/components/BusinessDetailMap'));
 import {
   displayWebsiteForInput,
@@ -459,8 +463,9 @@ const BusinessDetail: React.FC = () => {
   const detailDiscountBadge = tierDiscountBadge || listingOfferBadgeText(biz);
   const isListingOwner = Boolean(user?.id && biz.ownerId && user.id === biz.ownerId);
   const isFav = isListingFavorited(favorites, biz);
-  /** Same rule as booking: only pass holders get WhatsApp (avoids discount leakage). */
+  /** Same rule as booking: only pass holders get WhatsApp / phone (avoids discount leakage). */
   const canUseWhatsAppContact = Boolean(user?.pass);
+  const canUsePhoneContact = Boolean(user?.pass);
 
   useEffect(() => {
     if (!profileId) return;
@@ -553,16 +558,40 @@ const BusinessDetail: React.FC = () => {
         offeringId: String(biz.id),
       });
     }
+    const party = partyCountsFromTouristProfile(userProfile);
+    const tripPeople = loadTripState().paidPeople;
+    const adults =
+      party.adults > 0
+        ? party.adults
+        : clampPartySize(tripPeople || 1);
     const url = buildBookingInquiryWhatsAppUrl(d, {
       businessName: biz.name,
       visitDate: 'To be confirmed',
-      adults: 1,
-      children: 0,
-      infants: 0,
+      adults,
+      children: party.children,
+      infants: party.infants,
       estimatedPriceWithDiscount: formatVT(effectiveListingDealPrice(biz)),
       userName: user?.name?.trim() || 'Guest',
     });
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handlePhoneUnlock = () => {
+    if (!user) {
+      setShowAuth(true);
+      setAuthMode('signin');
+      return;
+    }
+    if (!user.pass) {
+      toast.error(
+        language === 'en'
+          ? 'Get a StikmNek pass to unlock contact details and member rates.'
+          : language === 'fr'
+            ? 'Obtenez un pass StikmNek pour déverrouiller les coordonnées et les tarifs membres.'
+            : 'Yu nidim StikmNek pas blong openem kontak mo praes blong membas.',
+      );
+      void purchasePass();
+    }
   };
 
   const heroCoverSrc =
@@ -951,15 +980,18 @@ const BusinessDetail: React.FC = () => {
                   </h3>
                   <p className="text-sm text-gray-500 mt-0.5">
                     {reviews.length} {t('biz.reviews', language)}
-                    {reviews.length > 0 && (
+                    {(() => {
+                      const avg = averageStarRating(reviews);
+                      return avg != null ? (
                       <span className="ml-2 inline-flex items-center gap-1">
                         <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
                         <span className="font-semibold text-gray-700">
-                          {(reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)}
+                          {avg.toFixed(1)}
                         </span>
                         <span className="text-gray-400">avg</span>
                       </span>
-                    )}
+                      ) : null;
+                    })()}
                     {superStarReviewCount > 0 && (
                       <span className="ml-2 inline-flex items-center gap-1">
                         <Sparkles className="w-3.5 h-3.5 text-purple-500" />
@@ -1288,7 +1320,32 @@ const BusinessDetail: React.FC = () => {
                     </div>
                   </div>
                 ) : null}
-                <div className="flex items-center gap-3 text-sm text-gray-600"><Phone className="w-4 h-4 text-teal-600 shrink-0" />{biz.phone}</div>
+                {biz.phone ? (
+                  canUsePhoneContact ? (
+                    <a
+                      href={`tel:${String(biz.phone).replace(/\s+/g, '')}`}
+                      className="flex items-center gap-3 text-sm text-gray-600 hover:text-teal-700"
+                    >
+                      <Phone className="w-4 h-4 text-teal-600 shrink-0" />
+                      {biz.phone}
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handlePhoneUnlock}
+                      className="flex items-center gap-3 text-sm text-gray-500 hover:text-teal-700 w-full text-left"
+                    >
+                      <Phone className="w-4 h-4 text-teal-600 shrink-0" />
+                      <span>
+                        {language === 'en'
+                          ? 'Unlock phone with a StikmNek pass'
+                          : language === 'fr'
+                            ? 'Déverrouiller le téléphone avec un pass'
+                            : 'Openem fon namba wetem StikmNek pas'}
+                      </span>
+                    </button>
+                  )
+                ) : null}
                 {hasWhatsApp && canUseWhatsAppContact && (
                   <button
                     type="button"

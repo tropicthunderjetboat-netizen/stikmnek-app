@@ -1,10 +1,9 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Copy, Heart, MapPin, Ticket, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppContext } from '@/contexts/AppContext';
 import {
-  businesses as localBusinesses,
   listingOfferBadgeText,
   touristFacingOfferings,
   type Business,
@@ -13,7 +12,7 @@ import { clampPartySize } from '@/data/pricing';
 import { businessesMatchingFavoriteKeys, isListingFavorited } from '@/lib/favoritesUi';
 import { dealPathForBusiness } from '@/lib/dealUrl';
 import { getBusinessImageUrl } from '@/lib/utils';
-import { loadTripState, saveTripState } from '@/lib/tripStorage';
+import { checkoutFromTrip, loadTripState, savePendingCheckout, saveTripState, TRIP_STORAGE_KEY } from '@/lib/tripStorage';
 import { SUPABASE_URL } from '@/lib/supabase';
 import PassTicketCard from '@/components/PassTicketCard';
 import ShareButton from '@/components/ShareButton';
@@ -90,10 +89,25 @@ const MyFavoritesList: React.FC = () => {
   const [tripSavedIds, setTripSavedIds] = useState<string[]>(() => loadTripState().savedPlaceIds);
   const [copied, setCopied] = useState(false);
 
-  const allBusinesses = useMemo(() => {
-    const live = touristFacingOfferings(dbBusinesses);
-    return live.length > 0 ? live : localBusinesses;
-  }, [dbBusinesses]);
+  useEffect(() => {
+    const sync = () => setTripSavedIds(loadTripState().savedPlaceIds);
+    sync();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === TRIP_STORAGE_KEY || e.key == null) sync();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('stikmnek-trip-updated', sync);
+    window.addEventListener('focus', sync);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('stikmnek-trip-updated', sync);
+      window.removeEventListener('focus', sync);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, []);
+
+  const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
   const savedDeals = useMemo(() => {
     const fromCloud = user ? businessesMatchingFavoriteKeys(allBusinesses, favorites) : [];
@@ -164,7 +178,9 @@ const MyFavoritesList: React.FC = () => {
 
   const handleGetPass = useCallback(() => {
     if (!user) {
-      setAuthMode('signin');
+      const pending = checkoutFromTrip(loadTripState());
+      savePendingCheckout(pending);
+      setAuthMode('signup-tourist');
       setShowAuth(true);
       return;
     }

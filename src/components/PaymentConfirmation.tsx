@@ -18,10 +18,12 @@ import {
 } from '@/components/ui/dialog';
 import TouristProfileForm from '@/components/TouristProfileForm';
 import PostPurchasePassPreferencesDialog from '@/components/PostPurchasePassPreferencesDialog';
+import PassTicketCard from '@/components/PassTicketCard';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 import { t, type Language } from '@/data/translations';
 import { SUPPORT_EMAIL, supportMailtoUrl } from '@/data/contact';
+import { useNavigate } from 'react-router-dom';
 
 function passPrefsPromptStorageKey(receiptNumber: string): string {
   return `pass_prefs_prompt_v1_${receiptNumber}`;
@@ -693,6 +695,7 @@ function addDaysToDate(dateStr: string | undefined, days: number): string {
 
 // ─── Main PaymentConfirmation Component ───
 const PaymentConfirmation: React.FC = () => {
+  const navigate = useNavigate();
   const { user, setCurrentView, language, userProfile, refreshUserProfile, refreshUserPass, authLoading } = useAppContext();
   const [payment, setPayment] = useState<PaymentResult | null>(null);
   const [showTouristProfileModal, setShowTouristProfileModal] = useState(false);
@@ -985,7 +988,10 @@ const PaymentConfirmation: React.FC = () => {
           <h2 className="text-xl font-bold text-gray-900 mb-3">No Payment Found</h2>
           <p className="text-gray-500 mb-6">No recent payment to display.</p>
           <button
-            onClick={() => setCurrentView('home')}
+            onClick={() => {
+              setCurrentView('home');
+              navigate('/');
+            }}
             className="px-6 py-3 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors"
           >
             Go Home
@@ -1227,7 +1233,27 @@ Enjoy your deals in Vanuatu!
               {passGroup}
             </div>
           )}
+          <p className="text-sm text-teal-700 mt-3 font-medium">
+            Show the QR below at partner venues to unlock your deal.
+          </p>
         </div>
+
+        {/* Pass QR — primary post-purchase deliverable */}
+        {(user?.passId || payment.sessionId) && (
+          <div className="mb-6">
+            <PassTicketCard
+              partySize={peopleCount}
+              qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(
+                String(user?.passId || payment.sessionId),
+              )}&color=0d9488&bgcolor=ffffff&margin=8`}
+              size="default"
+            >
+              <p className="text-center text-sm text-gray-600 mt-3">
+                Partners scan this code. You can also find it anytime under Saved or Profile.
+              </p>
+            </PassTicketCard>
+          </div>
+        )}
 
         {/* Receipt Card */}
         <div ref={receiptRef} className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden print:shadow-none">
@@ -1482,11 +1508,23 @@ Enjoy your deals in Vanuatu!
             Print Receipt
           </button>
           <button
-            onClick={() => setCurrentView('deals')}
+            onClick={() => {
+              setCurrentView('my-favorites');
+              navigate('/saved');
+            }}
             className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-semibold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200"
           >
-            Start Exploring Deals
+            View pass &amp; trip
             <ArrowRight className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => {
+              setCurrentView('home');
+              navigate('/');
+            }}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-white border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
+          >
+            Keep exploring
           </button>
         </div>
 

@@ -1423,12 +1423,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-    // #region agent log
-    try {
-      fetch('http://127.0.0.1:7607/ingest/08ca587e-0a1d-4571-8adc-bbc01b0f0e0b', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'e04eda' }, body: JSON.stringify({ sessionId: 'e04eda', runId: 'initial', hypothesisId: 'E', location: 'AppContext.tsx:signIn', message: 'signInWithPassword result', data: { ok: !error, error: error?.message ?? null, status: (error as { status?: number } | null)?.status ?? null, emailLower: email === email.trim().toLowerCase() }, timestamp: Date.now() }) }).catch(() => {});
-    } catch { /* ignore */ }
-    // #endregion
-
     if (error) {
       authIntentRedirectRef.current = false;
       console.error('[signIn] Error:', error.message);

@@ -42,6 +42,8 @@ export const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/passes': 'passes',
   '/saved': 'my-favorites',
   '/profile': 'dashboard',
+  '/checkout': 'checkout',
+  '/payment-confirmation': 'payment-confirmation',
   '/business/new': 'business-new',
   '/for-business': 'business-join',
   '/hub': 'business-dashboard',
@@ -49,6 +51,14 @@ export const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/faq': 'faq',
   '/business-guide': 'business-guide',
 };
+
+/** Canonical URL for a view when one exists (keeps refresh / share working). */
+export function pathForViewMode(view: ViewMode): string | null {
+  for (const [path, mapped] of Object.entries(PATH_TO_VIEW)) {
+    if (mapped === view) return path;
+  }
+  return null;
+}
 
 /**
  * Tourist Hybrid Hub bottom tabs. Saved maps to `my-favorites` (favorites + pass holder in later steps);

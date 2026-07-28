@@ -101,6 +101,7 @@ export function saveTripState(next: TripState): void {
   try {
     window.localStorage.setItem(TRIP_STORAGE_KEY, JSON.stringify(next));
     writePartySizeToStorage(next.paidPeople);
+    window.dispatchEvent(new Event('stikmnek-trip-updated'));
   } catch {
     /* quota / private mode */
   }

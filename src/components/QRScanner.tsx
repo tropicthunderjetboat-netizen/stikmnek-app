@@ -242,24 +242,6 @@ function formatVerifyInvokeFailure(
   return parts.length > 0 ? parts.join(' — ') : 'Edge Function request failed';
 }
 
-// #region agent log
-/** Debug NDJSON ingest (desktop dev only reaches localhost; mobile silently no-ops). */
-function agentLogVerifyRedemption(hypothesisId: string, data: Record<string, unknown>): void {
-  fetch('http://127.0.0.1:7358/ingest/1d246a66-fce1-41c9-9015-ebb5a8c5e87f', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'bf845b' },
-    body: JSON.stringify({
-      sessionId: 'bf845b',
-      hypothesisId,
-      location: 'QRScanner.tsx',
-      message: 'verify-redemption invoke failure',
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-}
-// #endregion
-
 function mergeVerifyInvokeParsed(
   parsed: InvokeErrorPayload | null,
   invokeData: unknown,
@@ -630,15 +612,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
       const parsed = mergeVerifyInvokeParsed(parsedRaw, data);
       const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
       const httpStatus = getFunctionsInvokeHttpStatus(error);
-      agentLogVerifyRedemption('H1', {
-        phase: 'verify_and_redeem',
-        httpStatus,
-        reason: parsed?.reason ?? null,
-        fnError: parsed?.error ?? null,
-        profileError: parsed?.profileError ?? null,
-        postgresCode: parsed?.postgresCode ?? null,
-        uid8: user?.id ? user.id.slice(0, 8) : null,
-      });
       console.error(
         '[QRScanner] verify_and_redeem failed',
         stringifyVerifyRedemptionClientDebug('verify_and_redeem', error, data, parsed, httpStatus),
@@ -911,15 +884,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
           const parsed = mergeVerifyInvokeParsed(parsedRaw, data);
           const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
           const httpStatus = getFunctionsInvokeHttpStatus(error);
-          agentLogVerifyRedemption('H1', {
-            phase: 'check_voucher_validity',
-            httpStatus,
-            reason: parsed?.reason ?? null,
-            fnError: parsed?.error ?? null,
-            profileError: parsed?.profileError ?? null,
-            postgresCode: parsed?.postgresCode ?? null,
-            uid8: user?.id ? user.id.slice(0, 8) : null,
-          });
           console.error(
             '[QRScanner] check_voucher_validity failed',
             stringifyVerifyRedemptionClientDebug('check_voucher_validity', error, data, parsed, httpStatus),
@@ -953,15 +917,6 @@ const QRScanner: React.FC<QRScannerProps> = ({
           const parsed = mergeVerifyInvokeParsed(parsedRaw, data);
           const backendMsg = resolveVerifyRedemptionBackendError(data, parsed);
           const httpStatus = getFunctionsInvokeHttpStatus(error);
-          agentLogVerifyRedemption('H1', {
-            phase: 'redeem_flow_check_voucher_validity',
-            httpStatus,
-            reason: parsed?.reason ?? null,
-            fnError: parsed?.error ?? null,
-            profileError: parsed?.profileError ?? null,
-            postgresCode: parsed?.postgresCode ?? null,
-            uid8: user?.id ? user.id.slice(0, 8) : null,
-          });
           console.error(
             '[QRScanner] redeem flow validity check failed',
             stringifyVerifyRedemptionClientDebug('redeem_flow_check_voucher_validity', error, data, parsed, httpStatus),

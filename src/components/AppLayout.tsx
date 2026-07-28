@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Store, ArrowRight } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { canAccessAdminPanel } from '@/lib/adminRoles';
 import {
@@ -8,6 +8,8 @@ import {
   partnerSlugFromPathname,
   isHubBottomNavView,
   isRoutableAppPath,
+  normalizeAppPathname,
+  pathForViewMode,
   viewFromPathname,
   type ViewMode,
 } from '@/utils/viewModes';
@@ -179,6 +181,7 @@ function HomePage() {
 
 const AppLayout: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const {
     currentView,
     user,
@@ -207,6 +210,16 @@ const AppLayout: React.FC = () => {
       setCurrentView(next);
     }
   }, [location.pathname, setCurrentView]);
+
+  // Checkout / confirmation used to be view-only (no URL) — keep the address bar in sync
+  // so refresh after PayPal does not drop the user back on the swipe home.
+  useEffect(() => {
+    if (currentView !== 'checkout' && currentView !== 'payment-confirmation') return;
+    const path = pathForViewMode(currentView);
+    if (!path) return;
+    if (normalizeAppPathname(location.pathname) === path) return;
+    navigate(path, { replace: true });
+  }, [currentView, location.pathname, navigate]);
 
   // ─── Deep-link resolver for /deal/:slug ───
   // Maps a shared URL back to the right listing: prefer the already-loaded
@@ -477,6 +490,7 @@ const AppLayout: React.FC = () => {
     currentView === 'complete-profile' ||
     currentView === 'complete-business-profile' ||
     currentView === 'checkout' ||
+    currentView === 'payment-confirmation' ||
     // Tourist home keeps SwipeDiscover's own branding/login chrome (not the full Navbar).
     (currentView === 'home' && user?.type !== 'business');
   const hideFooter =

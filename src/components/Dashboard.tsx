@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { clampPartySize } from '@/data/pricing';
 import { t } from '@/data/translations';
-import { businesses as localBusinesses } from '@/data/businesses';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 import { profileBusinessIdFor } from '@/lib/businessOfferingMap';
 import { businessesMatchingFavoriteKeys } from '@/lib/favoritesUi';
@@ -50,7 +49,7 @@ const Dashboard: React.FC = () => {
     void refreshUserPass();
   }, [refreshRedemptions, refreshUserPass]);
 
-  const allBusinesses = dbBusinesses.length > 0 ? dbBusinesses : localBusinesses;
+  const allBusinesses = dbBusinesses;
   const favBizs = useMemo(
     () => businessesMatchingFavoriteKeys(allBusinesses, favorites),
     [allBusinesses, favorites],

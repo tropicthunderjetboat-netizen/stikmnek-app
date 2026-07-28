@@ -126,11 +126,6 @@ const AuthModal: React.FC = () => {
         body: { email, redirectTo: `${SITE_URL}/reset-password` },
       });
       const payload = data as { success?: boolean; error?: string } | null;
-      // #region agent log
-      try {
-        fetch('http://127.0.0.1:7607/ingest/08ca587e-0a1d-4571-8adc-bbc01b0f0e0b', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'e04eda' }, body: JSON.stringify({ sessionId: 'e04eda', runId: 'post-fix', hypothesisId: 'G', location: 'AuthModal.tsx:requestPasswordReset', message: 'request-password-reset result', data: { invokeError: error?.message ?? null, payloadSuccess: payload?.success ?? null, payloadError: payload?.error ?? null, redirectTo: `${SITE_URL}/reset-password` }, timestamp: Date.now() }) }).catch(() => {});
-      } catch { /* ignore */ }
-      // #endregion
       if (error) throw error;
       if (payload && payload.success === false) throw new Error(payload.error || 'Failed to send reset link');
       setForgotPasswordSent(true);

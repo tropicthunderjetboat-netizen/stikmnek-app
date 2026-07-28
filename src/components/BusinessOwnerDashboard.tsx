@@ -3,7 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
 import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
 import { toast } from 'sonner';
-import { businesses as localBusinesses, categories, type Business, type Category } from '@/data/businesses';
+import { categories, type Business, type Category } from '@/data/businesses';
 import {
   Store, Edit3, BarChart3, MessageSquare, Image, Power,
   Save, X, ChevronRight, TrendingUp, Users, DollarSign,
