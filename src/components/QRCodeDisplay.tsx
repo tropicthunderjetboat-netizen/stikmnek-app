@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { t, type Language } from '@/data/translations';
 import { Calendar, Shield, Copy, Check, Share2, Loader2 } from 'lucide-react';
 import PassTicketCard from '@/components/PassTicketCard';
+import { useQrDataUrl } from '@/lib/qrCode';
 
 function toDateOnly(v: unknown): string | null {
   if (v == null) return null;
@@ -98,11 +99,7 @@ const QRCodeDisplay: React.FC = () => {
     return user.passId;
   }, [user?.pass, user?.passId]);
 
-  const qrCodeUrl = useMemo(() => {
-    if (!qrPayload) return null;
-    const encoded = encodeURIComponent(qrPayload);
-    return `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encoded}&color=0d9488&bgcolor=ffffff&margin=8`;
-  }, [qrPayload]);
+  const qrCodeUrl = useQrDataUrl(qrPayload, { size: 280 });
 
   const passMask = useMemo(
     () =>

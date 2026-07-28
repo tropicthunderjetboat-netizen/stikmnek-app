@@ -16,6 +16,7 @@ import { checkoutFromTrip, loadTripState, savePendingCheckout, saveTripState, TR
 import { SUPABASE_URL } from '@/lib/supabase';
 import PassTicketCard from '@/components/PassTicketCard';
 import ShareButton from '@/components/ShareButton';
+import { useQrDataUrl, peekPostPurchaseTripFocus, consumePostPurchaseTripFocus } from '@/lib/qrCode';
 
 function fmtPassDate(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -88,6 +89,16 @@ const MyFavoritesList: React.FC = () => {
 
   const [tripSavedIds, setTripSavedIds] = useState<string[]>(() => loadTripState().savedPlaceIds);
   const [copied, setCopied] = useState(false);
+  const [showTripFocusBanner, setShowTripFocusBanner] = useState(() => peekPostPurchaseTripFocus());
+
+  useEffect(() => {
+    if (peekPostPurchaseTripFocus()) setShowTripFocusBanner(true);
+  }, [user?.passId]);
+
+  const dismissTripFocusBanner = useCallback(() => {
+    consumePostPurchaseTripFocus();
+    setShowTripFocusBanner(false);
+  }, []);
 
   useEffect(() => {
     const sync = () => setTripSavedIds(loadTripState().savedPlaceIds);
@@ -109,6 +120,9 @@ const MyFavoritesList: React.FC = () => {
 
   const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
+  const hasPass = Boolean(user?.pass && user?.passId);
+  const qrCodeUrl = useQrDataUrl(hasPass ? user!.passId! : null, { size: 280 });
+
   const savedDeals = useMemo(() => {
     const fromCloud = user ? businessesMatchingFavoriteKeys(allBusinesses, favorites) : [];
     const fromTrip = allBusinesses.filter((b) => tripSavedIds.includes(b.id));
@@ -122,11 +136,7 @@ const MyFavoritesList: React.FC = () => {
     return merged;
   }, [user, allBusinesses, favorites, tripSavedIds]);
 
-  const hasPass = Boolean(user?.pass && user?.passId);
   const partySize = clampPartySize(user?.passPeopleCount || 1);
-  const qrCodeUrl = hasPass
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(user!.passId!)}&color=0d9488&bgcolor=ffffff&margin=8`
-    : null;
 
   const goHome = useCallback(() => {
     setCurrentView('home');
@@ -220,6 +230,34 @@ const MyFavoritesList: React.FC = () => {
                 : 'Your pass and saved deals — one place to compare and redeem.'}
           </p>
         </header>
+
+        {showTripFocusBanner && hasPass && (
+          <div className="mb-5 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-teal-900">
+                {language === 'fr'
+                  ? 'Votre pass est prêt — contactez vos lieux'
+                  : language === 'bi'
+                    ? 'Pas blong yu i redi — mesej ol ples'
+                    : 'Your pass is ready — message your trip'}
+              </p>
+              <p className="mt-0.5 text-xs text-teal-800 leading-relaxed">
+                {language === 'fr'
+                  ? 'Ouvrez un lieu enregistré pour WhatsApp et le tarif membre. Montrez le QR à l’arrivée.'
+                  : language === 'bi'
+                    ? 'Openem ples we yu sevem blong WhatsApp mo praes blong memba. Soem QR taem yu kasem.'
+                    : 'Open a saved place to WhatsApp them at the member rate. Show your QR when you arrive.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={dismissTripFocusBanner}
+              className="shrink-0 text-teal-700 text-xs font-bold"
+            >
+              Got it
+            </button>
+          </div>
+        )}
 
         {/* ── Pass wallet hero ── */}
         <section className="mb-8" aria-label="StikmNek Pass">

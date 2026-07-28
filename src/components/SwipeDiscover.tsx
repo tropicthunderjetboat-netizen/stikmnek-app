@@ -1,5 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, MapPin, MessageCircle, Phone, Search, Sparkles, Star, User, X, ChevronRight } from 'lucide-react';
+import { Heart, Lock, MapPin, MessageCircle, Phone, Search, Sparkles, Star, User, X, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
@@ -9,6 +9,8 @@ import {
   categoryLabelForKey,
   customerFacingListPrice,
   effectiveListingDealPrice,
+  effectiveListingOriginalPrice,
+  listingHasActiveDiscount,
   listingOfferBadgeText,
   primaryEmbeddedOffering,
   touristFacingOfferings,
@@ -22,6 +24,7 @@ import { digitsForWaMe, formatVT, getPhotoDisplayUrl } from '@/lib/utils';
 import { fetchApprovedPhotosForOffering } from '@/lib/fetchApprovedPhotosForOffering';
 import { pricingTiersForDisplay } from '@/lib/pricingTiers';
 import { averageStarRating } from '@/lib/reviewStats';
+import { useQrDataUrl } from '@/lib/qrCode';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import {
   checkoutFromTrip,
@@ -80,14 +83,22 @@ const FEED_TIP_STEPS: TipStep[] = [
     title: 'Build Your Itinerary',
     body: 'Love a spot? Tap the heart to save it to your trip list for easy comparing later.',
     icon: '♥',
-    afterPlaces: 5,
+    afterPlaces: 4,
+  },
+  {
+    id: 'qr',
+    title: 'One Pass. Unlimited Deals.',
+    body: 'Buy once, unlock member prices everywhere. Partners scan your QR at the venue — no booking fees, no middleman.',
+    icon: '📱',
+    afterPlaces: 6,
+    variant: 'qr',
   },
   {
     id: 'length',
     title: 'How long are you staying?',
     body: 'Just so we can point you at the right pass later — a day trip, or a longer stay.',
     icon: '📅',
-    afterPlaces: 7,
+    afterPlaces: 8,
     variant: 'length',
   },
   {
@@ -95,29 +106,19 @@ const FEED_TIP_STEPS: TipStep[] = [
     title: "Who's coming?",
     body: 'Anyone 6 and up needs a spot on the pass. Kids 5 and under come free.',
     icon: '👥',
-    afterPlaces: 9,
+    afterPlaces: 10,
     variant: 'party',
   },
   {
     id: 'whatsapp',
     title: 'Book Direct, Zero Fees',
-    body: 'No middleman markups. Use your pass to contact operators directly on WhatsApp or email to lock in your dates.',
+    body: 'No middleman markups. Use your pass to contact operators directly on WhatsApp to lock in your dates.',
     icon: '💬',
-    afterPlaces: 12,
-  },
-  {
-    id: 'qr',
-    title: 'One Pass. Unlimited Deals.',
-    body: 'One pass unlocks every single discount on StikmNek. Just show your digital QR code when you arrive to claim your savings.',
-    icon: '📱',
-    afterPlaces: 15,
-    variant: 'qr',
+    afterPlaces: 13,
   },
 ];
 
-/** Sample QR for the pass tip — same generator as real passes, demo payload only. */
-const TIP_SAMPLE_QR_URL =
-  'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=STIKMNEK-SAMPLE-PASS&color=0d9488&bgcolor=ffffff&margin=10';
+const SOFT_NUDGE_HEART_THRESHOLD = 3;
 
 const LENGTH_OPTIONS: { id: TripLength; label: string }[] = [
   { id: 'day', label: 'Day trip' },
@@ -258,6 +259,7 @@ export default function SwipeDiscover() {
   const [searchQuery, setSearchQuery] = useState('');
   /** Visual drag offset — updated via ref + rAF to avoid re-rendering the feed every touchmove. */
   const [showTapCoach, setShowTapCoach] = useState(() => !hasSeenTapHint());
+  const [showSoftNudge, setShowSoftNudge] = useState(false);
   /** Session-only: welcome shows again every fresh visit / page load */
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
   const [shuffleKey, setShuffleKey] = useState(0);
@@ -480,7 +482,8 @@ export default function SwipeDiscover() {
         toast.success('Removed from Your Trip', { style: tripToastStyle });
         if (user && inFav) void toggleFavorite(b, { silent: true });
       } else {
-        persist({ ...trip, savedPlaceIds: [...trip.savedPlaceIds, id] });
+        const nextIds = [...trip.savedPlaceIds, id];
+        persist({ ...trip, savedPlaceIds: nextIds });
         toast.success('Saved to Your Trip ✈️', { style: tripToastStyle });
         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
           try {
@@ -490,10 +493,22 @@ export default function SwipeDiscover() {
           }
         }
         if (user && !inFav) void toggleFavorite(b, { silent: true });
+        if (
+          !hasPass &&
+          !trip.softNudgeDismissed &&
+          nextIds.length >= SOFT_NUDGE_HEART_THRESHOLD
+        ) {
+          setShowSoftNudge(true);
+        }
       }
     },
-    [trip, persist, user, favorites, toggleFavorite],
+    [trip, persist, user, favorites, toggleFavorite, hasPass],
   );
+
+  const dismissSoftNudge = useCallback(() => {
+    setShowSoftNudge(false);
+    persist({ ...trip, softNudgeDismissed: true });
+  }, [trip, persist]);
 
   const setTripLengthFromTip = useCallback(
     (len: TripLength) => {
@@ -856,11 +871,12 @@ export default function SwipeDiscover() {
           <PlaceCard
             business={current.business}
             saved={isSaved(current.business)}
+            hasPass={hasPass}
             reviewCount={reviewsForBusiness(dbReviews, current.business).length || current.business.reviewCount || 0}
             rating={current.business.rating || 0}
             language={language}
             reserveTripStrip={savedBusinesses.length > 0}
-            showTapCoach={showTapCoach && !detail && !paywallBiz && !reviewsBiz && !searchOpen}
+            showTapCoach={showTapCoach && !detail && !paywallBiz && !reviewsBiz && !searchOpen && !showSoftNudge}
             onDismissCoach={dismissTapCoach}
             onHeart={() => void heartPlace(current.business)}
             onOpen={() => openDetail(current.business)}
@@ -956,9 +972,24 @@ export default function SwipeDiscover() {
           paidPeople={clampPartySize(trip.paidPeople || 1)}
           isExtended={isExtended}
           price={pricePreview}
+          tripCount={saveCount}
           onClose={() => setPaywallBiz(null)}
           onBuy={() => {
             setPaywallBiz(null);
+            openCheckout();
+          }}
+        />
+      )}
+
+      {showSoftNudge && !hasPass && (
+        <SoftNudgeSheet
+          tripCount={Math.max(saveCount, SOFT_NUDGE_HEART_THRESHOLD)}
+          paidPeople={clampPartySize(trip.paidPeople || 1)}
+          isExtended={isExtended}
+          price={pricePreview}
+          onDismiss={dismissSoftNudge}
+          onBuy={() => {
+            dismissSoftNudge();
             openCheckout();
           }}
         />
@@ -1098,6 +1129,7 @@ function TipCard({
   const isParty = tip.variant === 'party';
   const isLength = tip.variant === 'length';
   const isQr = tip.variant === 'qr';
+  const sampleQrUrl = useQrDataUrl(isQr ? 'STIKMNEK-SAMPLE-PASS' : null, { size: 200 });
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#F4F7F8]">
@@ -1105,12 +1137,16 @@ function TipCard({
         <div className="w-full max-w-[300px] text-center">
           {isQr ? (
             <div className="mx-auto mb-5 w-[148px] rounded-2xl bg-white p-3 ring-1 ring-[#0A1F2A]/[0.08] shadow-sm">
-              <img
-                src={TIP_SAMPLE_QR_URL}
-                alt="Example StikmNek pass QR code"
-                className="h-[124px] w-[124px] mx-auto"
-                draggable={false}
-              />
+              {sampleQrUrl ? (
+                <img
+                  src={sampleQrUrl}
+                  alt="Example StikmNek pass QR code"
+                  className="h-[124px] w-[124px] mx-auto"
+                  draggable={false}
+                />
+              ) : (
+                <div className="h-[124px] w-[124px] mx-auto rounded-lg bg-neutral-100 animate-pulse" />
+              )}
               <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-[#8A9BA8]">
                 Your pass QR
               </p>
@@ -1305,6 +1341,7 @@ function EndCard({
 function PlaceCard({
   business,
   saved,
+  hasPass,
   reviewCount,
   rating,
   language,
@@ -1318,6 +1355,7 @@ function PlaceCard({
 }: {
   business: Business;
   saved: boolean;
+  hasPass: boolean;
   reviewCount: number;
   rating: number;
   language: 'en' | 'fr' | 'bi';
@@ -1336,6 +1374,11 @@ function PlaceCard({
 
   const viewDealLabel =
     language === 'fr' ? 'Voir l’offre' : language === 'bi' ? 'Luk deal' : 'View Deal';
+
+  const dealPx = effectiveListingDealPrice(business);
+  const origPx = effectiveListingOriginalPrice(business);
+  const hasDiscount = listingHasActiveDiscount(business);
+  const memberLocked = !hasPass && hasDiscount && dealPx > 0;
 
   return (
     <div className="relative h-full w-full">
@@ -1424,14 +1467,46 @@ function PlaceCard({
             </h2>
           </button>
 
-          {/* Discount on its own row — never overlaps the title */}
-          <div className="mt-2">
+          {/* Discount / locked member price */}
+          <div className="mt-2 flex flex-col items-start gap-1.5">
             <span
               className="inline-block max-w-full truncate rounded-md bg-emerald-400 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wide text-neutral-950 pointer-events-none border border-white/80"
               style={{ boxShadow: '0 2px 12px rgba(16,185,129,0.45)' }}
             >
               {dealPillText(business)}
             </span>
+            {memberLocked ? (
+              <div
+                className="inline-flex items-center gap-2 rounded-lg bg-black/45 backdrop-blur-sm px-2.5 py-1.5 pointer-events-none"
+                style={{ textShadow: TEXT_SHADOW_SOFT }}
+              >
+                {origPx > dealPx ? (
+                  <span className="text-[11px] text-white/70 line-through">{formatVT(origPx)}</span>
+                ) : null}
+                <span className="relative inline-flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-amber-300" aria-hidden />
+                  <span className="text-sm font-bold text-white/40 blur-[3px] select-none tabular-nums">
+                    {formatVT(dealPx)}
+                  </span>
+                </span>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-200">
+                  Member price
+                </span>
+              </div>
+            ) : hasPass && hasDiscount && dealPx > 0 ? (
+              <div
+                className="inline-flex items-center gap-2 rounded-lg bg-teal-600/90 px-2.5 py-1.5 pointer-events-none"
+                style={{ textShadow: TEXT_SHADOW_SOFT }}
+              >
+                {origPx > dealPx ? (
+                  <span className="text-[11px] text-white/70 line-through">{formatVT(origPx)}</span>
+                ) : null}
+                <span className="text-sm font-bold text-white tabular-nums">{formatVT(dealPx)}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-teal-100">
+                  Unlocked
+                </span>
+              </div>
+            ) : null}
           </div>
 
           {locationLine ? (
@@ -1529,6 +1604,9 @@ function DetailSheet({
 }) {
   const hasWa = businessListingHasWhatsApp(business);
   const price = customerFacingListPrice(business);
+  const dealPx = effectiveListingDealPrice(business);
+  const origPx = effectiveListingOriginalPrice(business);
+  const hasDiscount = listingHasActiveDiscount(business);
   const fullText = plainDescription(business);
   const [expanded, setExpanded] = useState(false);
   const [showMorePricing, setShowMorePricing] = useState(false);
@@ -1647,6 +1725,24 @@ function DetailSheet({
             <span className="inline-block mt-2 rounded-md bg-teal-600 text-xs font-semibold px-2.5 py-1">
               {dealPillText(business)}
             </span>
+            {!hasPass && hasDiscount && dealPx > 0 ? (
+              <div className="mt-2 flex items-center gap-2 text-sm text-neutral-300">
+                {origPx > dealPx ? (
+                  <span className="line-through text-neutral-500">{formatVT(origPx)}</span>
+                ) : null}
+                <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="blur-[3px] select-none text-neutral-500 tabular-nums">{formatVT(dealPx)}</span>
+                <span className="text-amber-300 text-xs font-semibold">Member price — unlock with pass</span>
+              </div>
+            ) : hasPass && hasDiscount && dealPx > 0 ? (
+              <div className="mt-2 flex items-center gap-2 text-sm text-teal-300">
+                {origPx > dealPx ? (
+                  <span className="line-through text-neutral-500">{formatVT(origPx)}</span>
+                ) : null}
+                <span className="font-bold tabular-nums text-white">{formatVT(dealPx)}</span>
+                <span className="text-xs font-semibold">Your member price</span>
+              </div>
+            ) : null}
             <p className="mt-3 text-neutral-300 text-base leading-relaxed">{blurb}</p>
             {needsReadMore && (
               <button
@@ -1987,11 +2083,61 @@ function ReviewsSheet({
   );
 }
 
+function SoftNudgeSheet({
+  tripCount,
+  paidPeople,
+  isExtended,
+  price,
+  onDismiss,
+  onBuy,
+}: {
+  tripCount: number;
+  paidPeople: number;
+  isExtended: boolean;
+  price: number;
+  onDismiss: () => void;
+  onBuy: () => void;
+}) {
+  const plan =
+    isExtended
+      ? `Perfect for ${peopleWord(paidPeople)} · 7 days`
+      : `Perfect for ${peopleWord(paidPeople)} · 1 day`;
+
+  return (
+    <div className="absolute inset-0 z-[65] flex items-end bg-black/55" onClick={onDismiss}>
+      <div
+        className="w-full rounded-t-3xl bg-neutral-900 px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] space-y-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-10 h-1 rounded-full bg-white/20 mx-auto" />
+        <h3 className="text-lg font-bold text-center text-white">
+          Your trip has {tripCount} place{tripCount === 1 ? '' : 's'}
+        </h3>
+        <p className="text-sm text-neutral-400 text-center leading-relaxed">
+          Unlock WhatsApp + member prices for every saved spot. {plan}.
+        </p>
+        <button
+          type="button"
+          onClick={onBuy}
+          className="w-full min-h-12 rounded-xl bg-[#0FB5B5] font-bold text-white border-2 border-white"
+          style={{ boxShadow: '0 4px 20px rgba(15,181,181,0.35)' }}
+        >
+          {passCtaLabel(isExtended, paidPeople, price)}
+        </button>
+        <button type="button" onClick={onDismiss} className="w-full text-sm text-neutral-400 py-2">
+          Keep browsing
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PaywallSheet({
   businessName,
   paidPeople,
   isExtended,
   price,
+  tripCount = 0,
   onClose,
   onBuy,
 }: {
@@ -1999,6 +2145,7 @@ function PaywallSheet({
   paidPeople: number;
   isExtended: boolean;
   price: number;
+  tripCount?: number;
   onClose: () => void;
   onBuy: () => void;
 }) {
@@ -2009,11 +2156,29 @@ function PaywallSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto" />
-        <h3 className="text-lg font-bold text-center">Connect with {businessName}</h3>
-        <p className="text-sm text-neutral-400 text-center">
-          Unlock direct WhatsApp messaging & exclusive discounts with a StikmNek Pass. 100% direct — no booking fees.
+        <h3 className="text-lg font-bold text-center text-white">Connect with {businessName}</h3>
+        <p className="text-sm text-neutral-400 text-center leading-relaxed">
+          Unlock direct WhatsApp + the member price. Partners scan your QR at the venue — 100% direct, no booking fees.
+          {tripCount > 0
+            ? ` Your trip already has ${tripCount} saved place${tripCount === 1 ? '' : 's'}.`
+            : ''}
         </p>
-        <button type="button" onClick={onBuy} className="w-full min-h-12 rounded-xl bg-teal-600 font-bold">
+        <ul className="text-xs text-neutral-300 space-y-1.5 px-1">
+          <li className="flex items-center gap-2">
+            <Lock className="w-3.5 h-3.5 text-teal-400 shrink-0" /> Member rates on every listing
+          </li>
+          <li className="flex items-center gap-2">
+            <MessageCircle className="w-3.5 h-3.5 text-teal-400 shrink-0" /> WhatsApp operators directly
+          </li>
+          <li className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-teal-400 shrink-0" /> One QR · unlimited deals
+          </li>
+        </ul>
+        <button
+          type="button"
+          onClick={onBuy}
+          className="w-full min-h-12 rounded-xl bg-teal-600 font-bold text-white"
+        >
           {passCtaLabel(isExtended, paidPeople, price)}
         </button>
         <button type="button" onClick={onClose} className="w-full text-sm text-neutral-400 py-2">

@@ -24,6 +24,8 @@ import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 import { t, type Language } from '@/data/translations';
 import { SUPPORT_EMAIL, supportMailtoUrl } from '@/data/contact';
 import { useNavigate } from 'react-router-dom';
+import { markPostPurchaseTripFocus, useQrDataUrl } from '@/lib/qrCode';
+import { loadTripState } from '@/lib/tripStorage';
 
 function passPrefsPromptStorageKey(receiptNumber: string): string {
   return `pass_prefs_prompt_v1_${receiptNumber}`;
@@ -708,6 +710,14 @@ const PaymentConfirmation: React.FC = () => {
   const paymentRef = useRef<PaymentResult | null>(null);
   paymentRef.current = payment;
 
+  const passIdForQr = user?.passId || payment?.sessionId || null;
+  const qrCodeUrl = useQrDataUrl(passIdForQr, { size: 280 });
+  const tripSaveCount = loadTripState().savedPlaceIds.length;
+
+  useEffect(() => {
+    if (payment) markPostPurchaseTripFocus();
+  }, [payment?.receiptNumber]);
+
   useEffect(() => {
     async function loadReceipt() {
       const stored = localStorage.getItem('lastPayment');
@@ -1239,17 +1249,15 @@ Enjoy your deals in Vanuatu!
         </div>
 
         {/* Pass QR — primary post-purchase deliverable */}
-        {(user?.passId || payment.sessionId) && (
+        {passIdForQr && (
           <div className="mb-6">
             <PassTicketCard
               partySize={peopleCount}
-              qrCodeUrl={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(
-                String(user?.passId || payment.sessionId),
-              )}&color=0d9488&bgcolor=ffffff&margin=8`}
+              qrCodeUrl={qrCodeUrl}
               size="default"
             >
               <p className="text-center text-sm text-gray-600 mt-3">
-                Partners scan this code. You can also find it anytime under Saved or Profile.
+                Partners scan this code. Works offline once loaded — also under Saved or Profile.
               </p>
             </PassTicketCard>
           </div>
@@ -1509,12 +1517,15 @@ Enjoy your deals in Vanuatu!
           </button>
           <button
             onClick={() => {
+              markPostPurchaseTripFocus();
               setCurrentView('my-favorites');
               navigate('/saved');
             }}
             className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-semibold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200"
           >
-            View pass &amp; trip
+            {tripSaveCount > 0
+              ? `Message your trip (${tripSaveCount})`
+              : 'View pass & trip'}
             <ArrowRight className="w-4 h-4" />
           </button>
           <button

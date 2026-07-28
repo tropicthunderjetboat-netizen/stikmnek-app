@@ -3,6 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { X, Copy, Check } from 'lucide-react';
 import PassTicketCard from '@/components/PassTicketCard';
 import { clampPartySize } from '@/data/pricing';
+import { useQrDataUrl } from '@/lib/qrCode';
 
 const FloatingPassButton: React.FC = () => {
   const { user, currentView } = useAppContext();
@@ -14,6 +15,12 @@ const FloatingPassButton: React.FC = () => {
     const timer = setTimeout(() => setPulseAnim(false), 10000);
     return () => clearTimeout(timer);
   }, []);
+
+  const partySize = clampPartySize(user?.passPeopleCount || 1);
+  const qrCodeUrl = useQrDataUrl(
+    user?.type === 'tourist' && user?.pass && user?.passId ? user.passId : null,
+    { size: 300 },
+  );
 
   // Only show for tourists with an active pass — not on the pre-purchase homepage feed
   if (!user || user.type !== 'tourist' || !user.pass || !user.passId) return null;
@@ -29,12 +36,8 @@ const FloatingPassButton: React.FC = () => {
     return null;
   }
 
-  const partySize = clampPartySize(user.passPeopleCount || 1);
-  const qrPayload = user.passId;
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrPayload)}&color=0d9488&bgcolor=ffffff&margin=8`;
-
   const handleCopy = () => {
-    navigator.clipboard.writeText(qrPayload).then(() => {
+    navigator.clipboard.writeText(user.passId!).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
