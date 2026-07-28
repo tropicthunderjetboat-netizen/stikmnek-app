@@ -378,7 +378,7 @@ const MyFavoritesList: React.FC = () => {
                     ? 'Avec un StikmNek Tourist Pass, présentez votre QR chez les partenaires locaux et économisez sur vos deals enregistrés.'
                     : language === 'bi'
                       ? 'Wetem StikmNek Tourist Pass, soem QR long ol lokal bisnis mo sevem long ol deal we yu laikem.'
-                      : 'Unlock all discounts below with a StikmNek Tourist Pass — show your QR to local operators and save on every deal you’ve hearted.'}
+                      : 'Unlock all discounts below with a StikmNek Tourist Pass — show your QR to local operators and get member prices on every place you’ve saved.'}
                 </p>
                 {savingsSummary ? (
                   <div className="mt-3 rounded-xl border border-teal-200 bg-white/80 px-3 py-2.5">
