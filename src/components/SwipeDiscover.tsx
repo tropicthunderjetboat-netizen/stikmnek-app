@@ -1,5 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, List, Lock, Map, MapPin, MessageCircle, Phone, Plane, Search, Sparkles, Star, User, X, ChevronRight } from 'lucide-react';
+import { Heart, List, Lock, Map as MapIcon, MapPin, MessageCircle, Phone, Plane, Search, Sparkles, Star, User, X, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
@@ -2065,7 +2065,7 @@ function SearchSheet({
               {isMapMode ? (
                 <List className="w-4 h-4" aria-hidden />
               ) : (
-                <Map className="w-4 h-4" aria-hidden />
+                <MapIcon className="w-4 h-4" aria-hidden />
               )}
               <span className="text-[10px] font-semibold leading-tight text-center">{mapTileLabel}</span>
             </button>
