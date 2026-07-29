@@ -30,13 +30,15 @@ const CATEGORY_LABELS = {
 
 const SCHEMA_TYPE_BY_CATEGORY = {
   dining: 'FoodEstablishment',
-  tours: 'TouristAttraction',
-  activities: 'TouristAttraction',
   spa: 'DaySpa',
   accommodation: 'LodgingBusiness',
   shopping: 'Store',
-  transportation: 'LocalBusiness',
+  // tours / activities / transportation are trip/service listings → TouristTrip
+  // (see listingJsonLd). TouristAttraction reserved for real places only.
 };
+
+/** Categories modeled as TouristTrip + provider, not as the place/business itself. */
+const TOURIST_TRIP_CATEGORIES = new Set(['tours', 'activities', 'transportation']);
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 const GENERIC_TITLES = new Set(['', 'offer', 'main offer']);
@@ -106,7 +108,13 @@ export function categoryLabel(key) {
 }
 
 export function schemaTypeForCategory(key) {
+  if (TOURIST_TRIP_CATEGORIES.has(key)) return 'TouristTrip';
   return SCHEMA_TYPE_BY_CATEGORY[key] || 'LocalBusiness';
+}
+
+export function providerTypeForCategory(key) {
+  if (key === 'tours' || key === 'activities') return 'TravelAgency';
+  return 'LocalBusiness';
 }
 
 export function resolveImageUrl(raw) {
@@ -258,44 +266,141 @@ export function jsonLdScript(data) {
   return `<script type="application/ld+json">${JSON.stringify(data)}</script>`;
 }
 
+/** Parse "10% OFF" / "20%" → 10 / 20, or derive from prices. */
+export function discountPercentFromListing(listing) {
+  const fromText = String(listing.discount ?? '').match(/(\d+(?:\.\d+)?)\s*%/);
+  if (fromText) {
+    const n = Number(fromText[1]);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const deal = listing.dealPrice;
+  const orig = listing.originalPrice;
+  if (
+    deal != null &&
+    orig != null &&
+    orig > 0 &&
+    deal > 0 &&
+    deal < orig
+  ) {
+    return Math.round(((orig - deal) / orig) * 1000) / 10;
+  }
+  return null;
+}
+
+export function offerDiscountDescription(listing) {
+  const pct = discountPercentFromListing(listing);
+  const deal = listing.dealPrice != null && listing.dealPrice > 0 ? formatVT(listing.dealPrice) : null;
+  const orig =
+    listing.originalPrice != null && listing.originalPrice > 0
+      ? formatVT(listing.originalPrice)
+      : null;
+  const discountLabel = String(listing.discount ?? '').trim();
+
+  const parts = [];
+  if (discountLabel) {
+    parts.push(`${discountLabel} for StikmNek Pass holders`);
+  } else if (pct != null) {
+    parts.push(`${pct}% off for StikmNek Pass holders`);
+  } else {
+    parts.push('Special StikmNek Pass holder pricing');
+  }
+
+  if (deal && orig && listing.dealPrice < listing.originalPrice) {
+    parts.push(`(pass price ${deal}; was ${orig})`);
+  } else if (deal) {
+    parts.push(`(pass price ${deal})`);
+  }
+
+  return parts.join(' ');
+}
+
 export function offerJsonLd(listing) {
+  const pct = discountPercentFromListing(listing);
   const offer = {
     '@type': 'Offer',
     name: listing.title,
-    description:
-      listing.discount ||
-      listing.description.slice(0, 200) ||
-      `${listing.title} — StikmNek Pass holder deal`,
+    description: offerDiscountDescription(listing),
     url: `${SITE_ORIGIN}${listing.dealPath}`,
     priceCurrency: 'VUV',
     availability: 'https://schema.org/InStock',
   };
+
   if (listing.dealPrice != null && listing.dealPrice > 0) {
     offer.price = String(listing.dealPrice);
   }
-  if (listing.discount) offer.discount = listing.discount;
+  if (pct != null) {
+    offer.discount = `${pct}%`;
+  }
+
+  const specs = [];
+  if (listing.dealPrice != null && listing.dealPrice > 0) {
+    const saleSpec = {
+      '@type': 'UnitPriceSpecification',
+      priceType: 'https://schema.org/SalePrice',
+      price: String(listing.dealPrice),
+      priceCurrency: 'VUV',
+    };
+    if (pct != null) {
+      saleSpec.name = 'StikmNek Pass price';
+      saleSpec.description = `${pct}% off for StikmNek Pass holders`;
+    }
+    specs.push(saleSpec);
+  }
+  if (
+    listing.originalPrice != null &&
+    listing.originalPrice > 0 &&
+    (listing.dealPrice == null ||
+      listing.dealPrice <= 0 ||
+      listing.originalPrice > listing.dealPrice)
+  ) {
+    specs.push({
+      '@type': 'UnitPriceSpecification',
+      priceType: 'https://schema.org/ListPrice',
+      price: String(listing.originalPrice),
+      priceCurrency: 'VUV',
+      name: 'Regular price',
+    });
+  }
+  if (specs.length) offer.priceSpecification = specs;
+
   return offer;
 }
 
-export function localBusinessJsonLd(listingOrPartner, { isPartner = false } = {}) {
+function providerJsonLd(listingOrPartner) {
   const category = listingOrPartner.category;
-  const name = isPartner ? listingOrPartner.name : listingOrPartner.title;
-  const path = isPartner ? listingOrPartner.partnerPath : listingOrPartner.dealPath;
-  const description = stripHtml(listingOrPartner.description || '').slice(0, 500);
-  const data = {
-    '@context': 'https://schema.org',
-    '@type': schemaTypeForCategory(category),
+  const name =
+    listingOrPartner.profileName ||
+    listingOrPartner.name ||
+    listingOrPartner.title ||
+    'StikmNek partner';
+  const provider = {
+    '@type': providerTypeForCategory(category),
     name,
-    description:
-      description ||
-      `${name} — local Vanuatu deals on StikmNek`,
-    url: `${SITE_ORIGIN}${path}`,
-    image: listingOrPartner.image || DEFAULT_OG_IMAGE,
     address: {
       '@type': 'PostalAddress',
       addressLocality: listingOrPartner.location || 'Port Vila',
       addressCountry: 'VU',
     },
+  };
+  if (listingOrPartner.phone) provider.telephone = listingOrPartner.phone;
+  if (listingOrPartner.partnerPath) {
+    provider.url = `${SITE_ORIGIN}${listingOrPartner.partnerPath}`;
+  }
+  if (listingOrPartner.lat != null && listingOrPartner.lng != null) {
+    provider.geo = {
+      '@type': 'GeoCoordinates',
+      latitude: listingOrPartner.lat,
+      longitude: listingOrPartner.lng,
+    };
+  }
+  return provider;
+}
+
+function placeAddressAndContact(data, listingOrPartner) {
+  data.address = {
+    '@type': 'PostalAddress',
+    addressLocality: listingOrPartner.location || 'Port Vila',
+    addressCountry: 'VU',
   };
   if (listingOrPartner.phone) data.telephone = listingOrPartner.phone;
   if (listingOrPartner.lat != null && listingOrPartner.lng != null) {
@@ -312,6 +417,50 @@ export function localBusinessJsonLd(listingOrPartner, { isPartner = false } = {}
       reviewCount: String(listingOrPartner.reviewCount),
     };
   }
+}
+
+function partnerSchemaType(category) {
+  if (category === 'tours' || category === 'activities') return 'TravelAgency';
+  return SCHEMA_TYPE_BY_CATEGORY[category] || 'LocalBusiness';
+}
+
+/**
+ * Per-deal or partner-page JSON-LD.
+ * Tours/activities/transportation → TouristTrip + provider.
+ * Dining/spa/stays/shopping → LocalBusiness subtype with makesOffer.
+ * Descriptions are never truncated mid-sentence.
+ */
+export function localBusinessJsonLd(listingOrPartner, { isPartner = false } = {}) {
+  const category = listingOrPartner.category;
+  const name = isPartner ? listingOrPartner.name : listingOrPartner.title;
+  const path = isPartner ? listingOrPartner.partnerPath : listingOrPartner.dealPath;
+  const description =
+    stripHtml(listingOrPartner.description || '') ||
+    `${name} — local Vanuatu deals on StikmNek`;
+
+  if (!isPartner && TOURIST_TRIP_CATEGORIES.has(category)) {
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'TouristTrip',
+      name,
+      description,
+      url: `${SITE_ORIGIN}${path}`,
+      image: listingOrPartner.image || DEFAULT_OG_IMAGE,
+      provider: providerJsonLd(listingOrPartner),
+      offers: offerJsonLd(listingOrPartner),
+    };
+  }
+
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': isPartner ? partnerSchemaType(category) : schemaTypeForCategory(category),
+    name,
+    description,
+    url: `${SITE_ORIGIN}${path}`,
+    image: listingOrPartner.image || DEFAULT_OG_IMAGE,
+  };
+  placeAddressAndContact(data, listingOrPartner);
+
   if (isPartner && Array.isArray(listingOrPartner.offerings)) {
     data.makesOffer = listingOrPartner.offerings.map(offerJsonLd);
   } else {

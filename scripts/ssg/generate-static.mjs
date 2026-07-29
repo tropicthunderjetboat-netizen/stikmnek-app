@@ -64,6 +64,39 @@ function listingCard(listing) {
 </li>`;
 }
 
+function stripPreviousSsg(html) {
+  const startMarker = '<div id="ssg-content"';
+  let out = html;
+  let start = out.indexOf(startMarker);
+  while (start !== -1) {
+    let i = start;
+    let depth = 0;
+    let end = -1;
+    while (i < out.length) {
+      const nextOpen = out.indexOf('<div', i);
+      const nextClose = out.indexOf('</div>', i);
+      if (nextClose === -1) break;
+      if (nextOpen !== -1 && nextOpen < nextClose) {
+        depth += 1;
+        i = nextOpen + 4;
+      } else {
+        depth -= 1;
+        i = nextClose + 6;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    if (end === -1) break;
+    out = `${out.slice(0, start)}${out.slice(end)}`;
+    start = out.indexOf(startMarker);
+  }
+  // Collapse #root back to empty so injection is deterministic.
+  out = out.replace(/<div id="root"[^>]*>\s*<\/div>/i, '<div id="root"></div>');
+  return out;
+}
+
 function shellPage({
   template,
   title,
@@ -74,7 +107,7 @@ function shellPage({
   ogImage = DEFAULT_OG_IMAGE,
 }) {
   const canonical = `${SITE_ORIGIN}${canonicalPath === '/' ? '/' : canonicalPath}`;
-  let html = template;
+  let html = stripPreviousSsg(template);
 
   html = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeHtml(title)}</title>`);
 
@@ -115,6 +148,13 @@ function shellPage({
     html = html.replace(re, replacement);
   }
 
+  // Drop JSON-LD blocks we injected on a previous SSG pass (keep the sitewide
+  // Organization / WebApplication blocks from the Vite index.html template).
+  html = html.replace(
+    /\n?\s*<script type="application\/ld\+json">\{"@context":"https:\/\/schema\.org","@type":"(?:WebSite|CollectionPage|FAQPage|TouristTrip|TouristAttraction|FoodEstablishment|LocalBusiness|TravelAgency|DaySpa|LodgingBusiness|Store)"[\s\S]*?<\/script>/g,
+    '',
+  );
+
   if (jsonLdBlocks.length) {
     const injection = `\n    ${jsonLdBlocks.map(jsonLdScript).join('\n    ')}\n`;
     html = html.replace('</head>', `${injection}</head>`);
@@ -125,7 +165,8 @@ function shellPage({
 ${bodyHtml}
     </div>`;
 
-  // Prefer injecting inside #root so React's createRoot().render() replaces it.
+  // Inject once inside #root only — never also into <noscript> (that caused
+  // the homepage deals list to appear twice in raw HTML).
   if (/<div id="root"><\/div>/i.test(html)) {
     html = html.replace(
       /<div id="root"><\/div>/i,
@@ -134,16 +175,6 @@ ${bodyHtml}
   } else {
     html = html.replace('</body>', `${crawlerBlock}\n  </body>`);
   }
-
-  // Replace the "JavaScript is required" noscript with useful content too.
-  html = html.replace(
-    /<noscript>\s*<div[^>]*>[\s\S]*?JavaScript is required[\s\S]*?<\/div>\s*<\/noscript>/i,
-    `<noscript>
-      <div style="padding:2rem;font-family:sans-serif;max-width:48rem;margin:0 auto;">
-${bodyHtml}
-      </div>
-    </noscript>`,
-  );
 
   return html;
 }
