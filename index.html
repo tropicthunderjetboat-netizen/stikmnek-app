@@ -171,16 +171,139 @@
 
     <!-- LCP: welcome hero (tourist home). Leaflet CSS loads with MapView only. -->
     <link rel="preload" as="image" href="/welcome-hero.webp" type="image/webp" fetchpriority="high" />
+
+    <!--
+      SSG flash mitigation (critical, inline — must paint before JS/CSS bundles):
+      1) Style #ssg-content so crawler HTML isn't bare browser defaults if glimpsed.
+      2) JS-only boot cover hides it until React replaces #root (no-JS users never see the cover).
+    -->
+    <style id="ssg-boot-css">
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: #f0fdfa;
+      }
+      #ssg-content {
+        box-sizing: border-box;
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 1.5rem 1.25rem 3rem;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        font-size: 15px;
+        line-height: 1.55;
+        color: #134e4a;
+        background: linear-gradient(180deg, #f0fdfa 0%, #ffffff 40%);
+        min-height: 100vh;
+      }
+      #ssg-content h1 {
+        margin: 0 0 0.75rem;
+        font-size: 1.65rem;
+        line-height: 1.25;
+        font-weight: 700;
+        color: #0f766e;
+      }
+      #ssg-content h2 {
+        margin: 1.75rem 0 0.75rem;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #115e59;
+      }
+      #ssg-content p, #ssg-content li {
+        margin: 0.5rem 0;
+        color: #334155;
+      }
+      #ssg-content ul {
+        margin: 0.75rem 0;
+        padding-left: 1.15rem;
+      }
+      #ssg-content a {
+        color: #0d9488;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      #ssg-content a:hover {
+        text-decoration: underline;
+      }
+      #ssg-content strong {
+        color: #0f766e;
+      }
+      #ssg-boot {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        padding: 1.5rem;
+        background: linear-gradient(165deg, #0f766e 0%, #0d9488 45%, #14b8a6 100%);
+        color: #fff;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        text-align: center;
+      }
+      #ssg-boot img {
+        width: 72px;
+        height: 72px;
+        border-radius: 1rem;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+        background: #fff;
+      }
+      #ssg-boot .ssg-boot-title {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+      #ssg-boot .ssg-boot-sub {
+        margin: 0;
+        font-size: 0.95rem;
+        opacity: 0.9;
+        max-width: 16rem;
+      }
+      #ssg-boot .ssg-boot-spinner {
+        width: 1.75rem;
+        height: 1.75rem;
+        margin-top: 0.5rem;
+        border: 2.5px solid rgba(255, 255, 255, 0.35);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: ssg-boot-spin 0.7s linear infinite;
+      }
+      @keyframes ssg-boot-spin {
+        to { transform: rotate(360deg); }
+      }
+      html.app-ready #ssg-boot {
+        display: none !important;
+      }
+    </style>
   </head>
 
   <body>
     <!-- No-JS fallback -->
     <noscript>
-      <div style="padding:2rem;text-align:center;font-family:sans-serif;">
-        <h1>StikmNek</h1>
+      <div style="padding:2rem;text-align:center;font-family:Inter,sans-serif;color:#134e4a;background:#f0fdfa;min-height:100vh;">
+        <h1 style="color:#0f766e;">StikmNek</h1>
         <p>JavaScript is required to use this application. Please enable JavaScript in your browser settings.</p>
       </div>
     </noscript>
+    <!-- Boot cover only when JS runs — inserted before first paint of #ssg-content when possible -->
+    <script>
+      (function () {
+        try {
+          var boot = document.createElement('div');
+          boot.id = 'ssg-boot';
+          boot.setAttribute('aria-hidden', 'true');
+          boot.innerHTML =
+            '<img src="/app-icon.png" width="72" height="72" alt="" />' +
+            '<p class="ssg-boot-title">StikmNek</p>' +
+            '<p class="ssg-boot-sub">Vanuatu deals loading…</p>' +
+            '<div class="ssg-boot-spinner" role="presentation"></div>';
+          document.body.insertBefore(boot, document.body.firstChild);
+          window.__ssgBootShownAt = performance.now();
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

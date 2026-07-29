@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client';
+import { useLayoutEffect, type ReactNode } from 'react';
 import App from './App.tsx';
 import './index.css';
 import '@/lib/analytics';
@@ -23,11 +24,37 @@ import { registerPwaServiceWorker } from '@/lib/pwaInstall';
 
 void registerPwaServiceWorker();
 
+/** Dismiss the inline #ssg-boot cover once React has committed its first paint. */
+function SsgBootDismiss({ children }: { children: ReactNode }) {
+  useLayoutEffect(() => {
+    document.documentElement.classList.add('app-ready');
+    const boot = document.getElementById('ssg-boot');
+    if (boot) boot.remove();
+    try {
+      const shownAt = (window as Window & { __ssgBootShownAt?: number }).__ssgBootShownAt;
+      if (typeof shownAt === 'number' && typeof performance !== 'undefined') {
+        const ms = Math.round(performance.now() - shownAt);
+        (window as Window & { __ssgBootVisibleMs?: number }).__ssgBootVisibleMs = ms;
+        if (import.meta.env.DEV) {
+          console.debug(`[ssg-boot] cover visible ~${ms}ms before React commit`);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  return children;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // Render the app (skip if we just triggered a redirect to /reset-password)
 // ═══════════════════════════════════════════════════════════════════
 if (!isRecoveryOnWrongPage) {
-  createRoot(document.getElementById('root')!).render(<App />);
+  createRoot(document.getElementById('root')!).render(
+    <SsgBootDismiss>
+      <App />
+    </SsgBootDismiss>,
+  );
 }
 
 // Defer perf + error logger initialization (keep main thread free for FCP/LCP).
