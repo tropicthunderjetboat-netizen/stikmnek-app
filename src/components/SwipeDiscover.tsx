@@ -1668,8 +1668,9 @@ function DetailSheet({
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-neutral-950 animate-in slide-in-from-bottom duration-200">
       <DealOgHelmet business={business} imageUrl={gallery[photoIdx] || business.image} />
-      <div className="flex-1 overflow-y-auto overscroll-contain touch-pan-y">
-        <div className="relative h-[min(48vh,22rem)] bg-neutral-900">
+      {/* Scroll area + footer in flow so reviews aren’t trapped under the CTA overlay */}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y">
+        <div className="relative h-[min(42vh,20rem)] bg-neutral-900">
           {gallery[photoIdx] ? (
             <FitPhoto src={gallery[photoIdx]!} className="absolute inset-0 h-full w-full" />
           ) : null}
@@ -1752,7 +1753,7 @@ function DetailSheet({
           </div>
         )}
 
-        <div className="px-4 py-4 space-y-4 pb-[11.5rem]">
+        <div className="px-4 py-4 space-y-4 pb-6">
           <div>
             <h2 className="text-2xl font-bold">{business.name}</h2>
             <span className="inline-block mt-2 rounded-md bg-teal-600 text-xs font-semibold px-2.5 py-1">
@@ -1879,59 +1880,63 @@ function DetailSheet({
           )}
         </div>
       </div>
-      <div className="absolute bottom-0 inset-x-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] bg-neutral-950/95 border-t border-white/10 space-y-2">
+
+      <div className="shrink-0 border-t border-white/10 bg-neutral-950 px-3 pt-2.5 pb-[max(0.65rem,env(safe-area-inset-bottom))] space-y-2">
         {!hasPass ? (
           <>
             <button
               type="button"
               onClick={onGetPass}
-              className="w-full min-h-12 rounded-xl bg-[#0FB5B5] font-bold text-sm text-white border-2 border-white"
-              style={{ boxShadow: '0 4px 20px rgba(15,181,181,0.35)' }}
+              className="w-full min-h-11 rounded-xl bg-[#0FB5B5] font-bold text-sm text-white"
+              style={{ boxShadow: '0 4px 16px rgba(15,181,181,0.3)' }}
             >
               {passCtaLabel(isExtended, paidPeople, pricePreview)}
             </button>
-            <p className="text-center text-[11px] text-neutral-500">
-              Pass unlocks WhatsApp + QR check-in at these prices
-            </p>
-            {hasWa && (
-              <button
-                type="button"
-                onClick={onMessage}
-                className="w-full min-h-11 rounded-xl bg-[#25D366]/90 text-white text-sm font-semibold flex items-center justify-center gap-2"
-              >
-                <MessageCircle className="w-4 h-4" /> Message on WhatsApp
-              </button>
-            )}
-            {business.phone && (
-              <button
-                type="button"
-                onClick={onCall}
-                className="w-full min-h-11 rounded-xl border border-teal-600/70 text-teal-300 font-semibold text-sm flex items-center justify-center gap-2"
-              >
-                <Phone className="w-4 h-4" /> Call
-              </button>
+            {(hasWa || business.phone) && (
+              <div className="flex gap-2">
+                {hasWa && (
+                  <button
+                    type="button"
+                    onClick={onMessage}
+                    className="flex-1 min-h-10 rounded-xl bg-[#25D366]/90 text-white text-xs font-semibold flex items-center justify-center gap-1.5 px-2"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 shrink-0" /> WhatsApp
+                  </button>
+                )}
+                {business.phone && (
+                  <button
+                    type="button"
+                    onClick={onCall}
+                    className="flex-1 min-h-10 rounded-xl border border-teal-600/70 text-teal-300 font-semibold text-xs flex items-center justify-center gap-1.5 px-2"
+                  >
+                    <Phone className="w-3.5 h-3.5 shrink-0" /> Call
+                  </button>
+                )}
+              </div>
             )}
           </>
         ) : (
           <>
-            {hasWa && (
-              <button
-                type="button"
-                onClick={onMessage}
-                className="w-full min-h-12 rounded-xl bg-[#25D366] text-white font-bold text-sm flex items-center justify-center gap-2"
-              >
-                <MessageCircle className="w-5 h-5" /> Message on WhatsApp
-              </button>
-            )}
-            {business.phone && (
-              <button
-                type="button"
-                onClick={onCall}
-                className="w-full min-h-11 rounded-xl border border-teal-600 text-teal-400 font-semibold text-sm flex items-center justify-center gap-2"
-              >
-                <Phone className="w-4 h-4" /> Call
-              </button>
-            )}
+            <div className="flex gap-2">
+              {hasWa && (
+                <button
+                  type="button"
+                  onClick={onMessage}
+                  className="flex-1 min-h-11 rounded-xl bg-[#25D366] text-white font-bold text-sm flex items-center justify-center gap-2"
+                >
+                  <MessageCircle className="w-4 h-4" /> WhatsApp
+                </button>
+              )}
+              {business.phone && (
+                <button
+                  type="button"
+                  onClick={onCall}
+                  className="flex-1 min-h-11 rounded-xl border border-teal-600 text-teal-400 font-semibold text-sm flex items-center justify-center gap-2"
+                >
+                  <Phone className="w-4 h-4" /> Call
+                </button>
+              )}
+            </div>
             <p className="text-center text-[11px] text-neutral-500">
               Show your QR for the passholder price. StikmNek doesn’t take bookings.
             </p>
