@@ -391,14 +391,19 @@ Translation strings are in `src/data/translations.ts`. Language selection persis
 
 ### Frontend
 
-The app is built with Vite and outputs static files:
+The app is built with Vite and outputs static files, then a post-build SSG step
+(`scripts/ssg/generate-static.mjs`) queries Supabase and writes crawler-readable
+HTML for `/`, `/deals`, `/faq`, `/deal/:slug`, and `/partner/:slug`, plus a
+dynamic `sitemap.xml`.
 
 ```bash
 npm run build
-# Output: dist/
+# Output: dist/ (SPA assets + static SEO pages)
 ```
 
-Deploy the `dist/` folder to any static hosting (Netlify, Vercel, Cloudflare Pages, etc.).
+Deploy the `dist/` folder to Vercel (or any static host). Listing changes
+trigger a rebuild via the `trigger-ssg-rebuild` Edge Function → Vercel Deploy Hook
+(see migration `20260730120000_ssg_rebuild_triggers.sql`).
 
 ### Edge Functions
 
@@ -406,6 +411,8 @@ Edge functions are deployed to Supabase:
 
 ```bash
 supabase functions deploy <function-name>
+# SSG rebuild webhook target:
+supabase functions deploy trigger-ssg-rebuild
 ```
 
 ### Environment Variables (Edge Functions)
@@ -421,7 +428,13 @@ supabase secrets set RESEND_FROM_EMAIL=no-reply@yourdomain.com
 supabase secrets set PAYPAL_CLIENT_ID=<your-id>
 supabase secrets set PAYPAL_CLIENT_SECRET=<your-secret>
 supabase secrets set PAYPAL_MODE=live
+# SSG auto-rebuild (Database Webhook / pg_net → this function → Vercel)
+supabase secrets set VERCEL_DEPLOY_HOOK_URL="https://api.vercel.com/v1/integrations/deploy/..."
+supabase secrets set SSG_REBUILD_SECRET="<long random string>"
 ```
+
+Also add matching Vault secrets so DB triggers can call the function:
+`ssg_rebuild_function_url`, `ssg_rebuild_secret` (same secret value).
 
 ---
 

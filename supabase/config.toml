@@ -43,3 +43,8 @@ verify_jwt = false
 [functions.notify-expiring-deals]
 verify_jwt = false
 schedule = "0 7 * * *"
+
+# Database webhook / pg_net → Vercel Deploy Hook for SSG rebuilds.
+# Auth via x-ssg-rebuild-secret (SSG_REBUILD_SECRET), not Kong JWT.
+[functions.trigger-ssg-rebuild]
+verify_jwt = false

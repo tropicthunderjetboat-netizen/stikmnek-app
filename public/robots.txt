@@ -11,31 +11,40 @@ Disallow: /payment-confirmation
 Disallow: /api/
 Disallow: /*.json$
 
-# Google
 User-agent: Googlebot
 Allow: /
 Crawl-delay: 1
 
-# Bing
 User-agent: Bingbot
 Allow: /
 Crawl-delay: 2
 
-# Block AI crawlers from scraping content
 User-agent: GPTBot
-Disallow: /
+Allow: /
 
 User-agent: ChatGPT-User
-Disallow: /
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
 
 User-agent: CCBot
-Disallow: /
+Allow: /
 
-User-agent: anthropic-ai
-Disallow: /
-
-# Sitemap
 Sitemap: https://www.stikmnek.com/sitemap.xml
-
-# Host
 Host: https://www.stikmnek.com
