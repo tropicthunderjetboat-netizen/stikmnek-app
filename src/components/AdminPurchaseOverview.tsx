@@ -35,6 +35,8 @@ interface PassPurchase {
   created_at: string;
   /** From `passes.active` — cleared when pass expires (cron) */
   pass_is_active?: boolean | null;
+  is_promo_free?: boolean;
+  original_price?: number | null;
 }
 
 type PassRow = Record<string, unknown>;
@@ -66,6 +68,8 @@ function mapPassRowToPurchase(
     paypal_order_id: provider === 'paypal' ? sessionId : '',
     created_at: purchasedAt,
     pass_is_active: row.active as boolean | null | undefined,
+    is_promo_free: Boolean(row.is_promo_free) || provider === 'promo',
+    original_price: row.original_price != null ? Number(row.original_price) : null,
   };
 }
 
@@ -122,7 +126,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
       let query = supabase
         .from('passes')
         .select(
-          'id, user_id, pass_type, purchased_at, expires_at, amount_paid, active, payment_provider, payment_session_id, valid_from, valid_until',
+          'id, user_id, pass_type, purchased_at, expires_at, amount_paid, active, payment_provider, payment_session_id, valid_from, valid_until, is_promo_free, original_price',
         )
         .order('purchased_at', { ascending: false })
         .order('id', { ascending: false });
@@ -184,7 +188,12 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
           const passLabel = isLegacyPassType(newPurchase.pass_type)
             ? PASS_LABELS.legacy
             : PASS_LABELS.dynamic;
-          toast.info(`New pass purchase: ${passLabel} - $${newPurchase.amount_paid}`, { duration: 5000 });
+          toast.info(
+            newPurchase.is_promo_free
+              ? `Free promo pass claimed: ${passLabel}`
+              : `New pass purchase: ${passLabel} - $${newPurchase.amount_paid}`,
+            { duration: 5000 },
+          );
         },
       )
       .subscribe();
@@ -205,15 +214,19 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
   const failedPurchases = purchases.filter(p => p.payment_status === 'failed');
   const now = new Date();
 
-  const totalRevenue = completedPurchases.reduce((sum, p) => sum + Number(p.amount_paid), 0);
+  /** Paid revenue only — exclude free promo passes from $ metrics / AOV. */
+  const paidPurchases = completedPurchases.filter((p) => !p.is_promo_free);
+  const promoPurchases = completedPurchases.filter((p) => p.is_promo_free);
+
+  const totalRevenue = paidPurchases.reduce((sum, p) => sum + Number(p.amount_paid), 0);
   const activePasses = completedPurchases.filter(
     (p) => new Date(p.expiry_date) > now && p.pass_is_active !== false,
   ).length;
-  const totalPurchases = completedPurchases.length;
+  const totalPurchases = paidPurchases.length;
   const avgOrderValue = totalPurchases > 0 ? totalRevenue / totalPurchases : 0;
 
-  const dynamicPurchases = completedPurchases.filter((p) => p.pass_type === PRIMARY_PASS_TYPE);
-  const legacyPurchases = completedPurchases.filter((p) => isLegacyPassType(p.pass_type));
+  const dynamicPurchases = paidPurchases.filter((p) => p.pass_type === PRIMARY_PASS_TYPE);
+  const legacyPurchases = paidPurchases.filter((p) => isLegacyPassType(p.pass_type));
 
   const revenueByType = [
     {
@@ -259,7 +272,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
       dayMap[key] = { date: key, revenue: 0, count: 0, dynamic: 0, legacy: 0 };
     }
 
-    completedPurchases.forEach(p => {
+    paidPurchases.forEach(p => {
       const day = new Date(p.purchase_date).toISOString().split('T')[0];
       if (dayMap[day]) {
         dayMap[day].revenue += Number(p.amount_paid);
@@ -284,7 +297,7 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
   // Weekly aggregation for bar chart
   const weeklyData = (() => {
     const weeks: Record<string, { week: string; revenue: number; count: number }> = {};
-    completedPurchases.forEach(p => {
+    paidPurchases.forEach(p => {
       const d = new Date(p.purchase_date);
       const weekStart = new Date(d);
       weekStart.setDate(d.getDate() - d.getDay());
@@ -329,10 +342,10 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
   const prevPeriodStart = new Date(periodStart);
   prevPeriodStart.setDate(prevPeriodStart.getDate() - periodDays);
 
-  const currentPeriodRevenue = completedPurchases
+  const currentPeriodRevenue = paidPurchases
     .filter(p => new Date(p.purchase_date) >= periodStart)
     .reduce((sum, p) => sum + Number(p.amount_paid), 0);
-  const prevPeriodRevenue = completedPurchases
+  const prevPeriodRevenue = paidPurchases
     .filter(p => {
       const d = new Date(p.purchase_date);
       return d >= prevPeriodStart && d < periodStart;
@@ -342,8 +355,8 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
   const revenueChange = calcChange(currentPeriodRevenue, prevPeriodRevenue);
   const revenueUp = currentPeriodRevenue >= prevPeriodRevenue;
 
-  const currentPeriodCount = completedPurchases.filter(p => new Date(p.purchase_date) >= periodStart).length;
-  const prevPeriodCount = completedPurchases.filter(p => {
+  const currentPeriodCount = paidPurchases.filter(p => new Date(p.purchase_date) >= periodStart).length;
+  const prevPeriodCount = paidPurchases.filter(p => {
     const d = new Date(p.purchase_date);
     return d >= prevPeriodStart && d < periodStart;
   }).length;
@@ -463,7 +476,9 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
             </div>
           </div>
           <p className="text-2xl font-extrabold text-gray-900">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-          <p className="text-xs text-gray-400 mt-0.5">Total Revenue</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Paid revenue{promoPurchases.length > 0 ? ` · ${promoPurchases.length} free promo` : ''}
+          </p>
         </div>
 
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
@@ -800,7 +815,11 @@ const AdminPurchaseOverview: React.FC<AdminPurchaseOverviewProps> = ({
                       </td>
                       <td className="px-5 py-3">
                         <span className="text-sm font-bold text-gray-900">
-                          ${Number(purchase.amount_paid).toFixed(2)}
+                          {purchase.is_promo_free ? (
+                            <span className="text-emerald-700">Free promo</span>
+                          ) : (
+                            <>${Number(purchase.amount_paid).toFixed(2)}</>
+                          )}
                         </span>
                       </td>
                       <td className="px-5 py-3">

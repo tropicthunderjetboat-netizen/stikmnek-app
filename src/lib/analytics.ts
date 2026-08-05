@@ -417,6 +417,20 @@ class Analytics {
     });
   }
 
+  /** Free promo claim — not counted as paid revenue (value 0; distinct event name). */
+  promoPassClaimed(campaignCode: string, originalPriceAud: number) {
+    this.track('promo_pass_claimed', 'commerce', campaignCode, 0, {
+      campaign_code: campaignCode,
+      original_price_aud: originalPriceAud,
+    });
+    this.sendToGA('promo_pass_claimed', {
+      campaign_code: campaignCode,
+      value: 0,
+      currency: 'AUD',
+      original_price: originalPriceAud,
+    });
+  }
+
 
   viewBusiness(businessId: string, businessName: string) {
     this.track('view_business', 'engagement', businessName, undefined, { businessId });

@@ -31,6 +31,9 @@ verify_jwt = false
 [functions.paypal-capture]
 verify_jwt = false
 
+[functions.claim-promo-pass]
+verify_jwt = false
+
 [functions.verify-redemption]
 verify_jwt = false
 

@@ -12,7 +12,7 @@ import {
   CheckCircle, XCircle, AlertCircle, Clock, FileText, MessageSquare,
   Image as ImageIcon, Calendar, Loader2, RefreshCw, Edit3, ArrowRight,
   Wifi, WifiOff, Mail, Trash2, AlertTriangle, X, MapPin, Phone, Tag, Save,
-  Globe, Percent, CreditCard, UserPlus, ShieldCheck, Building2, Crop
+  Globe, Percent, CreditCard, UserPlus, ShieldCheck, Building2, Crop, Zap
 } from 'lucide-react';
 import { formatVT, getPhotoDisplayUrl } from '@/lib/utils';
 import LogoCropDialog from '@/components/LogoCropDialog';
@@ -57,6 +57,7 @@ const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
 
 const AdminPurchaseOverview = React.lazy(() => import('./AdminPurchaseOverview'));
 const PassEditor = React.lazy(() => import('./PassEditor'));
+const AdminPromoCampaigns = React.lazy(() => import('./AdminPromoCampaigns'));
 const AdminUserManager = React.lazy(() => import('./AdminUserManager'));
 const AdminBusinessOnboarding = React.lazy(() => import('./AdminBusinessOnboarding'));
 const EmailReceiptManager = React.lazy(() => import('./EmailReceiptManager'));
@@ -1700,8 +1701,9 @@ const AdminPanel: React.FC = () => {
               {tab === 'onboard' && <UserPlus className="w-3.5 h-3.5" />}
               {tab === 'emails' && <Mail className="w-3.5 h-3.5" />}
               {tab === 'passes' && <CreditCard className="w-3.5 h-3.5" />}
+              {tab === 'promos' && <Zap className="w-3.5 h-3.5" />}
               {tab === 'reviews' && <MessageSquare className="w-3.5 h-3.5" />}
-              {tab === 'onboard' ? 'Onboard' : tab}
+              {tab === 'onboard' ? 'Onboard' : tab === 'promos' ? 'Promos' : tab}
               {tab === 'approvals' && (pendingCount + pendingEditCount) > 0 && (
                 <span className={`absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${
                   activeTab === tab ? 'bg-white text-teal-600' : 'bg-red-500 text-white animate-pulse'
@@ -1719,6 +1721,13 @@ const AdminPanel: React.FC = () => {
         {activeTab === 'passes' && (
           <Suspense fallback={<AdminTabFallback />}>
             <PassEditor />
+          </Suspense>
+        )}
+
+        {/* ═══ PROMOS TAB ═══ */}
+        {activeTab === 'promos' && (
+          <Suspense fallback={<AdminTabFallback />}>
+            <AdminPromoCampaigns />
           </Suspense>
         )}
 

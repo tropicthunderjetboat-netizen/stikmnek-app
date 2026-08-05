@@ -27,6 +27,12 @@ import CheckoutPricingSummary from '@/components/CheckoutPricingSummary';
 import { loadPayPalButtonsSdk, renderPayPalCheckoutButtons, type PayPalSdkNamespace } from '@/lib/paypalSdk';
 import { t } from '@/data/translations';
 import type { Language } from '@/data/translations';
+import {
+  FIRST25_CAMPAIGN_CODE,
+  fetchPromoCampaignStatus,
+  type PromoCampaignStatus,
+} from '@/lib/promoCampaign';
+import { analytics } from '@/lib/analytics';
 
 /** Local calendar YYYY-MM-DD */
 function dateOnlyLocal(d = new Date()): string {
@@ -306,6 +312,22 @@ const PaymentCheckout: React.FC = () => {
   const paypalWalletButtonRef = useRef<HTMLDivElement>(null);
   const [paypalButtonsSdkError, setPaypalButtonsSdkError] = useState<string | null>(null);
   const [paypalButtonsReady, setPaypalButtonsReady] = useState(false);
+
+  const [promoStatus, setPromoStatus] = useState<PromoCampaignStatus | null>(null);
+  const [promoMissedMessage, setPromoMissedMessage] = useState<string | null>(null);
+  const [claimingPromo, setClaimingPromo] = useState(false);
+  const promoAvailable = Boolean(promoStatus?.available) && !promoMissedMessage;
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const status = await fetchPromoCampaignStatus(FIRST25_CAMPAIGN_CODE);
+      if (!cancelled) setPromoStatus(status);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /** Previous `cart.partySize` for oversize → capped sync (keep warning visible after cap). */
   const prevCartPartySizeRef = useRef<number | null>(null);
@@ -677,8 +699,137 @@ const PaymentCheckout: React.FC = () => {
     return { payStartDate, partyForPay, isExtended: extended, expectedAud, uiPriceAud };
   }
 
+  async function handleClaimPromoFree() {
+    if (!user?.email) {
+      toast.error('Sign in with an email account to claim a free pass.');
+      setShowAuth(true);
+      setAuthMode('signin');
+      return;
+    }
+
+    setClaimingPromo(true);
+    setPaymentError(null);
+    setStep('processing');
+
+    try {
+      const token = await ensureFreshSession();
+      if (!token) throw new Error('SESSION_EXPIRED');
+
+      const { payStartDate, partyForPay, isExtended: ext, expectedAud } = resolvePayContextFromRef();
+
+      const { data, error } = await supabase.functions.invoke('claim-promo-pass', {
+        body: {
+          campaignCode: FIRST25_CAMPAIGN_CODE,
+          startDate: payStartDate,
+          partySize: partyForPay,
+          party_size: partyForPay,
+          isExtended: ext,
+          is_extended: ext,
+        },
+      });
+
+      if (error) {
+        const body = await getInvokeErrorBody(error);
+        const fromBody = typeof body?.error === 'string' ? body.error : null;
+        const reason = typeof body?.reason === 'string' ? body.reason : null;
+        if (reason === 'already_claimed' || body?.fallbackToPaid) {
+          setPromoMissedMessage(
+            fromBody ||
+              'Ah, just missed it — the free passes are gone, but here is your pass at full price.',
+          );
+          setPromoStatus((prev) => (prev ? { ...prev, available: false, remaining: 0 } : prev));
+          setStep('payment');
+          toast.info(fromBody || 'Free passes are gone — continue with paid checkout.');
+          return;
+        }
+        throw new Error(fromBody || error.message || 'Could not claim free pass');
+      }
+
+      const ok = data as Record<string, unknown> | null;
+      if (!ok?.success) {
+        if (ok?.fallbackToPaid) {
+          const msg =
+            typeof ok.message === 'string'
+              ? ok.message
+              : 'Ah, just missed it — the free passes are gone, but here is your pass at full price.';
+          setPromoMissedMessage(msg);
+          setPromoStatus((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  available: false,
+                  remaining: 0,
+                  claims_count: Number(ok.claims_count) || prev.claims_count,
+                }
+              : prev,
+          );
+          setStep('payment');
+          toast.info(msg);
+          return;
+        }
+        throw new Error(typeof ok?.error === 'string' ? String(ok.error) : 'Could not claim free pass');
+      }
+
+      setPaymentResult(data);
+      setStep('success');
+
+      const paymentResultData = {
+        receiptNumber: ok.receiptNumber,
+        passType: ok.passType,
+        passLabel: ok.passLabel || passLabel,
+        amount: 0,
+        originalPrice: ok.originalPrice ?? expectedAud,
+        currency: ok.currency || 'AUD',
+        paymentMethod: 'promo',
+        isPromoFree: true,
+        expiresAt: ok.expiresAt,
+        validFrom: ok.validFrom,
+        validUntil: ok.validUntil,
+        days: ok.days,
+        shareBonusApplied: Boolean(ok.shareBonusApplied),
+        group: ok.group || `Up to ${partyForPay} people (ages 6+)`,
+        partySize: partyForPay,
+        isExtended: ext,
+        sessionId: ok.sessionId,
+        completedAt: new Date().toISOString(),
+        campaignCode: FIRST25_CAMPAIGN_CODE,
+      };
+      localStorage.setItem('lastPayment', JSON.stringify(paymentResultData));
+      localStorage.removeItem('paypalPending');
+      localStorage.removeItem('pendingPayment');
+
+      try {
+        analytics.promoPassClaimed(FIRST25_CAMPAIGN_CODE, expectedAud);
+      } catch {
+        /* ignore */
+      }
+
+      toast.success("You're in! Your free StikmNek Pass is ready.");
+      setTimeout(() => {
+        void refreshUserPass();
+      }, 1000);
+      setTimeout(() => {
+        setCart(null);
+        setCurrentView('payment-confirmation');
+      }, 2500);
+    } catch (err: unknown) {
+      let msg = err instanceof Error ? err.message : 'Could not claim free pass';
+      if (msg === 'SESSION_EXPIRED') {
+        toast.error('Your session has expired. Please sign in again.');
+        setShowAuth(true);
+        setAuthMode('signin');
+      } else {
+        toast.error(msg);
+      }
+      setPaymentError(msg);
+      setStep('payment');
+    } finally {
+      setClaimingPromo(false);
+    }
+  }
+
   useEffect(() => {
-    if (!paypalSmartEnabled || step !== 'payment') {
+    if (!paypalSmartEnabled || step !== 'payment' || promoAvailable) {
       setPaypalButtonsSdkError(null);
       setPaypalButtonsReady(false);
       if (paypalCardButtonRef.current) paypalCardButtonRef.current.innerHTML = '';
@@ -971,6 +1122,7 @@ const PaymentCheckout: React.FC = () => {
     paypalSmartEnabled,
     paypalClientId,
     step,
+    promoAvailable,
     passLabel,
     partySize,
     isExtended,
@@ -1251,7 +1403,9 @@ const PaymentCheckout: React.FC = () => {
         {step === 'processing' && (
           <div className="py-24 text-center space-y-4">
             <Loader2 className="w-10 h-10 text-teal-400 animate-spin mx-auto" />
-            <p className="text-lg font-bold">Processing payment</p>
+            <p className="text-lg font-bold">
+              {claimingPromo ? 'Claiming free pass' : 'Processing payment'}
+            </p>
             <p className="text-sm text-neutral-400">Stay on this page — usually a few seconds.</p>
           </div>
         )}
@@ -1262,7 +1416,11 @@ const PaymentCheckout: React.FC = () => {
               <CheckCircle className="w-8 h-8 text-teal-400" />
             </div>
             <p className="text-xl font-bold">You’re in</p>
-            <p className="text-sm text-neutral-400">Your pass is ready. Start messaging places from Your Trip.</p>
+            <p className="text-sm text-neutral-400">
+              {paymentResult?.isPromoFree || paymentResult?.paymentMethod === 'promo'
+                ? "Your free StikmNek Pass is ready — here's what to do next."
+                : 'Your pass is ready. Start messaging places from Your Trip.'}
+            </p>
             <button
               type="button"
               onClick={() => setCurrentView('payment-confirmation')}
@@ -1282,9 +1440,25 @@ const PaymentCheckout: React.FC = () => {
 
             <div className="rounded-2xl bg-gradient-to-br from-teal-600 to-teal-800 p-5 shadow-lg shadow-teal-950/40">
               <p className="text-teal-100 text-xs font-semibold uppercase tracking-wide">{planWord}</p>
-              <p className="text-3xl font-bold mt-1">A${priceAud.toFixed(2)}</p>
+              {promoAvailable ? (
+                <>
+                  <p className="text-3xl font-bold mt-1">Free</p>
+                  <p className="text-sm text-teal-100/90 mt-1 line-through opacity-80">
+                    Was A${priceAud.toFixed(2)}
+                  </p>
+                </>
+              ) : (
+                <p className="text-3xl font-bold mt-1">A${priceAud.toFixed(2)}</p>
+              )}
               <p className="text-sm text-teal-100/90 mt-1">{peopleWord} · ages 6+</p>
             </div>
+
+            {promoAvailable && promoStatus ? (
+              <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-3 py-2.5 text-sm text-emerald-100">
+                🎉 {promoStatus.remaining} of {promoStatus.max_claims} free traveler passes left — you
+                qualify!
+              </div>
+            ) : null}
 
             <div>
               <div className="flex items-center justify-between mb-2">
@@ -1464,7 +1638,11 @@ const PaymentCheckout: React.FC = () => {
               }}
               className="w-full min-h-12 rounded-xl bg-teal-500 hover:bg-teal-400 text-white font-bold text-base active:scale-[0.99] transition-transform disabled:opacity-60"
             >
-              {savingTraveller ? 'Saving…' : `Continue · A$${priceAud.toFixed(2)}`}
+              {savingTraveller
+                ? 'Saving…'
+                : promoAvailable
+                  ? 'Continue · Claim free pass'
+                  : `Continue · A$${priceAud.toFixed(2)}`}
             </button>
             <p className="text-center text-[11px] text-neutral-500">Receipt to {user.email}</p>
           </div>
@@ -1473,26 +1651,54 @@ const PaymentCheckout: React.FC = () => {
         {step === 'payment' && (
           <div className="space-y-5 pt-2">
             <div>
-              <h1 className="text-2xl font-bold">Pay</h1>
+              <h1 className="text-2xl font-bold">{promoAvailable ? 'Claim free pass' : 'Pay'}</h1>
               <p className="text-sm text-neutral-400 mt-1">
-                {planWord} for {peopleWord} · A${priceAud.toFixed(2)}
+                {planWord} for {peopleWord} ·{' '}
+                {promoAvailable ? (
+                  <span className="text-emerald-300 font-semibold">Free</span>
+                ) : (
+                  <>A${priceAud.toFixed(2)}</>
+                )}
               </p>
               <p className="text-xs text-neutral-500 mt-1">
                 {formatDate(startDate)} → {formatDate(endDate)}
               </p>
             </div>
 
+            {promoAvailable && promoStatus ? (
+              <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/15 px-3 py-2.5 text-sm text-emerald-100">
+                🎉 {promoStatus.remaining} of {promoStatus.max_claims} free traveler passes left
+              </div>
+            ) : null}
+
+            {promoMissedMessage ? (
+              <div className="rounded-xl bg-amber-500/15 border border-amber-500/40 px-3 py-2.5 text-sm text-amber-100">
+                {promoMissedMessage}
+              </div>
+            ) : null}
+
             {paymentError ? (
               <div className="rounded-xl bg-red-500/15 border border-red-500/40 px-3 py-2.5 text-sm text-red-200">
                 {paymentError}
               </div>
             ) : null}
-            {paypalButtonsSdkError && paypalSmartEnabled ? (
+            {paypalButtonsSdkError && paypalSmartEnabled && !promoAvailable ? (
               <div className="rounded-xl bg-amber-500/15 border border-amber-500/40 px-3 py-2.5 text-sm text-amber-100">
                 {paypalButtonsSdkError}
               </div>
             ) : null}
 
+            {promoAvailable ? (
+              <button
+                type="button"
+                onClick={() => void handleClaimPromoFree()}
+                disabled={processing || claimingPromo}
+                className="w-full min-h-12 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold disabled:opacity-60 flex items-center justify-center gap-2 shadow-lg shadow-teal-950/30"
+              >
+                {claimingPromo || processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Claim Your Free Pass
+              </button>
+            ) : (
             <div className="rounded-2xl bg-white text-neutral-900 p-4 space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-neutral-900 flex items-center justify-center">
@@ -1583,9 +1789,13 @@ const PaymentCheckout: React.FC = () => {
                 </div>
               ) : null}
             </div>
+            )}
 
             <p className="text-center text-[11px] text-neutral-500 flex items-center justify-center gap-1.5">
-              <Shield className="w-3.5 h-3.5" /> Secure payment · pass unlocks messaging
+              <Shield className="w-3.5 h-3.5" />{' '}
+              {promoAvailable
+                ? 'Free traveler promo · same QR pass as paid'
+                : 'Secure payment · pass unlocks messaging'}
             </p>
           </div>
         )}

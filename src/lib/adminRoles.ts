@@ -18,6 +18,7 @@ export type AdminTab =
   | 'users'
   | 'onboard'
   | 'passes'
+  | 'promos'
   | 'emails'
   | 'reports';
 
@@ -29,6 +30,7 @@ export const FULL_ADMIN_TABS: AdminTab[] = [
   'users',
   'onboard',
   'passes',
+  'promos',
   'emails',
   'reports',
 ];

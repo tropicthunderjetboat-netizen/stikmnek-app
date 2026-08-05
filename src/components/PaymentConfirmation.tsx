@@ -51,6 +51,9 @@ interface PaymentResult {
   peopleCount?: number;
   partySize?: number;
   isExtended?: boolean;
+  isPromoFree?: boolean;
+  originalPrice?: number;
+  campaignCode?: string;
 }
 
 const FALLBACK_PASS_PRODUCT: PassProductId = 'dynamic';
@@ -936,9 +939,12 @@ const PaymentConfirmation: React.FC = () => {
           pass_type: p.passType,
           amount: p.amount,
           currency: 'AUD',
-          payment_method: p.paymentMethod === 'card'
-            ? `Credit Card ending ${p.cardLast4 || '****'}`
-            : 'Credit or debit card',
+          payment_method:
+            p.isPromoFree || p.paymentMethod === 'promo'
+              ? 'Free traveler promo'
+              : p.paymentMethod === 'card'
+                ? `Credit Card ending ${p.cardLast4 || '****'}`
+                : 'Credit or debit card',
           valid_from: p.validFrom,
           valid_until: p.validUntil,
           duration_days: durationDays,
@@ -1235,8 +1241,16 @@ Enjoy your deals in Vanuatu!
               </span>
             </div>
           </div>
-          <h1 className="text-3xl font-extrabold text-gray-900 mt-6 mb-2">Payment Successful!</h1>
-          <p className="text-gray-500 text-lg">Your {passLabel} is now active</p>
+          <h1 className="text-3xl font-extrabold text-gray-900 mt-6 mb-2">
+            {payment.isPromoFree || payment.paymentMethod === 'promo'
+              ? "You're in! Your free StikmNek Pass is ready"
+              : 'Payment Successful!'}
+          </h1>
+          <p className="text-gray-500 text-lg">
+            {payment.isPromoFree || payment.paymentMethod === 'promo'
+              ? 'Here’s what to do next — your pass works just like a paid one'
+              : `Your ${passLabel} is now active`}
+          </p>
           {passGroup && (
             <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-sm font-semibold">
               <Users className="w-4 h-4" />
@@ -1417,9 +1431,11 @@ Enjoy your deals in Vanuatu!
                   <span className="text-xs text-gray-400 font-medium">Payment Method</span>
                 </div>
                 <p className="text-sm font-semibold text-gray-900">
-                  {payment.paymentMethod === 'card'
-                    ? `Card ending ${payment.cardLast4 || '****'}`
-                    : 'Credit or debit card'}
+                  {payment.isPromoFree || payment.paymentMethod === 'promo'
+                    ? 'Free traveler promo'
+                    : payment.paymentMethod === 'card'
+                      ? `Card ending ${payment.cardLast4 || '****'}`
+                      : 'Credit or debit card'}
                 </p>
               </div>
 
