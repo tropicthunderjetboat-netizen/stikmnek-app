@@ -131,32 +131,48 @@ async function main() {
   await sharp(ogOut).toFile(path.join(pub, 'og.jpg'));
   await sharp(ogOut).toFile(path.join(outDir, 'og-facebook-preview.jpg'));
 
-  // ── Email signature banner: 600 × 160 ────────────────────────────────────
-  const SIG_W = 600;
-  const SIG_H = 160;
-  const sigBase = await sharp(harbourBgSrc)
-    .resize(SIG_W, SIG_H, { fit: 'cover', position: 'centre' })
+  // ── Email signature: split photo + brand card ─────────────────────────────
+  const SIG_W = 640;
+  const SIG_H = 220;
+  const PHOTO_W = 250;
+
+  const sigPhoto = await sharp(coverBgSrc)
+    .resize(PHOTO_W, SIG_H, { fit: 'cover', position: 'right' })
+    .jpeg({ quality: 88 })
     .toBuffer();
 
-  const sigSvg = Buffer.from(`
+  await sharp(coverBgSrc)
+    .resize(168, 220, { fit: 'cover', position: 'right' })
+    .jpeg({ quality: 88 })
+    .toFile(path.join(outDir, 'email-signature-thumb.jpg'));
+
+  const sigCardSvg = Buffer.from(`
 <svg width="${SIG_W}" height="${SIG_H}" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0D9488" stop-opacity="0.94"/>
-      <stop offset="100%" stop-color="#059669" stop-opacity="0.92"/>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F766E"/>
+      <stop offset="55%" stop-color="#0D9488"/>
+      <stop offset="100%" stop-color="#059669"/>
     </linearGradient>
   </defs>
-  <rect width="${SIG_W}" height="${SIG_H}" fill="url(#g)"/>
-  <text x="80" y="58" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="800" fill="#ffffff">StikmNek</text>
-  <text x="80" y="86" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="600" fill="#ccfbf1">One pass · swipe local deals · show QR</text>
-  <text x="80" y="122" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="600" fill="#ffffff">www.stikmnek.com</text>
-  <text x="80" y="142" font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="500" fill="#a7f3d0">stikmnek@gmail.com  ·  +678 7766107</text>
+  <rect x="${PHOTO_W}" y="0" width="${SIG_W - PHOTO_W}" height="${SIG_H}" fill="url(#card)"/>
+  <rect x="${PHOTO_W}" y="0" width="6" height="${SIG_H}" fill="#F97316"/>
+  <text x="${PHOTO_W + 78}" y="52" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="800" fill="#ffffff">StikmNek</text>
+  <text x="${PHOTO_W + 22}" y="92" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#ffffff">Swipe deals. Show QR. Save.</text>
+  <text x="${PHOTO_W + 22}" y="118" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="600" fill="#ccfbf1">One pass for your group · up to 35% local</text>
+  <rect x="${PHOTO_W + 22}" y="138" width="148" height="34" rx="17" fill="#F97316"/>
+  <text x="${PHOTO_W + 96}" y="160" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="800" fill="#ffffff">Get your pass →</text>
+  <text x="${PHOTO_W + 22}" y="196" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="600" fill="#ecfdf5">www.stikmnek.com · +678 7766107</text>
 </svg>`);
 
-  await sharp(sigBase)
+  await sharp({
+    create: { width: SIG_W, height: SIG_H, channels: 3, background: '#0F766E' },
+  })
+    .jpeg()
     .composite([
-      { input: sigSvg, top: 0, left: 0 },
-      { input: logo56, top: 18, left: 16 },
+      { input: sigPhoto, top: 0, left: 0 },
+      { input: sigCardSvg, top: 0, left: 0 },
+      { input: logo56, top: 18, left: PHOTO_W + 16 },
     ])
     .png()
     .toFile(path.join(outDir, 'email-signature.png'));
@@ -165,31 +181,40 @@ async function main() {
     .jpeg({ quality: 90 })
     .toFile(path.join(outDir, 'email-signature.jpg'));
 
-  // @2x signature for retina mail clients
-  const SIG2_W = 1200;
-  const SIG2_H = 320;
-  const sig2Base = await sharp(harbourBgSrc)
-    .resize(SIG2_W, SIG2_H, { fit: 'cover', position: 'centre' })
+  const SIG2_W = 1280;
+  const SIG2_H = 440;
+  const PHOTO2_W = 500;
+  const sigPhoto2 = await sharp(coverBgSrc)
+    .resize(PHOTO2_W, SIG2_H, { fit: 'cover', position: 'right' })
+    .jpeg({ quality: 88 })
     .toBuffer();
-  const logo112 = await sharp(logoSrc).resize(112, 112).png().toBuffer();
+  const logo64 = await sharp(logoSrc).resize(64, 64).png().toBuffer();
   const sig2Svg = Buffer.from(`
 <svg width="${SIG2_W}" height="${SIG2_H}" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0D9488" stop-opacity="0.94"/>
-      <stop offset="100%" stop-color="#059669" stop-opacity="0.92"/>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F766E"/>
+      <stop offset="55%" stop-color="#0D9488"/>
+      <stop offset="100%" stop-color="#059669"/>
     </linearGradient>
   </defs>
-  <rect width="${SIG2_W}" height="${SIG2_H}" fill="url(#g)"/>
-  <text x="160" y="118" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="800" fill="#ffffff">StikmNek</text>
-  <text x="160" y="172" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="600" fill="#ccfbf1">One pass · swipe local deals · show QR</text>
-  <text x="160" y="244" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="600" fill="#ffffff">www.stikmnek.com</text>
-  <text x="160" y="284" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="500" fill="#a7f3d0">stikmnek@gmail.com  ·  +678 7766107</text>
+  <rect x="${PHOTO2_W}" y="0" width="${SIG2_W - PHOTO2_W}" height="${SIG2_H}" fill="url(#card)"/>
+  <rect x="${PHOTO2_W}" y="0" width="12" height="${SIG2_H}" fill="#F97316"/>
+  <text x="${PHOTO2_W + 156}" y="108" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="800" fill="#ffffff">StikmNek</text>
+  <text x="${PHOTO2_W + 44}" y="186" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="700" fill="#ffffff">Swipe deals. Show QR. Save.</text>
+  <text x="${PHOTO2_W + 44}" y="236" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="600" fill="#ccfbf1">One pass for your group · up to 35% local</text>
+  <rect x="${PHOTO2_W + 44}" y="270" width="296" height="68" rx="34" fill="#F97316"/>
+  <text x="${PHOTO2_W + 192}" y="314" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="800" fill="#ffffff">Get your pass →</text>
+  <text x="${PHOTO2_W + 44}" y="392" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="600" fill="#ecfdf5">www.stikmnek.com · +678 7766107</text>
 </svg>`);
-  await sharp(sig2Base)
+  await sharp({
+    create: { width: SIG2_W, height: SIG2_H, channels: 3, background: '#0F766E' },
+  })
+    .jpeg()
     .composite([
+      { input: sigPhoto2, top: 0, left: 0 },
       { input: sig2Svg, top: 0, left: 0 },
-      { input: logo112, top: 36, left: 32 },
+      { input: await sharp(logoSrc).resize(112, 112).png().toBuffer(), top: 36, left: PHOTO2_W + 32 },
     ])
     .png()
     .toFile(path.join(outDir, 'email-signature@2x.png'));
