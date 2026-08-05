@@ -19,7 +19,6 @@ import { normalizeAppPathname, viewFromPathname, type ViewMode } from '@/utils/v
 import type { PassProductId } from '@/data/passCatalog';
 import { passProductIdFromDb } from '@/data/passCatalog';
 import { clampPartySize, MAX_PARTY_SIZE } from '@/data/pricing';
-import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
 import { checkBusinessOwnerNeedsFirstListing } from '@/lib/businessOwnerListingStatus';
 import { isTouristReadyForPassCheckout } from '@/lib/passAccess';
 import {
@@ -136,7 +135,7 @@ export function defaultPassCartFromProfile(
   let isExtended = false;
   if (authExt || profExt) isExtended = true;
   else if (authShort || profShort) isExtended = false;
-  else isExtended = inferIsExtendedPassFromTripDates(profile);
+  // Do not infer 7-day from trip dates — a multi-day stay often still wants a 1-day pass.
 
   if (profile) {
     const adults = profile.num_adults ?? 0;

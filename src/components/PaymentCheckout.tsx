@@ -21,7 +21,6 @@ import {
   EXTEND_FEE_AUD,
 } from '@/data/pricing';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
-import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
 import { loadTripState, tripLengthToIsExtended } from '@/lib/tripStorage';
 import CheckoutPricingSummary from '@/components/CheckoutPricingSummary';
 import { loadPayPalButtonsSdk, renderPayPalCheckoutButtons, type PayPalSdkNamespace } from '@/lib/paypalSdk';
@@ -503,12 +502,6 @@ const PaymentCheckout: React.FC = () => {
 
     if (trip.vibeTripLengthDone && trip.tripLength) {
       nextExtended = tripLengthToIsExtended(trip.tripLength);
-    } else if (
-      userProfile &&
-      userProfile.preferred_pass_duration !== 'short' &&
-      inferIsExtendedPassFromTripDates(userProfile)
-    ) {
-      nextExtended = true;
     }
 
     if (nextParty === cart.partySize && nextExtended === cart.isExtended) {
@@ -1489,6 +1482,15 @@ const PaymentCheckout: React.FC = () => {
                   +
                 </button>
               </div>
+              {(userProfile?.num_adults || userProfile?.num_children) ? (
+                <p className="text-[11px] text-neutral-500 mt-2">
+                  Profile has {userProfile?.num_adults ?? 0} adult{(userProfile?.num_adults ?? 0) === 1 ? '' : 's'}
+                  {(userProfile?.num_children ?? 0) > 0
+                    ? ` + ${userProfile?.num_children} child${(userProfile?.num_children ?? 0) === 1 ? '' : 'ren'} (5–12)`
+                    : ''}
+                  . Pass seats are ages 6+ — adjust above if this isn’t your group.
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -1515,6 +1517,11 @@ const PaymentCheckout: React.FC = () => {
                   <p className="text-teal-300 font-semibold text-sm mt-1">A${priceExtendedOption.toFixed(0)}</p>
                 </button>
               </div>
+              {tripInclusiveDays != null && tripInclusiveDays >= 2 && !isExtended ? (
+                <p className="text-[11px] text-amber-200/90 mt-2">
+                  Your trip is {tripInclusiveDays} days — the 7-day pass may suit better, but 1-day stays selected until you change it.
+                </p>
+              ) : null}
             </div>
 
             <div>

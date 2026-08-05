@@ -88,7 +88,7 @@ const AdminWhatsAppContacts: React.FC<AdminWhatsAppContactsProps> = ({
   loading,
   onRefresh,
 }) => {
-  const [filter, setFilter] = useState<'opt_in' | 'all' | 'no_listing' | 'phone_only'>('opt_in');
+  const [filter, setFilter] = useState<'opt_in' | 'all' | 'no_listing' | 'phone_only'>('all');
 
   const filtered = useMemo(() => {
     if (filter === 'opt_in') {
@@ -124,8 +124,11 @@ const AdminWhatsAppContacts: React.FC<AdminWhatsAppContactsProps> = ({
             WhatsApp business contacts
           </h3>
           <p className="text-xs text-green-900/80 mt-0.5 max-w-2xl">
-            Export opted-in owners for your phone contacts or WhatsApp Business. Use for setup tips,
-            listing reminders, and education videos.
+            Opt-in is a separate checkbox (education tips), not “has a WhatsApp on the listing”.
+            Most field/admin-onboarded partners never saw that box — use <strong>All with WhatsApp</strong> to
+            reach them. Opted in: {contacts.filter((c) => c.whatsapp_marketing_opt_in).length} · With
+            WhatsApp: {contacts.filter((c) => (c.whatsapp_number || '').trim()).length} · Total:{' '}
+            {contacts.length}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
