@@ -21,6 +21,7 @@ import { passProductIdFromDb } from '@/data/passCatalog';
 import { clampPartySize, MAX_PARTY_SIZE } from '@/data/pricing';
 import { inferIsExtendedPassFromTripDates } from '@/lib/optimalPassFromRegistration';
 import { checkBusinessOwnerNeedsFirstListing } from '@/lib/businessOwnerListingStatus';
+import { isTouristReadyForPassCheckout } from '@/lib/passAccess';
 import {
   type AppRole,
   isListedAdminEmail,
@@ -263,16 +264,9 @@ function translateMustRedeemFirstMessage(
   return 'Yu mas redeem wan sarvis long bisinis ia bifo yu save riviu.';
 }
 
-/** Tourist onboarding gate — same criteria as AppLayout profile-first redirect. */
+/** Tourist must finish profile before checkout / free-pass claim. */
 export function isTouristProfileCompleteForGate(p: UserProfile | null | undefined): boolean {
-  if (!p) return false;
-  return (
-    p.post_pass_profile_completed === true &&
-    Boolean(p.name || p.full_name || p.display_name) &&
-    (p.num_adults ?? 0) >= 1 &&
-    Boolean(p.expected_arrival_date) &&
-    Boolean(p.expected_departure_date)
-  );
+  return isTouristReadyForPassCheckout(p);
 }
 
 interface AppContextType {
@@ -1761,6 +1755,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toast.info('You already have an active pass!');
         return;
       }
+      if (user.type !== 'business' && user.type !== 'admin' && user.type !== 'staff') {
+        if (!isTouristProfileCompleteForGate(userProfile)) {
+          toast.info('Set up your profile first — then we’ll issue your pass QR.');
+          setCurrentView('complete-profile');
+          return;
+        }
+      }
       let authMeta: Record<string, unknown> | null = null;
       try {
         const {
@@ -1795,7 +1796,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [user, userProfile, setCurrentView],
   );
 
-  // After signup/signin from swipe paywall: open checkout with vibe-card party size.
+  // After signup/signin from swipe paywall: profile first, then checkout (claim or pay).
   useEffect(() => {
     if (!user?.id) return;
     if (user.type === 'business' || user.type === 'admin' || user.type === 'staff') return;
@@ -1806,17 +1807,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     let cancelled = false;
-    void import('@/lib/tripStorage').then(({ consumePendingCheckout }) => {
+    void import('@/lib/tripStorage').then(({ peekPendingCheckout, consumePendingCheckout }) => {
       if (cancelled) return;
-      const pending = consumePendingCheckout();
+      const pending = peekPendingCheckout();
       if (!pending) return;
+      if (!isTouristProfileCompleteForGate(userProfile)) {
+        setCurrentView('complete-profile');
+        return;
+      }
+      consumePendingCheckout();
       setCart(pending);
       setCurrentView('checkout');
     });
     return () => {
       cancelled = true;
     };
-  }, [user?.id, user?.passId, user?.type, setCurrentView]);
+  }, [user?.id, user?.passId, user?.type, userProfile, setCurrentView]);
 
   const refreshUserProfile = useCallback(async () => {
     if (!user?.id) return;

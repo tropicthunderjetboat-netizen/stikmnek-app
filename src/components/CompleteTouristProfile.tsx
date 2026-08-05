@@ -60,10 +60,10 @@ const CompleteTouristProfile: React.FC = () => {
                     ? 'Reprenez où vous en étiez — vos informations sont enregistrées au fil du remplissage.'
                     : 'Go hed long wea yu stop long hem — ol samting i save sef taem yu muv iko lelebet.'
                 : language === 'en'
-                  ? 'We use this to show how pass limits relate to your group and travel dates.'
+                  ? 'Sign in is done — add your name, WhatsApp, and trip dates. Then we’ll issue your pass QR (free for the first 25 travelers).'
                   : language === 'fr'
-                    ? 'Nous l’utilisons pour expliquer comment les limites des passes correspondent à votre groupe et à vos dates.'
-                    : 'Mifala i yusum blong soem ol limit blong pas wetem grup mo det blong trip blong yu.'}
+                    ? 'Connexion OK — ajoutez nom, WhatsApp et dates. Ensuite nous délivrons votre QR (gratuit pour les 25 premiers voyageurs).'
+                    : 'Login i redi — putum nem, WhatsApp mo det blong trip. Bae mifala i givim QR (fri long fes 25).'}
             </p>
           </div>
 
@@ -103,10 +103,10 @@ const CompleteTouristProfile: React.FC = () => {
               <ArrowRight className="w-5 h-5 text-teal-700 mt-0.5" />
               <p className="text-sm text-teal-800">
                 {language === 'en'
-                  ? 'Next, you’ll go to secure checkout — pass options use your profile (change anytime before paying).'
+                  ? 'Next: claim your free pass (if still available) or pay — then your QR unlocks WhatsApp and member rates.'
                   : language === 'fr'
-                    ? 'Ensuite, passage au paiement sécurisé — le pass s’appuie sur votre profil (modifiable avant paiement).'
-                    : 'Biaen, yu go long checkout — pas opsen u mas usum profil blong yu (yu save jensem eni taem bifo pem).'}
+                    ? 'Ensuite : passe gratuit (si disponible) ou paiement — le QR débloque WhatsApp et les tarifs membres.'
+                    : 'Nekis: kliem fri pas (sipos i stap) o pe — QR i openem WhatsApp mo memba praes.'}
               </p>
             </div>
           </div>

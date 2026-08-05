@@ -86,6 +86,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
     : dbReviews.filter((r: any) => r.business_id === profileId && (r.offering_id ? String(r.offering_id) === String(business.id) : true) && r.has_super_star).length;
 
   const hasWhatsApp = digitsForWaMe(getBusinessWhatsAppRaw(business)).length >= 5;
+  const canUseWhatsApp = Boolean(user?.pass && user?.passId);
 
   const viewDetailsLabel = `View details for ${business.name}`;
 
@@ -235,7 +236,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
                         </button>
                       </h3>
                       <SuperStarBadge count={superStarCount} />
-                      {hasWhatsApp && (
+                      {hasWhatsApp && canUseWhatsApp && (
                         <button
                           type="button"
                           onClick={handleWhatsApp}
@@ -256,7 +257,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
                 </div>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
-                {hasWhatsApp && (
+                {hasWhatsApp && canUseWhatsApp && (
                   <button
                     type="button"
                     onClick={handleWhatsApp}
@@ -350,7 +351,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
 
         {/* Action Buttons — always visible; ≥44px targets */}
         <div className="absolute top-3 right-3 z-[3] flex items-center gap-1.5">
-          {hasWhatsApp && (
+          {hasWhatsApp && canUseWhatsApp && (
             <button
               type="button"
               onClick={handleWhatsApp}
@@ -455,7 +456,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
             <Clock className="w-3 h-3 shrink-0" />
             {business.hours.split(' - ')[0]}
           </span>
-          {hasWhatsApp && (
+          {hasWhatsApp && canUseWhatsApp && (
             <span className="flex items-center gap-1 text-green-600 shrink-0">
               <WhatsAppIcon className="w-3 h-3" />
               WhatsApp

@@ -21,7 +21,14 @@ Admin panel → **Promos** → Pause promo (sets `promo_campaigns.is_active = fa
 
 ## Funnel
 
-Admin → Promos shows claims with trip dates, redemption count, review count.
+Tourist browse (feed/map/deals) is open. WhatsApp / call / email stay locked until they have an active pass.
+
+1. Sign in / sign up  
+2. Complete tourist profile (name, WhatsApp, trip dates)  
+3. Checkout → Claim free FIRST25 **or** PayPal  
+4. QR issued → contact unlocks  
+
+Admin → Promos only lists rows written by `claim-promo-pass` (step 3). Browsing without claiming will not appear.
 
 ## Revenue
 

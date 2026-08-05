@@ -171,9 +171,13 @@ const TouristProfileForm: React.FC<TouristProfileFormProps> = ({
         toast.error(language === 'en' ? 'Please enter your email.' : 'Entrez votre e-mail.');
         return;
       }
-      if (preferredContact === 'whatsapp' && !waTrim) {
+      if (!waTrim) {
         toast.error(
-          language === 'en' ? 'Please enter your WhatsApp number.' : 'Entrez votre numéro WhatsApp.',
+          language === 'en'
+            ? 'WhatsApp is required so partners (and StikmNek) can reach you.'
+            : language === 'fr'
+              ? 'WhatsApp est obligatoire pour que les partenaires puissent vous joindre.'
+              : 'WhatsApp i mas stap blong bisnis i save kolim yu.',
         );
         return;
       }

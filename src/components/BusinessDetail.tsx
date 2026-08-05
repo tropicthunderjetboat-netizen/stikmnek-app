@@ -464,8 +464,8 @@ const BusinessDetail: React.FC = () => {
   const isListingOwner = Boolean(user?.id && biz.ownerId && user.id === biz.ownerId);
   const isFav = isListingFavorited(favorites, biz);
   /** Same rule as booking: only pass holders get WhatsApp / phone (avoids discount leakage). */
-  const canUseWhatsAppContact = Boolean(user?.pass);
-  const canUsePhoneContact = Boolean(user?.pass);
+  const canUseWhatsAppContact = Boolean(user?.pass && user?.passId);
+  const canUsePhoneContact = Boolean(user?.pass && user?.passId);
 
   useEffect(() => {
     if (!profileId) return;
@@ -691,7 +691,7 @@ const BusinessDetail: React.FC = () => {
                 </span>
               )}
               <span className="px-2 py-0.5 rounded-md bg-white/20 backdrop-blur-sm text-white text-xs capitalize">{biz.category}</span>
-              {hasWhatsApp && (
+              {hasWhatsApp && canUseWhatsAppContact && (
                 <button
                   type="button"
                   onClick={handleWhatsApp}
@@ -1229,8 +1229,8 @@ const BusinessDetail: React.FC = () => {
                 {language === 'en' ? 'Request booking' : language === 'fr' ? 'Demander une réservation' : 'Askem bukin'}
               </button>
 
-              {/* WhatsApp Button in Sidebar */}
-              {hasWhatsApp && (
+              {/* WhatsApp Button in Sidebar — only after an active pass */}
+              {hasWhatsApp && canUseWhatsAppContact ? (
                 <button
                   type="button"
                   onClick={handleWhatsApp}
@@ -1239,7 +1239,19 @@ const BusinessDetail: React.FC = () => {
                   <WhatsAppIcon className="w-4 h-4" />
                   {language === 'en' ? 'Message on WhatsApp' : language === 'fr' ? 'Message sur WhatsApp' : 'Mesej long WhatsApp'}
                 </button>
-              )}
+              ) : hasWhatsApp ? (
+                <button
+                  type="button"
+                  onClick={() => void purchasePass()}
+                  className="w-full py-3 rounded-xl border-2 border-teal-600 text-teal-700 font-bold text-sm hover:bg-teal-50 transition-all mb-3"
+                >
+                  {language === 'en'
+                    ? 'Get a pass to WhatsApp'
+                    : language === 'fr'
+                      ? 'Obtenez un pass pour WhatsApp'
+                      : 'Kasem pas blong WhatsApp'}
+                </button>
+              ) : null}
 
               <div className="flex gap-2">
                 <button

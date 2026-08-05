@@ -313,8 +313,9 @@ const MapView: React.FC<MapViewProps> = ({
   const {
     language, setSelectedBusiness, setCurrentView, dbBusinesses,
     userLocation, locationLoading, locationError, requestUserLocation, getDistanceTo,
-    favorites, toggleFavorite,
+    favorites, toggleFavorite, user,
   } = useAppContext();
+  const canSeeContact = Boolean(user?.pass && user?.passId);
 
   const [selectedMapBiz, setSelectedMapBiz] = useState<Business | null>(null);
   const [radiusFilter, setRadiusFilter] = useState<RadiusFilter>('all');
@@ -727,9 +728,15 @@ const MapView: React.FC<MapViewProps> = ({
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3 h-3" />{selectedMapBiz.hours}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <Phone className="w-3 h-3" />{selectedMapBiz.phone}
-                  </div>
+                  {canSeeContact && selectedMapBiz.phone ? (
+                    <div className="flex items-center gap-1.5">
+                      <Phone className="w-3 h-3" />{selectedMapBiz.phone}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-teal-700">
+                      <Phone className="w-3 h-3" />Get a pass to unlock contact
+                    </div>
+                  )}
                 </div>
 
                 {/* Walking / Driving Time Estimates */}

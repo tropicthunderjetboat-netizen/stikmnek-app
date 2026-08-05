@@ -297,7 +297,7 @@ export default function SwipeDiscover() {
     applyDragVisual(0);
   }, [applyDragVisual]);
 
-  const hasPass = Boolean(user?.pass);
+  const hasPass = Boolean(user?.pass && user?.passId);
 
   const listings = useMemo(() => {
     const base = touristFacingOfferings(dbBusinesses);
@@ -1892,28 +1892,9 @@ function DetailSheet({
             >
               {passCtaLabel(isExtended, paidPeople, pricePreview)}
             </button>
-            {(hasWa || business.phone) && (
-              <div className="flex gap-2">
-                {hasWa && (
-                  <button
-                    type="button"
-                    onClick={onMessage}
-                    className="flex-1 min-h-10 rounded-xl bg-[#25D366]/90 text-white text-xs font-semibold flex items-center justify-center gap-1.5 px-2"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5 shrink-0" /> WhatsApp
-                  </button>
-                )}
-                {business.phone && (
-                  <button
-                    type="button"
-                    onClick={onCall}
-                    className="flex-1 min-h-10 rounded-xl border border-teal-600/70 text-teal-300 font-semibold text-xs flex items-center justify-center gap-1.5 px-2"
-                  >
-                    <Phone className="w-3.5 h-3.5 shrink-0" /> Call
-                  </button>
-                )}
-              </div>
-            )}
+            <p className="text-center text-[11px] text-neutral-500 px-2">
+              Sign in, set up your profile, then get your QR — WhatsApp unlocks after that.
+            </p>
           </>
         ) : (
           <>
@@ -2319,7 +2300,7 @@ function PaywallSheet({
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto" />
         <h3 className="text-lg font-bold text-center text-white">Connect with {businessName}</h3>
         <p className="text-sm text-neutral-400 text-center leading-relaxed">
-          You’ve seen the savings — get a pass to WhatsApp {businessName} at the member rate and show your QR at check-in. No booking fees.
+          Sign in, finish your profile, then claim a free traveler pass (first 25) or pay. You’ll get a QR — then you can WhatsApp {businessName} at the member rate.
           {tripCount > 0
             ? ` My Trip already has ${tripCount} saved place${tripCount === 1 ? '' : 's'}.`
             : ''}
@@ -2340,7 +2321,7 @@ function PaywallSheet({
           onClick={onBuy}
           className="w-full min-h-12 rounded-xl bg-teal-600 font-bold text-white"
         >
-          {passCtaLabel(isExtended, paidPeople, price)}
+          Sign in & get your pass
         </button>
         <button type="button" onClick={onClose} className="w-full text-sm text-neutral-400 py-2">
           Maybe later

@@ -403,7 +403,7 @@ Do not optimize for vanity metrics (traffic without passes, listings without red
 - Tours/activities support **tiered pricing** (adult/child/infant); transportation often per trip/day
 - Reviews require redemption within 30 days; **1–5 stars** only for averages
 - **Super Star:** optional paid tip **A$5 AUD** via PayPal; stored separately (`has_super_star`); **excluded from 1–5 star averages**; still contributes to **Top Ranked leaderboard** weight (~18%) — it is **not** part of the normal 5-star review system
-- **FIRST25 promo (cold-start):** first 25 travelers can claim a free pass (skips PayPal); `is_promo_free` / admin Promos tab; exclude from paid revenue; pause via admin without deploy
+- **FIRST25 promo (cold-start):** first 25 travelers can claim a free pass (skips PayPal) **after sign-in + tourist profile**; `is_promo_free` / admin Promos tab; exclude from paid revenue; pause via admin without deploy. Browse is free; WhatsApp/call stay locked until an active pass/QR exists.
 - Business Hub: Scan QR, Share on Facebook, Submissions, New Listing, Edit, Analytics, Reviews, Photos, Credentials, Profile
 - Printable business guide: https://www.stikmnek.com/business-owner-guide-print.html
 - PWA installable; works mobile-first
