@@ -212,10 +212,17 @@ const AppLayout: React.FC = () => {
     }
   }, [location.pathname, setCurrentView]);
 
-  // Checkout / confirmation used to be view-only (no URL) — keep the address bar in sync
-  // so refresh after PayPal does not drop the user back on the swipe home.
+  // Checkout / confirmation / admin / hub — keep the address bar in sync
+  // so refresh does not drop the user on the wrong shell.
   useEffect(() => {
-    if (currentView !== 'checkout' && currentView !== 'payment-confirmation') return;
+    if (
+      currentView !== 'checkout' &&
+      currentView !== 'payment-confirmation' &&
+      currentView !== 'admin' &&
+      currentView !== 'business-dashboard'
+    ) {
+      return;
+    }
     const path = pathForViewMode(currentView);
     if (!path) return;
     if (normalizeAppPathname(location.pathname) === path) return;
@@ -307,6 +314,18 @@ const AppLayout: React.FC = () => {
     if (role === 'tourist' && currentView === 'business-dashboard') {
       if (!userProfile) return; // Wait for profile to load
       setCurrentView('dashboard');
+      return;
+    }
+
+    // Admin / staff must land on the admin panel (not business hub or tourist profile)
+    if (
+      canAccessAdminPanel(role, user.email) &&
+      (currentView === 'business-dashboard' ||
+        currentView === 'dashboard' ||
+        currentView === 'my-favorites' ||
+        currentView === 'complete-profile')
+    ) {
+      setCurrentView('admin');
       return;
     }
 
@@ -497,7 +516,11 @@ const AppLayout: React.FC = () => {
     currentView === 'payment-confirmation' ||
     currentView === 'list-business' ||
     // Tourist home keeps SwipeDiscover's own branding/login chrome (not the full Navbar).
-    (currentView === 'home' && user?.type !== 'business');
+    // Admins/staff always keep the top nav so Admin Panel stays reachable.
+    (currentView === 'home' &&
+      user?.type !== 'business' &&
+      user?.type !== 'admin' &&
+      user?.type !== 'staff');
   const hideFooter =
     currentView === 'admin' ||
     currentView === 'checkout' ||

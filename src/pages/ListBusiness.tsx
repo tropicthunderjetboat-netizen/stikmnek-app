@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { ArrowLeft } from 'lucide-react';
 import { APP_ICON } from '@/lib/brand';
 import { useAppContext } from '@/contexts/AppContext';
+import { canAccessAdminPanel } from '@/lib/adminRoles';
 
 type PageLang = 'en' | 'fr' | 'bi';
 
@@ -84,14 +85,14 @@ const ListBusiness: React.FC = () => {
   useEffect(() => {
     if (!pendingHubAfterLogin || authLoading || !user) return;
     const role = userProfile?.role || user.type;
-    if (role === 'business' || role === 'admin') {
-      setPendingHubAfterLogin(false);
-      navigate('/hub', { replace: true });
-      return;
-    }
-    if (role === 'staff') {
+    if (canAccessAdminPanel(role, user.email)) {
       setPendingHubAfterLogin(false);
       navigate('/admin', { replace: true });
+      return;
+    }
+    if (role === 'business') {
+      setPendingHubAfterLogin(false);
+      navigate('/hub', { replace: true });
     }
   }, [pendingHubAfterLogin, authLoading, user, userProfile, navigate]);
 

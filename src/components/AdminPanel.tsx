@@ -51,6 +51,7 @@ import {
   adminTabsFor,
   defaultAdminTab,
   canUseDestructiveAdminActions,
+  isStaff,
 } from '@/lib/adminRoles';
 
 const BusinessListingForm = React.lazy(() => import('./BusinessListingForm'));
@@ -158,6 +159,7 @@ const AdminPanel: React.FC = () => {
   const { language, user, userProfile, refreshBusinesses, dbBusinesses } = useAppContext();
 
   const appRole = userProfile?.role || user?.type || 'tourist';
+  const staffLimited = isStaff(appRole, user?.email);
   const visibleTabs = useMemo(
     () => adminTabsFor(appRole, user?.email),
     [appRole, user?.email],
@@ -173,6 +175,8 @@ const AdminPanel: React.FC = () => {
       setActiveTab(defaultAdminTab(appRole, user?.email));
     }
   }, [activeTab, visibleTabs, appRole, user?.email]);
+
+  const showTab = (tab: AdminTab) => visibleTabs.includes(tab) && activeTab === tab;
 
   // Review moderation (admin-only)
   const [adminReviews, setAdminReviews] = useState<any[]>([]);
@@ -1659,10 +1663,10 @@ const AdminPanel: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-900">
-              {user?.type === 'staff' ? 'Staff dashboard' : 'Admin Dashboard'}
+              {staffLimited ? 'Staff dashboard' : 'Admin Dashboard'}
             </h1>
             <p className="text-gray-500 text-sm">
-              {user?.type === 'staff'
+              {staffLimited
                 ? (language === 'en'
                   ? 'Onboard businesses, manage listings, and review submissions'
                   : 'Intégrer des entreprises, gérer les annonces et examiner les soumissions')
@@ -1718,35 +1722,35 @@ const AdminPanel: React.FC = () => {
 
 
         {/* ═══ PASSES TAB ═══ */}
-        {activeTab === 'passes' && (
+        {showTab('passes') && (
           <Suspense fallback={<AdminTabFallback />}>
             <PassEditor />
           </Suspense>
         )}
 
         {/* ═══ PROMOS TAB ═══ */}
-        {activeTab === 'promos' && (
+        {showTab('promos') && (
           <Suspense fallback={<AdminTabFallback />}>
             <AdminPromoCampaigns />
           </Suspense>
         )}
 
         {/* ═══ ONBOARD TAB ═══ */}
-        {activeTab === 'onboard' && (
+        {showTab('onboard') && (
           <Suspense fallback={<AdminTabFallback />}>
             <AdminBusinessOnboarding />
           </Suspense>
         )}
 
         {/* ═══ USERS TAB ═══ */}
-        {activeTab === 'users' && (
+        {showTab('users') && (
           <Suspense fallback={<AdminTabFallback />}>
             <AdminUserManager />
           </Suspense>
         )}
 
         {/* ═══ REVIEWS TAB ═══ */}
-        {activeTab === 'reviews' && (
+        {showTab('reviews') && (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
@@ -1940,7 +1944,7 @@ const AdminPanel: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'overview' && (
+        {showTab('overview') && (
           <Suspense fallback={<AdminTabFallback />}>
             <AdminPurchaseOverview
               totalBusinesses={allBusinesses.length}
@@ -1952,7 +1956,7 @@ const AdminPanel: React.FC = () => {
 
 
         {/* ═══ BUSINESSES TAB ═══ */}
-        {activeTab === 'businesses' && (
+        {showTab('businesses') && (
           <div className="space-y-4">
             <AdminExpiredListings
               listings={expiredListings}
@@ -2284,7 +2288,7 @@ const AdminPanel: React.FC = () => {
 
 
         {/* ═══ APPROVALS TAB ═══ */}
-        {activeTab === 'approvals' && (
+        {showTab('approvals') && (
           <div className="space-y-6">
             <AdminWhatsAppContacts
               contacts={whatsappContacts}
@@ -3108,7 +3112,7 @@ const AdminPanel: React.FC = () => {
         )}
 
         {/* ═══ EMAILS TAB ═══ (lazy: receipt manager + notification center load in parallel) */}
-        {activeTab === 'emails' && (
+        {showTab('emails') && (
           <Suspense fallback={<AdminEmailTabFallback />}>
             <div className="space-y-8">
               <EmailReceiptManager />
@@ -3121,7 +3125,7 @@ const AdminPanel: React.FC = () => {
 
 
 
-        {activeTab === 'reports' && (
+        {showTab('reports') && (
           <div className="space-y-6">
             <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
               <h3 className="font-bold text-gray-900 mb-4">Usage Pattern Reports</h3>

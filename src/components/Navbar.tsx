@@ -2,7 +2,7 @@ import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { t } from '@/data/translations';
 import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
-import { isAdminPanelUser } from '@/lib/adminRoles';
+import { canAccessAdminPanel, isStaff } from '@/lib/adminRoles';
 import { Menu, X, User, MapPin, Tag, LayoutDashboard, Shield, Ticket, Store, Plane, Briefcase, HelpCircle } from 'lucide-react';
 import {
   loadAdminPanel,
@@ -23,12 +23,15 @@ const Navbar: React.FC = () => {
     purchasePass,
   } = useAppContext();
 
+  const adminPanelUser = Boolean(user && canAccessAdminPanel(user.type, user.email));
+  const staffLimitedUser = Boolean(user && isStaff(user.type, user.email));
+
   // ─── Build role-based navigation ───
   const navItems: { key: string; view: any; icon: React.ReactNode; label: string }[] = [
     { key: 'home', view: 'home', icon: <Tag className="w-4 h-4" />, label: t('nav.home', language) },
   ];
 
-  if (!user || user.type === 'tourist' || isAdminPanelUser(user.type)) {
+  if (!user || user.type === 'tourist' || adminPanelUser) {
     navItems.push(
       { key: 'deals', view: 'deals', icon: <Ticket className="w-4 h-4" />, label: t('nav.deals', language) },
       { key: 'map', view: 'map', icon: <MapPin className="w-4 h-4" />, label: t('nav.map', language) },
@@ -37,7 +40,16 @@ const Navbar: React.FC = () => {
   }
 
   if (user) {
-    if (user.type === 'tourist') {
+    if (adminPanelUser) {
+      navItems.push({
+        key: 'admin',
+        view: 'admin',
+        icon: <Shield className="w-4 h-4" />,
+        label: staffLimitedUser
+          ? (language === 'en' ? 'Staff' : 'Équipe')
+          : t('nav.admin', language),
+      });
+    } else if (user.type === 'tourist') {
       navItems.push({
         key: 'dashboard',
         view: 'dashboard',
@@ -54,15 +66,6 @@ const Navbar: React.FC = () => {
           label: language === 'en' ? 'My Business' : 'Mon Entreprise',
         },
       );
-    } else if (isAdminPanelUser(user.type)) {
-      navItems.push({
-        key: 'admin',
-        view: 'admin',
-        icon: <Shield className="w-4 h-4" />,
-        label: user.type === 'staff'
-          ? (language === 'en' ? 'Staff' : 'Équipe')
-          : t('nav.admin', language),
-      });
     }
   }
 
@@ -217,7 +220,15 @@ const Navbar: React.FC = () => {
             {user ? (
               <div className="hidden sm:flex items-center gap-2">
                 <button
-                  onClick={() => setCurrentView(isAdminPanelUser(user.type) ? 'admin' : user.type === 'business' ? 'business-dashboard' : 'dashboard')}
+                  onClick={() =>
+                    setCurrentView(
+                      adminPanelUser
+                        ? 'admin'
+                        : user.type === 'business'
+                          ? 'business-dashboard'
+                          : 'dashboard',
+                    )
+                  }
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
                 >
                   {user.avatarUrl ? (

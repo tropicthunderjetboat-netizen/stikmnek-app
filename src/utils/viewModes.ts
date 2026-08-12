@@ -49,6 +49,7 @@ export const PATH_TO_VIEW: Record<string, ViewMode> = {
   '/for-business': 'business-join',
   '/list-your-business': 'list-business',
   '/hub': 'business-dashboard',
+  '/admin': 'admin',
   '/help': 'help',
   '/faq': 'faq',
   '/business-guide': 'business-guide',
