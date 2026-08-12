@@ -25,7 +25,7 @@ const LocalOwnedBadge: React.FC<LocalOwnedBadgeProps> = ({
   variant = 'footer',
   className = '',
 }) => {
-  const lang: Language = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  const lang: Language = language === 'fr' ? 'fr' : 'en';
 
   return (
     <p className={`${variantClasses[variant]} ${className}`.trim()} role="note">

@@ -7,7 +7,7 @@ import { Ticket, QrCode, MapPin, Smile } from 'lucide-react';
 
 const HowItWorks: React.FC = () => {
   const { language, setCurrentView, user, purchasePass } = useAppContext();
-  const lang: Language = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  const lang: Language = language === 'fr' ? 'fr' : 'en';
 
   const steps = [
     {

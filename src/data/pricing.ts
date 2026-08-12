@@ -100,12 +100,12 @@ export function addCalendarDaysIso(startDateIso: string, dayOffset: number): str
 
 export function getPassDisplayTitle(
   _raw: string | null | undefined,
-  lang: 'en' | 'fr' | 'bi' = 'en',
+  lang: 'en' | 'fr' = 'en',
 ): string {
-  return lang === 'fr' ? 'Pass StikmNek' : lang === 'bi' ? 'StikmNek Pas' : 'StikmNek Pass';
+  return lang === 'fr' ? 'Pass StikmNek' : 'StikmNek Pass';
 }
 
-export function getPassTitle(_passId: PassProductId, lang: 'en' | 'fr' | 'bi' = 'en'): string {
+export function getPassTitle(_passId: PassProductId, lang: 'en' | 'fr' = 'en'): string {
   return getPassDisplayTitle('dynamic', lang);
 }
 

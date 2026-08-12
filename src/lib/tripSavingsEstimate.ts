@@ -60,7 +60,7 @@ export function estimateTripSavings(
 /** Short tourist-facing line; empty when nothing to show. */
 export function tripSavingsSummaryLine(
   estimate: TripSavingsEstimate,
-  language: 'en' | 'fr' | 'bi' = 'en',
+  language: 'en' | 'fr' = 'en',
 ): string {
   if (estimate.totalVt <= 0 || estimate.placesWithSavings <= 0) return '';
   const amount = formatVT(estimate.totalVt);
@@ -69,9 +69,6 @@ export function tripSavingsSummaryLine(
   if (language === 'fr') {
     return `Environ ${amount} d’économies pour ${p} pers. (6+) sur ${n} lieu${n > 1 ? 'x' : ''}`;
   }
-  if (language === 'bi') {
-    return `Samting olsem ${amount} sevem blong ${p} pipol (6+) long ${n} ples`;
-  }
   return `About ${amount} saved for ${p} ${p === 1 ? 'person' : 'people'} (ages 6+) across ${n} place${n === 1 ? '' : 's'}`;
 }
 
@@ -79,7 +76,7 @@ export function tripSavingsSummaryLine(
 export function tripSavingsVsPassLine(
   savingsVt: number,
   passPriceAud: number,
-  language: 'en' | 'fr' | 'bi' = 'en',
+  language: 'en' | 'fr' = 'en',
 ): string {
   if (savingsVt <= 0 || !(passPriceAud > 0)) return '';
   const passVt = approximateVatuFromAud(passPriceAud);
@@ -88,17 +85,11 @@ export function tripSavingsVsPassLine(
     if (language === 'fr') {
       return `Ça couvre déjà un pass (~${formatVT(passVt)} à titre indicatif)`;
     }
-    if (language === 'bi') {
-      return `Hem i kava finis long wan pas (~${formatVT(passVt)} — estimet)`;
-    }
     return `That already covers a pass (~${formatVT(passVt)} rough VT)`;
   }
   const gap = passVt - savingsVt;
   if (language === 'fr') {
     return `Plus que ~${formatVT(gap)} et le pass est rentabilisé (estimatif)`;
-  }
-  if (language === 'bi') {
-    return `Nidim ~${formatVT(gap)} moa blong kava pas (estimet)`;
   }
   return `About ${formatVT(gap)} more and the pass pays for itself (estimate)`;
 }

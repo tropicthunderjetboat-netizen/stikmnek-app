@@ -1162,7 +1162,7 @@ const BusinessDetail: React.FC = () => {
                       {' · '}
                       {shortPriceUnitSuffix(
                         biz.category,
-                        language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en',
+                        language === 'fr' ? 'fr' : 'en',
                       )}
                     </p>
                   </div>

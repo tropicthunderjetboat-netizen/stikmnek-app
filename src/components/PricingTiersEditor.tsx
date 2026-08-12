@@ -43,7 +43,7 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
   discountPercent = null,
   usePresetSlots = true,
 }) => {
-  const lang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  const lang = language === 'fr' ? 'fr' : 'en';
   const [showAdvanced, setShowAdvanced] = useState(false);
   const autoMode =
     discountPercent != null && Number.isFinite(discountPercent) && discountPercent > 0;

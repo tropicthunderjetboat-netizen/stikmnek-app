@@ -75,7 +75,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
   category = '',
   language = 'en',
 }) => {
-  const lang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  const lang = language === 'fr' ? 'fr' : 'en';
   const priceHint = categoryUsesPerUnitPricing(category)
     ? perUnitPriceHint(category, lang)
     : lang === 'fr'

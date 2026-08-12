@@ -18,13 +18,13 @@ import {
 } from '@/components/ui/dialog';
 import TouristProfileForm from '@/components/TouristProfileForm';
 import PostPurchasePassPreferencesDialog from '@/components/PostPurchasePassPreferencesDialog';
-import PassTicketCard from '@/components/PassTicketCard';
+import PassCard from '@/components/PassCard';
 import { inclusiveCalendarDaysBetween } from '@/lib/passValidity';
 import { getHolidayPassMaskDisplay } from '@/lib/holidayPassDisplay';
 import { t, type Language } from '@/data/translations';
 import { SUPPORT_EMAIL, supportMailtoUrl } from '@/data/contact';
 import { useNavigate } from 'react-router-dom';
-import { markPostPurchaseTripFocus, useQrDataUrl } from '@/lib/qrCode';
+import { markPostPurchaseTripFocus } from '@/lib/qrCode';
 import { loadTripState } from '@/lib/tripStorage';
 
 function passPrefsPromptStorageKey(receiptNumber: string): string {
@@ -78,7 +78,7 @@ const SHARE_BONUSES: Record<PassProductId, ShareBonusRow> = {
 };
 
 function toPassLang(language: string | undefined): Language {
-  return language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  return language === 'fr' ? 'fr' : 'en';
 }
 
 /** Matches checkout / email `formatMoney` (AUD with two decimals). */
@@ -714,7 +714,6 @@ const PaymentConfirmation: React.FC = () => {
   paymentRef.current = payment;
 
   const passIdForQr = user?.passId || payment?.sessionId || null;
-  const qrCodeUrl = useQrDataUrl(passIdForQr, { size: 280 });
   const tripSaveCount = loadTripState().savedPlaceIds.length;
 
   useEffect(() => {
@@ -1258,22 +1257,14 @@ Enjoy your deals in Vanuatu!
             </div>
           )}
           <p className="text-sm text-teal-700 mt-3 font-medium">
-            Show the QR below at partner venues to unlock your deal.
+            Show your Pass below at partner venues to get your deal.
           </p>
         </div>
 
-        {/* Pass QR — primary post-purchase deliverable */}
-        {passIdForQr && (
+        {/* Visual Pass — primary post-purchase deliverable */}
+        {passIdForQr && user?.pass && (
           <div className="mb-6">
-            <PassTicketCard
-              partySize={peopleCount}
-              qrCodeUrl={qrCodeUrl}
-              size="default"
-            >
-              <p className="text-center text-sm text-gray-600 mt-3">
-                Partners scan this code. Works offline once loaded — also under Saved or Profile.
-              </p>
-            </PassTicketCard>
+            <PassCard size="default" showSharePrompt />
           </div>
         )}
 

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Home, MapPin, User } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
@@ -13,11 +13,12 @@ import {
   loadTouristDashboard,
   prefetchChunk,
 } from '@/lib/heavyChunks';
+import { loadTripState, TRIP_STORAGE_KEY } from '@/lib/tripStorage';
 
 type HubTab = {
   id: 'home' | 'map' | 'saved' | 'profile';
   view: ViewMode;
-  label: { en: string; fr: string; bi: string };
+  label: { en: string; fr: string };
   icon: React.ReactNode;
   prefetch?: () => Promise<unknown>;
 };
@@ -26,27 +27,27 @@ const TABS: HubTab[] = [
   {
     id: 'home',
     view: 'home',
-    label: { en: 'Home', fr: 'Accueil', bi: 'Hom' },
+    label: { en: 'Home', fr: 'Accueil' },
     icon: <Home className="w-5 h-5" strokeWidth={2.25} aria-hidden />,
   },
   {
     id: 'map',
     view: 'map',
-    label: { en: 'Map', fr: 'Carte', bi: 'Map' },
+    label: { en: 'Map', fr: 'Carte' },
     icon: <MapPin className="w-5 h-5" strokeWidth={2.25} aria-hidden />,
     prefetch: loadMapView,
   },
   {
     id: 'saved',
     view: 'my-favorites',
-    label: { en: 'My Trip', fr: 'Mon voyage', bi: 'Trip blong mi' },
+    label: { en: 'Saved', fr: 'Sauvé' },
     icon: <Heart className="w-5 h-5" strokeWidth={2.25} aria-hidden />,
     prefetch: loadMyFavoritesList,
   },
   {
     id: 'profile',
     view: 'dashboard',
-    label: { en: 'Profile', fr: 'Profil', bi: 'Profil' },
+    label: { en: 'Profile', fr: 'Profil' },
     icon: <User className="w-5 h-5" strokeWidth={2.25} aria-hidden />,
     prefetch: loadTouristDashboard,
   },
@@ -58,7 +59,26 @@ const TABS: HubTab[] = [
  */
 const BottomNav: React.FC = () => {
   const navigate = useNavigate();
-  const { language, currentView, setCurrentView } = useAppContext();
+  const { language, currentView, setCurrentView, favorites } = useAppContext();
+  const [tripCount, setTripCount] = useState(() => loadTripState().savedPlaceIds.length);
+
+  useEffect(() => {
+    const refresh = () => setTripCount(loadTripState().savedPlaceIds.length);
+    refresh();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === TRIP_STORAGE_KEY || e.key == null) refresh();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('stikmnek-trip-updated', refresh);
+    const id = window.setInterval(refresh, 2000);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('stikmnek-trip-updated', refresh);
+      window.clearInterval(id);
+    };
+  }, []);
+
+  const savedCount = Math.max(tripCount, favorites?.length ?? 0);
 
   const go = useCallback(
     (view: ViewMode) => {
@@ -73,13 +93,7 @@ const BottomNav: React.FC = () => {
   return (
     <nav
       role="navigation"
-      aria-label={
-        language === 'fr'
-          ? 'Navigation principale'
-          : language === 'bi'
-            ? 'Meni blong go long'
-            : 'Main navigation'
-      }
+      aria-label={language === 'fr' ? 'Navigation principale' : 'Main navigation'}
       className="hub-phone-fixed fixed bottom-0 z-[55] border-t border-teal-100/90 bg-white/95 backdrop-blur-md shadow-[0_-4px_20px_rgba(15,23,42,0.06)]"
       style={{
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -91,8 +105,13 @@ const BottomNav: React.FC = () => {
       >
         {TABS.map((tab) => {
           const active = currentView === tab.view;
+          const baseLabel = language === 'fr' ? tab.label.fr : tab.label.en;
           const label =
-            language === 'fr' ? tab.label.fr : language === 'bi' ? tab.label.bi : tab.label.en;
+            tab.id === 'saved'
+              ? savedCount > 0
+                ? `${baseLabel} ❤️ ${savedCount}`
+                : baseLabel
+              : baseLabel;
 
           return (
             <button
@@ -106,6 +125,11 @@ const BottomNav: React.FC = () => {
                 if (tab.prefetch) prefetchChunk(tab.prefetch);
               }}
               aria-current={active ? 'page' : undefined}
+              aria-label={
+                tab.id === 'saved' && savedCount > 0
+                  ? `${baseLabel} ${savedCount}`
+                  : baseLabel
+              }
               className={`relative flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors ${
                 active ? 'text-teal-700' : 'text-gray-500 hover:text-gray-800'
               }`}

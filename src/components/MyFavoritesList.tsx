@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Copy, Heart, MapPin, Ticket, X } from 'lucide-react';
+import { Heart, MapPin, Ticket, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAppContext } from '@/contexts/AppContext';
 import {
@@ -26,22 +26,9 @@ import {
   tripSavingsVsPassLine,
 } from '@/lib/tripSavingsEstimate';
 import { SUPABASE_URL } from '@/lib/supabase';
-import PassTicketCard from '@/components/PassTicketCard';
+import PassCard from '@/components/PassCard';
 import ShareButton from '@/components/ShareButton';
-import { useQrDataUrl, peekPostPurchaseTripFocus, consumePostPurchaseTripFocus } from '@/lib/qrCode';
-
-function fmtPassDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  try {
-    return new Date(iso.includes('T') ? iso : `${iso}T00:00:00`).toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  } catch {
-    return iso;
-  }
-}
+import { peekPostPurchaseTripFocus, consumePostPurchaseTripFocus } from '@/lib/qrCode';
 
 function dealLabel(biz: Business): string {
   try {
@@ -104,7 +91,6 @@ const MyFavoritesList: React.FC = () => {
   const [tripIsExtended, setTripIsExtended] = useState(
     () => tripLengthToIsExtended(loadTripState().tripLength),
   );
-  const [copied, setCopied] = useState(false);
   const [showTripFocusBanner, setShowTripFocusBanner] = useState(() => peekPostPurchaseTripFocus());
 
   useEffect(() => {
@@ -142,7 +128,6 @@ const MyFavoritesList: React.FC = () => {
   const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
 
   const hasPass = Boolean(user?.pass && user?.passId);
-  const qrCodeUrl = useQrDataUrl(hasPass ? user!.passId! : null, { size: 280 });
 
   const savedDeals = useMemo(() => {
     const fromCloud = user ? businessesMatchingFavoriteKeys(allBusinesses, favorites) : [];
@@ -157,9 +142,7 @@ const MyFavoritesList: React.FC = () => {
     return merged;
   }, [user, allBusinesses, favorites, tripSavedIds]);
 
-  const partySize = clampPartySize(user?.passPeopleCount || 1);
-
-  const lang = (language === 'fr' || language === 'bi' ? language : 'en') as 'en' | 'fr' | 'bi';
+  const lang = (language === 'fr' ? 'fr' : 'en') as 'en' | 'fr';
 
   const tripSavings = useMemo(
     () => estimateTripSavings(savedDeals, tripPaidPeople || 1),
@@ -240,25 +223,17 @@ const MyFavoritesList: React.FC = () => {
     void purchasePass();
   }, [user, purchasePass, setAuthMode, setShowAuth]);
 
-  const handleCopyPassId = useCallback(() => {
-    if (!user?.passId) return;
-    void navigator.clipboard.writeText(user.passId).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [user?.passId]);
-
   const title =
-    language === 'fr' ? 'Mon voyage' : language === 'bi' ? 'Trip blong mi' : 'My Trip';
+    language === 'fr' ? 'Sauvé' : 'Saved';
 
   const exploreLabel =
-    language === 'fr' ? 'Explorer les offres' : language === 'bi' ? 'Lukluk ol deal' : 'Explore Deals';
+    language === 'fr' ? 'Explorer les offres' : 'Explore Deals';
 
   const detailsLabel =
-    language === 'fr' ? 'Détails' : language === 'bi' ? 'Detail' : 'View Deal';
+    language === 'fr' ? 'Détails' : 'View Deal';
 
   const getPassLabel =
-    language === 'fr' ? 'Obtenir le Pass' : language === 'bi' ? 'Karem Pas' : 'Get Pass';
+    language === 'fr' ? 'Obtenir le Pass' : 'Get Pass';
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20">
@@ -286,10 +261,8 @@ const MyFavoritesList: React.FC = () => {
               </p>
               <p className="mt-0.5 text-xs text-teal-800 leading-relaxed">
                 {language === 'fr'
-                  ? 'Ouvrez un lieu enregistré pour WhatsApp et le tarif membre. Montrez le QR à l’arrivée.'
-                  : language === 'bi'
-                    ? 'Openem ples we yu sevem blong WhatsApp mo praes blong memba. Soem QR taem yu kasem.'
-                    : 'Open a saved place to WhatsApp them at the member rate. Show your QR when you arrive.'}
+                  ? 'Ouvrez un lieu enregistré pour WhatsApp et le tarif membre. Montrez votre Pass à l’arrivée.'
+                  : 'Open a saved place to WhatsApp them at the member rate. Show your Pass when you arrive.'}
               </p>
             </div>
             <button
@@ -305,61 +278,7 @@ const MyFavoritesList: React.FC = () => {
         {/* ── Pass wallet hero ── */}
         <section className="mb-8" aria-label="StikmNek Pass">
           {hasPass ? (
-            <PassTicketCard partySize={partySize} qrCodeUrl={qrCodeUrl} size="compact">
-              <div className="mt-3 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-                  </span>
-                  <span className="text-xs font-bold uppercase tracking-wide text-emerald-700">
-                    {language === 'fr' ? 'Pass actif' : language === 'bi' ? 'Aktiv pas' : 'Active pass'}
-                  </span>
-                </div>
-
-                {(user?.passValidFrom || user?.passValidUntil) && (
-                  <div className="rounded-xl border border-teal-100 bg-white/80 px-3 py-2.5">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#888888]">
-                      {language === 'en' ? 'Valid' : language === 'fr' ? 'Valide' : 'Valit'}
-                    </p>
-                    <p className="text-sm font-semibold text-[#0A0A0A]">
-                      {fmtPassDate(user?.passValidFrom)} → {fmtPassDate(user?.passValidUntil)}
-                    </p>
-                  </div>
-                )}
-
-                <p className="text-center text-xs text-[#555555]">
-                  {language === 'en' ? 'Holder' : language === 'fr' ? 'Titulaire' : 'Holda'} ·{' '}
-                  <span className="font-semibold text-[#0A0A0A]">{user?.name}</span>
-                </p>
-
-                <button
-                  type="button"
-                  onClick={handleCopyPassId}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-teal-200/80 bg-white/70 py-2.5 text-sm text-[#555555] transition-colors hover:bg-white"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-4 w-4 text-green-600" />
-                      <span className="font-medium text-green-600">
-                        {language === 'fr' ? 'Copié !' : language === 'bi' ? 'Kopi!' : 'Copied!'}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      <span>
-                        {language === 'fr'
-                          ? 'Copier le code pass'
-                          : language === 'bi'
-                            ? 'Kopi pas kod'
-                            : 'Copy pass code'}
-                      </span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </PassTicketCard>
+            <PassCard size="compact" />
           ) : (
             <div className="overflow-hidden rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50 via-white to-emerald-50 shadow-sm">
               <div className="p-5 sm:p-6">
@@ -375,10 +294,8 @@ const MyFavoritesList: React.FC = () => {
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed text-gray-600">
                   {language === 'fr'
-                    ? 'Avec un StikmNek Tourist Pass, présentez votre QR chez les partenaires locaux et économisez sur vos deals enregistrés.'
-                    : language === 'bi'
-                      ? 'Wetem StikmNek Tourist Pass, soem QR long ol lokal bisnis mo sevem long ol deal we yu laikem.'
-                      : 'Unlock all discounts below with a StikmNek Tourist Pass — show your QR to local operators and get member prices on every place you’ve saved.'}
+                    ? 'Avec un Holiday Pass, montrez votre Pass chez les partenaires locaux et économisez sur vos lieux enregistrés.'
+                    : 'Get member prices with a Holiday Pass — show your Pass to local operators on every place you’ve saved.'}
                 </p>
                 {savingsSummary ? (
                   <div className="mt-3 rounded-xl border border-teal-200 bg-white/80 px-3 py-2.5">

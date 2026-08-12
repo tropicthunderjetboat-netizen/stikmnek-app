@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { X, Copy, Check } from 'lucide-react';
-import PassTicketCard from '@/components/PassTicketCard';
-import { clampPartySize } from '@/data/pricing';
-import { useQrDataUrl } from '@/lib/qrCode';
+import { X } from 'lucide-react';
+import PassCard from '@/components/PassCard';
 
 const FloatingPassButton: React.FC = () => {
   const { user, currentView } = useAppContext();
   const [showPass, setShowPass] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [pulseAnim, setPulseAnim] = useState(true);
 
   useEffect(() => {
@@ -16,16 +13,8 @@ const FloatingPassButton: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const partySize = clampPartySize(user?.passPeopleCount || 1);
-  const qrCodeUrl = useQrDataUrl(
-    user?.type === 'tourist' && user?.pass && user?.passId ? user.passId : null,
-    { size: 300 },
-  );
-
-  // Only show for tourists with an active pass — not on the pre-purchase homepage feed
   if (!user || user.type !== 'tourist' || !user.pass || !user.passId) return null;
 
-  // Hide on Home (Map FAB owns the hub), Saved wallet, checkout / admin
   if (
     currentView === 'home' ||
     currentView === 'checkout' ||
@@ -35,13 +24,6 @@ const FloatingPassButton: React.FC = () => {
   ) {
     return null;
   }
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(user.passId!).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
 
   return (
     <>
@@ -84,46 +66,7 @@ const FloatingPassButton: React.FC = () => {
               <X className="w-5 h-5" />
             </button>
 
-            <PassTicketCard partySize={partySize} qrCodeUrl={qrCodeUrl} size="compact">
-              <div className="mt-3 space-y-2">
-                <p className="text-center text-xs text-[#555555]">
-                  Holder · <span className="font-semibold text-[#0A0A0A]">{user.name}</span>
-                </p>
-                <p className="text-center text-[11px] text-[#888888]">
-                  {user.passValidFrom
-                    ? new Date(user.passValidFrom + 'T00:00:00').toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })
-                    : '-'}
-                  {' — '}
-                  {user.passValidUntil
-                    ? new Date(user.passValidUntil + 'T00:00:00').toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })
-                    : '-'}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-teal-200/80 bg-white/70 text-sm text-[#555555] hover:bg-white transition-colors"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-4 h-4 text-green-600" />
-                      <span className="text-green-600 font-medium">Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      <span>Copy pass code</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </PassTicketCard>
+            <PassCard size="compact" showSharePrompt={false} />
           </div>
         </div>
       )}

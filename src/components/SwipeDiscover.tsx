@@ -30,7 +30,6 @@ import {
   tripSavingsSummaryLine,
   tripSavingsVsPassLine,
 } from '@/lib/tripSavingsEstimate';
-import { useQrDataUrl } from '@/lib/qrCode';
 import { supabase, SUPABASE_URL } from '@/lib/supabase';
 import {
   checkoutFromTrip,
@@ -86,17 +85,17 @@ const FEED_TIP_STEPS: TipStep[] = [
   {
     id: 'save',
     title: 'Build Your Itinerary',
-    body: 'Love a spot? Tap the heart to save it to your trip list for easy comparing later.',
+    body: 'Love a spot? Tap the heart to save it for easy comparing later.',
     icon: '♥',
     afterPlaces: 4,
   },
   {
-    id: 'qr',
-    title: 'One Pass. Unlimited Deals.',
-    body: 'Buy once, unlock member prices everywhere. Partners scan your QR at the venue — no booking fees, no middleman.',
-    icon: '📱',
+    id: 'pass',
+    title: 'One Holiday Pass. Big savings.',
+    body: 'Get a Holiday Pass for 7 days. Show your visual Pass at partners — save up to 35%. Kids under 6 free.',
+    icon: '🌴',
     afterPlaces: 6,
-    variant: 'qr',
+    variant: 'info',
   },
   {
     id: 'length',
@@ -490,12 +489,12 @@ export default function SwipeDiscover() {
         if (inTrip) {
           persist({ ...trip, savedPlaceIds: trip.savedPlaceIds.filter((x) => x !== id) });
         }
-        toast.success('Removed from My Trip', { style: tripToastStyle });
+        toast.success('Removed from Saved', { style: tripToastStyle });
         if (user && inFav) void toggleFavorite(b, { silent: true });
       } else {
         const nextIds = [...trip.savedPlaceIds, id];
         persist({ ...trip, savedPlaceIds: nextIds });
-        toast.success('Saved to My Trip', {
+        toast.success('Saved ❤️', {
           style: tripToastStyle,
           action: {
             label: 'Open',
@@ -783,10 +782,11 @@ export default function SwipeDiscover() {
                     ? 'bg-[#0A1F2A]/[0.08] text-[#0A1F2A] ring-1 ring-[#0A1F2A]/10'
                     : 'bg-white/18 text-white ring-1 ring-white/25'
                 }`}
-                aria-label={`Open My Trip · ${saveCount} place${saveCount === 1 ? '' : 's'}`}
+                aria-label={saveCount > 0 ? `Open Saved ❤️ ${saveCount}` : 'Open Saved'}
               >
                 <Plane className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                <span>My Trip</span>
+                <span>{saveCount > 0 ? `Saved ❤️ ${saveCount}` : 'Saved'}</span>
+                {saveCount > 0 && (
                 <span
                   className={`min-w-[1.25rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold leading-none ${
                     lightChrome ? 'bg-teal-600 text-white' : 'bg-[#0FB5B5] text-white'
@@ -794,6 +794,7 @@ export default function SwipeDiscover() {
                 >
                   {saveCount}
                 </span>
+                )}
               </button>
             )}
             <button
@@ -1108,7 +1109,7 @@ function WelcomeCard({
             className="mt-3 text-[15px] text-white/95 leading-relaxed"
             style={{ textShadow: TEXT_SHADOW_SOFT }}
           >
-            Tap ♥ on your favorites. Grab a StikmNek Pass to unlock direct discounts across the islands.
+            Tap ♥ on your favorites. Get a Holiday Pass for member prices across the islands.
           </p>
 
           <button
@@ -1157,58 +1158,38 @@ function TipCard({
 }) {
   const isParty = tip.variant === 'party';
   const isLength = tip.variant === 'length';
-  const isQr = tip.variant === 'qr';
-  const sampleQrUrl = useQrDataUrl(isQr ? 'STIKMNEK-SAMPLE-PASS' : null, { size: 200 });
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#F4F7F8]">
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-8 pb-20 pt-16">
         <div className="w-full max-w-[300px] text-center">
-          {isQr ? (
-            <div className="mx-auto mb-5 w-[148px] rounded-2xl bg-white p-3 ring-1 ring-[#0A1F2A]/[0.08] shadow-sm">
-              {sampleQrUrl ? (
-                <img
-                  src={sampleQrUrl}
-                  alt="Example StikmNek pass QR code"
-                  className="h-[124px] w-[124px] mx-auto"
-                  draggable={false}
+          <div
+            className={`mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full ring-1 ${
+              tip.id === 'save'
+                ? 'bg-[#0FB5B5]/10 ring-[#0FB5B5]/25'
+                : 'bg-white text-[26px] leading-none ring-[#0A1F2A]/[0.06]'
+            }`}
+            aria-hidden
+          >
+            {tip.id === 'save' ? (
+              <span className="relative inline-flex h-7 w-7 items-center justify-center">
+                <Heart
+                  className="h-7 w-7 text-[#0FB5B5]"
+                  strokeWidth={2.4}
+                  fill="none"
+                  aria-hidden
                 />
-              ) : (
-                <div className="h-[124px] w-[124px] mx-auto rounded-lg bg-neutral-100 animate-pulse" />
-              )}
-              <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-[#8A9BA8]">
-                Your pass QR
-              </p>
-            </div>
-          ) : (
-            <div
-              className={`mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full ring-1 ${
-                tip.id === 'save'
-                  ? 'bg-[#0FB5B5]/10 ring-[#0FB5B5]/25'
-                  : 'bg-white text-[26px] leading-none ring-[#0A1F2A]/[0.06]'
-              }`}
-              aria-hidden
-            >
-              {tip.id === 'save' ? (
-                <span className="relative inline-flex h-7 w-7 items-center justify-center">
-                  <Heart
-                    className="h-7 w-7 text-[#0FB5B5]"
-                    strokeWidth={2.4}
-                    fill="none"
-                    aria-hidden
-                  />
-                  <Heart
-                    className="pointer-events-none absolute inset-0 m-auto h-7 w-7 text-[#0FB5B5] tip-heart-pulse"
-                    strokeWidth={0}
-                    fill="currentColor"
-                    aria-hidden
-                  />
-                </span>
-              ) : (
-                tip.icon
-              )}
-            </div>
-          )}
+                <Heart
+                  className="pointer-events-none absolute inset-0 m-auto h-7 w-7 text-[#0FB5B5] tip-heart-pulse"
+                  strokeWidth={0}
+                  fill="currentColor"
+                  aria-hidden
+                />
+              </span>
+            ) : (
+              tip.icon
+            )}
+          </div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0FB5B5] mb-2">
             Quick tip
           </p>
@@ -1333,7 +1314,7 @@ function EndCard({
           <h2 className="text-[22px] font-bold text-[#0A1F2A] leading-tight">You’ve seen the best bits</h2>
           <p className="text-[15px] text-[#5A6D7A] leading-relaxed">
             {savedCount > 0
-              ? `${savedCount} place${savedCount === 1 ? '' : 's'} on My Trip. Shuffle for more, or unlock WhatsApp with a pass.`
+              ? `${savedCount} place${savedCount === 1 ? '' : 's'} saved. Shuffle for more, or message places with a Holiday Pass.`
               : 'Swipe again anytime — or get a pass to message places direct.'}
           </p>
 
@@ -1893,7 +1874,7 @@ function DetailSheet({
               {passCtaLabel(isExtended, paidPeople, pricePreview)}
             </button>
             <p className="text-center text-[11px] text-neutral-500 px-2">
-              Sign in, set up your profile, then get your QR — WhatsApp unlocks after that.
+              Sign in, set up your profile, then get your Holiday Pass — message places after that.
             </p>
           </>
         ) : (
@@ -1919,7 +1900,7 @@ function DetailSheet({
               )}
             </div>
             <p className="text-center text-[11px] text-neutral-500">
-              Show your QR for the passholder price. StikmNek doesn’t take bookings.
+              Show your Pass for the member price. StikmNek doesn’t take bookings.
             </p>
           </>
         )}
@@ -2245,7 +2226,7 @@ function SoftNudgeSheet({
       >
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto" />
         <h3 className="text-lg font-bold text-center text-white">
-          My Trip has {tripCount} place{tripCount === 1 ? '' : 's'}
+          Saved has {tripCount} place{tripCount === 1 ? '' : 's'}
         </h3>
         {savingsLine ? (
           <div className="rounded-xl bg-teal-500/15 border border-teal-400/30 px-3 py-2.5 text-center">
@@ -2256,7 +2237,7 @@ function SoftNudgeSheet({
           </div>
         ) : null}
         <p className="text-sm text-neutral-400 text-center leading-relaxed">
-          Unlock WhatsApp + QR check-in so you can use the member prices on every saved spot. {plan}.
+          Get a Holiday Pass so you can use member prices on every saved spot. {plan}.
         </p>
         <button
           type="button"
@@ -2300,9 +2281,9 @@ function PaywallSheet({
         <div className="w-10 h-1 rounded-full bg-white/20 mx-auto" />
         <h3 className="text-lg font-bold text-center text-white">Connect with {businessName}</h3>
         <p className="text-sm text-neutral-400 text-center leading-relaxed">
-          Sign in, finish your profile, then claim a free traveler pass (first 25) or pay. You’ll get a QR — then you can WhatsApp {businessName} at the member rate.
+          Sign in, finish your profile, then claim a free traveler pass (first 25) or pay. You’ll get a visual Pass — then you can WhatsApp {businessName} at the member rate.
           {tripCount > 0
-            ? ` My Trip already has ${tripCount} saved place${tripCount === 1 ? '' : 's'}.`
+            ? ` Saved already has ${tripCount} place${tripCount === 1 ? '' : 's'}.`
             : ''}
         </p>
         <ul className="text-xs text-neutral-300 space-y-1.5 px-1">
@@ -2313,7 +2294,7 @@ function PaywallSheet({
             <MessageCircle className="w-3.5 h-3.5 text-teal-400 shrink-0" /> WhatsApp operators directly
           </li>
           <li className="flex items-center gap-2">
-            <Lock className="w-3.5 h-3.5 text-teal-400 shrink-0" /> One QR · redeem at every partner
+            <Lock className="w-3.5 h-3.5 text-teal-400 shrink-0" /> One visual Pass · show at every partner
           </li>
         </ul>
         <button

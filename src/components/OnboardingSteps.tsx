@@ -12,11 +12,11 @@ export interface OnboardingStepsProps {
   completedSteps: number[];
   variant?: 'default' | 'compact';
   /** UI copy; defaults to English. */
-  language?: 'en' | 'fr' | 'bi';
+  language?: 'en' | 'fr';
   className?: string;
 }
 
-type Lang = 'en' | 'fr' | 'bi';
+type Lang = 'en' | 'fr';
 
 const NAV_LABEL: Record<Lang, string> = {
   en: 'Business onboarding progress',
@@ -148,7 +148,7 @@ const OnboardingSteps: React.FC<OnboardingStepsProps> = ({
   language = 'en',
   className = '',
 }) => {
-  const lang: Lang = language === 'fr' || language === 'bi' ? language : 'en';
+  const lang: Lang = language === 'fr' ? 'fr' : 'en';
   const completed = useMemo(() => normalizeCompletedSteps(completedSteps), [completedSteps]);
 
   const [isDesktop, setIsDesktop] = useState(false);

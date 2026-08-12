@@ -19,8 +19,7 @@ import {
   Wallet, Sparkles, PartyPopper,
 } from 'lucide-react';
 
-import QRCodeDisplay from './QRCodeDisplay';
-import PassTicketCard from './PassTicketCard';
+import PassCard from './PassCard';
 
 type DashboardTab = 'overview' | 'analytics';
 
@@ -202,7 +201,7 @@ const Dashboard: React.FC = () => {
     [language],
   );
 
-  const passLang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  const passLang = language === 'fr' ? 'fr' : 'en';
 
   const handleUnlockSecondWeek = useCallback(async () => {
     if (!user?.id || shareBusy) return;
@@ -439,68 +438,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   {user.pass ? (
                     <div className="p-5">
-                      <PassTicketCard partySize={clampPartySize(user.passPeopleCount || 1)}>
-                        <div className="mt-3 space-y-3 text-left">
-                          {holidayPassUi.isHolidayPass && (
-                            <p className="text-xs font-semibold text-teal-800">
-                              {holidayPassUi.showFirstWeekOnly
-                                ? t('share.dashboard_coverage_pill', passLang)
-                                : language === 'fr'
-                                  ? `${holidayPassUi.truthSpanDays} jours (bonus inclus)`
-                                  : language === 'bi'
-                                    ? `${holidayPassUi.truthSpanDays} dei (bonus)`
-                                    : `${holidayPassUi.truthSpanDays} days (bonus included)`}
-                            </p>
-                          )}
-                          {(user.passValidFrom || user.passValidUntil) && (
-                            <div className="rounded-xl bg-white/80 border border-teal-100 px-3 py-2.5">
-                              <p className="text-[10px] font-bold text-[#888888] uppercase tracking-wider mb-1">
-                                {language === 'en' ? 'Valid' : language === 'fr' ? 'Valide' : 'Valit'}
-                              </p>
-                              {holidayPassUi.showFirstWeekOnly && (
-                                <p className="text-[10px] font-semibold text-teal-700 mb-1">
-                                  {t('share.dashboard_week1_validity', passLang)}
-                                </p>
-                              )}
-                              <p className="text-sm font-semibold text-[#0A0A0A]">
-                                {fmtPassDate(user.passValidFrom)}
-                                {' → '}
-                                {fmtPassDate(
-                                  holidayPassUi.showFirstWeekOnly
-                                    ? holidayPassUi.displayUntilDateStr
-                                    : user.passValidUntil,
-                                )}
-                              </p>
-                            </div>
-                          )}
-                          {holidayPassUi.isHolidayPass && holidayPassUi.showFirstWeekOnly && (
-                            <button
-                              type="button"
-                              onClick={() => void handleUnlockSecondWeek()}
-                              disabled={shareBusy}
-                              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0FB5B5] hover:bg-[#0da3a3] text-white text-sm font-bold disabled:opacity-60 transition-colors"
-                            >
-                              {shareBusy ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                  {language === 'fr' ? 'Partage…' : language === 'bi' ? 'Serem…' : 'Sharing…'}
-                                </>
-                              ) : (
-                                <>
-                                  <Share2 className="w-4 h-4" />
-                                  {t('share.dashboard_unlock_button', passLang)}
-                                </>
-                              )}
-                            </button>
-                          )}
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="text-xs text-[#555555]">
-                              {language === 'en' ? 'Active' : 'Actif'}
-                            </span>
-                          </div>
-                        </div>
-                      </PassTicketCard>
+                      <PassCard />
                     </div>
                   ) : (
                     <div className="p-8 text-center">
@@ -574,10 +512,6 @@ const Dashboard: React.FC = () => {
 
               {/* Sidebar */}
               <div className="space-y-6">
-                {user.pass && user.passId && (
-                  <QRCodeDisplay />
-                )}
-
                 {/* Travel party — profile drives checkout party size */}
                 {user.type === 'tourist' && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">

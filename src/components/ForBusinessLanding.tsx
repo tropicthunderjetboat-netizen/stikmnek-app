@@ -41,7 +41,6 @@ const ForBusinessLanding: React.FC = () => {
   const langOptions = [
     { code: 'en' as const, label: 'English' },
     { code: 'fr' as const, label: 'Français' },
-    { code: 'bi' as const, label: 'Bislama' },
   ];
 
   const onJoin = () => {

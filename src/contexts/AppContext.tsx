@@ -235,9 +235,6 @@ function translateReviewWindowExpiredMessage(language: Language): string {
   if (language === 'fr') {
     return 'Pour garder des avis pertinents, vous ne pouvez publier un avis que dans les 30 jours suivant votre visite.';
   }
-  if (language === 'bi') {
-    return 'Blong riviu i stap fri, yu save postem riviu nomo insaed 30 dei from taem yu bin visit.';
-  }
   return 'To keep reviews fresh, you can only post a review within 30 days of your visit.';
 }
 

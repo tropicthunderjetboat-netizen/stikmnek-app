@@ -351,7 +351,7 @@ const AdminPendingSubmissionReview: React.FC<Props> = ({ biz, language, onSaved 
                       <option key={c} value={c}>
                         {categoryLabelForKey(
                           c,
-                          language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en',
+                          language === 'fr' ? 'fr' : 'en',
                         )}
                       </option>
                     ))}

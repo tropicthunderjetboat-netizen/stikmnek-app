@@ -1,10 +1,14 @@
 # StikmNek - Vanuatu Tourist Deals Platform
 
-> Discover the best deals on dining, tours, activities, spa & accommodation in Vanuatu. Save up to 35% with your StikmNek pass.
+> Free trip planner for Vanuatu — save favorites, build your trip, then unlock partner discounts with a StikmNek Pass. Local businesses list free.
+
+**Canonical pricing source:** `src/data/pricing.ts` (keep Edge `supabase/functions/_shared/pricingDynamic.ts` in sync).  
+**Product brief for AI / strategy:** `docs/MASTER_AI_PROMPT.md`
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Pass Pricing (live)](#pass-pricing-live)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
@@ -26,22 +30,41 @@
 
 ## Overview
 
-StikmNek is a full-stack web application that connects tourists in Vanuatu with local businesses offering exclusive deals and discounts. Tourists purchase a pass (daily, weekly, or monthly) and unlock savings across dining, tours, activities, spa treatments, and accommodation.
+StikmNek is a full-stack web/PWA that connects tourists in Vanuatu with local businesses offering exclusive discounts. Tourists can **browse and plan for free** (heart favorites / My Trip). A digital **StikmNek Pass** unlocks partner discounts and contact details; redemption is by **QR code** scanned by the business. Businesses list **free forever** — revenue is from pass sales (and optional Super Star tips), not listing fees or commissions.
 
 ### Key Features
 
-- **Tourist Pass System**: Daily ($15), Weekly ($45), Monthly ($99) passes with QR code verification
-- **Business Directory**: Searchable, filterable grid of local businesses with map view
-- **Business Owner Dashboard**: Submit listings, manage photos, edit details, view analytics
-- **Admin Panel**: Approve/reject listings, manage users, view platform statistics
-- **Review System**: Star ratings, text reviews, business owner responses, SuperStar reviews
-- **Payment Processing**: PayPal integration (sandbox + live modes)
-- **Email Notifications**: Resend-powered transactional emails
-- **Multi-language Support**: English, French, Bislama
-- **Geolocation**: Nearby deals, proximity alerts, interactive Leaflet map
+- **Free trip planner**: Browse the vertical swipe feed, heart favorites, and build a trip before buying
+- **StikmNek Pass**: Single dynamic product (party size + 1-day or 7-day Holiday) with QR verification — see [Pass Pricing](#pass-pricing-live)
+- **Deal discovery**: Swipe feed (primary), `/deals` grid, and Leaflet map; categories include dining, tours, activities, transportation, shopping, spa, accommodation
+- **Business Owner Dashboard**: Submit/edit listings (incl. tiered tour pricing), photos, QR scanner, reviews
+- **Admin Panel**: Approvals, users, listings, promos, platform stats
+- **Reviews**: Star ratings, owner responses, optional paid **Super Star** tip (A$5 AUD)
+- **Payments**: PayPal Smart Buttons (sandbox + live); optional FIRST25 free promo via `claim-promo-pass`
+- **Email**: Resend transactional mail (pass confirmation, ops digests, etc.)
+- **i18n**: English, French, Bislama
 - **PWA**: Offline support, installable, service worker caching
-- **Error Monitoring**: Sentry integration via relay edge function
-- **Analytics**: Google Analytics 4 with GDPR-compliant consent management
+- **Monitoring**: Sentry relay + Google Analytics 4 (consent-gated)
+
+---
+
+## Pass Pricing (live)
+
+**Do not** describe Daily / Weekly / Monthly fixed packs — that model is retired. There is one product: **StikmNek Pass**.
+
+| Rule | Amount (AUD) |
+|------|----------------|
+| First paying guest (ages **6+**) | **A$15** |
+| Each additional guest (2–20) | **A$10** |
+| Children under 6 | Free (not counted in party) |
+| **1-day** (day pass) | Base headcount only |
+| **7-day Holiday** add-on | **+A$15** (7 inclusive calendar days) |
+| Share bonus (Holiday) | After purchase (or prepurchase share path): unlock **+7 days** → **14 days** total |
+| Max party size | **20** per pass |
+
+**Examples:** solo 1-day **A$15** · solo Holiday **A$30** · couple 1-day **A$25** · couple Holiday **A$40**
+
+Prices exclude payment processing fees. Passes are generally **non-refundable once activated** (support handles exceptions). Super Star tips are **A$5 AUD**, separate from the pass.
 
 ---
 
@@ -71,12 +94,12 @@ StikmNek is a full-stack web application that connects tourists in Vanuatu with 
 
 ### Data Flow
 
-1. **Tourist browses deals** → React SPA fetches from Supabase DB (direct client)
-2. **Tourist purchases pass** → PayPal Smart Buttons on checkout (or legacy card form) → `create-checkout` / `paypal-capture` Edge Functions (or `process-card-payment` when no public client id)
-3. **Business submits listing** → Edge function inserts into `pending_businesses` → Admin reviews → Approved to `businesses`
-4. **Business edits listing** → Edge function inserts into `pending_edits` → Admin reviews → Applied to `businesses`
-5. **Tourist redeems deal** → Edge function verifies pass validity → Records redemption → Updates savings tracker
-6. **Error occurs** → ErrorLogger → Supabase `error_logs` table + Sentry relay edge function
+1. **Tourist browses / plans** → React SPA loads listings (view / `business_offerings` join); hearts can stay local until signup
+2. **Tourist buys or claims a pass** → Checkout builds party size + duration → PayPal (`create-checkout` / `paypal-capture`) or FIRST25 (`claim-promo-pass`) → QR pass issued
+3. **Business submits listing** → Edge function → `pending_businesses` → Admin approves → live on `businesses` + `business_offerings`
+4. **Business edits listing** → Edge function → `pending_edits` → Admin reviews → applied to live listings
+5. **Tourist redeems deal** → Business scans QR → `verify-redemption` → redemption recorded
+6. **Error occurs** → ErrorLogger → Supabase `error_logs` + Sentry relay edge function
 
 ---
 
@@ -84,7 +107,7 @@ StikmNek is a full-stack web application that connects tourists in Vanuatu with 
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18, TypeScript 5.5, Vite 5 |
+| Frontend | React 18, TypeScript 5.5, Vite 8 |
 | Styling | Tailwind CSS 3.4, shadcn/ui, Radix UI |
 | State | React Context, React Query |
 | Routing | React Router 6 |
@@ -111,7 +134,7 @@ StikmNek is a full-stack web application that connects tourists in Vanuatu with 
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd stikmnek
+cd stikmnek-app
 
 # Install dependencies
 npm install
@@ -161,6 +184,8 @@ src/
 │   └── AppContext.tsx    # Global state management (auth, cart, favorites, etc.)
 ├── data/
 │   ├── businesses.ts    # Business type definitions
+│   ├── pricing.ts       # Live StikmNek Pass pricing (AUD) — source of truth
+│   ├── passCatalog.ts   # Pass product identity / legacy DB type mapping
 │   └── translations.ts  # i18n translation strings (EN/FR/BI)
 ├── hooks/
 │   ├── useGeolocation.ts # Geolocation hook
@@ -227,31 +252,43 @@ The primary API endpoint handling 25+ actions:
 - Admin operations: 100 per minute
 
 ### `create-checkout`
-Creates a PayPal order for pass purchase.
+Creates a PayPal order for StikmNek Pass purchase (dynamic party size + duration pricing).
 
 ### `paypal-capture`
-Captures a PayPal payment after approval.
+Captures a PayPal payment after approval and issues/activates the pass.
 
-### `superstar-checkout`
-Handles SuperStar review purchases.
+### `claim-promo-pass`
+FIRST25 cold-start promo — claims a free pass when the campaign is active (see `docs/PROMO_FIRST25.md`).
 
 ### `extend-pass`
-Extends an existing pass duration.
+Extends an existing pass duration (share / holiday paths as implemented).
 
 ### `verify-redemption`
 Verifies QR code and records deal redemption.
 
 ### `send-email`
-Resend email delivery for notifications (pass confirmation, booking inquiries, etc.).
+Resend email delivery (pass confirmation, booking inquiries, purchase ops notify, etc.).
+
+### `notify-expiring-deals`
+Daily ops digest of deals expiring within 7 days.
 
 ### `upload-photo`
-Handles business photo uploads to Supabase Storage.
+Business photo uploads to Supabase Storage.
+
+### `upload-credential`
+Business credential uploads (insurance/permits) for trust signals.
+
+### `create-user-profile` / `request-password-reset`
+Profile bootstrap and password-reset helpers.
+
+### `trigger-ssg-rebuild`
+Called after listing changes to rebuild static SEO pages via Vercel deploy hook.
 
 ### `sentry-relay`
 Relays frontend errors to Sentry (keeps DSN server-side).
 
-### `payment-webhook`
-PayPal webhook handler for payment events.
+### `process-card-payment`
+Legacy/dev card path when PayPal Smart Buttons client ID is unset.
 
 ---
 
@@ -261,28 +298,22 @@ PayPal webhook handler for payment events.
 
 | Table | Description |
 |-------|-------------|
-| `businesses` | Approved business listings |
+| `businesses` | Business profiles (company-level) |
+| `business_offerings` | Live deals / listings shown in Explore (canonical for feed) |
 | `pending_businesses` | Business submissions awaiting review |
 | `pending_edits` | Edit requests awaiting admin approval |
 | `user_profiles` | User profiles (tourist/business/admin) |
-| `passes` | Purchased tourist passes |
+| `passes` | Tourist passes (dynamic product; legacy `pass_type` values may exist on old rows) |
+| `pass_purchases` | Purchase / promo claim records |
 | `redemptions` | Deal redemption records |
 | `reviews` | Business reviews |
 | `review_responses` | Business owner responses to reviews |
-| `favorites` | User favorite businesses |
+| `favorites` | User favorite listings |
 | `business_photos` | Business photo gallery |
+| `promo_campaigns` | Promo config (e.g. FIRST25) |
 | `error_logs` | Frontend error logs |
 
-### Key Fields on `businesses`
-
-```sql
-id, name, category, description, description_fr, description_bi,
-image, rating, review_count, discount, original_price, deal_price,
-location, lat, lng, hours, phone, whatsapp_number,
-tags, featured, owner_id, map_url, website,
-discount_valid_from, discount_valid_until, super_star_count,
-created_at
-```
+Listings for tourists are primarily loaded from `business_listings_view` / `business_offerings` (see `src/lib/loadListings.ts`), not a flat single-row-per-business model.
 
 ---
 
@@ -305,6 +336,10 @@ Authentication is handled by Supabase Auth (GoTrue):
 ---
 
 ## Payment Integration
+
+### StikmNek Pass checkout
+
+Checkout prices from **party size (ages 6+)** and **1-day vs 7-day Holiday** using `calculatePassPrice` in `src/data/pricing.ts`. There are no separate Daily/Weekly/Monthly SKUs.
 
 ### PayPal
 
@@ -567,6 +602,11 @@ Proprietary - All rights reserved.
 ## Support
 
 - **Email**: stikmnek@gmail.com
+- **Phone**: +678 7766107
 - **Website**: https://www.stikmnek.com
 - **Location**: Vanuatu
+
+---
+
+*README pricing & product model last synced with `src/data/pricing.ts` — August 2026. If this file and the app disagree, trust the code.*
 

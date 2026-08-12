@@ -48,7 +48,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
     [],
   );
 
-  const helpLang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  const helpLang = language === 'fr' ? 'fr' : 'en';
 
   const howItWorksSteps = useMemo(() => {
     return [

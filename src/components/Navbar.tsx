@@ -29,7 +29,6 @@ const Navbar: React.FC = () => {
   ];
 
   if (!user || user.type === 'tourist' || isAdminPanelUser(user.type)) {
-    // Tourist navigation items
     navItems.push(
       { key: 'deals', view: 'deals', icon: <Ticket className="w-4 h-4" />, label: t('nav.deals', language) },
       { key: 'map', view: 'map', icon: <MapPin className="w-4 h-4" />, label: t('nav.map', language) },
@@ -39,13 +38,21 @@ const Navbar: React.FC = () => {
 
   if (user) {
     if (user.type === 'tourist') {
-      // Tourist dashboard
-      navItems.push({ key: 'dashboard', view: 'dashboard', icon: <LayoutDashboard className="w-4 h-4" />, label: language === 'en' ? 'My Dashboard' : language === 'fr' ? 'Mon Tableau de Bord' : 'Dasbod Blong Mi' });
+      navItems.push({
+        key: 'dashboard',
+        view: 'dashboard',
+        icon: <LayoutDashboard className="w-4 h-4" />,
+        label: language === 'en' ? 'My Dashboard' : 'Mon Tableau de Bord',
+      });
     } else if (user.type === 'business') {
-      // Business dashboard - primary navigation for business users
       navItems.push(
         { key: 'deals', view: 'deals', icon: <Ticket className="w-4 h-4" />, label: t('nav.deals', language) },
-        { key: 'business-dashboard', view: 'business-dashboard', icon: <Store className="w-4 h-4" />, label: language === 'en' ? 'My Business' : language === 'fr' ? 'Mon Entreprise' : 'Bisnis Blong Mi' },
+        {
+          key: 'business-dashboard',
+          view: 'business-dashboard',
+          icon: <Store className="w-4 h-4" />,
+          label: language === 'en' ? 'My Business' : 'Mon Entreprise',
+        },
       );
     } else if (isAdminPanelUser(user.type)) {
       navItems.push({
@@ -53,14 +60,18 @@ const Navbar: React.FC = () => {
         view: 'admin',
         icon: <Shield className="w-4 h-4" />,
         label: user.type === 'staff'
-          ? (language === 'en' ? 'Staff' : language === 'fr' ? 'Équipe' : 'Staf')
+          ? (language === 'en' ? 'Staff' : 'Équipe')
           : t('nav.admin', language),
       });
     }
   }
 
-  // Help link for everyone
-  navItems.push({ key: 'help', view: 'help', icon: <HelpCircle className="w-4 h-4" />, label: language === 'en' ? 'Help' : language === 'fr' ? 'Aide' : 'Elb' });
+  navItems.push({
+    key: 'help',
+    view: 'help',
+    icon: <HelpCircle className="w-4 h-4" />,
+    label: language === 'en' ? 'Help' : 'Aide',
+  });
 
   const goToPassesOrCheckout = (view: string) => {
     if (view === 'passes' && shouldOpenCheckoutInsteadOfPassesPage(user)) {
@@ -73,10 +84,8 @@ const Navbar: React.FC = () => {
   const langOptions = [
     { code: 'en' as const, label: 'EN' },
     { code: 'fr' as const, label: 'FR' },
-    { code: 'bi' as const, label: 'BI' },
   ];
 
-  // Role badge for user
   const getRoleBadge = () => {
     if (!user) return null;
     if (user.type === 'business') {
@@ -118,12 +127,11 @@ const Navbar: React.FC = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-teal-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <button
             onClick={() => setCurrentView('home')}
-            className="flex items-center gap-2 group"
+            className="flex items-center gap-2 group min-w-0"
           >
-            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-teal-200 group-hover:shadow-teal-300 transition-shadow">
+            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-teal-200 group-hover:shadow-teal-300 transition-shadow shrink-0">
               <img
                 src={APP_ICON}
                 alt="StikmNek"
@@ -143,26 +151,28 @@ const Navbar: React.FC = () => {
                 }}
               />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-teal-700 to-emerald-600 bg-clip-text text-transparent">
-              StikmNek
+            <span className="flex min-w-0 flex-col items-start leading-tight">
+              <span className="text-xl font-bold bg-gradient-to-r from-teal-700 to-emerald-600 bg-clip-text text-transparent">
+                StikmNek
+              </span>
+              <span className="text-[10px] font-medium text-gray-500 tracking-wide truncate max-w-[9.5rem] sm:max-w-none">
+                Vanuatu trip planner
+              </span>
             </span>
           </button>
 
-          {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-1">
             {navItems.map(item => (
               <button
                 key={item.key}
                 onClick={() => goToPassesOrCheckout(item.view)}
                 onMouseEnter={() => {
-                  // Strategic prefetch on intent (hover/focus) only.
                   if (item.view === 'map') prefetchChunk(loadMapView);
                   if (item.view === 'dashboard') prefetchChunk(loadTouristDashboard);
                   if (item.view === 'business-dashboard') prefetchChunk(loadBusinessOwnerDashboard);
                   if (item.view === 'admin') prefetchChunk(loadAdminPanel);
                 }}
                 onFocus={() => {
-                  // Keyboard users: prefetch on focus.
                   if (item.view === 'map') prefetchChunk(loadMapView);
                   if (item.view === 'dashboard') prefetchChunk(loadTouristDashboard);
                   if (item.view === 'business-dashboard') prefetchChunk(loadBusinessOwnerDashboard);
@@ -180,13 +190,11 @@ const Navbar: React.FC = () => {
             ))}
           </div>
 
-          {/* Right Side */}
           <div className="flex items-center gap-2">
-            {/* Language Switcher — always visible (incl. mobile) with flags so it's easy to find */}
             <div
               className="flex items-center gap-0.5 bg-gray-100 rounded-full p-1 shadow-sm ring-1 ring-gray-200/70"
               role="group"
-              aria-label={language === 'en' ? 'Change language' : language === 'fr' ? 'Changer de langue' : 'Mekem Akaon'}
+              aria-label={language === 'en' ? 'Change language' : 'Changer de langue'}
             >
               {langOptions.map(opt => (
                 <button
@@ -206,7 +214,6 @@ const Navbar: React.FC = () => {
               ))}
             </div>
 
-            {/* Auth Button */}
             {user ? (
               <div className="hidden sm:flex items-center gap-2">
                 <button
@@ -243,7 +250,6 @@ const Navbar: React.FC = () => {
               </div>
             )}
 
-            {/* Mobile Menu Toggle */}
             <button
               onClick={toggleSidebar}
               className="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
@@ -254,11 +260,9 @@ const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {sidebarOpen && (
         <div className="md:hidden bg-white border-t border-gray-100 shadow-lg">
           <div className="px-4 py-3 space-y-1">
-            {/* User info banner for mobile */}
             {user && (
               <div className="flex items-center gap-3 px-3 py-3 mb-2 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center text-white text-sm font-bold">
@@ -289,7 +293,7 @@ const Navbar: React.FC = () => {
             ))}
             <div className="pt-2 border-t border-gray-100 mt-2">
               <p className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                {language === 'en' ? 'Language' : language === 'fr' ? 'Langue' : 'Dil Klosap'}
+                {language === 'en' ? 'Language' : 'Langue'}
               </p>
               <div className="flex items-center gap-1">
                 {langOptions.map(opt => (
@@ -321,7 +325,7 @@ const Navbar: React.FC = () => {
                   onClick={() => { setShowAuth(true); setAuthMode('signup'); toggleSidebar(); }}
                   className="w-full px-4 py-2.5 rounded-lg border border-teal-200 text-teal-700 text-sm font-medium hover:bg-teal-50"
                 >
-                  {language === 'en' ? 'Create Account' : language === 'fr' ? 'Créer un compte' : 'Turis Pas'}
+                  {language === 'en' ? 'Create Account' : 'Créer un compte'}
                 </button>
               </div>
             )}

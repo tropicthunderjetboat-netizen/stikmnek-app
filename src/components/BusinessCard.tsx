@@ -79,7 +79,7 @@ const BusinessCard: React.FC<BusinessCardProps> = ({ business, listView = false 
   // Compute super star count: use DB field if available, otherwise count from reviews
   const priceUnitSuffix = shortPriceUnitSuffix(
     business.category,
-    language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en',
+    language === 'fr' ? 'fr' : 'en',
   );
   const superStarCount = (business.superStarCount && business.superStarCount > 0)
     ? business.superStarCount

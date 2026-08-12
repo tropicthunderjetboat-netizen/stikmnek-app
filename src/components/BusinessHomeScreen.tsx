@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import {
-  ScanLine, Edit3, Plus, MessageSquare, Home, BarChart3,
+  Edit3, Plus, MessageSquare, Home, BarChart3,
   Store, Sparkles, ArrowRight, Wifi, Clock, CheckCircle,
   Star, Users, TrendingUp, Zap, ShieldCheck
 } from 'lucide-react';
@@ -13,7 +13,6 @@ interface BusinessHomeScreenProps {
   pendingCount: number;
   reviewCount: number;
   onSwitchTab: (tab: string) => void;
-  onOpenScanner: () => void;
 }
 
 
@@ -24,7 +23,6 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
   pendingCount,
   reviewCount,
   onSwitchTab,
-  onOpenScanner,
 }) => {
   const { user, setCurrentView, language } = useAppContext();
 
@@ -34,22 +32,9 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
 
   const mainActions = [
     {
-      key: 'scan',
-      label: language === 'en' ? 'Scan a Pass' : language === 'fr' ? 'Scanner un Pass' : 'Skanem wan Pas',
-      description: language === 'en' ? 'Scan tourist QR codes to verify and redeem discounts' : language === 'fr' ? 'Scannez les codes QR des touristes' : 'Skanem QR kod blong turis blong reviu akaon',
-      icon: <ScanLine className="w-7 h-7" />,
-      gradient: 'from-teal-500 to-emerald-600',
-      shadow: 'shadow-teal-200/60',
-      bgHover: 'hover:shadow-teal-300/60',
-      onClick: onOpenScanner,
-      badge: null,
-      disabled: !hasApprovedBusinesses,
-      disabledMsg: 'Available after listing approval',
-    },
-    {
       key: 'edit',
-      label: language === 'en' ? 'Edit my Listing' : language === 'fr' ? 'Modifier mon annonce' : 'Editim Listing Blong Mi',
-      description: language === 'en' ? 'Update your business details, photos, and deals' : language === 'fr' ? 'Mettez à jour vos détails' : 'Apdeitem ditel blong bisnis blong yu',
+      label: language === 'en' ? 'Edit my Listing' : 'Modifier mon annonce',
+      description: language === 'en' ? 'Update your business details, photos, and deals' : 'Mettez à jour vos détails',
       icon: <Edit3 className="w-7 h-7" />,
       gradient: 'from-blue-500 to-indigo-600',
       shadow: 'shadow-blue-200/60',
@@ -63,13 +48,11 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
       ? [
           {
             key: 'credentials',
-            label: language === 'en' ? 'Credentials' : language === 'fr' ? 'Accréditations' : 'Kredensel',
+            label: language === 'en' ? 'Credentials' : 'Accréditations',
             description:
               language === 'en'
                 ? 'Upload licence, insurance, and permits'
-                : language === 'fr'
-                  ? 'Téléversez licence, assurance et permis'
-                  : 'Uploadem permit mo insurance',
+                : 'Téléversez licence, assurance et permis',
             icon: <ShieldCheck className="w-7 h-7" />,
             gradient: 'from-violet-500 to-indigo-600',
             shadow: 'shadow-violet-200/60',
@@ -83,8 +66,8 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
       : []),
     {
       key: 'create',
-      label: language === 'en' ? 'Create a New Listing' : language === 'fr' ? 'Créer une annonce' : 'Mekem Niufala Listing',
-      description: language === 'en' ? 'Submit a new business listing for approval' : language === 'fr' ? 'Soumettre une nouvelle annonce' : 'sapmitim niufala bisnis listing blong oli save aprovum ',
+      label: language === 'en' ? 'Create a New Listing' : 'Créer une annonce',
+      description: language === 'en' ? 'Submit a new business listing for approval' : 'Soumettre une nouvelle annonce',
       icon: <Plus className="w-7 h-7" />,
       gradient: 'from-purple-500 to-violet-600',
       shadow: 'shadow-purple-200/60',
@@ -96,8 +79,8 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
     },
     {
       key: 'reviews',
-      label: language === 'en' ? 'My Reviews' : language === 'fr' ? 'Mes Avis' : 'Riviu Blong Mi',
-      description: language === 'en' ? 'Read and respond to customer reviews' : language === 'fr' ? 'Lire et répondre aux avis' : 'Ridim mo ansarem riviu',
+      label: language === 'en' ? 'My Reviews' : 'Mes Avis',
+      description: language === 'en' ? 'Read and respond to customer reviews' : 'Lire et répondre aux avis',
       icon: <MessageSquare className="w-7 h-7" />,
       gradient: 'from-amber-500 to-orange-600',
       shadow: 'shadow-amber-200/60',
@@ -109,8 +92,8 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
     },
     {
       key: 'home',
-      label: language === 'en' ? 'Home' : language === 'fr' ? 'Accueil' : 'Hom',
-      description: language === 'en' ? 'Return to the main StikmNek app' : language === 'fr' ? 'Retourner à l\'app principale' : 'Go bak long main app',
+      label: language === 'en' ? 'Home' : 'Accueil',
+      description: language === 'en' ? 'Return to the main StikmNek app' : "Retourner à l'app principale",
       icon: <Home className="w-7 h-7" />,
       gradient: 'from-slate-500 to-gray-700',
       shadow: 'shadow-gray-200/60',
@@ -122,8 +105,8 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
     },
     {
       key: 'stats',
-      label: language === 'en' ? 'Stats' : language === 'fr' ? 'Statistiques' : 'Stat',
-      description: language === 'en' ? 'View your business analytics and performance' : language === 'fr' ? 'Voir vos analyses et performances' : 'Lukim analitiks mo pefomans',
+      label: language === 'en' ? 'Stats' : 'Statistiques',
+      description: language === 'en' ? 'See who saved and viewed your page' : 'Voir qui a sauvé et vu votre page',
       icon: <BarChart3 className="w-7 h-7" />,
       gradient: 'from-rose-500 to-pink-600',
       shadow: 'shadow-rose-200/60',
@@ -256,14 +239,16 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="flex items-start gap-3 p-3 rounded-xl bg-white/70 border border-indigo-100/50">
             <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
-              <ScanLine className="w-4 h-4 text-teal-600" />
+              <Users className="w-4 h-4 text-teal-600" />
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-800">
-                {language === 'en' ? 'Scan passes quickly' : 'Scannez rapidement'}
+                {language === 'en' ? 'Tourists show their Pass' : 'Les touristes montrent leur Pass'}
               </p>
               <p className="text-[11px] text-gray-500 mt-0.5">
-                {language === 'en' ? 'Use the floating scan button at the bottom right for fast QR scanning.' : 'Utilisez le bouton flottant en bas à droite.'}
+                {language === 'en'
+                  ? 'No scanning needed. Check the name and valid-until date on their phone.'
+                  : 'Pas de scan. Vérifiez le nom et la date de fin sur leur téléphone.'}
               </p>
             </div>
           </div>
@@ -286,10 +271,12 @@ const BusinessHomeScreen: React.FC<BusinessHomeScreenProps> = ({
             </div>
             <div>
               <p className="text-xs font-semibold text-gray-800">
-                {language === 'en' ? 'Track your stats' : 'Suivez vos stats'}
+                {language === 'en' ? 'Check your stats' : 'Vérifiez vos stats'}
               </p>
               <p className="text-[11px] text-gray-500 mt-0.5">
-                {language === 'en' ? 'Check analytics regularly to understand tourist engagement.' : 'Consultez les analyses pour comprendre l\'engagement.'}
+                {language === 'en'
+                  ? 'See how many travelers saved you and viewed your page.'
+                  : 'Voyez combien de voyageurs vous ont sauvés et vu votre page.'}
               </p>
             </div>
           </div>

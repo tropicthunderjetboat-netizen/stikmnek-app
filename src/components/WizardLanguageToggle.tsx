@@ -6,12 +6,10 @@ import LanguageFlag, { type FlagCode } from '@/components/LanguageFlag';
 const OPTIONS: { code: Language; label: string }[] = [
   { code: 'en', label: 'EN' },
   { code: 'fr', label: 'FR' },
-  { code: 'bi', label: 'BI' },
 ];
 
 /**
- * Compact in-flow language switcher for the onboarding wizards, so owners can
- * switch into Bislama right where they're working instead of hunting for the navbar.
+ * Compact in-flow language switcher for the onboarding wizards.
  */
 const WizardLanguageToggle: React.FC<{ className?: string }> = ({ className }) => {
   const { language, setLanguage } = useAppContext();

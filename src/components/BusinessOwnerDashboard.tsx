@@ -12,7 +12,7 @@ import {
   ArrowDownRight, Calendar, MapPin, Phone, Mail, Tag, Trash2,
   RefreshCw, ShieldCheck, History, ArrowRight, Info, ClipboardList,
   BellRing, ChevronDown, LayoutDashboard, Menu, ArrowLeft,
-  Sparkles, Settings, LogOut, Zap, Wifi, ScanLine, Building2, Home
+  Sparkles, Settings, LogOut, Zap, Wifi, Building2, Home
 } from 'lucide-react';
 import EmailNotificationCenter from './EmailNotificationCenter';
 import PhotoUploader, { UploadedPhoto } from './PhotoUploader';
@@ -20,7 +20,6 @@ import MySubmissions from './MySubmissions';
 import BusinessProfileSettings from './BusinessProfileSettings';
 import BusinessCredentialsSettings from './BusinessCredentialsSettings';
 import PricingDiscountFields, { DURATION_OPTIONS, addDays, todayStr } from './PricingDiscountFields';
-import QRScanner from './QRScanner';
 import BusinessHomeScreen from './BusinessHomeScreen';
 import BusinessSimpleHub from './BusinessSimpleHub';
 import DealExpiryWarningBanner from './DealExpiryWarningBanner';
@@ -388,7 +387,6 @@ const BusinessOwnerDashboard: React.FC = () => {
   const [pendingBusinesses, setPendingBusinesses] = useState<any[]>([]);
   const [unseenSubmissionChanges, setUnseenSubmissionChanges] = useState(0);
   const [businessSelectorOpen, setBusinessSelectorOpen] = useState(false);
-  const [showScanner, setShowScanner] = useState<boolean>(false);
   // ═══ UNIFIED OWNER DATA STATE ═══
   const [ownerDataLoading, setOwnerDataLoading] = useState(true);
   const [approvedBusinesses, setApprovedBusinesses] = useState<any[]>([]);
@@ -2348,7 +2346,7 @@ const BusinessOwnerDashboard: React.FC = () => {
 
         {/* Main Content */}
         <div className={`flex-1 min-w-0 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
-          <div className={`pt-20 lg:pt-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-w-0 ${simpleHubNav && activeTab === 'overview' && selectedIsApproved ? 'pb-8 lg:pb-12' : 'pb-28 lg:pb-16'}`}>
+          <div className={`pt-20 lg:pt-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto min-w-0 pb-8 lg:pb-12`}>
             {/* Desktop Header — hidden on simple home for approved owners */}
             {!(simpleHubNav && activeTab === 'overview' && selectedIsApproved) && (
             <div className="hidden lg:flex items-center justify-between mb-8">
@@ -2477,19 +2475,38 @@ const BusinessOwnerDashboard: React.FC = () => {
                 profileCompanyName={profileCompanyMeta.name || selectedBusiness?.name || 'Business'}
                 profileLogoUrl={profileCompanyMeta.logo}
                 profileBusinessId={resolvedProfileBusinessId || selectedProfileId}
-                listingOptions={approvedListingsSameProfile.map((b) => ({
-                  id: b.id,
-                  name: b.name || 'Listing',
-                  image: b.image,
-                  isProfileRow: String(b.id) === String(selectedProfileId),
-                }))}
+                listingOptions={approvedListingsSameProfile.map((b) => {
+                  const orig = Number(b.originalPrice) || 0;
+                  const deal = Number(b.dealPrice) || 0;
+                  const discountPercent =
+                    orig > 0 && deal > 0 && deal < orig
+                      ? Math.round(((orig - deal) / orig) * 100)
+                      : null;
+                  return {
+                    id: b.id,
+                    name: b.name || 'Listing',
+                    image: b.image,
+                    isProfileRow: String(b.id) === String(selectedProfileId),
+                    discountPercent,
+                  };
+                })}
                 selectedListingId={selectedBusinessId}
                 onSelectListing={setSelectedBusinessId}
                 reviewCount={businessReviews.length}
                 submissionBadge={submissionsBadge}
                 hasBusinessProfile={Boolean(resolvedProfileBusinessId)}
-                onOpenScanner={() => setShowScanner(true)}
                 onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)}
+                offerDiscountPercent={
+                  selectedBusiness?.originalPrice > 0 &&
+                  selectedBusiness?.dealPrice > 0 &&
+                  selectedBusiness.dealPrice < selectedBusiness.originalPrice
+                    ? Math.round(
+                        ((selectedBusiness.originalPrice - selectedBusiness.dealPrice) /
+                          selectedBusiness.originalPrice) *
+                          100,
+                      )
+                    : 20
+                }
               />
             )}
             {activeTab === 'profile' && resolvedProfileBusinessId && (
@@ -2544,7 +2561,6 @@ const BusinessOwnerDashboard: React.FC = () => {
                 pendingCount={pendingOnlyBusinesses.length}
                 reviewCount={businessReviews.length}
                 onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)}
-                onOpenScanner={() => setShowScanner(true)}
               />
             )}
 
@@ -2601,36 +2617,6 @@ const BusinessOwnerDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Action Button - Scan QR (hidden on Simple Hub home where scan is the hero) */}
-      {!(simpleHubNav && activeTab === 'overview' && selectedIsApproved) && (
-      <button
-        onClick={() => setShowScanner(true)}
-        className="fixed bottom-6 right-6 z-50 group flex items-center gap-2 pl-4 pr-5 py-3.5 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-semibold shadow-xl shadow-teal-300/40 hover:shadow-2xl hover:shadow-teal-400/50 hover:from-teal-500 hover:to-emerald-500 active:scale-95 transition-all duration-200"
-        title="Scan Tourist QR Code"
-      >
-        <div className="relative">
-          <ScanLine className="w-5 h-5" />
-          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-yellow-400 animate-ping" />
-          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-yellow-400" />
-        </div>
-        <span className="text-sm hidden sm:inline">Scan QR</span>
-      </button>
-      )}
-
-      {showScanner && (
-        <QRScanner
-          onClose={() => setShowScanner(false)}
-          preferredBusinessId={
-            selectedBusiness?._source === 'approved'
-              ? effectiveProfileBusinessId(selectedBusiness)
-              : null
-          }
-          preferredOfferingId={
-            selectedBusiness?._source === 'approved' ? selectedBusiness.id : null
-          }
-          preferredBusinessName={selectedBusiness?.name ?? null}
-        />
-      )}
     </div>
   );
 };

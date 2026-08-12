@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StikmNek — Business Reel (silent)</title>
+  <style>
+    :root {
+      --teal: #0D9488;
+      --teal-dark: #0F766E;
+      --emerald: #059669;
+      --orange: #F97316;
+      --ink: #0A1F2A;
+      --cream: #FFFCF5;
+      --wa: #25D366;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      gap: 16px;
+      background: #111827;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: white;
+      padding: 16px;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      max-width: 420px;
+      text-align: center;
+    }
+    .controls p { font-size: 13px; opacity: 0.75; width: 100%; line-height: 1.4; }
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 22px;
+      font-weight: 700;
+      font-size: 15px;
+      cursor: pointer;
+      background: linear-gradient(90deg, var(--teal), var(--emerald));
+      color: white;
+    }
+    button.secondary { background: #374151; }
+    /* Phone frame 9:16 */
+    .phone {
+      width: min(360px, 92vw);
+      aspect-ratio: 9 / 16;
+      border-radius: 28px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+      background: #000;
+      isolation: isolate;
+    }
+    .stage {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    .bg {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      transform: scale(1.08);
+      transition: opacity 0.6s ease, transform 8s ease;
+      opacity: 0;
+    }
+    .bg.on { opacity: 1; }
+    .bg.kenburns { transform: scale(1.18); }
+    .scrim {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(15,118,110,0.55) 0%, rgba(10,31,42,0.72) 55%, rgba(10,31,42,0.88) 100%);
+      pointer-events: none;
+    }
+    .scene {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 8% 7% 10%;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.45s ease;
+    }
+    .scene.on { opacity: 1; }
+    .copy {
+      text-align: center;
+      z-index: 3;
+      width: 100%;
+    }
+    .kicker {
+      display: inline-block;
+      font-size: clamp(12px, 3.2vw, 14px);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: #99F6E4;
+      margin-bottom: 12px;
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    .headline {
+      font-size: clamp(28px, 8.2vw, 42px);
+      font-weight: 800;
+      line-height: 1.12;
+      text-wrap: balance;
+      text-shadow: 0 2px 18px rgba(0,0,0,0.35);
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    .sub {
+      margin-top: 14px;
+      font-size: clamp(16px, 4.6vw, 20px);
+      font-weight: 600;
+      line-height: 1.35;
+      color: #E5E7EB;
+      text-wrap: balance;
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    .scene.on .kicker,
+    .scene.on .headline,
+    .scene.on .sub {
+      animation: rise 0.7s ease forwards;
+    }
+    .scene.on .headline { animation-delay: 0.12s; }
+    .scene.on .sub { animation-delay: 0.28s; }
+    @keyframes rise {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Simple Stik */
+    .stik {
+      position: absolute;
+      width: 28%;
+      max-width: 120px;
+      z-index: 4;
+      filter: drop-shadow(0 8px 12px rgba(0,0,0,0.35));
+      transition: transform 0.5s ease, opacity 0.4s ease;
+      opacity: 0;
+    }
+    .stik.show { opacity: 1; }
+    .stik.pos-br { right: 6%; bottom: 14%; }
+    .stik.pos-bl { left: 5%; bottom: 14%; }
+    .stik.pos-tr { right: 8%; top: 12%; }
+    .stik.bob { animation: bob 1.8s ease-in-out infinite; }
+    .stik.shake { animation: shake 0.55s ease-in-out 2; }
+    .stik.nod { animation: nod 0.7s ease-in-out 2; }
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    @keyframes shake {
+      0%, 100% { transform: rotate(0); }
+      25% { transform: rotate(-8deg); }
+      75% { transform: rotate(8deg); }
+    }
+    @keyframes nod {
+      0%, 100% { transform: translateY(0) rotate(0); }
+      40% { transform: translateY(4px) rotate(6deg); }
+      70% { transform: translateY(-2px) rotate(-3deg); }
+    }
+
+    /* Visual props */
+    .prop {
+      position: absolute;
+      z-index: 2;
+      opacity: 0;
+      transition: opacity 0.5s ease, transform 0.6s ease;
+    }
+    .prop.show { opacity: 1; }
+    .browser {
+      width: 72%;
+      max-width: 280px;
+      left: 50%;
+      top: 18%;
+      transform: translateX(-50%) scale(0.92);
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+      color: var(--ink);
+    }
+    .browser.show { transform: translateX(-50%) scale(1); }
+    .browser .chrome {
+      background: #E5E7EB;
+      padding: 8px 10px;
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+    .browser .dot { width: 8px; height: 8px; border-radius: 50%; background: #9CA3AF; }
+    .browser .url {
+      flex: 1;
+      margin-left: 6px;
+      background: white;
+      border-radius: 6px;
+      font-size: 10px;
+      padding: 4px 8px;
+      color: #6B7280;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .browser .body {
+      min-height: 130px;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: #F3F4F6;
+      position: relative;
+    }
+    .browser.empty .body::after {
+      content: "No website";
+      color: #9CA3AF;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .browser.filled .body {
+      background: linear-gradient(160deg, #F0FDFA, #ECFDF5);
+      display: block;
+      padding: 12px;
+    }
+    .page-card h4 {
+      font-size: 13px;
+      color: var(--teal-dark);
+      margin: 6px 0 4px;
+    }
+    .page-card p { font-size: 10px; color: #4B5563; }
+    .page-card .badge {
+      display: inline-block;
+      margin-top: 8px;
+      background: var(--teal);
+      color: white;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 4px 8px;
+      border-radius: 999px;
+    }
+    .page-card img.thumb {
+      width: 100%;
+      height: 54px;
+      object-fit: cover;
+      border-radius: 8px;
+      background: var(--teal);
+    }
+
+    .money {
+      right: 8%;
+      top: 22%;
+      font-size: 42px;
+      transform: translateX(0);
+    }
+    .money.fly {
+      animation: flyAway 2.2s ease-in forwards;
+    }
+    @keyframes flyAway {
+      to { transform: translate(40px, -80px) rotate(18deg); opacity: 0; }
+    }
+
+    .cash-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 18px;
+      font-size: 34px;
+      opacity: 0;
+    }
+    .scene.on .cash-row {
+      animation: rise 0.7s ease 0.4s forwards;
+    }
+
+    .cta-box {
+      margin-top: 18px;
+      background: var(--wa);
+      color: #053B1F;
+      font-weight: 800;
+      font-size: clamp(18px, 5vw, 24px);
+      padding: 14px 18px;
+      border-radius: 16px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+    }
+    .phone-num {
+      margin-top: 10px;
+      font-size: clamp(22px, 6vw, 28px);
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+    .brand {
+      position: absolute;
+      top: 4.5%;
+      left: 0;
+      right: 0;
+      text-align: center;
+      z-index: 5;
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: 0.02em;
+      opacity: 0.95;
+      text-shadow: 0 1px 8px rgba(0,0,0,0.4);
+    }
+    .progress {
+      position: absolute;
+      left: 8%;
+      right: 8%;
+      bottom: 3.5%;
+      height: 3px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 99px;
+      overflow: hidden;
+      z-index: 6;
+    }
+    .progress > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--teal), #34D399);
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <p>Silent business Reel · 9:16 · ~36s · screen-record this phone frame</p>
+    <button type="button" id="play">Play</button>
+    <button type="button" class="secondary" id="replay">Replay</button>
+  </div>
+
+  <div class="phone" id="phone" aria-label="StikmNek business reel stage">
+    <div class="stage">
+      <div class="bg" id="bg1" style="background-image:url('../../public/port-vila-harbour.png')"></div>
+      <div class="bg" id="bg2" style="background-image:url('../../public/welcome-hero.jpg')"></div>
+      <div class="bg" id="bg3" style="background-image:url('./brand-harbour-bg.jpg')"></div>
+      <div class="scrim"></div>
+      <div class="brand">StikmNek</div>
+
+      <!-- Simple Stik (inline SVG) -->
+      <div class="stik pos-br" id="stik" aria-hidden="true">
+        <svg viewBox="0 0 120 140" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="60" cy="128" rx="28" ry="6" fill="rgba(0,0,0,0.2)"/>
+          <!-- legs -->
+          <path d="M48 95 L42 122 M72 95 L78 122" stroke="#FFC93C" stroke-width="4" stroke-linecap="round" fill="none"/>
+          <path d="M36 122 L48 122 M72 122 L86 122" stroke="#FFC93C" stroke-width="4" stroke-linecap="round" fill="none"/>
+          <!-- body -->
+          <ellipse cx="60" cy="78" rx="32" ry="28" fill="#0E7A7B" stroke="#101214" stroke-width="3"/>
+          <ellipse cx="60" cy="82" rx="18" ry="16" fill="#FFFCF5" stroke="#101214" stroke-width="2"/>
+          <!-- neck + head -->
+          <path d="M60 55 Q58 42 62 32" stroke="#0E7A7B" stroke-width="10" fill="none" stroke-linecap="round"/>
+          <circle cx="68" cy="28" r="16" fill="#0E7A7B" stroke="#101214" stroke-width="3"/>
+          <!-- crest -->
+          <path d="M60 18 L56 6 L64 14 L68 4 L72 14 L80 8 L74 20" fill="#FF5A3C" stroke="#101214" stroke-width="2" stroke-linejoin="round"/>
+          <!-- beak -->
+          <path d="M82 28 Q96 30 82 36 Z" fill="#FFC93C" stroke="#101214" stroke-width="2"/>
+          <!-- eye wink -->
+          <path d="M62 26 Q66 24 70 26" stroke="#101214" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <circle cx="74" cy="26" r="2.2" fill="#101214"/>
+          <!-- wing -->
+          <path d="M40 70 Q28 78 36 92 Q48 86 50 76 Z" fill="#0E7A7B" stroke="#101214" stroke-width="3"/>
+          <path d="M36 88 L30 96 M40 90 L36 98 M44 88 L42 96" stroke="#FF5A3C" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+      </div>
+
+      <!-- Empty / filled website prop -->
+      <div class="prop browser empty" id="browser">
+        <div class="chrome">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <div class="url" id="urlBar">your-business.com</div>
+        </div>
+        <div class="body">
+          <div class="page-card" id="pageCard" hidden>
+            <img class="thumb" src="../../public/app-icon.png" alt="" />
+            <h4>Your business</h4>
+            <p>Photo · deal · map · contact</p>
+            <span class="badge">On StikmNek</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prop money" id="money" aria-hidden="true">💸</div>
+
+      <!-- Scenes -->
+      <section class="scene" data-scene="0">
+        <div class="copy">
+          <div class="kicker">Vanuatu locals</div>
+          <h1 class="headline">No website?</h1>
+          <p class="sub">A lot of great businesses still aren’t online.</p>
+        </div>
+      </section>
+
+      <section class="scene" data-scene="1">
+        <div class="copy">
+          <div class="kicker">The old way</div>
+          <h1 class="headline">Big booking sites take about 30%</h1>
+          <p class="sub">And you wait for your money.</p>
+        </div>
+      </section>
+
+      <section class="scene" data-scene="2">
+        <div class="copy" style="margin-top: 42%;">
+          <div class="kicker">StikmNek</div>
+          <h1 class="headline">Your page on StikmNek</h1>
+          <p class="sub">Like a simple website for your business.</p>
+        </div>
+      </section>
+
+      <section class="scene" data-scene="3">
+        <div class="copy">
+          <div class="kicker">How you get paid</div>
+          <h1 class="headline">Tourists find you</h1>
+          <p class="sub">They contact you direct.<br/>You get paid hand to hand.</p>
+          <div class="cash-row" aria-hidden="true">🤝 💵</div>
+        </div>
+      </section>
+
+      <section class="scene" data-scene="4">
+        <div class="copy">
+          <div class="kicker">Don’t worry</div>
+          <h1 class="headline">We will set it up for you</h1>
+          <p class="sub">And teach you how it works.</p>
+        </div>
+      </section>
+
+      <section class="scene" data-scene="5">
+        <div class="copy">
+          <div class="kicker">Join free</div>
+          <h1 class="headline">Want your page?</h1>
+          <div class="cta-box">WhatsApp us</div>
+          <div class="phone-num">+678 7766107</div>
+          <p class="sub" style="margin-top:12px;">100% locally owned</p>
+        </div>
+      </section>
+
+      <div class="progress"><span id="bar"></span></div>
+    </div>
+  </div>
+
+  <script>
+    const TOTAL_MS = 36000;
+    const scenes = [
+      { id: 0, start: 0,    end: 5500,  bg: 'bg1', stik: 'show bob pos-br', browser: '', money: false },
+      { id: 1, start: 5500, end: 12000, bg: 'bg2', stik: 'show shake pos-bl', browser: '', money: true },
+      { id: 2, start: 12000,end: 20000, bg: 'bg1', stik: 'show nod pos-br', browser: 'fill', money: false },
+      { id: 3, start: 20000,end: 27000, bg: 'bg3', stik: 'show bob pos-bl', browser: '', money: false },
+      { id: 4, start: 27000,end: 31500, bg: 'bg2', stik: 'show bob pos-br', browser: '', money: false },
+      { id: 5, start: 31500,end: 36000, bg: 'bg1', stik: 'show bob pos-br', browser: '', money: false },
+    ];
+
+    const sceneEls = [...document.querySelectorAll('.scene')];
+    const bgs = {
+      bg1: document.getElementById('bg1'),
+      bg2: document.getElementById('bg2'),
+      bg3: document.getElementById('bg3'),
+    };
+    const stik = document.getElementById('stik');
+    const browser = document.getElementById('browser');
+    const pageCard = document.getElementById('pageCard');
+    const urlBar = document.getElementById('urlBar');
+    const money = document.getElementById('money');
+    const bar = document.getElementById('bar');
+
+    let raf = null;
+    let startTs = 0;
+    let playing = false;
+
+    function resetVisuals() {
+      sceneEls.forEach(el => el.classList.remove('on'));
+      Object.values(bgs).forEach(bg => {
+        bg.classList.remove('on', 'kenburns');
+      });
+      stik.className = 'stik pos-br';
+      browser.className = 'prop browser empty';
+      browser.classList.remove('show');
+      pageCard.hidden = true;
+      urlBar.textContent = 'your-business.com';
+      money.className = 'prop money';
+      bar.style.width = '0%';
+    }
+
+    function applyScene(s, t) {
+      sceneEls.forEach(el => {
+        el.classList.toggle('on', Number(el.dataset.scene) === s.id);
+      });
+      Object.entries(bgs).forEach(([key, el]) => {
+        const on = key === s.bg;
+        el.classList.toggle('on', on);
+        if (on) el.classList.add('kenburns');
+      });
+
+      stik.className = 'stik ' + s.stik;
+
+      if (s.browser === 'fill') {
+        browser.classList.add('show');
+        // empty first half of scene, then fill
+        const local = t - s.start;
+        if (local < 1800) {
+          browser.classList.add('empty');
+          browser.classList.remove('filled');
+          pageCard.hidden = true;
+          urlBar.textContent = 'your-business.com';
+        } else {
+          browser.classList.remove('empty');
+          browser.classList.add('filled');
+          pageCard.hidden = false;
+          urlBar.textContent = 'stikmnek.com/your-page';
+        }
+      } else if (s.id === 0) {
+        browser.classList.add('show');
+        browser.classList.add('empty');
+        browser.classList.remove('filled');
+        pageCard.hidden = true;
+        urlBar.textContent = 'your-business.com';
+      } else {
+        browser.classList.remove('show');
+      }
+
+      if (s.money) {
+        money.classList.add('show');
+        if (t - s.start > 600) money.classList.add('fly');
+      } else {
+        money.className = 'prop money';
+      }
+    }
+
+    function frame(now) {
+      if (!playing) return;
+      const t = now - startTs;
+      const clamped = Math.min(t, TOTAL_MS);
+      bar.style.width = ((clamped / TOTAL_MS) * 100).toFixed(2) + '%';
+
+      const s = scenes.find(sc => clamped >= sc.start && clamped < sc.end) || scenes[scenes.length - 1];
+      applyScene(s, clamped);
+
+      if (t < TOTAL_MS) {
+        raf = requestAnimationFrame(frame);
+      } else {
+        playing = false;
+      }
+    }
+
+    function play() {
+      cancelAnimationFrame(raf);
+      resetVisuals();
+      playing = true;
+      startTs = performance.now();
+      raf = requestAnimationFrame(frame);
+    }
+
+    document.getElementById('play').addEventListener('click', play);
+    document.getElementById('replay').addEventListener('click', play);
+
+    // Show first frame idle
+    resetVisuals();
+    applyScene(scenes[0], 0);
+    document.querySelector('[data-scene="0"]').classList.add('on');
+    bgs.bg1.classList.add('on');
+    stik.className = 'stik show bob pos-br';
+    browser.classList.add('show');
+  </script>
+</body>
+</html>

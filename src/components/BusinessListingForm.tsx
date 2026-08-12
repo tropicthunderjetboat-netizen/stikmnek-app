@@ -1599,7 +1599,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
       ? savedDiscountValidFromRef.current
       : todayStr();
 
-  const legalLang: 'en' | 'fr' | 'bi' = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  const legalLang: 'en' | 'fr' = language === 'fr' ? 'fr' : 'en';
 
   // ─── Guided wizard (first-deal / new-listing path) ───
   // Full form stays for dashboard editing and admin onboarding.
@@ -1901,7 +1901,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
               >
                 {CATEGORY_SELECT_KEYS.map((key) => (
                   <option key={key} value={key}>
-                    {categoryLabelForKey(key, language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en')}
+                    {categoryLabelForKey(key, language === 'fr' ? 'fr' : 'en')}
                   </option>
                 ))}
               </select>
@@ -2066,7 +2066,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                   {categoryUsesPerUnitPricing(form.category)
                     ? perUnitPriceHint(
                         form.category,
-                        language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en',
+                        language === 'fr' ? 'fr' : 'en',
                       )
                     : language === 'en'
                       ? 'Regular price per person in Vatu'
@@ -2256,7 +2256,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                       {categoryUsesPerUnitPricing(form.category)
                         ? shortPriceUnitSuffix(
                             form.category,
-                            language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en',
+                            language === 'fr' ? 'fr' : 'en',
                           )
                         : language === 'en'
                           ? 'per person'

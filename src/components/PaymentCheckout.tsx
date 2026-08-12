@@ -237,7 +237,7 @@ const PaymentCheckout: React.FC = () => {
   const navigate = useNavigate();
   const { user, userProfile, setCurrentView, cart, setCart, setShowAuth, setAuthMode, refreshUserPass, refreshUserProfile, language } =
     useAppContext();
-  const checkoutLang: Language = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  const checkoutLang: Language = language === 'fr' ? 'fr' : 'en';
   const [processing, setProcessing] = useState(false);
   const [step, setStep] = useState<'dates' | 'payment' | 'processing' | 'success'>('dates');
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -1427,7 +1427,7 @@ const PaymentCheckout: React.FC = () => {
         {step === 'dates' && (
           <div className="space-y-6 pt-2">
             <div>
-              <h1 className="text-2xl font-bold leading-tight">Your pass</h1>
+              <h1 className="text-2xl font-bold leading-tight">Get your Holiday Pass</h1>
               <p className="text-neutral-400 text-sm mt-1">Almost done — then message places direct.</p>
             </div>
 
@@ -1801,8 +1801,8 @@ const PaymentCheckout: React.FC = () => {
             <p className="text-center text-[11px] text-neutral-500 flex items-center justify-center gap-1.5">
               <Shield className="w-3.5 h-3.5" />{' '}
               {promoAvailable
-                ? 'Free traveler promo · same QR pass as paid'
-                : 'Secure payment · pass unlocks messaging'}
+                ? 'Free traveler promo · visual Pass'
+                : 'Secure payment · Holiday Pass for 7 days'}
             </p>
           </div>
         )}

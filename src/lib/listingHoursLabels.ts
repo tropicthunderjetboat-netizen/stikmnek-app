@@ -1,6 +1,6 @@
 import { isTourOrActivityCategory } from '@/lib/businessOfferingMap';
 
-type Lang = 'en' | 'fr' | 'bi';
+type Lang = 'en' | 'fr';
 
 export function listingHoursFieldCopy(
   category: unknown,
@@ -9,7 +9,7 @@ export function listingHoursFieldCopy(
 ): { label: string; hint: string; placeholder: string } {
   const tour = isTourOrActivityCategory(category);
   const perListing = opts?.isPerListing ?? tour;
-  const lang: Lang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  const lang: Lang = language === 'fr' ? 'fr' : 'en';
 
   if (tour || perListing) {
     if (lang === 'fr') {

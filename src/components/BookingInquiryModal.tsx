@@ -149,7 +149,7 @@ const BookingInquiryModal: React.FC<BookingInquiryModalProps> = ({
   const useTiered =
     categoryUsesTieredPricing(biz.category) && tierRows.length > 0;
   const perUnit = categoryUsesPerUnitPricing(biz.category);
-  const unitLabels = unitLabelForCategory(biz.category, language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en');
+  const unitLabels = unitLabelForCategory(biz.category, language === 'fr' ? 'fr' : 'en');
 
   const { totalStandard, totalDeal } = useMemo(() => {
     if (useTiered) {

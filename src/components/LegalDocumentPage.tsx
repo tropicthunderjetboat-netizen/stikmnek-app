@@ -14,7 +14,7 @@ const VALID_SLUGS = new Set([
   'data-protection',
 ]);
 
-export type Lang = 'en' | 'fr' | 'bi';
+export type Lang = 'en' | 'fr';
 
 export const TITLES: Record<string, Record<Lang, string>> = {
   privacy: {
@@ -188,7 +188,7 @@ interface LegalDocumentPageProps {
 
 const LegalDocumentPage: React.FC<LegalDocumentPageProps> = ({ slug }) => {
   const { language } = useAppContext();
-  const lang: Lang = language === 'fr' ? 'fr' : language === 'bi' ? 'bi' : 'en';
+  const lang: Lang = language === 'fr' ? 'fr' : 'en';
 
   if (!VALID_SLUGS.has(slug)) {
     return (
