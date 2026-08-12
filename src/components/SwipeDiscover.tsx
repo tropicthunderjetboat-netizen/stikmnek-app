@@ -3,6 +3,7 @@ import { Heart, List, Lock, Map as MapIcon, MapPin, MessageCircle, Phone, Plane,
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
+import PhotoLightbox from '@/components/PhotoLightbox';
 import {
   businessListingHasWhatsApp,
   businessListingWhatsAppRaw,
@@ -1569,6 +1570,7 @@ function DetailSheet({
   const [showMorePricing, setShowMorePricing] = useState(false);
   const [gallery, setGallery] = useState<string[]>(() => (business.image ? [business.image] : []));
   const [photoIdx, setPhotoIdx] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const needsReadMore = fullText.split(' ').length > 28;
 
   const pricingTiers = useMemo(() => {
@@ -1588,6 +1590,7 @@ function DetailSheet({
   useEffect(() => {
     let cancelled = false;
     setPhotoIdx(0);
+    setLightboxOpen(false);
     setExpanded(false);
     setShowMorePricing(false);
     setGallery(business.image ? [business.image] : []);
@@ -1621,11 +1624,26 @@ function DetailSheet({
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-neutral-950 animate-in slide-in-from-bottom duration-200">
       <DealOgHelmet business={business} imageUrl={gallery[photoIdx] || business.image} />
+      <PhotoLightbox
+        open={lightboxOpen}
+        photos={gallery}
+        index={photoIdx}
+        onIndexChange={setPhotoIdx}
+        onClose={() => setLightboxOpen(false)}
+        altPrefix={business.name}
+      />
       {/* Scroll area + footer in flow so reviews aren’t trapped under the CTA overlay */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y">
         <div className="relative h-[min(42vh,20rem)] bg-neutral-900">
           {gallery[photoIdx] ? (
-            <FitPhoto src={gallery[photoIdx]!} className="absolute inset-0 h-full w-full" />
+            <button
+              type="button"
+              className="absolute inset-0 h-full w-full text-left"
+              onClick={() => setLightboxOpen(true)}
+              aria-label="View photos full screen"
+            >
+              <FitPhoto src={gallery[photoIdx]!} className="absolute inset-0 h-full w-full" />
+            </button>
           ) : null}
 
           {/* Top scrim so controls stay readable on dark photos / letterboxing */}
@@ -1668,24 +1686,20 @@ function DetailSheet({
           </div>
 
           {gallery.length > 1 && (
-            <>
-              <div className="absolute inset-y-0 left-0 z-[3] w-1/3" onClick={() => setPhotoIdx((i) => Math.max(0, i - 1))} />
-              <div
-                className="absolute inset-y-0 right-0 z-[3] w-1/3"
-                onClick={() => setPhotoIdx((i) => Math.min(gallery.length - 1, i + 1))}
-              />
-              <div className="absolute bottom-3 inset-x-0 z-[3] flex justify-center gap-1.5">
-                {gallery.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    aria-label={`Photo ${i + 1}`}
-                    onClick={() => setPhotoIdx(i)}
-                    className={`h-1.5 rounded-full transition-all ${i === photoIdx ? 'w-4 bg-white' : 'w-1.5 bg-white/40'}`}
-                  />
-                ))}
-              </div>
-            </>
+            <div className="pointer-events-none absolute bottom-3 inset-x-0 z-[3] flex justify-center gap-1.5">
+              {gallery.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 rounded-full transition-all ${i === photoIdx ? 'w-4 bg-white' : 'w-1.5 bg-white/40'}`}
+                />
+              ))}
+            </div>
+          )}
+
+          {gallery.length > 0 && (
+            <p className="pointer-events-none absolute bottom-8 inset-x-0 z-[3] text-center text-[11px] font-medium text-white/70">
+              Tap photo for full screen
+            </p>
           )}
         </div>
 
@@ -1695,10 +1709,14 @@ function DetailSheet({
               <button
                 key={`${src}-${i}`}
                 type="button"
-                onClick={() => setPhotoIdx(i)}
+                onClick={() => {
+                  setPhotoIdx(i);
+                  setLightboxOpen(true);
+                }}
                 className={`shrink-0 w-16 h-16 rounded-lg overflow-hidden ring-2 ${
                   i === photoIdx ? 'ring-teal-500' : 'ring-transparent'
                 }`}
+                aria-label={`Open photo ${i + 1} full screen`}
               >
                 <FitPhoto src={src} className="h-full w-full" />
               </button>

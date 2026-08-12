@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ChevronLeft, ChevronRight, X, Expand, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Expand, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { getPhotoDisplayUrl } from '@/lib/utils';
 import { SUPABASE_URL } from '@/lib/supabase';
 import {
@@ -8,6 +8,7 @@ import {
   supplementUntaggedPhotosForRecentNewestOffering,
 } from '@/lib/offeringPhotoPartition';
 import type { OfferingCreatedRow } from '@/lib/offeringPhotoPartition';
+import PhotoLightbox from '@/components/PhotoLightbox';
 
 interface BusinessPhoto {
   id: string;
@@ -176,26 +177,6 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
     setLightboxOpen(false);
   }, []);
 
-  const lightboxNext = useCallback(() => {
-    setLightboxIndex(prev => (prev + 1) % allPhotos.length);
-  }, [allPhotos.length]);
-
-  const lightboxPrev = useCallback(() => {
-    setLightboxIndex(prev => (prev - 1 + allPhotos.length) % allPhotos.length);
-  }, [allPhotos.length]);
-
-  // Keyboard navigation for lightbox
-  useEffect(() => {
-    if (!lightboxOpen) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeLightbox();
-      if (e.key === 'ArrowRight') lightboxNext();
-      if (e.key === 'ArrowLeft') lightboxPrev();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [lightboxOpen, closeLightbox, lightboxNext, lightboxPrev]);
-
   // Don't render if only the cover image (no additional photos)
   if (!loading && allPhotos.length <= 1) {
     return null;
@@ -255,9 +236,9 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
               </div>
             ))}
 
-            {/* Expand icon overlay */}
-            <div className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="w-9 h-9 rounded-lg bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-colors">
+            {/* Expand affordance — always visible on touch devices */}
+            <div className="absolute top-3 right-3 z-20">
+              <div className="w-9 h-9 rounded-lg bg-black/50 backdrop-blur-sm flex items-center justify-center text-white">
                 <Expand className="w-4 h-4" />
               </div>
             </div>
@@ -305,19 +286,20 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           )}
         </div>
 
-        {/* Thumbnail Strip */}
+        {/* Thumbnail Strip — tap opens full screen */}
         {allPhotos.length > 1 && (
           <div className="px-4 py-3">
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
               {allPhotos.map((photo, idx) => (
                 <button
                   key={photo.id}
-                  onClick={() => goToSlide(idx)}
+                  onClick={() => openLightbox(idx)}
                   className={`relative flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden transition-all ${
                     idx === activeIndex
                       ? 'ring-2 ring-teal-500 ring-offset-1 scale-105'
                       : 'opacity-60 hover:opacity-90 hover:scale-102'
                   }`}
+                  aria-label={`Open photo ${idx + 1} full screen`}
                 >
                   <img
                     src={photo.url}
@@ -336,79 +318,17 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({
         )}
       </div>
 
-      {/* Lightbox / Fullscreen Modal */}
-      {lightboxOpen && (
-        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center">
-          {/* Close button */}
-          <button
-            onClick={closeLightbox}
-            className="absolute top-4 right-4 z-50 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-            aria-label="Close lightbox"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
-          {/* Counter */}
-          <div className="absolute top-5 left-1/2 -translate-x-1/2 z-50 text-white/70 text-sm font-medium">
-            {lightboxIndex + 1} / {allPhotos.length}
-          </div>
-
-          {/* Main Image */}
-          <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-12">
-            <img
-              src={allPhotos[lightboxIndex]?.url || '/placeholder.svg'}
-              alt={`${businessName} photo ${lightboxIndex + 1}`}
-              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-              onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
-            />
-          </div>
-
-          {/* Navigation Arrows */}
-          {allPhotos.length > 1 && (
-            <>
-              <button
-                onClick={lightboxPrev}
-                className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-50 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-                aria-label="Previous photo"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              <button
-                onClick={lightboxNext}
-                className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-50 w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-                aria-label="Next photo"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-            </>
-          )}
-
-          {/* Bottom Thumbnail Strip */}
-          {allPhotos.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 flex gap-2 max-w-[90vw] overflow-x-auto px-4 py-2">
-              {allPhotos.map((photo, idx) => (
-                <button
-                  key={photo.id}
-                  onClick={() => setLightboxIndex(idx)}
-                  className={`relative flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden transition-all ${
-                    idx === lightboxIndex
-                      ? 'ring-2 ring-white scale-110'
-                      : 'opacity-40 hover:opacity-70'
-                  }`}
-                >
-                  <img
-                    src={photo.url}
-                    alt={`Thumbnail ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }}
-                  />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <PhotoLightbox
+        open={lightboxOpen}
+        photos={allPhotos.map((p) => p.url)}
+        index={lightboxIndex}
+        onIndexChange={(i) => {
+          setLightboxIndex(i);
+          setActiveIndex(i);
+        }}
+        onClose={closeLightbox}
+        altPrefix={businessName}
+      />
     </>
   );
 };
