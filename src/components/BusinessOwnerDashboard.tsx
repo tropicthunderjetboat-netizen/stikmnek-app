@@ -365,6 +365,8 @@ const BusinessOwnerDashboard: React.FC = () => {
     dbBusinesses,
     dbReviews,
     setCurrentView,
+    setShowAuth,
+    setAuthMode,
     signOut,
     refreshBusinesses,
     businessOwnerHasBusinessRow,
@@ -1605,7 +1607,19 @@ const BusinessOwnerDashboard: React.FC = () => {
         </div>
       );
     }
-    
+
+    const openLogin = async () => {
+      if (user && effectiveRole === 'tourist') {
+        try {
+          await signOut();
+        } catch {
+          /* open auth anyway */
+        }
+      }
+      setAuthMode('signin');
+      setShowAuth(true);
+    };
+
     return (
       <div className="min-h-screen bg-gray-50 pt-20 pb-16">
         <div className="max-w-lg mx-auto px-4 text-center pt-20">
@@ -1613,9 +1627,24 @@ const BusinessOwnerDashboard: React.FC = () => {
             <Store className="w-10 h-10 text-orange-500" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-3">Business Account Required</h2>
-          <p className="text-gray-500 mb-6">You need a business account to access this dashboard.</p>
-          <button onClick={() => setCurrentView('home')} className="px-6 py-3 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors">
-            Go Home
+          <p className="text-gray-500 mb-6">
+            {user
+              ? 'You are signed in with an account that cannot open the Business Hub. Sign in with your Staff or Business account.'
+              : 'Sign in with your Staff or Business account to open the hub.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => void openLogin()}
+            className="w-full max-w-xs mx-auto px-6 py-3 rounded-xl bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-colors"
+          >
+            Staff / Business login
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentView('list-business')}
+            className="mt-3 block w-full max-w-xs mx-auto text-sm text-teal-700 font-semibold hover:underline"
+          >
+            List your business — free
           </button>
         </div>
       </div>
