@@ -4,8 +4,6 @@ import { Helmet } from 'react-helmet-async';
 import { ArrowLeft } from 'lucide-react';
 import { APP_ICON } from '@/lib/brand';
 import { useAppContext } from '@/contexts/AppContext';
-import AuthModal from '@/components/AuthModal';
-import { toast } from 'sonner';
 
 type PageLang = 'en' | 'fr' | 'bi';
 
@@ -73,20 +71,13 @@ const WhatsAppIcon: React.FC<{ className?: string }> = ({ className = 'w-6 h-6' 
 /**
  * Public info page — list your business free. No login required.
  * Page language is local state only (does not change the app language).
+ * Rendered inside AppLayout so AuthModal is available for Staff / Business login.
  */
 const ListBusiness: React.FC = () => {
   const navigate = useNavigate();
-  const {
-    user,
-    userProfile,
-    setShowAuth,
-    setAuthMode,
-    showAuth,
-    signOut,
-    authLoading,
-  } = useAppContext();
+  const { user, userProfile, setShowAuth, setAuthMode, showAuth, authLoading } = useAppContext();
   const [selectedLang, setSelectedLang] = useState<PageLang>('en');
-  /** After Staff/Business login CTA — send owners to /hub once session is ready. */
+  /** After login CTA — go to hub once a business/staff session is ready. */
   const [pendingHubAfterLogin, setPendingHubAfterLogin] = useState(false);
   const copy = COPY[selectedLang];
 
@@ -101,52 +92,24 @@ const ListBusiness: React.FC = () => {
     if (role === 'staff') {
       setPendingHubAfterLogin(false);
       navigate('/admin', { replace: true });
-      return;
     }
-    // Signed in but not a business account — stay and explain
-    setPendingHubAfterLogin(false);
-    toast.message(
-      selectedLang === 'fr'
-        ? 'Connectez-vous avec un compte entreprise / staff.'
-        : selectedLang === 'bi'
-          ? 'Yu mas saen in wetem bisnis o staff akaon.'
-          : 'Sign in with a Staff or Business account to open the hub.',
-    );
-  }, [pendingHubAfterLogin, authLoading, user, userProfile, navigate, selectedLang]);
+  }, [pendingHubAfterLogin, authLoading, user, userProfile, navigate]);
 
-  // User closed the auth sheet without signing in
   useEffect(() => {
     if (pendingHubAfterLogin && !showAuth && !user && !authLoading) {
       setPendingHubAfterLogin(false);
     }
   }, [pendingHubAfterLogin, showAuth, user, authLoading]);
 
-  const openStaffBusinessLogin = async () => {
-    const role = userProfile?.role || user?.type;
-    if (user && (role === 'business' || role === 'admin')) {
-      navigate('/hub');
-      return;
-    }
-    if (user && role === 'staff') {
-      navigate('/admin');
-      return;
-    }
-    // Tourist (or other) session blocks a fresh business login — clear it first
-    if (user) {
-      try {
-        await signOut();
-      } catch {
-        /* still open auth */
-      }
-    }
+  /** Open Sign In sheet immediately — same as Navbar. No /hub detour. */
+  const openStaffBusinessLogin = () => {
     setPendingHubAfterLogin(true);
-    setAuthMode('signin');
     setShowAuth(true);
+    setAuthMode('signin');
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-teal-50 via-white to-emerald-50/40 flex flex-col">
-      <AuthModal />
       <Helmet>
         <title>List your business — Free forever | StikmNek</title>
         <meta
@@ -253,7 +216,7 @@ const ListBusiness: React.FC = () => {
             </Link>
             <button
               type="button"
-              onClick={() => void openStaffBusinessLogin()}
+              onClick={openStaffBusinessLogin}
               className="block w-full text-sm text-gray-600 hover:text-teal-700 hover:underline"
             >
               Already have an account? Staff / Business login

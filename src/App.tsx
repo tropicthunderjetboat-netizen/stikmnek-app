@@ -11,7 +11,6 @@ import { AppProvider } from "@/contexts/AppContext";
 import AppLayout from "@/components/AppLayout";
 import React, { Suspense } from "react";
 import ResetPassword from "./pages/ResetPassword";
-import ListBusiness from "./pages/ListBusiness";
 
 const DiagnosticPanel = React.lazy(() => import("./components/DiagnosticPanel"));
 
@@ -46,7 +45,7 @@ const App = () => (
                 }
               />
               <Route element={<AppProviderLayout />}>
-                <Route path="/list-your-business" element={<ListBusiness />} />
+                {/* /list-your-business → AppLayout list-business (AuthModal lives on AppLayout) */}
                 <Route path="/for-business" element={<Navigate to="/list-your-business" replace />} />
                 <Route path="/*" element={<AppLayout />} />
               </Route>
@@ -60,4 +59,3 @@ const App = () => (
 );
 
 export default App;
-
