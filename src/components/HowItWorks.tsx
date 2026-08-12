@@ -3,7 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { shouldOpenCheckoutInsteadOfPassesPage } from '@/utils/passNavigation';
 import { t } from '@/data/translations';
 import type { Language } from '@/data/translations';
-import { Ticket, QrCode, MapPin, Smile } from 'lucide-react';
+import { Ticket, MapPin, Smile, BadgeCheck } from 'lucide-react';
 
 const HowItWorks: React.FC = () => {
   const { language, setCurrentView, user, purchasePass } = useAppContext();
@@ -14,29 +14,36 @@ const HowItWorks: React.FC = () => {
       icon: <Ticket className="w-7 h-7" />,
       title: t('passSelection.title', lang),
       desc: t('pass.build_how_desc', lang),
-
       color: 'from-sky-500 to-blue-600',
       shadow: 'shadow-sky-200',
     },
     {
       icon: <MapPin className="w-7 h-7" />,
-      title: language === 'en' ? 'Explore Deals' : language === 'fr' ? 'Explorez les offres' : 'Eksploarem Dils',
-      desc: language === 'en' ? 'Browse 120+ deals on the map or by category. Find what excites you!' : language === 'fr' ? 'Parcourez plus de 120 offres sur la carte ou par catégorie.' : 'Lukim 120+ dils long map o bae kategori. Faenem wanem i eksaetem yu!',
+      title: language === 'en' ? 'Explore Deals' : 'Explorez les offres',
+      desc:
+        language === 'en'
+          ? 'Browse local spots on the map or by category. Tap ❤️ to save places to your trip.'
+          : 'Parcourez les lieux locaux sur la carte ou par catégorie. Touchez ❤️ pour les enregistrer.',
       color: 'from-teal-500 to-emerald-600',
       shadow: 'shadow-teal-200',
     },
     {
-      icon: <QrCode className="w-7 h-7" />,
-      title: language === 'en' ? 'Show QR Code' : language === 'fr' ? 'Montrez le QR code' : 'Soem QR Kod',
-      desc: language === 'en' ? 'Present your QR code at the business to redeem your exclusive discount' : language === 'fr' ? 'Présentez votre QR code à l\'entreprise pour utiliser votre réduction exclusive' : 'Soem QR kod blong yu long bisnis blong yusim ekslusiv diskount blong yu',
+      icon: <BadgeCheck className="w-7 h-7" />,
+      title: language === 'en' ? 'Show your Pass' : 'Montrez votre Pass',
+      desc:
+        language === 'en'
+          ? 'Show your Pass at the business — name, party size, and VALID UNTIL. Pay them direct, minus your discount.'
+          : 'Montrez votre Pass — nom, taille du groupe et VALID UNTIL. Payez le commerce directement, moins votre réduction.',
       color: 'from-purple-500 to-violet-600',
       shadow: 'shadow-purple-200',
     },
     {
       icon: <Smile className="w-7 h-7" />,
-      title: language === 'en' ? 'Save & Enjoy' : language === 'fr' ? 'Économisez et profitez' : 'Sevem mo Enjoem',
-      desc: language === 'en' ? 'Save up to 35% on dining, tours, activities and more across Vanuatu' : language === 'fr' ? 'Économisez jusqu\'à 35% sur la restauration, les visites, les activités et plus à travers le Vanuatu' : 'Sevem kasem 35% long kakae, tua, aktiviti mo moa long Vanuatu',
-
+      title: language === 'en' ? 'Save & Enjoy' : 'Économisez et profitez',
+      desc:
+        language === 'en'
+          ? 'Save up to 35% with Pass on dining, tours, activities and more across Vanuatu'
+          : 'Économisez jusqu’à 35 % avec le Pass sur la restauration, les visites, les activités et plus au Vanuatu',
       color: 'from-orange-500 to-amber-600',
       shadow: 'shadow-orange-200',
     },
@@ -47,21 +54,22 @@ const HowItWorks: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-3">
-            {language === 'en' ? 'How StikmNek Works' : language === 'fr' ? 'Comment fonctionne StikmNek' : 'Ao nao StikmNek i Wok'}
+            {language === 'en' ? 'How StikmNek Works' : 'Comment fonctionne StikmNek'}
           </h2>
           <p className="text-gray-500 max-w-lg mx-auto">
-            {language === 'en' ? 'Four simple steps to start saving on your Vanuatu adventure' :
-             language === 'fr' ? 'Quatre étapes simples pour commencer à économiser sur votre aventure au Vanuatu' :
-             'Fo simpol step blong stat sevem long Vanuatu advenja blong yu'}
+            {language === 'en'
+              ? 'Four simple steps to start saving on your Vanuatu adventure'
+              : 'Quatre étapes simples pour commencer à économiser sur votre aventure au Vanuatu'}
           </p>
-
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {steps.map((step, i) => (
             <div key={i} className="text-center group">
               <div className="relative inline-block mb-6">
-                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white shadow-lg ${step.shadow} group-hover:scale-110 transition-transform`}>
+                <div
+                  className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white shadow-lg ${step.shadow} group-hover:scale-110 transition-transform`}
+                >
                   {step.icon}
                 </div>
                 <div className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 shadow-sm">
@@ -83,7 +91,7 @@ const HowItWorks: React.FC = () => {
             }}
             className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-lg shadow-teal-200 hover:shadow-xl"
           >
-            {language === 'en' ? 'Start Saving Today' : language === 'fr' ? 'Commencez à économiser aujourd\'hui' : 'Stat Sevem Tede'}
+            {language === 'en' ? 'Start Saving Today' : "Commencez à économiser aujourd'hui"}
           </button>
         </div>
       </div>

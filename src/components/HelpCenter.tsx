@@ -11,7 +11,7 @@ import {
 import { SUPPORT_EMAIL, supportMailtoUrl } from '@/data/contact';
 import {
   HelpCircle, Book, Store, Shield, Users, ChevronDown, ChevronRight,
-  Search, ArrowLeft, MapPin, CreditCard, QrCode, Star, Camera,
+  Search, ArrowLeft, MapPin, CreditCard, Star, Camera,
   BarChart3, Mail, Phone, MessageSquare, Ticket, Globe, Clock,
   CheckCircle, AlertCircle, Lightbulb, Zap, FileText, ExternalLink
 } from 'lucide-react';
@@ -59,8 +59,12 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
         desc: `Open Passes, set your group (ages 6+, up to ${MAX_PARTY_SIZE} per pass), choose the 7-day holiday pass or a 24-hour day pass, pick a start date, and pay ($${BASE_PRICE_AUD} first guest, then $${GUEST_FEE_AUD} each additional guest; +$${EXTEND_FEE_AUD} holiday period). PayPal or card where enabled.`,
       },
       { step: '3', title: 'Browse Deals', desc: 'Explore dining, tours, activities, transportation, spa, shopping, and accommodation on Deals and Map' },
-      { step: '4', title: 'Show Your QR Code', desc: 'Present your pass QR code at a partner business; staff scan it in StikmNek' },
-      { step: '5', title: 'Save Money', desc: 'Discounts follow each listing (deal price vs standard price)' },
+      {
+        step: '4',
+        title: 'Show your Pass',
+        desc: 'Show your Pass at the business. Pass shows your name, party size, VALID UNTIL date/time, and live VALID clock. Pay business direct, minus discount.',
+      },
+      { step: '5', title: 'Save Money', desc: 'Save up to 35% with Pass — discounts follow each listing (deal price vs standard price)' },
     ];
   }, [helpLang]);
 
@@ -68,7 +72,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
     () => [
       {
         question: 'What is StikmNek?',
-        answer: `StikmNek is a tourist discount platform for Vanuatu. You buy a digital pass (prices in Australian dollars), then show your pass QR code at partner restaurants, tours, activities, spas, and accommodation. Current pass types: ${passProductSummary}.`,
+        answer: `StikmNek is a long-stay trip planner and Holiday Pass for Vanuatu. You buy a digital pass (prices in Australian dollars), then show your Pass at partner restaurants, tours, activities, spas, and accommodation — and pay the business direct, minus your discount. Current pass types: ${passProductSummary}.`,
         icon: <HelpCircle className="w-4 h-4" />,
       },
       {
@@ -79,13 +83,13 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       {
         question: 'How do I redeem a deal?',
         answer:
-          'Visit a partner business while your pass is valid, open your pass QR code in the app, and staff scan it with their StikmNek scanner. The savings shown for that listing are applied as part of the redemption.',
-        icon: <QrCode className="w-4 h-4" />,
+          'Show your Pass at the business. Pass shows your name, party size, VALID UNTIL date/time, and live VALID clock. Pay business direct, minus discount.',
+        icon: <Ticket className="w-4 h-4" />,
       },
       {
         question: 'Can I use my pass at multiple businesses?',
         answer:
-          'Yes. You can visit different partner businesses while your pass is active, and you may return to the same venue more than once on the same day (for example breakfast and later happy hour) as long as your pass is valid and each redemption is recorded by staff when you use the deal.',
+          'Yes. You can visit different partner businesses while your pass is active, and you may return to the same venue more than once on the same day (for example breakfast and later happy hour) as long as your Pass shows VALID.',
         icon: <Store className="w-4 h-4" />,
       },
       {
@@ -115,7 +119,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       {
         question: 'Can I use StikmNek offline?',
         answer:
-          'You need the internet to buy a pass and browse deals. For redemption, keep your phone charged; a screenshot of your QR can help if signal is weak, but the latest pass screen in the app is best.',
+          'You need the internet to buy a pass and browse deals. To show your Pass, keep your phone charged; open Dashboard → My Pass so staff can see your name, party size, VALID UNTIL, and the live VALID clock.',
         icon: <Globe className="w-4 h-4" />,
       },
       {
@@ -148,7 +152,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
         'Enter your name, email, and a password you can remember.',
         'Check your email and confirm your account if asked — otherwise you may not be able to sign in.',
         'Sign in again. As a business user you are taken to your Business Hub (you can also use My Business in the top menu anytime).',
-        'On your phone, tap Save on the “Add to Home Screen” banner when it appears — this opens the scanner faster next time.',
+        'On your phone, tap Save on the “Add to Home Screen” banner when it appears for quicker access next time.',
       ],
     },
     {
@@ -156,7 +160,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       content:
         'After you sign in, your Business Hub is the sidebar area titled “Business Hub”. The menu names below are the exact labels you will see.',
       steps: [
-        'Overview — Summary, redemptions, quick actions, and open the QR scanner.',
+        'Overview — Summary and quick actions for your listing.',
         'Business Profile — Your business identity: name, category, map pin, logo, and contact details (complete this after your first listing is approved).',
         'My credentials — Optional insurance, permits, association docs, and first-aid certificates (see section 5).',
         'My Submissions — Listings waiting for approval or returned for changes.',
@@ -207,20 +211,16 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       ],
     },
     {
-      title: '6. QR Scanner — verify a pass and charge the right amount',
+      title: '6. How to give discount',
       content:
-        'When someone wants your StikmNek discount, they show a QR code from their pass. You scan inside StikmNek — no separate scanner app. The screen shows how much to charge in VT (the StikmNek deal total), with tourist savings shown smaller underneath.',
+        'How to give discount: 1. Check Pass name matches ID 2. Check VALID UNTIL date 3. Check green pulsing VALID. 4. Give discount, charge as normal. Tourist pays you direct.',
       steps: [
-        'In the Business Hub, open Overview or tap the floating Scan button.',
-        'Allow camera access when the browser asks.',
-        'Ask the guest to brighten their screen and hold the QR steady.',
-        'The app shows whether the pass is valid and how many people (ages 6+) the pass covers.',
-        'If you have several listings, pick the correct deal when asked.',
-        'Tours and activities: enter how many adults, children (6+), and infants (under 6, usually free) are on this visit.',
-        'Shops and retail (per-item deals): enter the number of items in this purchase — separate from people on the pass.',
-        'Check Amount to charge (VT) — that is what the tourist pays you. Tourist saves (VT) is shown smaller for reference.',
-        'Tap Confirm redemption. The visit is recorded with the correct tiered or flat pricing.',
-        'If scanning fails: brighter screen, wipe the lens, or use manual code entry on the scanner screen.',
+        'Ask the guest to open their Pass in the app (Dashboard → My Pass).',
+        'Check Pass name matches their ID.',
+        'Check VALID UNTIL date/time.',
+        'Check the green pulsing VALID clock.',
+        'Give the listed StikmNek discount and charge as normal — tourist pays you direct (no commission).',
+        'If the Pass looks expired or invalid, do not give the discount; ask them to refresh or contact support.',
       ],
     },
     {
@@ -311,10 +311,10 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
 
   const troubleshooting: FAQItem[] = [
     {
-      question: 'I am a business: the scanner will not open or the camera is blocked',
+      question: 'I am a business: guest Pass does not look valid',
       answer:
-        'Use Chrome or Safari on your phone, open StikmNek, go to My Business (Business Hub), then Overview or the Scan button. When the browser asks for camera permission, tap Allow. If you denied it earlier, open the site settings for StikmNek and turn the camera back on. Good lighting on the guest’s phone helps.',
-      icon: <QrCode className="w-4 h-4" />,
+        'Ask them to open Dashboard → My Pass and brighten the screen. Check name matches ID, VALID UNTIL has not passed, and the green VALID clock is pulsing. If anything looks wrong, do not give the discount and ask them to refresh or contact support.',
+      icon: <Ticket className="w-4 h-4" />,
     },
     {
       question: 'I am a business: my listing edits are not showing on the public site',
@@ -329,12 +329,11 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
       icon: <AlertCircle className="w-4 h-4" />,
     },
     {
-      question: 'It says I already redeemed at this business today',
+      question: 'Business says my Pass is not valid',
       answer:
-        'Older versions of the app blocked a second scan at the same venue on the same day. That limit has been removed so you can use your pass again the same day (each visit still needs a fresh scan). Update the app or ask staff to try again. If the message persists, contact support with your account email.',
+        'Open Dashboard → My Pass. Confirm VALID UNTIL has not passed and the green VALID clock is showing. Refresh the page if needed. If it still looks wrong, contact support with your account email.',
       icon: <AlertCircle className="w-4 h-4" />,
     },
-    { question: 'My QR code is not scanning', answer: 'Ensure your screen brightness is at maximum. Try zooming in on the QR code. If the issue persists, take a screenshot and show it to the business. You can also try refreshing the page to regenerate the QR code.' },
     { question: 'Payment failed or was declined', answer: 'Check your PayPal account has sufficient funds. Ensure your PayPal account is verified. Try a different payment method within PayPal. If the issue persists, contact PayPal support or try again later.' },
     { question: 'I cannot see my purchased pass', answer: 'Go to your Dashboard and check the "My Pass" section. If your pass does not appear, try signing out and signing back in. Ensure the pass start date has arrived - passes activate on the selected date.' },
     { question: 'Business listing not appearing after approval', answer: 'It may take a few minutes for the listing to appear. Try refreshing the page. If it still does not show, check the Business Dashboard to confirm the approval status.' },
@@ -563,7 +562,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
               <div>
                 <h2 className="text-xl font-bold text-gray-900 mb-2">Business Owner Guide</h2>
                 <p className="text-sm text-gray-500 mb-2">
-                  Plain-language steps for signing up, listing your deal, completing your profile and credentials, and scanning tourist passes. Menu names match what you see after you sign in.
+                  Plain-language steps for signing up, listing your deal, completing your profile and credentials, and giving the Pass discount. Menu names match what you see after you sign in.
                 </p>
                 <p className="text-sm mb-4">
                   <a
@@ -582,7 +581,7 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
                     In simple terms
                   </h3>
                   <p className="text-sm text-emerald-900/90 leading-relaxed">
-                    You sign up as a business, submit your deal in VT, and wait for approval. Complete your Business Profile and optionally upload credentials for verified trust badges. When tourists visit, they show a QR code — you scan it in your Business Hub, see the amount to charge in VT, confirm the visit, and give the StikmNek discount. Turning your listing off or on is immediate; most other edits wait for a quick admin check.
+                    You sign up as a business, submit your deal in VT, and wait for approval. Complete your Business Profile and optionally upload credentials for verified trust badges. How to give discount: 1. Check Pass name matches ID 2. Check VALID UNTIL date 3. Check green pulsing VALID. 4. Give discount, charge as normal. Tourist pays you direct. Turning your listing off or on is immediate; most other edits wait for a quick admin check.
                   </p>
                 </div>
                 {renderGuide(businessGuide)}
@@ -645,10 +644,10 @@ const HelpCenter: React.FC<HelpCenterProps> = ({ initialSection }) => {
                       },
                       {
                         step: 5,
-                        title: 'Use the QR scanner when you are approved',
+                        title: 'Give the Pass discount when you are approved',
                         time: '2 min',
                         details:
-                          'After approval, open the Business Hub → Overview (or the floating Scan button). Allow camera access. When a guest shows their pass QR code on their phone, scan it in StikmNek, choose the right listing if asked, and confirm redemption. No separate scanner app is required.',
+                          'How to give discount: 1. Check Pass name matches ID 2. Check VALID UNTIL date 3. Check green pulsing VALID. 4. Give discount, charge as normal. Tourist pays you direct.',
                       },
                     ].map((item) => (
                       <div key={item.step} className="flex gap-4">

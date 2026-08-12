@@ -25,7 +25,7 @@ const COPY: Record<
       'We list you free — tourists find you on the StikmNek trip planner',
       'You pick a discount for Pass holders (e.g. 15% off, 2-for-1 kava, free pickup)',
       'We take photos & add you — 5 minutes',
-      'Tourists save you ❤️ and show a Pass with name + expiry date. No scanning.',
+      'You get paid as normal. Tourist pays you direct, minus your discount',
     ],
     needLabel: 'What we need from you',
     needBody: 'Business name, location pin, 3 photos, discount, WhatsApp',
@@ -36,7 +36,7 @@ const COPY: Record<
       'Nous vous listons gratuitement — les touristes vous trouvent sur le planificateur StikmNek',
       'Vous choisissez une réduction pour les détenteurs de Pass (ex. −15 %, 2 kava pour 1, transfert gratuit)',
       'Nous prenons les photos et vous ajoutons — 5 minutes',
-      'Les touristes vous enregistrent ❤️ et montrent un Pass avec nom + date de fin. Pas de scan.',
+      'Vous êtes payé normalement. Le touriste vous paie directement, moins votre réduction.',
     ],
     needLabel: 'Ce dont nous avons besoin',
     needBody: "Nom de l'entreprise, localisation, 3 photos, réduction, WhatsApp",
@@ -47,7 +47,7 @@ const COPY: Record<
       'Mifala i putum yu fri nomo — ol turis i faenem yu long StikmNek',
       'Yu jusum wan diskount blong ol man we i gat Pass (olsem 15% of, 2-fo-1 kava, fri pickup)',
       'Mifala i tekem foto mo putum yu — 5 minit',
-      'Ol turis i sevem yu ❤️ mo soem Pass wetem nem + det we i finis. No skan.',
+      'Turis i pem yu direct nomo. Hemi soem Pass blong kasem discount we yu jusum.',
     ],
     needLabel: 'Mifala i nid long yu',
     needBody: 'Nem blong bisnis, ples long map, 3 foto, diskount, WhatsApp',
@@ -170,6 +170,11 @@ const ListBusiness: React.FC = () => {
             <WhatsAppIcon className="h-6 w-6 shrink-0" />
             Message Andy on WhatsApp
           </a>
+          <div className="mt-2.5 text-center">
+            <Link to="/business/new" className="text-sm underline opacity-70 text-gray-700 hover:opacity-100">
+              Tech-savvy? List it yourself
+            </Link>
+          </div>
         </div>
       </div>
     </div>

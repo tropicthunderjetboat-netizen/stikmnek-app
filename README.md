@@ -1,70 +1,79 @@
 # StikmNek - Vanuatu Tourist Deals Platform
 
-> Free trip planner for Vanuatu — save favorites, build your trip, then unlock partner discounts with a StikmNek Pass. Local businesses list free.
+> Free trip planner for Vanuatu — save favorites, build your trip, then unlock discounts with a Holiday Pass. Local businesses list free.
 
-**Canonical pricing source:** `src/data/pricing.ts` (keep Edge `supabase/functions/_shared/pricingDynamic.ts` in sync).  
-**Product brief for AI / strategy:** `docs/MASTER_AI_PROMPT.md`
+**Canonical pricing source:** `src/data/pricing.ts`  
+**Last audited:** 12 August 2026 — Long-stay focus, No QR UI, WhatsApp business onboarding
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Pass Pricing (live)](#pass-pricing-live)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-- [Project Structure](#project-structure)
-- [Edge Functions (API)](#edge-functions-api)
-- [Database Schema](#database-schema)
-- [Authentication](#authentication)
-- [Payment Integration](#payment-integration)
-- [Analytics & Monitoring](#analytics--monitoring)
-- [PWA & Service Worker](#pwa--service-worker)
-- [Internationalization](#internationalization)
-- [Deployment](#deployment)
-- [Environment Variables](#environment-variables)
-- [Testing](#testing)
-- [Security](#security)
-- [Contributing](#contributing)
+Keep Edge pricing in sync: `supabase/functions/_shared/pricingDynamic.ts`.
 
 ---
 
 ## Overview
 
-StikmNek is a full-stack web/PWA that connects tourists in Vanuatu with local businesses offering exclusive discounts. Tourists can **browse and plan for free** (heart favorites / My Trip). A digital **StikmNek Pass** unlocks partner discounts and contact details; redemption is by **QR code** scanned by the business. Businesses list **free forever** — revenue is from pass sales (and optional Super Star tips), not listing fees or commissions.
+StikmNek helps **long-stay tourists (about 7–14 days)** plan Vanuatu and save money with local partners. Cruise-day visitors are secondary.
 
-### Key Features
+**How it works (simple):**
 
-- **Free trip planner**: Browse the vertical swipe feed, heart favorites, and build a trip before buying
-- **StikmNek Pass**: Single dynamic product (party size + 1-day or 7-day Holiday) with QR verification — see [Pass Pricing](#pass-pricing-live)
-- **Deal discovery**: Swipe feed (primary), `/deals` grid, and Leaflet map; categories include dining, tours, activities, transportation, shopping, spa, accommodation
-- **Business Owner Dashboard**: Submit/edit listings (incl. tiered tour pricing), photos, QR scanner, reviews
-- **Admin Panel**: Approvals, users, listings, promos, platform stats
-- **Reviews**: Star ratings, owner responses, optional paid **Super Star** tip (A$5 AUD)
-- **Payments**: PayPal Smart Buttons (sandbox + live); optional FIRST25 free promo via `claim-promo-pass`
-- **Email**: Resend transactional mail (pass confirmation, ops digests, etc.)
-- **i18n**: English, French, Bislama
-- **PWA**: Offline support, installable, service worker caching
-- **Monitoring**: Sentry relay + Google Analytics 4 (consent-gated)
+1. **Free trip planner** — Browse ~63 local spots on the swipe feed. Tap ❤️ to save places under **Saved**.
+2. **Holiday Pass** — Buy a party-based Pass (hero: Solo Holiday **A$30** / Couple Holiday **A$40** for 7 days). Save up to **35%** at partners.
+3. **Show the Pass** — Visual card only: big name, party size, **VALID UNTIL**, and a live pulsing **✓ VALID** clock. No QR in the UI.
+4. **Pay the business direct** — Tourist pays the venue as normal, minus the Pass discount. StikmNek does **not** take commission on those sales and does **not** process business payments.
+
+**Revenue:** Pass sales (AUD via PayPal) + optional **A$5 Super Star** tip. Listings are **free forever**.
+
+**Businesses:** Founder onboards via WhatsApp from `/list-your-business`. No self-serve “list and pay” product; no scanning by staff.
 
 ---
 
 ## Pass Pricing (live)
 
-**Do not** describe Daily / Weekly / Monthly fixed packs — that model is retired. There is one product: **StikmNek Pass**.
+Source of truth: **`src/data/pricing.ts`** (mirrored in Edge `pricingDynamic.ts`).
 
 | Rule | Amount (AUD) |
 |------|----------------|
-| First paying guest (ages **6+**) | **A$15** |
-| Each additional guest (2–20) | **A$10** |
-| Children under 6 | Free (not counted in party) |
-| **1-day** (day pass) | Base headcount only |
-| **7-day Holiday** add-on | **+A$15** (7 inclusive calendar days) |
-| Share bonus (Holiday) | After purchase (or prepurchase share path): unlock **+7 days** → **14 days** total |
-| Max party size | **20** per pass |
+| 1st guest (ages **6+**) | **A$15** |
+| Each extra guest (2–20) | **A$10** |
+| Kids under 6 | Free |
+| Max party | **20** |
+| 1-day Pass | Headcount only |
+| Holiday 7-day add-on | **+A$15** |
+| Share bonus (Holiday) | +7 days → **14 days** total |
 
-**Examples:** solo 1-day **A$15** · solo Holiday **A$30** · couple 1-day **A$25** · couple Holiday **A$40**
+**Examples**
 
-Prices exclude payment processing fees. Passes are generally **non-refundable once activated** (support handles exceptions). Super Star tips are **A$5 AUD**, separate from the pass.
+| Product | Party | Math | Total |
+|---------|-------|------|-------|
+| Solo 1-day | 1 | A$15 | **A$15** |
+| Solo Holiday (hero) | 1 + 7-day | A$15 + A$15 | **A$30** |
+| Couple Holiday (hero) | 2 + 7-day | A$15 + A$10 + A$15 | **A$40** |
+
+Prices exclude payment processing fees. Pass is non-transferable; name should match ID. Super Star is **A$5 AUD**, separate from the Pass.
+
+---
+
+## User Flows
+
+### Tourist
+
+1. Open the app → swipe feed of local spots  
+2. Tap ❤️ → places land in **Saved**  
+3. Buy a **Holiday Pass** (or 1-day) at checkout (PayPal / promo)  
+4. Show **PassCard** at the venue (name + party + valid until + live VALID)  
+5. Pay the business **direct**, minus discount  
+6. Optional: message partners on WhatsApp once Pass is active  
+
+### Business
+
+1. Tap **List your business — free** (home / Hero / Footer)  
+2. Open `/list-your-business` — EN 🇦🇺 / FR 🇫🇷 / BI 🇻🇺  
+3. Tap **Message Andy on WhatsApp** (English prefill message)  
+4. Founder adds listing (photos, pin, discount) — **free forever**  
+
+### Admin
+
+- Hidden shell at `/admin` (staff / admin roles)  
+- Approvals, users, listings, promos, ops  
 
 ---
 
@@ -72,85 +81,36 @@ Prices exclude payment processing fees. Passes are generally **non-refundable on
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (React SPA)                       │
-│  React 18 + TypeScript + Tailwind CSS + shadcn/ui            │
-│  Vite build system | React Router | React Query              │
+│  Frontend (React SPA / PWA)                                  │
+│  SwipeDiscover · Saved · PassCard · Checkout · Map · Deals   │
+│  /list-your-business (public, no auth)                       │
 ├─────────────────────────────────────────────────────────────┤
-│                    Supabase Platform                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │  PostgreSQL   │  │ Edge Functions│  │   Storage    │       │
-│  │  (Database)   │  │  (Deno API)  │  │  (Photos)    │       │
-│  └──────────────┘  └──────────────┘  └──────────────┘       │
-│  ┌──────────────┐  ┌──────────────┐                          │
-│  │  Auth (GoTrue)│  │  Realtime    │                          │
-│  │  Email/OAuth  │  │  WebSocket   │                          │
-│  └──────────────┘  └──────────────┘                          │
+│  Supabase                                                    │
+│  Auth · Postgres · Storage · Edge Functions                  │
 ├─────────────────────────────────────────────────────────────┤
-│                  External Services                           │
-│  PayPal (Payments) | Resend (Email) | Sentry (Errors)       │
-│  Google Analytics (Tracking)                                 │
+│  PayPal (Pass + Super Star) · Resend (email) · Sentry / GA4 │
 └─────────────────────────────────────────────────────────────┘
+
+DEPRECATED (keep out of tourist/business UI product story):
+  · QR scanning UI (QRScanner.tsx)
+  · verify-redemption Edge Function (backend may still exist)
+  · Business Owner Dashboard as primary onboarding (use WhatsApp page instead)
 ```
-
-### Data Flow
-
-1. **Tourist browses / plans** → React SPA loads listings (view / `business_offerings` join); hearts can stay local until signup
-2. **Tourist buys or claims a pass** → Checkout builds party size + duration → PayPal (`create-checkout` / `paypal-capture`) or FIRST25 (`claim-promo-pass`) → QR pass issued
-3. **Business submits listing** → Edge function → `pending_businesses` → Admin approves → live on `businesses` + `business_offerings`
-4. **Business edits listing** → Edge function → `pending_edits` → Admin reviews → applied to live listings
-5. **Tourist redeems deal** → Business scans QR → `verify-redemption` → redemption recorded
-6. **Error occurs** → ErrorLogger → Supabase `error_logs` + Sentry relay edge function
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 18, TypeScript 5.5, Vite 8 |
-| Styling | Tailwind CSS 3.4, shadcn/ui, Radix UI |
-| State | React Context, React Query |
-| Routing | React Router 6 |
-| Maps | Leaflet, React Leaflet |
-| Charts | Recharts |
-| Backend | Supabase (PostgreSQL, Edge Functions, Auth, Storage, Realtime) |
-| Payments | PayPal REST API v2 |
-| Email | Resend REST API |
-| Monitoring | Sentry (via relay), Custom ErrorLogger |
-| Analytics | Google Analytics 4, Custom analytics module |
-| PWA | Service Worker, Web App Manifest |
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ and npm
-- A Supabase project (already configured)
-
-### Installation
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd stikmnek-app
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-Production: `https://www.stikmnek.com`.
-
-### Build for Production
-
-```bash
-npm run build
-npm run preview  # Preview production build locally
-```
+| Layer | Choice |
+|-------|--------|
+| UI | React 18, TypeScript, Vite, Tailwind, shadcn/ui |
+| Routing | React Router (`App.tsx` + `AppLayout` view modes) |
+| Backend | Supabase (Auth, DB, Storage, Edge Functions) |
+| Payments | PayPal Smart Buttons (`VITE_PAYPAL_CLIENT_ID` + Edge secrets) |
+| Email | Resend |
+| Maps | Leaflet |
+| PWA | Service worker / installable |
+| Monitoring | Sentry relay, GA4 (consent-gated) |
 
 ---
 
@@ -158,455 +118,248 @@ npm run preview  # Preview production build locally
 
 ```
 src/
-├── components/          # React components
-│   ├── ui/              # shadcn/ui base components (Button, Card, Dialog, etc.)
-│   ├── AppLayout.tsx    # Main layout orchestrator (renders all views)
-│   ├── Navbar.tsx       # Top navigation bar
-│   ├── Hero.tsx         # Landing page hero section
-│   ├── BusinessGrid.tsx # Business listing grid with filters
-│   ├── BusinessCard.tsx # Individual business card component
-│   ├── BusinessDetail.tsx # Business detail view
-│   ├── BusinessListingForm.tsx # New business submission form
-│   ├── BusinessOwnerDashboard.tsx # Business owner management panel
-│   ├── EditListingPanel.tsx # Edit existing business listing
-│   ├── AdminPanel.tsx   # Admin dashboard
-│   ├── AuthModal.tsx    # Sign in / Sign up modal
-│   ├── PaymentCheckout.tsx # PayPal checkout flow
-│   ├── MapView.tsx      # Interactive Leaflet map
-│   ├── QRCodeDisplay.tsx # QR code for pass verification
-│   ├── QRScanner.tsx    # QR code scanner for businesses
-│   ├── ReviewForm.tsx   # Submit review form
-│   ├── ReviewsSection.tsx # Reviews display
-│   ├── ErrorBoundary.tsx # React error boundary with Sentry
-│   ├── CookieConsent.tsx # GDPR cookie consent banner
-│   └── ...              # 40+ more components
-├── contexts/
-│   └── AppContext.tsx    # Global state management (auth, cart, favorites, etc.)
-├── data/
-│   ├── businesses.ts    # Business type definitions
-│   ├── pricing.ts       # Live StikmNek Pass pricing (AUD) — source of truth
-│   ├── passCatalog.ts   # Pass product identity / legacy DB type mapping
-│   └── translations.ts  # i18n translation strings (EN/FR/BI)
-├── hooks/
-│   ├── useGeolocation.ts # Geolocation hook
-│   ├── usePassConfig.ts  # Pass configuration hook
-│   └── use-toast.ts      # Toast notification hook
-├── lib/
-│   ├── supabase.ts      # Supabase client initialization
-│   ├── analytics.ts     # Analytics tracking (local + GA4)
-│   ├── errorLogger.ts   # Error logging (Supabase + Sentry)
-│   └── utils.ts         # Utility functions
-├── pages/
-│   ├── Index.tsx        # Main page wrapper
-│   └── NotFound.tsx     # 404 page
-├── main.tsx             # App entry point (error logger init, SW registration)
-├── App.tsx              # Router setup
-└── index.css            # Global styles + Tailwind imports
-
-public/
-├── sw.js                # Service worker (caching, offline support)
-├── manifest.json        # PWA manifest
-├── robots.txt           # Search engine directives
-├── sitemap.xml          # XML sitemap
-└── placeholder.svg      # Placeholder icon
+  App.tsx                 # Routes: /list-your-business, /* → AppLayout
+  pages/
+    ListBusiness.tsx      # Public list-free page (EN/FR/BI + WhatsApp)
+    ResetPassword.tsx
+  components/
+    SwipeDiscover.tsx     # Home feed + Saved hearts
+    PassCard.tsx          # Visual Pass (no QR)
+    PassCards.tsx         # Pricing / purchase marketing
+    DealsPricingCard.tsx
+    PaymentCheckout.tsx
+    PaymentConfirmation.tsx
+    MyFavoritesList.tsx   # Saved tab
+    Hero.tsx / Footer.tsx / Navbar.tsx / BottomNav.tsx
+    Dashboard.tsx         # Tourist profile
+    AdminPanel.tsx
+    … business hub files (legacy / still routable — see Loose Ends)
+  data/
+    pricing.ts            # CANONICAL pass pricing
+    translations.ts       # Tourist UI: en | fr only
+    businesses.ts
+  lib/                    # Helpers (trip storage, PayPal SDK, etc.)
+supabase/functions/       # Edge API
 ```
 
----
+### Deprecated / legacy UI files (do not treat as product truth)
 
-## Edge Functions (API)
-
-All server-side logic runs as Supabase Edge Functions (Deno runtime).
-
-### `manage-business`
-The primary API endpoint handling 25+ actions:
-
-| Action | Category | Description |
-|--------|----------|-------------|
-| `get_or_create_profile` | Auth | Create or retrieve user profile |
-| `update_profile` | Auth | Update user profile fields |
-| `get_profile` | Auth | Get user profile by ID |
-| `submit_business` | Business | Submit new business for review |
-| `get_owner_businesses` | Business | Get businesses owned by user |
-| `get_all_owner_data` | Business | Get all owner data (approved + pending) |
-| `submit_edit` | Business | Submit edit request for existing business |
-| `get_pending_edits` | Business | Get pending edit requests |
-| `submit_review` | Reviews | Submit a business review |
-| `get_reviews` | Reviews | Get reviews for a business |
-| `respond_to_review` | Reviews | Business owner responds to review |
-| `review_business` | Admin | Approve/reject business submission |
-| `review_edit` | Admin | Approve/reject edit request |
-| `admin_get_stats` | Admin | Get platform dashboard statistics |
-| `admin_get_users` | Admin | List all users |
-| `admin_update_user` | Admin | Update user role/details |
-| `admin_delete_user` | Admin | Delete a user |
-| `admin_create_business` | Admin | Create business directly |
-| `admin_update_business` | Admin | Update business fields |
-| `admin_delete_business` | Admin | Remove one deal: `offeringId` + `businessId`; if `onlyDealOnProfile`, also drops the profile when that was the last offer. Full wipe: `businessId` + `confirmDeleteEntireProfile: true`. |
-| `admin_get_businesses` | Admin | List all businesses |
-
-**Rate Limiting**: Built-in per-user rate limiting:
-- Read operations: 60 requests/minute
-- Write operations: 20 requests/minute
-- Submissions: 5 per 5 minutes
-- Auth operations: 10 per minute
-- Admin operations: 100 per minute
-
-### `create-checkout`
-Creates a PayPal order for StikmNek Pass purchase (dynamic party size + duration pricing).
-
-### `paypal-capture`
-Captures a PayPal payment after approval and issues/activates the pass.
-
-### `claim-promo-pass`
-FIRST25 cold-start promo — claims a free pass when the campaign is active (see `docs/PROMO_FIRST25.md`).
-
-### `extend-pass`
-Extends an existing pass duration (share / holiday paths as implemented).
-
-### `verify-redemption`
-Verifies QR code and records deal redemption.
-
-### `send-email`
-Resend email delivery (pass confirmation, booking inquiries, purchase ops notify, etc.).
-
-### `notify-expiring-deals`
-Daily ops digest of deals expiring within 7 days.
-
-### `upload-photo`
-Business photo uploads to Supabase Storage.
-
-### `upload-credential`
-Business credential uploads (insurance/permits) for trust signals.
-
-### `create-user-profile` / `request-password-reset`
-Profile bootstrap and password-reset helpers.
-
-### `trigger-ssg-rebuild`
-Called after listing changes to rebuild static SEO pages via Vercel deploy hook.
-
-### `sentry-relay`
-Relays frontend errors to Sentry (keeps DSN server-side).
-
-### `process-card-payment`
-Legacy/dev card path when PayPal Smart Buttons client ID is unset.
+| File | Status |
+|------|--------|
+| `QRScanner.tsx` | **DEPRECATED** — not wired in BusinessOwnerDashboard UI after long-stay refactor; file still in repo |
+| `QRCodeDisplay.tsx` | Re-exports `PassCard` only |
+| `PassTicketCard.tsx` | Old cream ticket + optional QR image — superseded by `PassCard` |
+| `lib/qrCode.ts` | QR data-URL helper — legacy; Pass UI no longer depends on it for display |
+| `BusinessOwnerDashboard.tsx` | Still at `/hub` for signed-in business accounts — **not** the public list path |
+| `ForBusinessLanding.tsx` | `/for-business` — still QR / scan / signup oriented copy |
+| `verify-redemption` | Edge Function **DEPRECATED** for product UI |
 
 ---
 
-## Database Schema
+## Edge Functions
 
-### Core Tables
+### Active (product)
 
-| Table | Description |
-|-------|-------------|
-| `businesses` | Business profiles (company-level) |
-| `business_offerings` | Live deals / listings shown in Explore (canonical for feed) |
-| `pending_businesses` | Business submissions awaiting review |
-| `pending_edits` | Edit requests awaiting admin approval |
-| `user_profiles` | User profiles (tourist/business/admin) |
-| `passes` | Tourist passes (dynamic product; legacy `pass_type` values may exist on old rows) |
-| `pass_purchases` | Purchase / promo claim records |
-| `redemptions` | Deal redemption records |
-| `reviews` | Business reviews |
-| `review_responses` | Business owner responses to reviews |
-| `favorites` | User favorite listings |
-| `business_photos` | Business photo gallery |
-| `promo_campaigns` | Promo config (e.g. FIRST25) |
-| `error_logs` | Frontend error logs |
+| Function | Role |
+|----------|------|
+| `create-checkout` | Start PayPal Pass order (uses shared pricing) |
+| `paypal-capture` | Capture payment, issue Pass |
+| `claim-promo-pass` | Free / promo Pass (e.g. FIRST25) |
+| `extend-pass` | Share-bonus second week |
+| `process-card-payment` | Legacy / mock card path when Smart Buttons unset |
+| `create-user-profile` | Profile bootstrap |
+| `manage-business` | Listings, analytics, owner ops |
+| `upload-photo` / `upload-credential` | Media & credentials |
+| `send-email` | Transactional mail |
+| `notify-expiring-deals` | Deal expiry ops |
+| `request-password-reset` | Auth email |
+| `sentry-relay` | Error relay |
+| `trigger-ssg-rebuild` | Static rebuild hook |
 
-Listings for tourists are primarily loaded from `business_listings_view` / `business_offerings` (see `src/lib/loadListings.ts`), not a flat single-row-per-business model.
+Shared: `_shared/pricingDynamic.ts`, `passSpan.ts`, `cors.ts`, `resend.ts`, `purchaseNotify.ts`, …
 
----
+### Deprecated
 
-## Authentication
-
-Authentication is handled by Supabase Auth (GoTrue):
-
-- **Email/Password**: Standard signup and signin
-- **User Types**: Tourist, Business Owner, Admin
-- **Admin Detection**: Hardcoded admin emails auto-elevated to admin role
-- **Session Persistence**: localStorage with auto-refresh tokens
-- **Profile Management**: Separate `user_profiles` table with extended fields
-
-### Auth Flow
-
-1. User signs up → Supabase creates auth user → `onAuthStateChange` fires
-2. App calls `get_or_create_profile` edge function → Creates `user_profiles` record
-3. Profile role determines UI access (tourist views, business dashboard, admin panel)
+| Function | Notes |
+|----------|--------|
+| **`verify-redemption`** | QR / scan redemption API. **Keep in backend if deployed, but treat as DEPRECATED.** Product Pass is visual-only; UI should not call this. |
 
 ---
 
-## Payment Integration
+## Routing (current)
 
-### StikmNek Pass checkout
-
-Checkout prices from **party size (ages 6+)** and **1-day vs 7-day Holiday** using `calculatePassPrice` in `src/data/pricing.ts`. There are no separate Daily/Weekly/Monthly SKUs.
-
-### PayPal
-
-- **Mode**: Configurable via `PAYPAL_MODE` env var (sandbox/live) on Edge Functions.
-- **PayPal Smart Buttons**: When `VITE_PAYPAL_CLIENT_ID` is set, checkout loads the PayPal JS SDK (`components=buttons`). The buyer pays in PayPal’s flow (wallet / card on PayPal); `create-checkout` creates the order and `paypal-capture` runs after approval. Use the same REST app’s **public** Live or Sandbox client ID as on the Edge secrets.
-- **Legacy / dev**: If `VITE_PAYPAL_CLIENT_ID` is unset, checkout keeps the older raw card form, which calls `process-card-payment` (mock or disabled unless `CARD_MOCK_ENABLED=true` on that function).
-
-### Environment Variables
-
-```
-# Supabase Edge (create-checkout, paypal-capture)
-PAYPAL_CLIENT_ID     - PayPal app client ID
-PAYPAL_CLIENT_SECRET - PayPal app secret
-PAYPAL_MODE          - "sandbox" or "live"
-
-# Vite frontend (public — use sandbox client ID for dev; live for production)
-VITE_PAYPAL_CLIENT_ID - Same PayPal app’s public client ID for Smart Buttons SDK
-```
----
-
-## Analytics & Monitoring
-
-### Google Analytics 4
-
-- Loaded dynamically when user accepts cookie consent
-- Tracks: page views, sign ups, purchases, searches, errors, Web Vitals (LCP, FID, CLS)
-- GDPR compliant: No tracking until consent given
-- Measurement ID configured via `GA_MEASUREMENT_ID` env var
-
-### Sentry Error Tracking
-
-- Frontend errors sent via `sentry-relay` edge function (DSN stays server-side)
-- Captures: runtime errors, unhandled rejections, React ErrorBoundary crashes, API errors
-- Severity levels: warning, error, critical (critical = immediate flush)
-- Fallback: errors also stored in Supabase `error_logs` table + localStorage
-
-### Custom Analytics
-
-- Local event tracking in localStorage (always active, no consent needed)
-- Session tracking, page view counts, commerce events
-- Performance monitoring (long tasks, page load times)
+| Path | Purpose |
+|------|---------|
+| `/` | Tourist swipe home |
+| `/saved` | Saved places |
+| `/deals` · `/map` · `/passes` | Deals grid, map, Pass marketing |
+| `/checkout` · `/payment-confirmation` | Buy Pass |
+| `/list-your-business` | Public business info + WhatsApp (EN/FR/BI) |
+| `/for-business` | Older marketing join page (see Loose Ends) |
+| `/business/new` · `/hub` | Listing form / business hub (legacy self-serve) |
+| `/admin` | Admin |
+| `/help` · `/faq` · `/legal/*` | Help & legal |
 
 ---
 
-## PWA & Service Worker
+## Languages
 
-### Features
+| Surface | Languages |
+|---------|-----------|
+| Main tourist app (`translations.ts` Language type) | **EN + FR** only |
+| `/list-your-business` page-local toggles | **EN + FR + BI** |
+| Navbar language switcher | EN + FR |
 
-- **Offline Support**: Cached index.html served when offline
-- **Asset Caching**: Cache-first for JS/CSS/fonts, network-first for API calls
-- **Image Caching**: CDN images cached for 30 days
-- **Auto-update**: Service worker checks for updates hourly
-- **Push Ready**: Push notification handlers configured (future use)
-
-### Manifest
-
-```json
-{
-  "name": "StikmNek - Vanuatu Tourist Deals",
-  "short_name": "StikmNek",
-  "display": "standalone",
-  "theme_color": "#0d9488",
-  "start_url": "/"
-}
-```
+Dead BI ternaries still exist in many components (never selected when Language is `en` \| `fr`) — see Loose Ends.
 
 ---
 
-## Internationalization
+## Copy rules (product)
 
-Three languages supported:
+**Prefer**
 
-| Code | Language | Coverage |
-|------|----------|----------|
-| `en` | English | Full |
-| `fr` | French | Full |
-| `bi` | Bislama | Full |
+- Save up to 35% with Pass  
+- Free to use / Free forever  
+- You get paid as normal (tourist pays you direct)  
+- Show your Pass / visual Pass  
 
-Translation strings are in `src/data/translations.ts`. Language selection persists in app state.
+**Avoid**
+
+- “local prices”  
+- “unlock direct discounts” / heavy “unlock” sales speak where avoidable  
+- “exclusive”  
+- “scan QR” / staff scanning  
+
+---
+
+## Loose Ends Found
+
+Audit vs founder product truth (12 Aug 2026). **App and README disagree here — fix later; README is not claiming these are fixed.**
+
+### QR / redemption (should be out of product UI)
+
+- `src/components/QRScanner.tsx` — full scanner + `verify-redemption` invokes; file remains  
+- `supabase/functions/verify-redemption/` — **DEPRECATED** Edge Function still in repo  
+- `src/lib/qrCode.ts`, `PassTicketCard.tsx` — QR-era helpers / UI  
+- `HowItWorks.tsx` — still says show QR / “exclusive discount”  
+- `HelpCenter.tsx` — large sections still teach QR scan for tourists **and** business hub scanning  
+- `ForBusinessLanding.tsx` — “scan their pass QR”, dashboard scans  
+- `CompleteTouristProfile.tsx` — “QR unlocks WhatsApp”  
+- `usePassConfig.ts` — feature copy “QR code redemptions”  
+- `Dashboard.tsx` — tourist redemption history / savings tracker still shown; comment about QR offline  
+- `BusinessDetail.tsx` / `BusinessCard.tsx` / `MapView.tsx` — “unlock” member rates / contact  
+
+### Business onboarding (should be WhatsApp-first)
+
+- Homepage / Hero / Footer correctly point to `/list-your-business`  
+- **`/hub` + `BusinessOwnerDashboard`** still fully available for business users (Navbar “My Business”)  
+- **`/business/new` + `BusinessListingForm`** — self-serve listing + auth gates still live  
+- **`/for-business` (`ForBusinessLanding`)** — signup-business + QR-era narrative  
+- `AuthModal` still supports `signup-business`  
+- `ListYourBusinessCta.tsx` — primary CTA goes to list page, but still has “Already have an account? Sign in” (and may reference `setAuthMode` / `setShowAuth`)  
+- `AppLayout` still forces complete-business-profile / listing gates for business accounts  
+
+### BI / i18n debt
+
+- Main `Language` is `en` \| `fr` (good)  
+- Many components still have `language === 'bi'` branches (dead code): e.g. `MyFavoritesList`, `BusinessDetail`, `BusinessGrid`, `PassEditor`, `categoryPricing`, `Footer` Help labels, etc.  
+- BI is **correct** only as local state on `/list-your-business`  
+
+### Pricing / copy drift
+
+- Live math in `pricing.ts` ↔ `pricingDynamic.ts` **matches** (A$15 / A$10 / +A$15 Holiday) — good  
+- `PassEditor` / `EmailNotificationCenter` still mention Weekly-style labels in places  
+- Share / unlock wording remains in `translations.ts` (`share.*`, about page “unlock fair local deals”)  
+- Hero / PassCards / ListBusiness copy largely aligned with long-stay story  
+
+### Saved vs My Trip
+
+- UI labels largely moved to **Saved** (BottomNav, Welcome footer, toasts)  
+- No remaining `"My Trip"` string matches in `src/` at audit time  
+
+### Analytics / charts
+
+- `DashboardAnalytics.tsx` simplified for business (no Recharts charts)  
+- `AdminPurchaseOverview.tsx` still uses **recharts** (admin-only — OK)  
+- Tourist `Dashboard.tsx` still has redemption savings analytics (old scan-era model)  
+
+### `/list-your-business` checklist
+
+- Exists at `src/pages/ListBusiness.tsx`  
+- Routed in `App.tsx` + `viewModes`  
+- EN / FR / BI flag buttons  
+- WhatsApp CTA English-only message to `wa.me/6787766107`  
+- No auth required  
 
 ---
 
 ## Deployment
 
-### Frontend
-
-The app is built with Vite and outputs static files, then a post-build SSG step
-(`scripts/ssg/generate-static.mjs`) queries Supabase and writes crawler-readable
-HTML for `/`, `/deals`, `/faq`, `/deal/:slug`, and `/partner/:slug`, plus a
-dynamic `sitemap.xml`.
+Typical path: **Vite build → Vercel (or similar) + Supabase** (DB, Auth, Edge Functions, Storage).
 
 ```bash
-npm run build
-# Output: dist/ (SPA assets + static SEO pages)
+npm install
+npm run dev          # local
+npm run build        # production + SSG helper
+npm run functions:deploy
 ```
 
-Deploy the `dist/` folder to Vercel (or any static host). Listing changes
-trigger a rebuild via the `trigger-ssg-rebuild` Edge Function → Vercel Deploy Hook
-(see migration `20260730120000_ssg_rebuild_triggers.sql`).
-
-### Edge Functions
-
-Edge functions are deployed to Supabase:
-
-```bash
-supabase functions deploy <function-name>
-# SSG rebuild webhook target:
-supabase functions deploy trigger-ssg-rebuild
-```
-
-### Environment Variables (Edge Functions)
-
-Set via Supabase dashboard or CLI:
-
-```bash
-supabase secrets set SENTRY_DSN=<your-dsn>
-supabase secrets set GA_MEASUREMENT_ID=<your-id>
-supabase secrets set RESEND_API_KEY=<your-key>
-supabase secrets set RESEND_FROM_EMAIL=no-reply@yourdomain.com
-# Optional: RESEND_FROM_NAME=StikmNek
-supabase secrets set PAYPAL_CLIENT_ID=<your-id>
-supabase secrets set PAYPAL_CLIENT_SECRET=<your-secret>
-supabase secrets set PAYPAL_MODE=live
-# SSG auto-rebuild (Database Webhook / pg_net → this function → Vercel)
-supabase secrets set VERCEL_DEPLOY_HOOK_URL="https://api.vercel.com/v1/integrations/deploy/..."
-supabase secrets set SSG_REBUILD_SECRET="<long random string>"
-```
-
-Also add matching Vault secrets so DB triggers can call the function:
-`ssg_rebuild_function_url`, `ssg_rebuild_secret` (same secret value).
+Deploy Edge Functions with Supabase CLI; set secrets for PayPal, Resend, etc.
 
 ---
 
 ## Environment Variables
 
-### Edge Function Secrets
+### Frontend (Vite) — see `env.example`
 
-| Variable | Service | Description |
-|----------|---------|-------------|
-| `SUPABASE_URL` | Supabase | Auto-provided by Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase | Auto-provided by Supabase |
-| `PAYPAL_CLIENT_ID` | PayPal | PayPal app client ID |
-| `PAYPAL_CLIENT_SECRET` | PayPal | PayPal app secret key |
-| `PAYPAL_MODE` | PayPal | "sandbox" or "live" |
-| `RESEND_API_KEY` | Resend | Transactional email API key (required for `send-email`, `manage-business`, `paypal-capture`) |
-| `RESEND_FROM_EMAIL` | Resend | Verified sender address (e.g. `no-reply@stikmnek.com`) |
-| `RESEND_FROM_NAME` | Resend | Display name for the From header (optional) |
-| `RESEND_TEMPLATE_*` | Resend | Optional published template ids — see `supabase/resend-templates.md` |
-| `PURCHASE_NOTIFY_EMAILS` | Resend | Comma-separated ops inboxes notified on each pass sale (default `stikmnek@gmail.com` if unset) |
-| `OPS_NOTIFY_EMAILS` | Resend | Ops inboxes for daily **expiring business deals** digest (falls back to `PURCHASE_NOTIFY_EMAILS`) |
-| `CRON_SECRET` | Internal | Optional manual trigger secret for `notify-expiring-deals` (scheduled runs use service role) |
-| `SENTRY_DSN` | Sentry | Error tracking DSN |
-| `GA_MEASUREMENT_ID` | Google | Analytics measurement ID |
-| `GATEWAY_API_KEY` | Internal | API gateway key |
+| Variable | Purpose |
+|----------|---------|
+| `VITE_SUPABASE_URL` | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Anon key |
+| `VITE_SITE_URL` | Canonical site URL (emails / redirects) |
+| `VITE_PAYPAL_CLIENT_ID` | Public PayPal client ID for Smart Buttons (must match Edge live/sandbox mode) |
 
-### Expiring business deals (ops email)
+Optional: perf / Sentry flags (`VITE_PERF_*`, `VITE_SENTRY_RELAY_IN_DEV`).
 
-The `notify-expiring-deals` Edge Function runs **daily at 07:00 UTC** (see `supabase/config.toml`). It emails your ops inbox with every **active** deal whose `discount_valid_until` falls within the next **7 days**, including business name, deal title, expiry date, and owner contact details so you can chase renewals.
+### Edge (Supabase secrets)
 
-1. Deploy: `npm run functions:deploy:notify-expiring-deals`
-2. Set `RESEND_API_KEY` and `OPS_NOTIFY_EMAILS` (or reuse `PURCHASE_NOTIFY_EMAILS`)
-3. Manual test: `curl -X POST "$SUPABASE_URL/functions/v1/notify-expiring-deals" -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"`
+| Variable | Purpose |
+|----------|---------|
+| `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | PayPal REST app |
+| `PAYPAL_MODE` | `sandbox` or `live` |
+| Resend / template IDs | Transactional email |
+| Service role / ops notify secrets | As configured per function |
 
-No email is sent when there are zero expiring deals.
+If `VITE_PAYPAL_CLIENT_ID` is unset, checkout may fall back to the older card / mock path via `process-card-payment`.
 
-### Frontend (Vite / `.env`)
+---
 
-| Variable | Description |
-|----------|-------------|
-| `VITE_PAYPAL_CLIENT_ID` | Public PayPal client ID for **Smart Buttons** checkout (`components=buttons`). Omit to use the legacy `process-card-payment` form (dev/mock). |
+## Getting Started (devs)
+
+1. Copy `env.example` → `.env.local` and fill values  
+2. `npm install` && `npm run dev`  
+3. Point Supabase CLI at the project; deploy functions as needed  
+4. For pricing changes: edit **`src/data/pricing.ts`** and mirror **`supabase/functions/_shared/pricingDynamic.ts`**, then redeploy checkout-related functions  
 
 ---
 
 ## Testing
 
-### Demo tourist pass (business presentations)
-
-For a non-expiring QR pass on a dedicated demo account (`tourist@gmail.com` / **Ima Tourist**):
-
-1. Create the user in **Supabase → Authentication → Users** (email `tourist@gmail.com`, password of your choice).
-2. Run `supabase/scripts/seed_demo_tourist_pass.sql` in the **SQL Editor**.
-3. Sign in as that user → **My Dashboard** → show the QR code to businesses for scanning.
-
-The script sets `valid_until` and `expires_at` to **2099-12-31** and marks the row with `payment_provider = demo`. Re-run the script anytime to refresh the pass.
-
-### Manual Testing Checklist
-
-- [ ] Tourist signup → Profile creation → Pass purchase → Deal redemption
-- [ ] Business signup → Listing submission → Admin approval → Live listing
-- [ ] Business edit → Admin review → Changes applied
-- [ ] PayPal payment flow (sandbox mode)
-- [ ] Email notifications (Resend: domain verified, secrets set)
-- [ ] QR code generation and scanning
-- [ ] Map view with geolocation
-- [ ] Multi-language switching
-- [ ] Offline mode (service worker)
-- [ ] Error boundary recovery
-- [ ] Admin panel: user management, business management, statistics
-
-### Automated Testing (Recommended)
-
 ```bash
-# Install Playwright
-npm install -D @playwright/test
-
-# Run tests
-npx playwright test
+npm test
+npm run lint
 ```
 
----
-
-## Security
-
-### Implemented
-
-- **Row Level Security (RLS)**: Database-level access control
-- **Admin Verification**: Server-side admin role check on all admin endpoints
-- **Rate Limiting**: Per-user request throttling on edge functions
-- **Request Size Limits**: Max 1MB request body
-- **Input Sanitization**: Field whitelisting on all update operations
-- **CORS Headers**: Configured on all edge functions
-- **CSP Headers**: Content-Security-Policy meta tags
-- **No Frontend Secrets**: All API keys stored server-side in edge functions
-- **Session Management**: Supabase Auth with auto-refresh tokens
-
-### Headers
-
-```html
-<meta http-equiv="X-Content-Type-Options" content="nosniff" />
-<meta http-equiv="X-Frame-Options" content="DENY" />
-<meta name="referrer" content="strict-origin-when-cross-origin" />
-```
+Prefer fixing Loose Ends before expanding QR / business-dashboard tests — those paths are not the intended product.
 
 ---
 
-## Contributing
+## Product north star (founder)
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+- **Long-stay first** (7–14 day Holiday Pass story)  
+- **Free planner → Saved → Holiday Pass → show visual Pass**  
+- **Businesses list free** via WhatsApp; pay-direct, no commission  
+- **No QR in the UI**  
+- **EN + FR** for tourists; **BI** only on the list-business info page  
 
-### Code Style
-
-- TypeScript strict mode
-- Tailwind CSS for styling (no inline styles)
-- Component files in PascalCase
-- Utility files in camelCase
-- Edge functions in kebab-case
-
----
-
-## License
-
-Proprietary - All rights reserved.
-
----
-
-## Support
-
-- **Email**: stikmnek@gmail.com
-- **Phone**: +678 7766107
-- **Website**: https://www.stikmnek.com
-- **Location**: Vanuatu
-
----
-
-*README pricing & product model last synced with `src/data/pricing.ts` — August 2026. If this file and the app disagree, trust the code.*
-
+When code and this README disagree, trust this document’s **Intended product** sections and the **Loose Ends** list — then fix the code.

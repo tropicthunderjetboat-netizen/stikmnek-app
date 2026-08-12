@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { ThemeProvider } from "@/components/theme-provider";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -47,6 +47,7 @@ const App = () => (
               />
               <Route element={<AppProviderLayout />}>
                 <Route path="/list-your-business" element={<ListBusiness />} />
+                <Route path="/for-business" element={<Navigate to="/list-your-business" replace />} />
                 <Route path="/*" element={<AppLayout />} />
               </Route>
             </Routes>

@@ -1,6 +1,6 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Store, ArrowRight } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { canAccessAdminPanel } from '@/lib/adminRoles';
 import {
@@ -39,7 +39,7 @@ const HowItWorks = React.lazy(() => import('./HowItWorks'));
 const BusinessGrid = React.lazy(() => import('./BusinessGrid'));
 const PassCards = React.lazy(() => import('./PassCards'));
 const ListYourBusinessCta = React.lazy(() => import('./ListYourBusinessCta'));
-const ForBusinessLanding = React.lazy(() => import('./ForBusinessLanding'));
+// ForBusinessLanding kept in repo; /for-business and business-join redirect to /list-your-business
 const ListBusiness = React.lazy(() => import('@/pages/ListBusiness'));
 const CompleteTouristProfile = React.lazy(() => import('./CompleteTouristProfile'));
 const CompleteBusinessProfile = React.lazy(() => import('./CompleteBusinessProfile'));
@@ -475,11 +475,8 @@ const AppLayout: React.FC = () => {
       case 'business-new':
         return <BusinessListingFormInLayout padded />;
       case 'business-join':
-        return (
-          <Suspense fallback={<LoadingSkeleton />}>
-            <ForBusinessLanding />
-          </Suspense>
-        );
+        // Primary onboarding is /list-your-business; keep ForBusinessLanding.tsx in repo for reference.
+        return <Navigate to="/list-your-business" replace />;
       case 'list-business':
         return (
           <Suspense fallback={<LoadingSkeleton />}>

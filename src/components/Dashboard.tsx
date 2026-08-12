@@ -13,8 +13,8 @@ import type { Business } from '@/data/businesses';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import {
-  Ticket, Heart, History, ChevronRight, Wifi,
-  LayoutDashboard, TrendingUp, BarChart3,
+  Ticket, Heart, ChevronRight, Wifi,
+  TrendingUp, BarChart3,
   MapPin, Star, Zap, Target, Clock, Flame, Users, Share2, Loader2, Pencil,
   Wallet, Sparkles, PartyPopper,
 } from 'lucide-react';
@@ -40,7 +40,8 @@ const Dashboard: React.FC = () => {
     language, user, userProfile, favorites, redemptions, setSelectedBusiness, setCurrentView, dbBusinesses,
     refreshRedemptions, purchasePass, refreshUserPass,
   } = useAppContext();
-  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+  const [activeTab] = useState<DashboardTab>('overview');
+  // setActiveTab reserved when restoring analytics tab
   const [shareBusy, setShareBusy] = useState(false);
 
   useEffect(() => {
@@ -171,10 +172,12 @@ const Dashboard: React.FC = () => {
     accommodation: 'from-amber-400 to-amber-600',
   };
 
-  const tabLabels = {
+  // Reserved when restoring analytics tab UI
+  const _tabLabels = {
     overview: { en: 'Overview', fr: 'Aperçu', bi: 'Ovaviu' },
     analytics: { en: 'My Analytics', fr: 'Mes analyses', bi: 'Analitiks blong mi' },
   };
+  void _tabLabels;
 
   const holidayPassUi = useMemo(
     () =>
@@ -306,47 +309,12 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Tab Navigation — full-width on small screens for reliable touch + clear state */}
-        <div
-          className="relative z-10 mb-8 grid grid-cols-2 gap-1 rounded-xl border border-gray-100 bg-white p-1 shadow-sm sm:flex sm:w-fit sm:grid-cols-none touch-manipulation"
-          role="tablist"
-          aria-label={language === 'en' ? 'Dashboard sections' : 'Sections du tableau de bord'}
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'overview'}
-            onClick={() => setActiveTab('overview')}
-            className={`flex min-h-[48px] items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-all sm:px-5 sm:py-2.5 ${
-              activeTab === 'overview'
-                ? 'bg-teal-600 text-white shadow-md shadow-teal-200'
-                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-            }`}
-          >
-            <LayoutDashboard className="h-4 w-4 shrink-0" />
-            <span className="text-center leading-tight">{tabLabels.overview[language]}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'analytics'}
-            onClick={() => setActiveTab('analytics')}
-            className={`flex min-h-[48px] items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-all sm:px-5 sm:py-2.5 ${
-              activeTab === 'analytics'
-                ? 'bg-teal-600 text-white shadow-md shadow-teal-200'
-                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-            }`}
-          >
-            <BarChart3 className="h-4 w-4 shrink-0" />
-            <span className="text-center leading-tight">{tabLabels.analytics[language]}</span>
-          </button>
-        </div>
+        {/* Analytics tab / savings tracker hidden — PassCard-first dashboard */}
 
-        {/* ─── OVERVIEW TAB ─── */}
-        {activeTab === 'overview' && (
-          <>
+        {/* ─── OVERVIEW ─── */}
+        <>
             {/* Quick Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 gap-4 mb-8">
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                 <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center mb-2"><Ticket className="w-5 h-5 text-teal-600" /></div>
                 <p className="text-2xl font-bold text-gray-900">{user.pass ? '1' : '0'}</p>
@@ -366,67 +334,11 @@ const Dashboard: React.FC = () => {
                   <ChevronRight className="w-3.5 h-3.5 text-gray-400" aria-hidden />
                 </p>
               </button>
+              {/* Redeemed + Total saved (redemptions) stats hidden
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mb-2"><History className="w-5 h-5 text-purple-600" /></div>
-                <p className="text-2xl font-bold text-gray-900">{redemptions.length}</p>
-                <p className="text-xs text-gray-500">{language === 'en' ? 'Redeemed' : language === 'fr' ? 'Utilisés' : 'Yusim'}</p>
+                ... redemption count + savings tracker ...
               </div>
-              <div
-                className={`rounded-xl p-4 text-left shadow-sm ${
-                  isPassCostBeaten
-                    ? 'border-2 border-amber-300/80 bg-gradient-to-br from-amber-50 via-emerald-50 to-teal-50 shadow-md shadow-emerald-100/70 ring-1 ring-fuchsia-200/40'
-                    : totalSaved > 0
-                      ? 'border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-teal-50'
-                      : 'border border-green-100 bg-gradient-to-br from-green-50 to-emerald-50'
-                }`}
-              >
-                <div className="mb-2 flex items-center gap-2">
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                      totalSaved > 0
-                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm'
-                        : 'bg-green-100'
-                    }`}
-                  >
-                    <TrendingUp className={`h-5 w-5 ${totalSaved > 0 ? 'text-white' : 'text-green-600'}`} />
-                  </div>
-                  {isPassCostBeaten && (
-                    <Sparkles className="h-5 w-5 text-amber-500" aria-hidden />
-                  )}
-                </div>
-                <p className="text-2xl font-black tracking-tight">
-                  {totalSaved > 0 ? (
-                    <>
-                      <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-                        {totalSaved.toLocaleString()}
-                      </span>
-                      <span className="ml-1 text-sm font-bold text-teal-600/90">VT</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-green-700">0</span>
-                      <span className="ml-1 text-xs font-semibold text-green-500">VT</span>
-                    </>
-                  )}
-                </p>
-                {totalSaved > 0 && (
-                  <p className="mt-1 text-sm font-extrabold leading-tight">
-                    <span className="bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">
-                      ≈ A$
-                      {totalSavedAudApprox.toLocaleString('en-AU', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                    <span className="ml-1 text-[9px] font-bold uppercase text-gray-500">
-                      {language === 'en' ? 'approx.' : language === 'fr' ? 'env.' : 'rid.'}
-                    </span>
-                  </p>
-                )}
-                <p className="text-xs font-semibold text-emerald-800">
-                  {language === 'en' ? 'Total saved (redemptions)' : language === 'fr' ? 'Total économisé (utilisations)' : 'Total sevem (redim)'}
-                </p>
-              </div>
+              */}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -454,60 +366,11 @@ const Dashboard: React.FC = () => {
                   )}
                 </div>
 
-                {/* Redemption History (compact) */}
+                {/* Redemption History / savings tracker — hidden (keep PassCard above)
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-                    <h3 className="font-bold text-gray-900 flex items-center gap-2"><History className="w-5 h-5 text-purple-600" />{t('dash.history', language)}</h3>
-                    {redemptionsForAnalytics.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('analytics')}
-                        className="text-xs text-teal-600 font-semibold hover:text-teal-700 flex items-center gap-1 transition-colors"
-                      >
-                        {language === 'en' ? 'Insights' : language === 'fr' ? 'Analyses' : 'tingting'}
-                        <ChevronRight className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                  {redemptionsForAnalytics.length > 0 ? (
-                    <div className="divide-y divide-gray-100">
-                      {redemptionsForAnalytics.slice(0, 5).map((r, i) => {
-                        const biz =
-                          resolveListingForRedemption(r, allBusinesses) ??
-                          allBusinesses.find((b) => profileBusinessIdFor(b) === r.businessId);
-                        if (!biz) return null;
-                        return (
-                          <div key={`${r.businessId}-${r.date}-${i}`} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                            onClick={() => { setSelectedBusiness(biz); setCurrentView('business-detail'); navigate(dealPathForBusiness(biz)); }}>
-                            <img src={biz.image} alt={biz.name} className="w-12 h-12 rounded-xl object-cover" />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm text-gray-900 truncate">{biz.name}</p>
-                              <p className="text-xs text-gray-400">{r.date}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-bold text-green-600">-{r.saved.toLocaleString()} VT</p>
-                              <p className="text-[10px] text-gray-400">{language === 'en' ? 'saved' : 'économisé'}</p>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-gray-300" />
-                          </div>
-                        );
-                      })}
-                      {redemptionsForAnalytics.length > 5 && (
-                        <button
-                          type="button"
-                          onClick={() => setActiveTab('analytics')}
-                          className="w-full p-3 text-center text-sm text-teal-600 font-semibold hover:bg-teal-50 transition-colors"
-                        >
-                          {language === 'en' ? `More stats (${redemptionsForAnalytics.length} redemptions)` : language === 'fr' ? `Plus de stats (${redemptionsForAnalytics.length})` : `Moa stats (${redemptionsForAnalytics.length})`}
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-8 text-center text-gray-400 text-sm">
-                      {language === 'en' ? 'No redemptions yet. Start exploring deals!' : language === 'fr' ? 'Pas encore d\'utilisations. Explorez les offres!' : 'No usim yet. Stat eksploarem dils!'}
-                    </div>
-                  )}
+                  ... redemption history list ...
                 </div>
+                */}
               </div>
 
               {/* Sidebar */}
@@ -557,29 +420,13 @@ const Dashboard: React.FC = () => {
                   </div>
                 )}
 
+                {/* Savings tracker CTA — hidden
                 {totalSaved > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('analytics')}
-                    className="w-full bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl p-5 text-white text-left shadow-lg shadow-teal-200/50 hover:shadow-xl hover:shadow-teal-200/60 transition-all group"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
-                        <TrendingUp className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold">{language === 'en' ? 'Your savings' : language === 'fr' ? 'Vos économies' : 'Seving blong yu'}</p>
-                        <p className="text-xs text-white/60">{language === 'en' ? 'Open analytics' : language === 'fr' ? 'Voir les analyses' : 'Openem analitiks'}</p>
-                      </div>
-                    </div>
-                    <p className="text-3xl font-black">{totalSaved.toLocaleString()} <span className="text-lg font-bold text-white/70">VT</span></p>
-                    <div className="flex items-center gap-1 mt-2 text-xs text-white/70 group-hover:text-white/90 transition-colors">
-                      <BarChart3 className="w-3.5 h-3.5" />
-                      <span>{language === 'en' ? `from ${redemptions.length} redemptions` : language === 'fr' ? `${redemptions.length} utilisations` : `long ${redemptions.length} redim`}</span>
-                      <ChevronRight className="w-3 h-3 ml-auto group-hover:translate-x-1 transition-transform" />
-                    </div>
+                  <button type="button" onClick={() => setActiveTab('analytics')} ...>
+                    Your savings / Open analytics
                   </button>
                 )}
+                */}
 
                 {/* Favorites */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -618,7 +465,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   <p className="text-xs text-gray-400">
                     {language === 'en'
-                      ? 'Your data is securely stored and synced across devices. QR codes work offline too!'
+                      ? 'Your data is securely stored and synced across devices.'
                       : language === 'fr'
                         ? 'Vos données sont stockées en toute sécurité et synchronisées entre les appareils.'
                         : 'Data blong yu i sef mo sink akros olgeta divaes.'}
@@ -627,10 +474,9 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           </>
-        )}
 
-        {/* ─── ANALYTICS TAB ─── */}
-        {activeTab === 'analytics' && (
+        {/* ─── ANALYTICS TAB (hidden — redemption / savings tracker; restore by removing `false &&`) ─── */}
+        {false && activeTab === 'analytics' && (
           <div className="space-y-6">
             {/* Analytics Header */}
             <div
