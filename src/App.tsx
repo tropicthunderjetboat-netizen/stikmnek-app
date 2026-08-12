@@ -11,6 +11,7 @@ import { AppProvider } from "@/contexts/AppContext";
 import AppLayout from "@/components/AppLayout";
 import React, { Suspense } from "react";
 import ResetPassword from "./pages/ResetPassword";
+import ListBusiness from "./pages/ListBusiness";
 
 const DiagnosticPanel = React.lazy(() => import("./components/DiagnosticPanel"));
 
@@ -45,6 +46,7 @@ const App = () => (
                 }
               />
               <Route element={<AppProviderLayout />}>
+                <Route path="/list-your-business" element={<ListBusiness />} />
                 <Route path="/*" element={<AppLayout />} />
               </Route>
             </Routes>

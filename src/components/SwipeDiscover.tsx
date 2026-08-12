@@ -676,33 +676,10 @@ export default function SwipeDiscover() {
     [feed, resetDragVisual],
   );
 
-  const openPartnerSignIn = useCallback(() => {
-    if (user) {
-      if (user.type === 'business') {
-        setCurrentView('business-dashboard');
-        navigate('/hub');
-        return;
-      }
-      if (user.type === 'admin' || user.type === 'staff') {
-        setCurrentView('admin');
-        return;
-      }
-      toast.info('You are signed in as a tourist. Sign out to log in with a business account.', {
-        action: {
-          label: 'Sign out',
-          onClick: () => {
-            void signOut().then(() => {
-              setAuthMode('signin');
-              setShowAuth(true);
-            });
-          },
-        },
-      });
-      return;
-    }
-    setAuthMode('signin');
-    setShowAuth(true);
-  }, [user, setAuthMode, setShowAuth, setCurrentView, navigate, signOut]);
+  const openListBusiness = useCallback(() => {
+    setCurrentView('list-business');
+    navigate('/list-your-business');
+  }, [navigate, setCurrentView]);
 
   if (!dataLoaded) {
     return (
@@ -890,10 +867,7 @@ export default function SwipeDiscover() {
           <WelcomeCard
             onStart={finishWelcome}
             dealCount={listings.length}
-            onPartnerSignIn={openPartnerSignIn}
-            partnerLabel={
-              user?.type === 'business' ? 'Go to my business dashboard' : 'Business login'
-            }
+            onListBusiness={openListBusiness}
           />
         )}
         {current?.kind === 'tip' && (
@@ -1031,13 +1005,11 @@ export default function SwipeDiscover() {
 function WelcomeCard({
   onStart,
   dealCount,
-  onPartnerSignIn,
-  partnerLabel,
+  onListBusiness,
 }: {
   onStart: () => void;
   dealCount: number;
-  onPartnerSignIn: () => void;
-  partnerLabel: string;
+  onListBusiness: () => void;
 }) {
   const dealsMeta =
     dealCount > 0
@@ -1130,11 +1102,11 @@ function WelcomeCard({
 
         <button
           type="button"
-          onClick={onPartnerSignIn}
+          onClick={onListBusiness}
           className="mt-4 text-center text-[13px] font-semibold text-white hover:text-teal-100 underline-offset-2 hover:underline"
           style={{ textShadow: TEXT_SHADOW_SOFT }}
         >
-          {partnerLabel}
+          List your business — free
         </button>
       </div>
     </div>

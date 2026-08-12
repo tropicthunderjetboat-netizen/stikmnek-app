@@ -8,7 +8,7 @@ import LocalOwnedBadge from './LocalOwnedBadge';
 
 const Hero: React.FC = () => {
   const navigate = useNavigate();
-  const { language, user, setShowAuth, setAuthMode, setCurrentView, dbBusinesses } = useAppContext();
+  const { language, user, setCurrentView, dbBusinesses } = useAppContext();
   const signedInTourist = user?.type === 'tourist';
 
   const goToDeals = () => {
@@ -16,18 +16,9 @@ const Hero: React.FC = () => {
     navigate('/deals');
   };
 
-  const scrollToListBusiness = () => {
-    if (!user) {
-      setAuthMode('signup-business');
-      setShowAuth(true);
-      return;
-    }
-    if (user.type === 'business') {
-      navigate('/business/new');
-      return;
-    }
-    setAuthMode('signup-business');
-    setShowAuth(true);
+  const goToListBusiness = () => {
+    setCurrentView('list-business');
+    navigate('/list-your-business');
   };
 
   const allBusinesses = useMemo(() => touristFacingOfferings(dbBusinesses), [dbBusinesses]);
@@ -103,10 +94,10 @@ const Hero: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={scrollToListBusiness}
+                  onClick={goToListBusiness}
                   className="flex w-full items-center justify-center gap-2 px-8 py-3.5 rounded-xl border-2 border-white/90 bg-white/5 text-white font-semibold text-base hover:bg-white/15 transition-all min-h-[3rem] backdrop-blur-[2px]"
                 >
-                  {t('hero.ctaBusiness', language)}
+                  List your business — free
                 </button>
               </>
             ) : (
@@ -126,10 +117,10 @@ const Hero: React.FC = () => {
                     </p>
                     <button
                       type="button"
-                      onClick={scrollToListBusiness}
+                      onClick={goToListBusiness}
                       className="flex w-full items-center justify-center gap-2 px-8 py-3.5 sm:py-4 rounded-xl border-2 border-white/90 bg-white/5 text-white font-semibold text-base hover:bg-white/15 transition-all min-h-[3rem] backdrop-blur-[2px]"
                     >
-                      {t('hero.ctaBusiness', language)}
+                      List your business — free
                     </button>
                   </>
                 )}
@@ -152,6 +143,15 @@ const Hero: React.FC = () => {
           <p className="text-sm sm:text-base font-semibold text-white/85 drop-shadow-[0_1px_6px_rgba(0,0,0,0.45)]">
             {footerMeta}
           </p>
+          {!user || user.type !== 'business' ? (
+            <button
+              type="button"
+              onClick={goToListBusiness}
+              className="mt-4 text-left text-sm font-semibold text-white/90 underline-offset-2 hover:underline hover:text-white"
+            >
+              List your business — free
+            </button>
+          ) : null}
         </div>
       </div>
     </section>

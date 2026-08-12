@@ -135,8 +135,8 @@ const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/business/new" className="text-sm text-gray-400 hover:text-teal-400 transition-colors">
-                  {t('footer.business', language)}
+                <Link to="/list-your-business" className="text-sm text-gray-400 hover:text-teal-400 transition-colors">
+                  List your business — free
                 </Link>
               </li>
             </ul>

@@ -13,20 +13,11 @@ const COLOUR_TILES_BG =
  */
 const ListYourBusinessCta: React.FC = () => {
   const navigate = useNavigate();
-  const { language, user, setShowAuth, setAuthMode } = useAppContext();
+  const { language, user, setCurrentView } = useAppContext();
 
   const onClick = () => {
-    if (!user) {
-      setAuthMode('signup-business');
-      setShowAuth(true);
-      return;
-    }
-    if (user.type === 'business') {
-      navigate('/business/new');
-      return;
-    }
-    setAuthMode('signup-business');
-    setShowAuth(true);
+    setCurrentView('list-business');
+    navigate('/list-your-business');
   };
 
   const badge =

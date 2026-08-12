@@ -40,6 +40,7 @@ const BusinessGrid = React.lazy(() => import('./BusinessGrid'));
 const PassCards = React.lazy(() => import('./PassCards'));
 const ListYourBusinessCta = React.lazy(() => import('./ListYourBusinessCta'));
 const ForBusinessLanding = React.lazy(() => import('./ForBusinessLanding'));
+const ListBusiness = React.lazy(() => import('@/pages/ListBusiness'));
 const CompleteTouristProfile = React.lazy(() => import('./CompleteTouristProfile'));
 const CompleteBusinessProfile = React.lazy(() => import('./CompleteBusinessProfile'));
 const PaymentConfirmation = React.lazy(() => import('./PaymentConfirmation'));
@@ -479,6 +480,12 @@ const AppLayout: React.FC = () => {
             <ForBusinessLanding />
           </Suspense>
         );
+      case 'list-business':
+        return (
+          <Suspense fallback={<LoadingSkeleton />}>
+            <ListBusiness />
+          </Suspense>
+        );
       case 'home':
       default:
         return <HomePage />;
@@ -491,6 +498,7 @@ const AppLayout: React.FC = () => {
     currentView === 'complete-business-profile' ||
     currentView === 'checkout' ||
     currentView === 'payment-confirmation' ||
+    currentView === 'list-business' ||
     // Tourist home keeps SwipeDiscover's own branding/login chrome (not the full Navbar).
     (currentView === 'home' && user?.type !== 'business');
   const hideFooter =
@@ -499,6 +507,7 @@ const AppLayout: React.FC = () => {
     currentView === 'payment-confirmation' ||
     currentView === 'business-dashboard' ||
     currentView === 'business-join' ||
+    currentView === 'list-business' ||
     currentView === 'complete-profile' ||
     currentView === 'complete-business-profile' ||
     (currentView === 'home' && user?.type !== 'business') ||
