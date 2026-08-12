@@ -4,7 +4,12 @@
 -- Safe to re-run: upserts profile and refreshes the demo pass row by payment_session_id.
 --
 -- QR code = passes.id (UUID). Redemption checks valid_from / valid_until and active=true.
--- Hourly cron sets active=false when expires_at < now() — this pass uses year 2099.
+-- Hourly cron sets active=false when expires_at < now() — this pass uses year 2099 for expires_at /
+-- valid_until so demos keep working; valid_from is CURRENT_DATE so PassCard "VALID UNTIL" shows a
+-- current first week (not a fixed historical date like 2020).
+--
+-- Real free/paid passes are never created by this script — Edge functions set valid_from / valid_until
+-- from the shopper's start date (today…+30 days UTC) and product length (1 or 7/14 days).
 
 DO $$
 DECLARE
@@ -12,6 +17,7 @@ DECLARE
   v_uid uuid;
   v_pass_id uuid;
   v_demo_session text := 'demo-ima-tourist';
+  v_from date := (CURRENT_DATE)::date;
 BEGIN
   SELECT id INTO v_uid FROM auth.users WHERE lower(email) = lower(v_email) LIMIT 1;
 
@@ -93,7 +99,7 @@ BEGIN
       v_uid,
       'dynamic',
       true,
-      '2020-01-01'::date,
+      v_from,
       '2099-12-31'::date,
       '2099-12-31 23:59:59+00'::timestamptz,
       20,
@@ -110,7 +116,7 @@ BEGIN
     SET
       pass_type = 'dynamic',
       active = true,
-      valid_from = '2020-01-01'::date,
+      valid_from = v_from,
       valid_until = '2099-12-31'::date,
       expires_at = '2099-12-31 23:59:59+00'::timestamptz,
       max_people = 20,
@@ -121,6 +127,6 @@ BEGIN
     WHERE id = v_pass_id;
   END IF;
 
-  RAISE NOTICE 'Demo pass ready for % (user_id=%). Pass UUID (QR payload)=%',
-    v_email, v_uid, v_pass_id;
+  RAISE NOTICE 'Demo pass ready for % (user_id=%). Pass UUID (QR payload)=%. valid_from=%',
+    v_email, v_uid, v_pass_id, v_from;
 END $$;
