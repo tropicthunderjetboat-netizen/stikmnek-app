@@ -17,6 +17,7 @@ const FloatingPassButton: React.FC = () => {
 
   if (
     currentView === 'home' ||
+    currentView === 'dashboard' ||
     currentView === 'checkout' ||
     currentView === 'payment-confirmation' ||
     currentView === 'admin' ||
