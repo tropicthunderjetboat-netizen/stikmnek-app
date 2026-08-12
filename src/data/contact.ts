@@ -2,8 +2,9 @@
 export const SUPPORT_EMAIL = 'stikmnek@gmail.com';
 
 /**
- * Your WhatsApp for concierge business onboarding (digits only, e.g. 6781234567).
- * Set this to enable "Message us" links on /for-business. Leave empty to hide the button.
+ * Outreach WhatsApp for concierge business onboarding (digits only, e.g. 6787766107).
+ * Set this to enable "Message our team" links on /for-business. Leave empty to hide the button.
+ * Public UI must say StikmNek team / our team — never a personal name.
  */
 export const OUTREACH_WHATSAPP = '';
 

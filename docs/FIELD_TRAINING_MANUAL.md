@@ -2,7 +2,7 @@
 
 **For:** Field agents who visit businesses, sign them up, and teach staff how to scan tourist passes.
 
-**Website:** www.stikmnek.com · **Support:** Andy — +678 7766107 · stikmnek@gmail.com
+**Website:** www.stikmnek.com · **Support:** StikmNek team — +678 7766107 · stikmnek@gmail.com
 
 **Updated:** July 2026
 

@@ -22,7 +22,7 @@ StikmNek helps **long-stay tourists (about 7–14 days)** plan Vanuatu and save 
 
 **Revenue:** Pass sales (AUD via PayPal) + optional **A$5 Super Star** tip. Listings are **free forever**.
 
-**Businesses:** Founder onboards via WhatsApp from `/list-your-business`. No self-serve “list and pay” product; no scanning by staff.
+**Businesses:** StikmNek team onboards via WhatsApp from `/list-your-business`. No self-serve “list and pay” product; no scanning by staff.
 
 ---
 
@@ -67,8 +67,8 @@ Prices exclude payment processing fees. Pass is non-transferable; name should ma
 
 1. Tap **List your business — free** (home / Hero / Footer)  
 2. Open `/list-your-business` — EN 🇦🇺 / FR 🇫🇷 / BI 🇻🇺  
-3. Tap **Message Andy on WhatsApp** (English prefill message)  
-4. Founder adds listing (photos, pin, discount) — **free forever**  
+3. Tap **Message us on WhatsApp** (English prefill to StikmNek team)  
+4. StikmNek team adds listing (photos, pin, discount) — **free forever**  
 
 ### Admin
 

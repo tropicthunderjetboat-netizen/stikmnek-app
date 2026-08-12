@@ -6,8 +6,12 @@ import { APP_ICON } from '@/lib/brand';
 
 type PageLang = 'en' | 'fr' | 'bi';
 
+/** English prefill — number stays 6787766107; display text is team brand, not a person. */
 const WHATSAPP_URL =
-  'https://wa.me/6787766107?text=Hi%20Andy%20-%20I%20want%20to%20list%20my%20business%20on%20StikmNek%20for%20free.%20Business%3A%20%0ALocation%3A%20%0ADiscount%20for%20Pass%20holders%3A%20%0A';
+  'https://wa.me/6787766107?text=' +
+  encodeURIComponent(
+    'Hi StikmNek team - I want to list my business on StikmNek for free. Business: \nLocation: \nDiscount for Pass holders: \n',
+  );
 
 const LANG_OPTIONS: { code: PageLang; label: string; flag: string }[] = [
   { code: 'en', label: 'EN', flag: '🇦🇺' },
@@ -17,7 +21,7 @@ const LANG_OPTIONS: { code: PageLang; label: string; flag: string }[] = [
 
 const COPY: Record<
   PageLang,
-  { title: string; bullets: string[]; needLabel: string; needBody: string }
+  { title: string; bullets: string[]; needLabel: string; needBody: string; waCta: string }
 > = {
   en: {
     title: 'For Ni-Vanuatu & local businesses',
@@ -29,6 +33,7 @@ const COPY: Record<
     ],
     needLabel: 'What we need from you',
     needBody: 'Business name, location pin, 3 photos, discount, WhatsApp',
+    waCta: 'Message us on WhatsApp',
   },
   fr: {
     title: 'Pour les entreprises locales',
@@ -40,6 +45,7 @@ const COPY: Record<
     ],
     needLabel: 'Ce dont nous avons besoin',
     needBody: "Nom de l'entreprise, localisation, 3 photos, réduction, WhatsApp",
+    waCta: 'Contactez notre équipe',
   },
   bi: {
     title: 'Blong ol lokol bisnes',
@@ -51,6 +57,7 @@ const COPY: Record<
     ],
     needLabel: 'Mifala i nid long yu',
     needBody: 'Nem blong bisnis, ples long map, 3 foto, diskount, WhatsApp',
+    waCta: 'Sendem mesej long mifala',
   },
 };
 
@@ -168,11 +175,14 @@ const ListBusiness: React.FC = () => {
             className="flex w-full min-h-[3.5rem] items-center justify-center gap-2.5 rounded-2xl bg-[#0FB5B5] px-5 text-base font-bold text-white shadow-xl shadow-teal-300/40 hover:bg-[#0da3a3] active:scale-[0.99] transition-all"
           >
             <WhatsAppIcon className="h-6 w-6 shrink-0" />
-            Message Andy on WhatsApp
+            {copy.waCta}
           </a>
-          <div className="mt-2.5 text-center">
-            <Link to="/business/new" className="text-sm underline opacity-70 text-gray-700 hover:opacity-100">
-              Tech-savvy? List it yourself
+          <div className="mt-2.5 text-center space-y-1.5">
+            <Link to="/business/new" className="block text-sm underline opacity-70 text-gray-700 hover:opacity-100">
+              Tech-savvy? List it yourself →
+            </Link>
+            <Link to="/hub" className="block text-sm text-gray-600 hover:text-teal-700 hover:underline">
+              Already have an account? Staff / Business login
             </Link>
           </div>
         </div>

@@ -560,6 +560,10 @@ export const translations: Record<string, Record<Language, string>> = {
   'footer.faq': { en: 'FAQ', fr: 'FAQ' },
   'footer.business': { en: 'List Your Business', fr: 'Inscrivez votre entreprise' },
   'footer.copyright': { en: '© 2026 StikmNek. All rights reserved.', fr: '© 2026 StikmNek. Tous droits réservés.' },
+
+  // Team contact (no personal names in public UI). BI: "Sendem mesej long mifala" — used on /list-your-business local COPY.
+  'contact.message_team': { en: 'Message our team', fr: 'Contactez notre équipe' },
+  'contact.message_whatsapp': { en: 'Message us on WhatsApp', fr: 'Contactez notre équipe sur WhatsApp' },
   
   // Auth
   'auth.signin': { en: 'Sign In', fr: 'Connexion' },
