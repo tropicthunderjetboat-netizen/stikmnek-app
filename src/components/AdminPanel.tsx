@@ -2613,10 +2613,10 @@ const AdminPanel: React.FC = () => {
                                       onClick={() => setRecropPhoto(photo)}
                                       disabled={recropSaving || processingPhotoId === photo.id}
                                       className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition-colors disabled:opacity-50 shadow-sm"
-                                      title="Crop to vertical for the phone swipe feed"
+                                      title="Adjust how this photo looks on the swipe feed"
                                     >
                                       <Crop className="w-3.5 h-3.5" />
-                                      Crop for feed
+                                      Adjust for feed
                                     </button>
                                     {photo.status === 'pending' ? (
                                       <div className="flex items-center gap-2">

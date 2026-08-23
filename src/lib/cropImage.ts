@@ -56,11 +56,19 @@ export async function dataUrlToFile(dataUrl: string, fileName: string): Promise<
   return new File([blob], fileName, { type: 'image/jpeg' });
 }
 
+/**
+ * Read pixel size for layout. Do not set crossOrigin — admin storage URLs often
+ * fail CORS on a canvas-tainted Image, which made landscape photos look portrait.
+ */
 export async function getImageNaturalSize(
   src: string,
 ): Promise<{ width: number; height: number }> {
-  const image = await createImage(src);
-  return { width: image.naturalWidth, height: image.naturalHeight };
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    image.onerror = () => reject(new Error('Could not read image size'));
+    image.src = src;
+  });
 }
 
 export function isLandscapeSize(width: number, height: number): boolean {
@@ -75,6 +83,45 @@ export function landscapeOutputSize(
   const width = 1920;
   const height = Math.max(1, Math.round((cropHeight / Math.max(1, cropWidth)) * width));
   return { width, height };
+}
+
+/** Scale the full image (no crop) for feed upload. */
+export async function encodeFullImageDataUrl(src: string, maxWidth = 1920): Promise<string> {
+  const image = await createImage(src);
+  let width = image.naturalWidth;
+  let height = image.naturalHeight;
+  if (width > maxWidth) {
+    height = Math.max(1, Math.round((maxWidth / width) * height));
+    width = maxWidth;
+  }
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas not supported');
+  canvas.width = width;
+  canvas.height = height;
+  ctx.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL('image/jpeg', 0.92);
+}
+
+export async function sourceToJpegFile(
+  src: string,
+  fileName: string,
+): Promise<{ file: File; preview: string }> {
+  const jpegName = fileName.replace(/\.[^.]+$/, '') + '.jpg';
+  try {
+    const preview = await encodeFullImageDataUrl(src);
+    const file = await dataUrlToFile(preview, jpegName);
+    return { file, preview };
+  } catch {
+    if (src.startsWith('data:')) {
+      const file = await dataUrlToFile(src, jpegName);
+      return { file, preview: src };
+    }
+    const res = await fetch(src);
+    const blob = await res.blob();
+    const file = new File([blob], jpegName, { type: blob.type || 'image/jpeg' });
+    return { file, preview: src };
+  }
 }
 
 /**

@@ -1125,10 +1125,10 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
                       });
                     }}
                     className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all px-2 py-1 rounded-lg bg-white text-teal-800 text-[10px] font-semibold flex items-center gap-1 shadow"
-                    title="Crop to vertical for the phone feed"
+                    title="Adjust photo for the phone feed"
                   >
                     <Crop className="w-3 h-3" />
-                    Recrop
+                    Adjust
                   </button>
                 )}
                 {allowReorder && index > 0 && (
