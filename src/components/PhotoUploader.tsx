@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import LogoCropDialog from '@/components/LogoCropDialog';
+import { getImageNaturalSize, isLandscapeSize } from '@/lib/cropImage';
 import { useAppContext } from '@/contexts/AppContext';
 import {
   AlertDialog,
@@ -50,7 +51,7 @@ interface PhotoUploaderProps {
   /** Square crop + zoom before upload (business logo). */
   logoCrop?: boolean;
   /**
-   * Vertical 9:16 crop before upload (matches tourist swipe feed).
+   * Vertical phone-screen crop before upload (matches tourist swipe feed).
    * Defaults on for listing photos when not using logoCrop.
    */
   portraitCrop?: boolean;
@@ -289,7 +290,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   const resolvedSublabel =
     sublabel ??
     (portraitCrop
-      ? 'Vertical crop for the phone feed. PNG, JPG up to 5MB. First photo = cover.'
+      ? 'Portrait photos are framed to the phone. Wide (landscape) photos stay in full on the swipe feed. PNG, JPG up to 5MB. First photo = cover.'
       : logoCrop
         ? 'Drag & drop or click. Square crop for your logo.'
         : 'Drag & drop or click to browse. PNG, JPG up to 5MB each.');
@@ -699,26 +700,52 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
     }
 
     if (portraitCrop) {
-      const queue: { src: string; fileName: string }[] = [];
+      const portraitQueue: { src: string; fileName: string }[] = [];
+      const landscapeFiles: File[] = [];
+      const landscapeReads: string[] = [];
       for (let i = 0; i < filesToUpload.length; i++) {
         const src = preReads[i];
         if (!src) {
           toast.error(`Could not read "${filesToUpload[i].name}" — skipped.`);
           continue;
         }
-        queue.push({ src, fileName: filesToUpload[i].name });
+        let landscape = false;
+        try {
+          const size = await getImageNaturalSize(src);
+          landscape = isLandscapeSize(size.width, size.height);
+        } catch {
+          landscape = false;
+        }
+        if (landscape) {
+          landscapeFiles.push(filesToUpload[i]);
+          landscapeReads.push(src);
+        } else {
+          portraitQueue.push({ src, fileName: filesToUpload[i].name });
+        }
       }
-      if (queue.length === 0) {
-        toast.error('Could not read selected images — try again.');
+      if (landscapeFiles.length > 0) {
+        toast.message(
+          language === 'en'
+            ? 'Wide photos stay in full on the swipe feed (blurred fill around them).'
+            : language === 'fr'
+              ? 'Les photos paysage restent entières sur le fil (fond flou autour).'
+              : 'Wide foto i stap ful long swipe feed.',
+        );
+        await uploadFilesAfterCrop(landscapeFiles, landscapeReads);
+      }
+      if (portraitQueue.length === 0) {
+        if (landscapeFiles.length === 0) {
+          toast.error('Could not read selected images — try again.');
+        }
         return;
       }
-      setCropQueue(queue.slice(1));
-      setCropDialog(queue[0]);
+      setCropQueue(portraitQueue.slice(1));
+      setCropDialog(portraitQueue[0]);
       return;
     }
 
     await uploadFilesAfterCrop(filesToUpload, preReads);
-  }, [photos, maxPhotos, isSingleSlot, uploading, logoCrop, portraitCrop, uploadFilesAfterCrop, onPhotosChange]);
+  }, [photos, maxPhotos, isSingleSlot, uploading, logoCrop, portraitCrop, uploadFilesAfterCrop, onPhotosChange, language]);
 
   const handleCropDialogClose = useCallback(() => {
     setCropDialog(null);
@@ -1057,7 +1084,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
                 setDropTargetIndex(null);
               }}
               className={`group relative rounded-xl overflow-hidden bg-gray-100 border transition-all ${
-                portraitCrop ? 'aspect-[9/16]' : 'aspect-square'
+                portraitCrop ? 'aspect-[9/19.5]' : 'aspect-square'
               } ${
                 dropTargetIndex === index && dragPhotoIndex !== null && dragPhotoIndex !== index
                   ? 'border-teal-500 ring-2 ring-teal-300 scale-[1.02]'
@@ -1069,7 +1096,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               <img
                 src={photo.url || photo.preview}
                 alt={photo.name}
-                className="w-full h-full object-cover pointer-events-none"
+                className="w-full h-full object-contain bg-neutral-900 pointer-events-none"
                 loading="lazy"
                 draggable={false}
               />
@@ -1181,7 +1208,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
             <div
               onClick={handleClick}
               className={`rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center hover:border-teal-300 hover:bg-teal-50/30 transition-all cursor-pointer ${
-                portraitCrop ? 'aspect-[9/16]' : 'aspect-square'
+                portraitCrop ? 'aspect-[9/19.5]' : 'aspect-square'
               }`}
             >
               <Upload className="w-6 h-6 text-gray-300 mb-1" />

@@ -19,7 +19,7 @@ function createImage(url: string): Promise<HTMLImageElement> {
 
 /**
  * Returns a JPEG data URL of the cropped region.
- * Pass matching width/height for square logos, or portrait (e.g. 1080×1920) for feed covers.
+ * Pass matching width/height for square logos, or portrait (e.g. 1080×2340) for feed covers.
  */
 export async function getCroppedImageDataUrl(
   imageSrc: string,
@@ -56,7 +56,31 @@ export async function dataUrlToFile(dataUrl: string, fileName: string): Promise<
   return new File([blob], fileName, { type: 'image/jpeg' });
 }
 
-/** Phone-style vertical for the tourist swipe feed. */
-export const PORTRAIT_ASPECT = 9 / 16;
+export async function getImageNaturalSize(
+  src: string,
+): Promise<{ width: number; height: number }> {
+  const image = await createImage(src);
+  return { width: image.naturalWidth, height: image.naturalHeight };
+}
+
+export function isLandscapeSize(width: number, height: number): boolean {
+  return width > height;
+}
+
+/** Encode a landscape crop at 1920px wide, keeping the cropped aspect. */
+export function landscapeOutputSize(
+  cropWidth: number,
+  cropHeight: number,
+): { width: number; height: number } {
+  const width = 1920;
+  const height = Math.max(1, Math.round((cropHeight / Math.max(1, cropWidth)) * width));
+  return { width, height };
+}
+
+/**
+ * Phone-style vertical for the tourist swipe feed.
+ * 9:16 is shorter than modern phones (~9:19.5) and left letterboxing on the feed.
+ */
+export const PORTRAIT_ASPECT = 9 / 19.5;
 export const PORTRAIT_OUTPUT_WIDTH = 1080;
-export const PORTRAIT_OUTPUT_HEIGHT = 1920;
+export const PORTRAIT_OUTPUT_HEIGHT = 2340;

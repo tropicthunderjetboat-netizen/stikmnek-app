@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext, type DBReview } from '@/contexts/AppContext';
 import PhotoLightbox from '@/components/PhotoLightbox';
+import { FeedFitPhoto } from '@/components/FeedFitPhoto';
 import {
   businessListingHasWhatsApp,
   businessListingWhatsAppRaw,
@@ -204,9 +205,6 @@ function placeKey(b: Business): string {
   return b.id;
 }
 
-/** Fill the portrait card (wide camera photos crop on the sides instead of letterboxing).
- *  Soft blurred fill stays behind in case of tiny gaps while the image loads.
- */
 function FitPhoto({
   src,
   className = '',
@@ -216,28 +214,10 @@ function FitPhoto({
   src: string;
   className?: string;
   imgClassName?: string;
-  /** When true, eager-load for the visible card (LCP / first place). */
   priority?: boolean;
 }) {
-  if (!src) return <div className={`bg-neutral-900 ${className}`} />;
-  const safeUrl = src.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
   return (
-    <div className={`relative overflow-hidden bg-neutral-950 ${className}`}>
-      <div
-        aria-hidden
-        className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl opacity-50"
-        style={{ backgroundImage: `url("${safeUrl}")` }}
-      />
-      <img
-        src={src}
-        alt=""
-        draggable={false}
-        decoding={priority ? 'sync' : 'async'}
-        loading={priority ? 'eager' : 'lazy'}
-        fetchPriority={priority ? 'high' : 'auto'}
-        className={`relative z-[1] h-full w-full object-cover object-center ${imgClassName}`}
-      />
-    </div>
+    <FeedFitPhoto src={src} className={className} imgClassName={imgClassName} priority={priority} />
   );
 }
 

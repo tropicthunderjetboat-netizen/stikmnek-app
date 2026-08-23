@@ -14,6 +14,9 @@ import { Loader2, ZoomIn } from 'lucide-react';
 import {
   dataUrlToFile,
   getCroppedImageDataUrl,
+  getImageNaturalSize,
+  isLandscapeSize,
+  landscapeOutputSize,
   PORTRAIT_ASPECT,
   PORTRAIT_OUTPUT_HEIGHT,
   PORTRAIT_OUTPUT_WIDTH,
@@ -29,7 +32,7 @@ type LogoCropDialogProps = {
   language: Language;
   onClose: () => void;
   onCropped: (file: File, previewDataUrl: string) => void | Promise<void>;
-  /** Square logo (default) or vertical feed photo. */
+  /** Square logo (default) or feed photo. */
   variant?: CropVariant;
 };
 
@@ -46,29 +49,62 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [saving, setSaving] = useState(false);
+  const [sourceSize, setSourceSize] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setCroppedAreaPixels(null);
-  }, [imageSrc]);
+    setSourceSize(null);
+    if (!imageSrc || variant !== 'portrait') return;
+    let cancelled = false;
+    void getImageNaturalSize(imageSrc)
+      .then((size) => {
+        if (!cancelled) setSourceSize(size);
+      })
+      .catch(() => {
+        if (!cancelled) setSourceSize({ width: 9, height: 19.5 });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [imageSrc, variant]);
 
   const onCropComplete = useCallback((_area: Area, pixels: Area) => {
     setCroppedAreaPixels(pixels);
   }, []);
 
   const isPortrait = variant === 'portrait';
+  const sourceIsLandscape = Boolean(
+    sourceSize && isLandscapeSize(sourceSize.width, sourceSize.height),
+  );
+  const cropAspect = !isPortrait
+    ? 1
+    : sourceIsLandscape && sourceSize
+      ? sourceSize.width / sourceSize.height
+      : PORTRAIT_ASPECT;
+  const cropperReady = !isPortrait || sourceSize != null;
 
   const t = isPortrait
     ? {
-        title:
-          language === 'en'
+        title: sourceIsLandscape
+          ? language === 'en'
+            ? 'Keep the full wide photo'
+            : language === 'fr'
+              ? 'Garder la photo en largeur'
+              : 'Kipem wide foto'
+          : language === 'en'
             ? 'Frame your photo'
             : language === 'fr'
               ? 'Cadrez votre photo'
               : 'Frameem foto',
-        hint:
-          language === 'en'
+        hint: sourceIsLandscape
+          ? language === 'en'
+            ? 'Wide camera photos stay in full on the swipe feed, with a blurred fill around them. You can still trim the edges.'
+            : language === 'fr'
+              ? 'Les photos paysage restent entières sur le fil, avec un fond flou. Vous pouvez encore recadrer les bords.'
+              : 'Wide foto i stap ful long feed, wetem blur raon. Yu save trim edges.'
+          : language === 'en'
             ? 'Crop to vertical — this is how it looks on the phone swipe feed. Drag to reposition, zoom to fill.'
             : language === 'fr'
               ? 'Cadrez en vertical — comme sur le fil mobile. Glissez et zoomez.'
@@ -99,9 +135,19 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
     if (!croppedAreaPixels) return;
     setSaving(true);
     try {
-      const outW = isPortrait ? PORTRAIT_OUTPUT_WIDTH : 800;
-      const outH = isPortrait ? PORTRAIT_OUTPUT_HEIGHT : 800;
-      const dataUrl = await getCroppedImageDataUrl(imageSrc, croppedAreaPixels, outW, outH);
+      const landscapeCrop =
+        isPortrait && croppedAreaPixels.width > croppedAreaPixels.height;
+      const out = !isPortrait
+        ? { width: 800, height: 800 }
+        : landscapeCrop
+          ? landscapeOutputSize(croppedAreaPixels.width, croppedAreaPixels.height)
+          : { width: PORTRAIT_OUTPUT_WIDTH, height: PORTRAIT_OUTPUT_HEIGHT };
+      const dataUrl = await getCroppedImageDataUrl(
+        imageSrc,
+        croppedAreaPixels,
+        out.width,
+        out.height,
+      );
       const suffix = isPortrait ? '-photo.jpg' : '-logo.jpg';
       const file = await dataUrlToFile(dataUrl, fileName.replace(/\.[^.]+$/, '') + suffix);
       await onCropped(file, dataUrl);
@@ -123,20 +169,30 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
 
         <div
           className={`relative w-full bg-gray-900 ${
-            isPortrait ? 'h-[min(68vh,440px)]' : 'h-[min(52vw,280px)]'
+            isPortrait && sourceIsLandscape
+              ? 'h-[min(52vh,320px)]'
+              : isPortrait
+                ? 'h-[min(68vh,440px)]'
+                : 'h-[min(52vw,280px)]'
           }`}
         >
-          <Cropper
-            image={imageSrc}
-            crop={crop}
-            zoom={zoom}
-            aspect={isPortrait ? PORTRAIT_ASPECT : 1}
-            cropShape="rect"
-            showGrid
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
-            onCropComplete={onCropComplete}
-          />
+          {cropperReady ? (
+            <Cropper
+              image={imageSrc}
+              crop={crop}
+              zoom={zoom}
+              aspect={cropAspect}
+              cropShape="rect"
+              showGrid
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={onCropComplete}
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Loader2 className="w-6 h-6 animate-spin text-white/70" />
+            </div>
+          )}
         </div>
 
         <div className="px-5 py-4 space-y-3 border-t border-gray-100">
@@ -158,7 +214,12 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
             {t.cancel}
           </Button>
-          <Button type="button" onClick={() => void handleSave()} disabled={saving} className="bg-teal-600 hover:bg-teal-700">
+          <Button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={saving || !croppedAreaPixels}
+            className="bg-teal-600 hover:bg-teal-700"
+          >
             {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             {t.save}
           </Button>

@@ -2577,7 +2577,7 @@ const AdminPanel: React.FC = () => {
                                   photo.status === 'rejected' ? 'border-red-300' : 'border-yellow-300'
                                 }`}>
                                   {/* Photo */}
-                                  <div className="relative bg-gray-900 aspect-[9/16]">
+                                  <div className="relative bg-gray-900 aspect-[9/19.5]">
                                     <img
                                       src={getPhotoDisplayUrl(photo, SUPABASE_URL) || photo.url || '/placeholder.svg'}
                                       alt={`Photo ${idx + 1}`}

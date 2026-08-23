@@ -10,6 +10,7 @@ import { bodyFor as legalBodyFor, TITLES as LEGAL_TITLES } from './LegalDocument
 import { formatVT } from '@/lib/utils';
 import { toast } from 'sonner';
 import PhotoUploader, { UploadedPhoto } from './PhotoUploader';
+import { FeedFitPhoto } from '@/components/FeedFitPhoto';
 import PricingTiersEditor from './PricingTiersEditor';
 import { Switch } from '@/components/ui/switch';
 import LocationMapPicker from './LocationMapPicker';
@@ -2561,8 +2562,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
             </label>
             <p className="text-sm text-gray-700 mb-2">
               {language === 'en'
-                ? 'At least one photo is required. Photos are cropped to vertical (phone screen) — first photo is your cover on the swipe feed.'
-                : 'Au moins une photo est requise. Cadrez en vertical (écran téléphone) — la première est la couverture du fil.'}
+                ? 'At least one photo is required. Portrait photos are framed to the phone. Wide camera photos stay in full on the swipe feed. First photo is your cover.'
+                : 'Au moins une photo est requise. Les photos portrait sont cadrées au téléphone. Les photos paysage restent entières sur le fil. La première est la couverture.'}
             </p>
             <div className={fieldErrors.photos ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
               <PhotoUploader
@@ -2843,12 +2844,12 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
             </div>
 
             <div className="flex-1 flex items-center justify-center px-6 pb-8 min-h-0">
-              <div className="relative w-full max-w-[320px] aspect-[9/16] rounded-[1.75rem] overflow-hidden border border-white/15 shadow-2xl bg-neutral-900">
+              <div className="relative w-full max-w-[320px] aspect-[9/19.5] rounded-[1.75rem] overflow-hidden border border-white/15 shadow-2xl bg-neutral-900">
                 {photos[0]?.url || photos[0]?.preview ? (
-                  <img
+                  <FeedFitPhoto
                     src={photos[0].url || photos[0].preview}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover"
+                    className="absolute inset-0 h-full w-full"
+                    priority
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-neutral-500 text-sm">

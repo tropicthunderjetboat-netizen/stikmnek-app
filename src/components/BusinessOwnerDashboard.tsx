@@ -2068,7 +2068,7 @@ const BusinessOwnerDashboard: React.FC = () => {
           )}
           <div className="border-t border-gray-100 pt-6">
             <p className="text-sm font-medium text-gray-700 mb-3">Upload New Photos</p>
-            <PhotoUploader photos={newGalleryPhotos} onPhotosChange={setNewGalleryPhotos} maxPhotos={10} maxSizeMB={5} userId={user.id} label="Upload New Promotional Images" sublabel="Vertical crop for the phone feed. PNG, JPG up to 5MB. First photo = cover." />
+            <PhotoUploader photos={newGalleryPhotos} onPhotosChange={setNewGalleryPhotos} maxPhotos={10} maxSizeMB={5} userId={user.id} label="Upload New Promotional Images" sublabel="Portrait photos are framed to the phone. Wide photos stay in full on the swipe feed. PNG, JPG up to 5MB. First photo = cover." />
             {newGalleryPhotos.length > 0 && (
               <button onClick={handleSaveNewGalleryPhotos} disabled={savingGallery} className="mt-4 w-full py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-bold hover:from-teal-700 hover:to-emerald-700 shadow-lg shadow-teal-200 flex items-center justify-center gap-2 disabled:opacity-60">
                 {savingGallery ? <><Loader2 className="w-5 h-5 animate-spin" />Saving...</> : <><Save className="w-5 h-5" />Save {newGalleryPhotos.length} Photo{newGalleryPhotos.length > 1 ? 's' : ''}</>}
@@ -2307,10 +2307,10 @@ const BusinessOwnerDashboard: React.FC = () => {
               </label>
               <p className="text-xs text-gray-500 mb-2">
                 {language === 'en'
-                  ? 'At least one photo is required. Crop to vertical for the phone swipe feed — first photo is the cover.'
+                  ? 'At least one photo is required. Portrait photos are framed to the phone. Wide photos stay in full on the swipe feed — first photo is the cover.'
                   : language === 'fr'
-                    ? 'Au moins une photo est requise. Cadrez en vertical pour le fil mobile — la première est la couverture.'
-                    : 'Atlas u nidim wan foto. Crop vertical blong phone feed — first foto = cover.'}
+                    ? 'Au moins une photo est requise. Portrait : cadré au téléphone. Paysage : photo entière sur le fil — la première est la couverture.'
+                    : 'Atlas u nidim wan foto. Portrait i frame long phone. Wide foto i stap ful long feed — first foto = cover.'}
               </p>
               <div className={submitFieldErrors.photos ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
                 <PhotoUploader
@@ -2323,7 +2323,7 @@ const BusinessOwnerDashboard: React.FC = () => {
                   maxSizeMB={5}
                   userId={user.id}
                   label="Upload photos of your business"
-                  sublabel="Vertical crop for the phone feed. PNG, JPG up to 5MB. First photo = cover."
+                  sublabel="Portrait photos are framed to the phone. Wide photos stay in full on the swipe feed. PNG, JPG up to 5MB. First photo = cover."
                 />
               </div>
               {submitFieldErrors.photos && (
