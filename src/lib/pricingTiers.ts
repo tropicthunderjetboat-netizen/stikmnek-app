@@ -10,7 +10,20 @@ export type PricingTierInput = {
   max_pax: number | null;
   original_price_vt: number;
   deal_price_vt: number;
+  /** Whole-boat / private charter row — not an infant/child person price. */
+  kind?: 'person' | 'charter';
 };
+
+/** Whole-group charter row (not Adults / Children / Infants). */
+export function isCharterTier(tier: Pick<PricingTierInput, 'label' | 'kind'>): boolean {
+  if (tier.kind === 'charter') return true;
+  return /charter/i.test((tier.label || '').trim());
+}
+
+export function isInfantTier(tier: Pick<PricingTierInput, 'label' | 'kind'>): boolean {
+  if (isCharterTier(tier)) return false;
+  return /infant|^b[eé]b[eé]|^bebi|baby/i.test((tier.label || '').trim());
+}
 
 /** Default slot order for tours / activities — shown as “Adults” and “Children”, not “Tier 1”. */
 export const TIER_PRESET_SLOTS = [
@@ -80,9 +93,10 @@ export function pricingTiersForEditor(value: unknown): PricingTierInput[] {
 
   const out = parsed.map((row, index) => ({
     ...row,
-    label: normalizeTierLabelForSlot(row.label, index),
-    min_pax:
-      index === 0
+    label: isCharterTier(row) ? row.label : normalizeTierLabelForSlot(row.label, index),
+    min_pax: isCharterTier(row)
+      ? row.min_pax
+      : index === 0
         ? Math.max(1, row.min_pax || 1)
         : index === 1
           ? Math.max(0, row.min_pax)
@@ -116,12 +130,17 @@ export function pricingTiersFromDb(value: unknown): PricingTierInput[] {
       maxRaw === null || maxRaw === undefined || maxRaw === ''
         ? null
         : Math.max(0, Math.floor(Number(maxRaw) || 0));
+    const label = String(o.label ?? '').trim();
+    const kindRaw = String(o.kind ?? '').trim().toLowerCase();
+    const kind: PricingTierInput['kind'] =
+      kindRaw === 'charter' || /charter/i.test(label) ? 'charter' : undefined;
     out.push({
-      label: String(o.label ?? '').trim(),
+      label,
       min_pax: min,
       max_pax: max,
       original_price_vt: Math.max(0, Number(o.original_price_vt) || 0),
       deal_price_vt: Math.max(0, Number(o.deal_price_vt) || 0),
+      ...(kind ? { kind } : {}),
     });
   }
   return out;
@@ -149,6 +168,7 @@ export function validatePricingTiersForSubmit(tiers: PricingTierInput[]): {
     max_pax: number | null;
     original_price_vt: number;
     deal_price_vt: number;
+    kind?: 'charter';
   }[] = [];
 
   for (const t of active) {
@@ -160,22 +180,37 @@ export function validatePricingTiersForSubmit(tiers: PricingTierInput[]): {
         ? null
         : Math.max(0, Math.floor(Number(maxRaw)));
     const original_price_vt = Math.max(0, Number(t.original_price_vt) || 0);
-    const deal_price_vt = Math.max(0, Number(t.deal_price_vt) || 0);
+    // No discount: pass/list price may equal the standard price (or be left blank → copy standard).
+    const deal_price_vt =
+      Math.max(0, Number(t.deal_price_vt) || 0) > 0
+        ? Math.max(0, Number(t.deal_price_vt) || 0)
+        : original_price_vt;
+    const charter = isCharterTier(t);
 
     if (!label) {
       return { data: null, error: 'Each pricing tier needs a label.' };
     }
-    if (original_price_vt <= 0 || deal_price_vt <= 0) {
-      return { data: null, error: 'Each tier needs standard and StikmNek prices greater than 0.' };
+    if (original_price_vt <= 0) {
+      return { data: null, error: 'Each tier needs a standard price greater than 0.' };
     }
-    if (deal_price_vt >= original_price_vt) {
-      return { data: null, error: 'StikmNek price must be less than the standard price for each tier.' };
+    if (deal_price_vt <= 0) {
+      return { data: null, error: 'Each tier needs a listed price greater than 0.' };
+    }
+    if (deal_price_vt > original_price_vt) {
+      return { data: null, error: 'Listed / pass price cannot be higher than the standard price for each tier.' };
     }
     if (max_pax !== null && max_pax < min_pax) {
       return { data: null, error: 'Max pax must be greater than or equal to min pax for each tier.' };
     }
 
-    cleaned.push({ label, min_pax, max_pax, original_price_vt, deal_price_vt });
+    cleaned.push({
+      label,
+      min_pax,
+      max_pax,
+      original_price_vt,
+      deal_price_vt,
+      ...(charter ? { kind: 'charter' as const } : {}),
+    });
   }
 
   return { data: cleaned, error: null };
@@ -193,15 +228,18 @@ export function categoryUsesTieredPricing(category: string): boolean {
 export function representativePerPersonPricesFromTiers(
   pricingTiers: unknown,
 ): { original_price_vt: number; deal_price_vt: number } | null {
-  const rows = pricingTiersFromDb(pricingTiers).filter(
-    (t) =>
-      t.original_price_vt > 0 &&
-      t.deal_price_vt >= 0 &&
-      t.deal_price_vt < t.original_price_vt,
-  );
+  const rows = pricingTiersFromDb(pricingTiers)
+    .filter((t) => t.original_price_vt > 0)
+    .map((t) => ({
+      ...t,
+      deal_price_vt: t.deal_price_vt > 0 ? t.deal_price_vt : t.original_price_vt,
+    }))
+    .filter((t) => t.deal_price_vt > 0 && t.deal_price_vt <= t.original_price_vt);
   if (rows.length === 0) return null;
-  let best = rows[0];
-  for (const t of rows) {
+  const discounted = rows.filter((t) => t.deal_price_vt < t.original_price_vt);
+  const pool = discounted.length > 0 ? discounted : rows;
+  let best = pool[0];
+  for (const t of pool) {
     if (t.deal_price_vt < best.deal_price_vt) best = t;
   }
   return { original_price_vt: best.original_price_vt, deal_price_vt: best.deal_price_vt };
@@ -220,7 +258,8 @@ export function pricingTiersEqual(a: PricingTierInput[], b: PricingTierInput[]):
       Math.floor(Number(x.min_pax) || 0) !== Math.floor(Number(y.min_pax) || 0) ||
       maxA !== maxB ||
       Number(x.original_price_vt) !== Number(y.original_price_vt) ||
-      Number(x.deal_price_vt) !== Number(y.deal_price_vt)
+      Number(x.deal_price_vt) !== Number(y.deal_price_vt) ||
+      Boolean(isCharterTier(x)) !== Boolean(isCharterTier(y))
     ) {
       return false;
     }
@@ -242,7 +281,9 @@ export function computeTieredBookingTotals(
   const a = Math.max(0, adults);
   const ch = Math.max(0, children);
   const inf = Math.max(0, infants);
-  const usable = tiers.filter((t) => t.original_price_vt > 0 && t.deal_price_vt >= 0);
+  const usable = tiers.filter(
+    (t) => t.original_price_vt > 0 && t.deal_price_vt >= 0 && !isCharterTier(t),
+  );
   if (usable.length === 0) return { totalStandard: 0, totalDeal: 0 };
 
   if (usable.length === 1) {

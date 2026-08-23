@@ -204,9 +204,8 @@ function placeKey(b: Business): string {
   return b.id;
 }
 
-/** Full photo visible (no crop) + soft blurred fill behind for letterboxing.
- *  Blur layer uses CSS background (same URL as the img) so the browser only
- *  fetches the image once.
+/** Fill the portrait card (wide camera photos crop on the sides instead of letterboxing).
+ *  Soft blurred fill stays behind in case of tiny gaps while the image loads.
  */
 function FitPhoto({
   src,
@@ -236,7 +235,7 @@ function FitPhoto({
         decoding={priority ? 'sync' : 'async'}
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : 'auto'}
-        className={`relative z-[1] h-full w-full object-contain object-center ${imgClassName}`}
+        className={`relative z-[1] h-full w-full object-cover object-center ${imgClassName}`}
       />
     </div>
   );

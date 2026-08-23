@@ -791,7 +791,7 @@ const EditListingPanel: React.FC<EditListingPanelProps> = ({
                 category={selectedBusiness.category}
               />
 
-              {form.deal_price >= form.original_price && form.original_price > 0 && (
+              {form.deal_price >= form.original_price && form.original_price > 0 && listingDiscountPercent.trim() !== '' && (
                 <div className="p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                   <p className="text-xs text-red-700">Deal price should be lower than the original price to show savings.</p>

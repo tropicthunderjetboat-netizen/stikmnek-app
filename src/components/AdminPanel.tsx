@@ -791,7 +791,7 @@ const AdminPanel: React.FC = () => {
       );
       return;
     }
-    if (!addForm.originalPrice || !addForm.discountPercent) { toast.error('Please enter the original price and discount percentage.'); return; }
+    if (!addForm.originalPrice) { toast.error('Please enter the original price.'); return; }
     setAddingBusiness(true);
     try {
       const DURATION_DAYS: Record<string, number> = { '1_day': 1, '1_week': 7, '2_weeks': 14, '1_month': 30, '3_months': 90, '6_months': 180, '1_year': 365 };

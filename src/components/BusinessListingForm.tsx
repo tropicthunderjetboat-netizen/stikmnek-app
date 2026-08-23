@@ -11,6 +11,7 @@ import { formatVT } from '@/lib/utils';
 import { toast } from 'sonner';
 import PhotoUploader, { UploadedPhoto } from './PhotoUploader';
 import PricingTiersEditor from './PricingTiersEditor';
+import { Switch } from '@/components/ui/switch';
 import LocationMapPicker from './LocationMapPicker';
 import WebsiteUrlInput from './WebsiteUrlInput';
 import {
@@ -558,6 +559,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
     const defaults = {
       name: '', category: 'dining', description: '', discount: '',
       originalPrice: '', discountPercent: '', dealPrice: '',
+      offerDiscount: false,
       offerType: 'price_discount' as 'price_discount' | 'free_add_on',
       address: '', phone: '', email: '', hours: '',
       whatsappNumber: '',
@@ -717,6 +719,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
       originalPrice: origStr,
       discountPercent: pct,
       dealPrice: dealStr,
+      offerDiscount: Boolean(pct && Number(pct) > 0),
       offerType: deriveOfferTypeFromBusiness(b),
       address: b.location || '',
       phone: b.phone || '',
@@ -770,9 +773,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
 
   // Auto-calculate deal price and discount label when original price or discount % changes
   const tierDiscountPercent = useMemo(() => {
+    if (!form.offerDiscount) return null;
     const p = parseFloat(form.discountPercent);
-    return Number.isFinite(p) && p >= 0 ? p : null;
-  }, [form.discountPercent]);
+    return Number.isFinite(p) && p > 0 ? p : null;
+  }, [form.discountPercent, form.offerDiscount]);
 
   const calculatedDealPrice = useMemo(() => {
     if (form.offerType === 'free_add_on') return '';
@@ -909,6 +913,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
     setForm({
       name: '', category: 'dining', description: '', discount: '',
       originalPrice: '', discountPercent: '', dealPrice: '',
+      offerDiscount: false,
       offerType: 'price_discount',
       address: '', phone: '', email: '', hours: '',
       whatsappNumber: '',
@@ -1969,18 +1974,47 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
             <p className="text-sm text-gray-700 mb-4">
               {categoryUsesTieredPricing(form.category)
                 ? language === 'en'
-                  ? 'Set your normal price in Vatu (VT), then choose what tourists get — a lower price or a free extra. If you add no tiers, this single price is used.'
+                  ? 'Set your normal guest prices below. A discount is optional — turn it on only if pass holders pay less.'
                   : language === 'fr'
-                    ? "Indiquez votre prix normal en Vatu (VT), puis choisissez ce que les touristes reçoivent : un prix réduit ou un bonus gratuit."
-                    : 'Putum nomol praes blong yu long VT, biaen jusum wanem turis bae kasem: wan daon praes o wan fri ad-on.'
+                    ? "Indiquez vos prix normaux ci-dessous. Une remise est optionnelle."
+                    : 'Putum nomol praes blong yu. Diskaon i opsonal.'
                 : language === 'en'
-                  ? 'Enter your normal price in Vatu (VT), then choose the offer tourists get.'
+                  ? 'Enter your normal price in Vatu (VT). A discount is optional.'
                   : language === 'fr'
-                    ? 'Entrez votre prix normal en Vatu (VT), puis choisissez l’offre pour les touristes.'
-                    : 'Putum nomol praes blong yu long VT, biaen jusum ofa blong ol turis.'}
+                    ? 'Entrez votre prix normal en Vatu (VT). La remise est optionnelle.'
+                    : 'Putum nomol praes blong yu long VT. Diskaon i opsonal.'}
             </p>
 
-            {!categoryUsesTieredPricing(form.category) && (
+            <div className="flex items-center justify-between gap-3 mb-4 p-3 rounded-xl bg-white border border-teal-100">
+              <div>
+                <p className="text-sm font-bold text-gray-900">
+                  {language === 'en' ? 'Offer a discount' : language === 'fr' ? 'Proposer une remise' : 'Oferem wan diskaon'}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {language === 'en'
+                    ? 'Off = your normal price. On = pass holders pay less.'
+                    : language === 'fr'
+                      ? 'Désactivé = prix normal. Activé = les détenteurs de pass paient moins.'
+                      : 'Off = nomol praes. On = pas holers i pei less.'}
+                </p>
+              </div>
+              <Switch
+                checked={Boolean(form.offerDiscount)}
+                onCheckedChange={(on) => {
+                  setFieldErrors((fe) => ({ ...fe, pricing: undefined }));
+                  setForm((prev) => ({
+                    ...prev,
+                    offerDiscount: on,
+                    discountPercent: on ? prev.discountPercent : '',
+                    discount: on ? prev.discount : '',
+                    dealPrice: on ? prev.dealPrice : prev.originalPrice,
+                  }));
+                }}
+                aria-label={language === 'en' ? 'Offer a discount' : 'Proposer une remise'}
+              />
+            </div>
+
+            {form.offerDiscount && !categoryUsesTieredPricing(form.category) && (
               <div className="mb-4">
                 <label className="block text-xs font-medium text-gray-600 mb-2">
                   {language === 'en' ? 'Offer type' : language === 'fr' ? "Type d'offre" : 'Kaen ofa'}
@@ -2040,7 +2074,13 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
 
 
             {/* Price + Discount + New Price row */}
-            <div className={`grid grid-cols-1 ${form.offerType === 'free_add_on' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-3 items-end`}>
+            <div className={`grid grid-cols-1 ${
+              !form.offerDiscount
+                ? 'sm:grid-cols-1'
+                : form.offerType === 'free_add_on'
+                  ? 'sm:grid-cols-2'
+                  : 'sm:grid-cols-3'
+            } gap-3 items-end`}>
               {/* Original Price */}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -2076,7 +2116,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                 </p>
               </div>
 
-              {form.offerType === 'price_discount' ? (
+              {form.offerDiscount && form.offerType === 'price_discount' ? (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
                     {language === 'en' ? 'Tourist discount (%)' : language === 'fr' ? 'Remise touriste (%)' : 'Diskaon blong turis (%)'}
@@ -2102,7 +2142,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                     {language === 'en' ? 'How much less tourists pay' : 'Combien les touristes paient en moins'}
                   </p>
                 </div>
-              ) : (
+              ) : form.offerDiscount && form.offerType === 'free_add_on' ? (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
                     {language === 'en' ? 'What tourists get' : language === 'fr' ? 'Ce que les touristes reçoivent' : 'Wanem turis bae kasem'}
@@ -2121,10 +2161,10 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                     {language === 'en' ? 'Example: Free dessert with 2 mains' : 'Exemple : Dessert offert pour 2 plats'}
                   </p>
                 </div>
-              )}
+              ) : null}
 
               {/* Auto-Calculated New Price */}
-              <div>
+              {form.offerDiscount && (
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   {form.offerType === 'free_add_on'
                     ? language === 'en'
@@ -2167,10 +2207,11 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                       : 'Calculé automatiquement'}
                 </p>
               </div>
+              )}
             </div>
 
             {/* ─── Live Price Breakdown Preview ─── */}
-            {form.offerType === 'free_add_on' && form.originalPrice && form.discount && (
+            {form.offerDiscount && form.offerType === 'free_add_on' && form.originalPrice && form.discount && (
               <div className="mt-4 p-4 rounded-xl bg-white border border-teal-200 shadow-sm">
                 <div className="flex items-center gap-1.5 mb-3">
                   <Tag className="w-3.5 h-3.5 text-teal-600" />
@@ -2199,7 +2240,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
                 </div>
               </div>
             )}
-            {form.offerType !== 'free_add_on' && displayAutoDealPrice && form.originalPrice && (
+            {form.offerDiscount && form.offerType !== 'free_add_on' && displayAutoDealPrice && form.originalPrice && (
               <div className="mt-4 p-4 rounded-xl bg-white border border-teal-200 shadow-sm">
                 <div className="flex items-center gap-1.5 mb-3">
                   <Tag className="w-3.5 h-3.5 text-teal-600" />
@@ -2302,7 +2343,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
             </div>
           )}
 
-          {/* ─── Discount Validity Date Range ─── */}
+          {form.offerDiscount && (
           <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
             <div className="flex items-center gap-2 mb-3">
               <Calendar className="w-4 h-4 text-blue-600" />
@@ -2382,7 +2423,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
               </div>
             )}
           </div>
-
+          )}
           </div>)}
           {(!guided || step === 2) && (
           <div className="space-y-5">

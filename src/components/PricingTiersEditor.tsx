@@ -5,7 +5,8 @@ import type { Language } from '@/data/translations';
 import type { PricingTierInput } from '@/lib/pricingTiers';
 import {
   emptyPricingTier,
-  tierPresetLabel,
+  isCharterTier,
+  isInfantTier,
   TIER_PRESET_SLOTS,
 } from '@/lib/pricingTiers';
 
@@ -17,11 +18,6 @@ export interface PricingTiersEditorProps {
   discountPercent?: number | null;
   /** Use fixed Adults / Children cards instead of generic "Tier 1" labels. */
   usePresetSlots?: boolean;
-}
-
-/** Charter rows carry the whole-boat flat price; identified by label prefix. */
-function isCharterTier(tier: PricingTierInput): boolean {
-  return /^charter/i.test((tier.label || '').trim());
 }
 
 /** Stable list key — must not depend on editable fields like `label` or prices. */
@@ -62,9 +58,9 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
           ? 'Saisissez votre prix normal pour chaque visiteur. Nous calculons le prix réduit du pass. Les enfants de moins de 6 ans sont gratuits.'
           : 'Nem'
       : language === 'en'
-        ? 'Type your normal price, then the lower pass price for each guest. Children under 6 are usually free.'
+        ? 'Type your normal price for each guest you offer. Children and infants are optional. Turn on a discount above if pass holders pay less.'
         : language === 'fr'
-          ? 'Saisissez votre prix normal puis le prix réduit du pass pour chaque visiteur.'
+          ? 'Saisissez votre prix normal pour chaque visiteur que vous proposez. Enfants et bébés sont optionnels.'
           : 'exsampol. Adult (13+)',
     labelField:
       language === 'en' ? 'Guest name' : language === 'fr' ? 'Libellé' : 'Adult',
@@ -84,14 +80,20 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
       language === 'en' ? 'Pass price (VT)' : language === 'fr' ? 'Prix du pass (VT)' : 'Pas praes — olgeta grup (VT)',
     origFlat:
       language === 'en' ? 'Normal price — whole group (VT)' : language === 'fr' ? 'Prix normal — groupe entier (VT)' : 'Pas praes',
+    origFlat:
+      language === 'en' ? 'Normal price — whole group (VT)' : language === 'fr' ? 'Prix normal — groupe entier (VT)' : 'Pas praes',
     dealFlat:
       language === 'en' ? 'Pass price — whole group (VT)' : language === 'fr' ? 'Prix du pass — groupe entier (VT)' : 'Nem blong jata',
+    passPriceLabel:
+      language === 'en' ? 'Pass price' : language === 'fr' ? 'Prix du pass' : 'exsampol. Private jata (5 pipol)',
     passPriceLabel:
       language === 'en' ? 'Pass price' : language === 'fr' ? 'Prix du pass' : 'exsampol. Private jata (5 pipol)',
     charterName:
       language === 'en' ? 'Charter name' : language === 'fr' ? 'Nom du charter' : 'Min man',
     charterNamePlaceholder:
       language === 'en' ? 'e.g. Private Charter (up to 5)' : language === 'fr' ? 'ex. Charter privé (jusqu\'à 5)' : 'Max man (opsonal)',
+    minPax:
+      language === 'en' ? 'Min people' : language === 'fr' ? 'Min pers.' : 'Addem bebi praes',
     minPax:
       language === 'en' ? 'Min people' : language === 'fr' ? 'Min pers.' : 'Addem bebi praes',
     maxPax:
@@ -127,14 +129,16 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
     const row = tiers[index];
     if (!row) return;
     const merged: PricingTierInput = { ...row, ...patch };
-    // Auto-calculate deal price when standard price changes and discount is set
-    if (
-      discountPercent != null &&
-      Number.isFinite(discountPercent) &&
-      discountPercent >= 0 &&
-      Object.prototype.hasOwnProperty.call(patch, 'original_price_vt')
-    ) {
-      merged.deal_price_vt = dealFromOriginal(merged.original_price_vt, discountPercent);
+    if (Object.prototype.hasOwnProperty.call(patch, 'original_price_vt')) {
+      if (
+        discountPercent != null &&
+        Number.isFinite(discountPercent) &&
+        discountPercent > 0
+      ) {
+        merged.deal_price_vt = dealFromOriginal(merged.original_price_vt, discountPercent);
+      } else {
+        merged.deal_price_vt = merged.original_price_vt;
+      }
     }
     onChange(tiers.map((r, i) => (i === index ? merged : r)));
   };
@@ -145,13 +149,14 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
   };
 
   const addInfantTier = () => {
-    if (tiers.some((t) => /^infant|^b[eé]b[eé]/i.test(t.label))) return;
+    if (tiers.some(isInfantTier)) return;
     onChange([...tiers, emptyPricingTier(2)]);
   };
 
   const addCharterTier = () => {
     const charterRow: PricingTierInput = {
-      label: language === 'en' ? 'Private Charter' : language === 'fr' ? 'Charter privé' : 'Plis jusum wan sta reting',
+      label: language === 'en' ? 'Private Charter' : language === 'fr' ? 'Charter privé' : 'Private Charter',
+      kind: 'charter',
       min_pax: 1,
       max_pax: 5,
       original_price_vt: 0,
@@ -168,7 +173,7 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
     index === 0 ? t.adults : index === 1 ? t.children : t.infants;
 
   const hasCharter = tiers.some(isCharterTier);
-  const hasInfants = tiers.some((t) => /^infant|^b[eé]b[eé]|^bebi/i.test(t.label));
+  const hasInfants = tiers.some(isInfantTier);
 
   return (
     <div className="rounded-xl border border-violet-200 bg-violet-50/70 p-4 space-y-3">
@@ -261,7 +266,7 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
                 />
               </div>
 
-              {/* Pass price — auto-computed from the discount %, or entered manually */}
+              {/* Pass price — auto from discount %, or same as normal price when no discount */}
               {autoMode ? (
                 <div className="mt-2 flex items-center justify-between rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">
                   <span className="text-xs font-bold text-emerald-800">{t.passPriceLabel}</span>
@@ -269,28 +274,7 @@ const PricingTiersEditor: React.FC<PricingTiersEditorProps> = ({
                     {tier.original_price_vt > 0 ? formatVT(passPrice) : '—'}
                   </span>
                 </div>
-              ) : (
-                <div className="mt-2.5">
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    {charter ? t.dealFlat : t.deal}
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">VT</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      step={1}
-                      value={tier.deal_price_vt || ''}
-                      onChange={(e) =>
-                        updateTier(index, { deal_price_vt: Math.max(0, Number(e.target.value) || 0) })
-                      }
-                      className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-300 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-violet-500"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-              )}
+              ) : null}
 
               {/* Advanced: how many people this price covers */}
               {showAdvanced && (

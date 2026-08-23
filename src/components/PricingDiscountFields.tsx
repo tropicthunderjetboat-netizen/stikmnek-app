@@ -1,7 +1,8 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Tag, Percent, ArrowRight, Calendar, Globe } from 'lucide-react';
 import LocationMapPicker from '@/components/LocationMapPicker';
 import WebsiteUrlInput from '@/components/WebsiteUrlInput';
+import { Switch } from '@/components/ui/switch';
 import { formatVT } from '@/lib/utils';
 import {
   categoryUsesPerUnitPricing,
@@ -84,6 +85,16 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
         ? 'Stanad praes long wan man (VT)'
         : 'Regular price per person in Vatu';
   const savingsUnitSuffix = shortPriceUnitSuffix(category, lang);
+  const [discountOn, setDiscountOn] = useState(() => {
+    const p = parseFloat(String(discountPercent).replace(/,/g, ''));
+    return Number.isFinite(p) && p > 0;
+  });
+
+  useEffect(() => {
+    const p = parseFloat(String(discountPercent).replace(/,/g, ''));
+    if (Number.isFinite(p) && p > 0) setDiscountOn(true);
+  }, [discountPercent]);
+
   // Auto-calculate deal price (same for flat & tiered categories — tier table is additional, not a substitute).
   const calculatedDealPrice = useMemo(() => {
     const orig = parseFloat(String(originalPrice).replace(/,/g, ''));
@@ -104,8 +115,12 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
 
   // Sync calculated values to parent
   useEffect(() => {
+    if (!discountOn) {
+      onCalculatedValues(String(originalPrice || ''), '');
+      return;
+    }
     onCalculatedValues(calculatedDealPrice, calculatedDiscountLabel);
-  }, [calculatedDealPrice, calculatedDiscountLabel]);
+  }, [discountOn, calculatedDealPrice, calculatedDiscountLabel, originalPrice]);
 
   // Discount validity
   const selectedDuration = DURATION_OPTIONS.find(d => d.value === listingDuration);
@@ -129,20 +144,43 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
         <p className="text-xs text-gray-500 mb-4">
           {mode === 'tiered'
             ? language === 'en'
-              ? 'For tours & activities, prices come from your tier table below. Use this section to set an optional % discount badge and validity dates.'
+              ? 'For tours & activities, prices come from your guest-price table below. Turn on a discount only if pass holders pay less than your normal price.'
               : language === 'fr'
-                ? 'Pour les visites et activités, les prix viennent du tableau des paliers ci-dessous. Utilisez cette section pour définir une remise (%) et des dates.'
+                ? 'Pour les visites et activités, les prix viennent du tableau ci-dessous. Activez une remise seulement si les détenteurs de pass paient moins.'
                 : 'Praes blong yu (VT)'
             : language === 'en'
-              ? 'Enter your price in Vatu (VT). Discount is optional — businesses offering discounts get featured priority.'
+              ? 'Enter your price in Vatu (VT). Discounts are optional — turn one on only if you want pass holders to pay less.'
               : language === 'fr'
-                ? 'Entrez votre prix en Vatu (VT). La remise est optionnelle — les entreprises offrant des remises sont prioritaires.'
+                ? 'Entrez votre prix en Vatu (VT). La remise est optionnelle.'
                 : 'Diskaon (%)'}
         </p>
 
+        <div className="flex items-center justify-between gap-3 mb-4 p-3 rounded-xl bg-white border border-teal-100">
+          <div>
+            <p className="text-sm font-bold text-gray-900">
+              {language === 'en' ? 'Offer a discount' : language === 'fr' ? 'Proposer une remise' : 'Oferem wan diskaon'}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {language === 'en'
+                ? 'Off = list your normal price. On = pass holders pay a lower price.'
+                : language === 'fr'
+                  ? 'Désactivé = prix normal. Activé = les détenteurs de pass paient moins.'
+                  : 'Off = nomol praes. On = pas holers i pei less.'}
+            </p>
+          </div>
+          <Switch
+            checked={discountOn}
+            onCheckedChange={(on) => {
+              setDiscountOn(on);
+              if (!on) onDiscountPercentChange('');
+            }}
+            aria-label={language === 'en' ? 'Offer a discount' : 'Proposer une remise'}
+          />
+        </div>
+
 
         {/* Price + Discount + New Price row */}
-        <div className={mode === 'tiered' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3 items-end' : 'grid grid-cols-1 sm:grid-cols-3 gap-3 items-end'}>
+        <div className={mode === 'tiered' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3 items-end' : `grid grid-cols-1 ${discountOn ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3 items-end`}>
           {mode !== 'tiered' && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -166,6 +204,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
           )}
 
           {/* Discount Percentage */}
+          {discountOn && (
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
               {language === 'en' ? 'Discount (%)' : language === 'fr' ? 'Remise (%)' : 'Kastoma bae luk'}
@@ -188,8 +227,9 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
               {language === 'en' ? 'Percentage off for pass holders' : 'Pourcentage de réduction'}
             </p>
           </div>
+          )}
 
-          {mode !== 'tiered' && (
+          {mode !== 'tiered' && discountOn && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
                 {language === 'en' ? 'New Price (auto)' : language === 'fr' ? 'Nouveau prix (auto)' : 'Kastoma i sevem'}
@@ -273,7 +313,7 @@ const PricingDiscountFields: React.FC<PricingDiscountFieldsProps> = ({
       </div>
 
       {/* ─── Discount Validity Period ─── */}
-      {showValidity && (
+      {showValidity && discountOn && (
         <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
           <div className="flex items-center gap-2 mb-3">
             <Calendar className="w-4 h-4 text-blue-600" />

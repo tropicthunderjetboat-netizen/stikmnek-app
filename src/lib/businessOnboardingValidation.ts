@@ -389,7 +389,7 @@ export function validateListingSubmissionOnboarding(
       errors.pricing = error;
     } else if (!data || !Array.isArray(data) || data.length === 0) {
       errors.pricing =
-        'Add at least one complete pricing tier (label and valid standard / StikmNek prices, with StikmNek below standard).';
+        'Add at least one priced guest type (for example Adults). Children, infants, and discounts are optional.';
     }
   } else {
     const flat = input.flatPricing;
@@ -460,14 +460,16 @@ export function localizeListingPricingErrorFr(en: string): string {
       'Avec une remise, le prix StikmNek doit être inférieur au prix standard.',
     'Listed price must be positive and not greater than your standard price.':
       'Prix invalide : le prix affiché doit être positif et ne pas dépasser le prix standard.',
-    'Add at least one complete pricing tier (label and valid standard / StikmNek prices, with StikmNek below standard).':
-      'Ajoutez au moins un palier de prix complet (libellé et prix valides, avec le prix StikmNek inférieur au standard).',
+    'Add at least one priced guest type (for example Adults). Children, infants, and discounts are optional.':
+      'Ajoutez au moins un tarif (par ex. Adultes). Enfants, bébés et remises sont optionnels.',
     'Enter pricing for this listing.': 'Indiquez les tarifs pour cette annonce.',
     'Each pricing tier needs a label.': 'Chaque palier de prix doit avoir un libellé.',
-    'Each tier needs standard and StikmNek prices greater than 0.':
-      'Chaque palier doit avoir des prix standard et StikmNek supérieurs à 0.',
-    'StikmNek price must be less than the standard price for each tier.':
-      'Le prix StikmNek doit être inférieur au prix standard pour chaque palier.',
+    'Each tier needs a standard price greater than 0.':
+      'Chaque palier doit avoir un prix standard supérieur à 0.',
+    'Each tier needs a listed price greater than 0.':
+      'Chaque palier doit avoir un prix affiché supérieur à 0.',
+    'Listed / pass price cannot be higher than the standard price for each tier.':
+      'Le prix affiché / pass ne peut pas être supérieur au prix standard pour chaque palier.',
     'Max pax must be greater than or equal to min pax for each tier.':
       'Le nombre max. de pers. doit être supérieur ou égal au min. pour chaque palier.',
   };
