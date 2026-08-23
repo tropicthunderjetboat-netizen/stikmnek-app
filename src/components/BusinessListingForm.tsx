@@ -2165,48 +2165,49 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
 
               {/* Auto-Calculated New Price */}
               {form.offerDiscount && (
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  {form.offerType === 'free_add_on'
-                    ? language === 'en'
-                      ? 'Price shown in app'
-                      : language === 'fr'
-                        ? "Prix affiché dans l'app"
-                        : 'Praes long app'
-                    : language === 'en'
-                      ? 'New Price (auto)'
-                      : language === 'fr'
-                        ? 'Nouveau prix (auto)'
-                        : 'Niu Praes (oto)'}
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">VT</span>
-                  <input
-                    type="text"
-                    value={
-                      displayAutoDealPrice
-                        ? formatVT(parseFloat(displayAutoDealPrice)).replace('VT ', '')
-                        : '—'
-                    }
-                    readOnly
-                    className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm cursor-not-allowed ${
-                      displayAutoDealPrice
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-700 font-bold'
-                        : 'bg-gray-50 border-gray-200 text-gray-400'
-                    }`}
-                  />
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    {form.offerType === 'free_add_on'
+                      ? language === 'en'
+                        ? 'Price shown in app'
+                        : language === 'fr'
+                          ? "Prix affiché dans l'app"
+                          : 'Praes long app'
+                      : language === 'en'
+                        ? 'New Price (auto)'
+                        : language === 'fr'
+                          ? 'Nouveau prix (auto)'
+                          : 'Niu Praes (oto)'}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">VT</span>
+                    <input
+                      type="text"
+                      value={
+                        displayAutoDealPrice
+                          ? formatVT(parseFloat(displayAutoDealPrice)).replace('VT ', '')
+                          : '—'
+                      }
+                      readOnly
+                      className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm cursor-not-allowed ${
+                        displayAutoDealPrice
+                          ? 'bg-emerald-50 border-emerald-300 text-emerald-700 font-bold'
+                          : 'bg-gray-50 border-gray-200 text-gray-400'
+                      }`}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    {form.offerType === 'free_add_on'
+                      ? language === 'en'
+                        ? 'Same price, plus the free add-on offer'
+                        : language === 'fr'
+                          ? "Même prix, avec l'offre gratuite en plus"
+                          : 'Sem praes wetem fri ad-on'
+                      : language === 'en'
+                        ? 'Calculated from price & discount'
+                        : 'Calculé automatiquement'}
+                  </p>
                 </div>
-                <p className="text-xs text-gray-600 mt-0.5">
-                  {form.offerType === 'free_add_on'
-                    ? language === 'en'
-                      ? 'Same price, plus the free add-on offer'
-                      : language === 'fr'
-                        ? "Même prix, avec l'offre gratuite en plus"
-                        : 'Sem praes wetem fri ad-on'
-                    : language === 'en'
-                      ? 'Calculated from price & discount'
-                      : 'Calculé automatiquement'}
-                </p>
-              </div>
               )}
             </div>
 
