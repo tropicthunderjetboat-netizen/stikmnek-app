@@ -2583,7 +2583,6 @@ const AdminPanel: React.FC = () => {
                                       src={getPhotoDisplayUrl(photo, SUPABASE_URL) || photo.url || '/placeholder.svg'}
                                       className="absolute inset-0 h-full w-full"
                                     />
-                                    />
                                     {/* Main badge */}
                                     {photo.is_main && (
                                       <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-blue-600 text-white text-[10px] font-bold shadow-sm">
