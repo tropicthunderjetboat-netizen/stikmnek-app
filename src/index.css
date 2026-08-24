@@ -235,7 +235,3 @@
   object-position: center;
 }
 
-.feed-photo-img--contain {
-  object-fit: contain;
-  object-position: center center;
-}

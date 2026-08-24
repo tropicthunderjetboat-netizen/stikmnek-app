@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
 type FeedFitPhotoProps = {
   src: string;
@@ -9,8 +9,8 @@ type FeedFitPhotoProps = {
 };
 
 /**
- * Portrait photos fill the card (cover). Landscape photos stay fully visible
- * (contain) on a blurred fill of the same image — no black bars, no side crop.
+ * Every photo fills the phone card (object-cover), whatever its shape.
+ * Landscape and portrait both cover the frame — no letterbox strip, no forced crop dialog.
  */
 export function FeedFitPhoto({
   src,
@@ -18,24 +18,10 @@ export function FeedFitPhoto({
   imgClassName = '',
   priority = false,
 }: FeedFitPhotoProps) {
-  const [contain, setContain] = useState(true);
-
-  useEffect(() => {
-    setContain(true);
-  }, [src]);
-
   if (!src) return <div className={`bg-neutral-900 ${className}`} />;
-
-  const safeUrl = src.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
   return (
     <div className={`relative overflow-hidden bg-neutral-950 ${className}`}>
-      <div
-        aria-hidden
-        className="absolute inset-0 scale-125 bg-cover bg-center blur-2xl brightness-90"
-        style={{ backgroundImage: `url("${safeUrl}")` }}
-      />
-      {contain ? <div aria-hidden className="absolute inset-0 bg-black/25" /> : null}
       <img
         src={src}
         alt=""
@@ -43,19 +29,7 @@ export function FeedFitPhoto({
         decoding={priority ? 'sync' : 'async'}
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : 'auto'}
-        ref={(el) => {
-          if (el && el.complete && el.naturalWidth > 1) {
-            const next = el.naturalWidth > el.naturalHeight;
-            if (next !== contain) setContain(next);
-          }
-        }}
-        onLoad={(e) => {
-          const el = e.currentTarget;
-          if (el.naturalWidth > 1 && el.naturalHeight > 1) {
-            setContain(el.naturalWidth > el.naturalHeight);
-          }
-        }}
-        className={`feed-photo-img ${contain ? 'feed-photo-img--contain' : ''} ${imgClassName}`}
+        className={`feed-photo-img ${imgClassName}`}
       />
     </div>
   );

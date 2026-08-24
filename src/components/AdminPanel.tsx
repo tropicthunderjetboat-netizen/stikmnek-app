@@ -2581,7 +2581,7 @@ const AdminPanel: React.FC = () => {
                                     <img
                                       src={getPhotoDisplayUrl(photo, SUPABASE_URL) || photo.url || '/placeholder.svg'}
                                       alt={`Photo ${idx + 1}`}
-                                      className="w-full h-full object-contain"
+                                      className="w-full h-full object-cover"
                                       onError={(e) => {
                                         (e.target as HTMLImageElement).src = '/placeholder.svg';
                                       }}

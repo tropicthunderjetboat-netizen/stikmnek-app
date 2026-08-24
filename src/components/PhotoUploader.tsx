@@ -292,7 +292,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   const resolvedSublabel =
     sublabel ??
     (portraitCrop
-      ? 'Portrait photos are framed to the phone. Wide (landscape) photos stay in full on the swipe feed. PNG, JPG up to 5MB. First photo = cover.'
+      ? 'Photos fill the phone feed — any shape works. PNG, JPG up to 5MB. First photo = cover.'
       : logoCrop
         ? 'Drag & drop or click. Square crop for your logo.'
         : 'Drag & drop or click to browse. PNG, JPG up to 5MB each.');
@@ -701,27 +701,6 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
       preReads.push(preReadDataUrl);
     }
 
-    if (portraitCrop) {
-      // Always open the feed dialog. It decides wide vs tall from the real
-      // pixels — pre-classifying here failed after a couple of large photos.
-      const queue: { src: string; fileName: string }[] = [];
-      for (let i = 0; i < filesToUpload.length; i++) {
-        const src = preReads[i] || URL.createObjectURL(filesToUpload[i]);
-        if (!preReads[i] && !src) {
-          toast.error(`Could not read "${filesToUpload[i].name}" — skipped.`);
-          continue;
-        }
-        queue.push({ src, fileName: filesToUpload[i].name });
-      }
-      if (queue.length === 0) {
-        toast.error('Could not read selected images — try again.');
-        return;
-      }
-      setCropQueue(queue.slice(1));
-      setCropDialog(queue[0]);
-      return;
-    }
-
     await uploadFilesAfterCrop(filesToUpload, preReads);
   }, [photos, maxPhotos, isSingleSlot, uploading, logoCrop, portraitCrop, uploadFilesAfterCrop, onPhotosChange, language]);
 
@@ -1076,7 +1055,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
               <img
                 src={photo.url || photo.preview}
                 alt={photo.name}
-                className="w-full h-full object-contain bg-neutral-900 pointer-events-none"
+                className="w-full h-full object-cover pointer-events-none"
                 loading="lazy"
                 draggable={false}
               />

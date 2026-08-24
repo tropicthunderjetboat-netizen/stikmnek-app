@@ -2562,8 +2562,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
             </label>
             <p className="text-sm text-gray-700 mb-2">
               {language === 'en'
-                ? 'At least one photo is required. Portrait photos are framed to the phone. Wide camera photos stay in full on the swipe feed. First photo is your cover.'
-                : 'Au moins une photo est requise. Les photos portrait sont cadrées au téléphone. Les photos paysage restent entières sur le fil. La première est la couverture.'}
+                ? 'At least one photo is required. Photos fill the phone feed — any shape works. First photo is your cover.'
+                : 'Au moins une photo est requise. Les photos remplissent le fil téléphone — tous les formats conviennent. La première est la couverture.'}
             </p>
             <div className={fieldErrors.photos ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
               <PhotoUploader
