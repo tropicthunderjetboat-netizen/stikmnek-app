@@ -38,6 +38,15 @@ type LogoCropDialogProps = {
   variant?: CropVariant;
 };
 
+function applyNaturalSize(
+  width: number,
+  height: number,
+  setSize: (size: { width: number; height: number }) => void,
+) {
+  if (width < 2 || height < 2) return;
+  setSize({ width, height });
+}
+
 const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
   open,
   imageSrc,
@@ -62,11 +71,10 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
     let cancelled = false;
     void getImageNaturalSize(imageSrc)
       .then((size) => {
-        if (!cancelled) setSourceSize(size);
+        if (!cancelled) applyNaturalSize(size.width, size.height, setSourceSize);
       })
       .catch(() => {
-        // Most listing photos are wide camera shots. Never fall back to a tall
-        // crop window — that is what produced black bars around landscape photos.
+        // Prefer the wide-photo feed layout over a tall crop if we cannot measure.
         if (!cancelled) setSourceSize({ width: 16, height: 9 });
       });
     return () => {
@@ -79,40 +87,54 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
   }, []);
 
   const isPortrait = variant === 'portrait';
-  const sourceIsLandscape = Boolean(
-    sourceSize && isLandscapeSize(sourceSize.width, sourceSize.height),
-  );
-  const cropAspect = !isPortrait
-    ? 1
-    : sourceIsLandscape && sourceSize
-      ? sourceSize.width / sourceSize.height
-      : PORTRAIT_ASPECT;
-  const cropperReady = !isPortrait || sourceSize != null;
+  const orientation: 'unknown' | 'landscape' | 'portrait' = !isPortrait
+    ? 'portrait'
+    : !sourceSize
+      ? 'unknown'
+      : isLandscapeSize(sourceSize.width, sourceSize.height)
+        ? 'landscape'
+        : 'portrait';
+  const sourceIsLandscape = orientation === 'landscape';
+  const cropAspect = !isPortrait ? 1 : PORTRAIT_ASPECT;
 
   const t = isPortrait
     ? {
-        title: sourceIsLandscape
-          ? language === 'en'
-            ? 'Wide photo — shown in full'
-            : language === 'fr'
-              ? 'Photo paysage — affichée en entier'
-              : 'Wide foto — ful long screen'
-          : language === 'en'
-            ? 'Frame your photo'
-            : language === 'fr'
-              ? 'Cadrez votre photo'
-              : 'Frameem foto',
-        hint: sourceIsLandscape
-          ? language === 'en'
-            ? 'The whole photo stays visible on the swipe feed. Empty space is a blur of the same image — we do not crop the sides of wide camera shots.'
-            : language === 'fr'
-              ? 'Toute la photo reste visible sur le fil. L’espace autour est un flou de la même image — les côtés ne sont pas coupés.'
-              : 'Ful foto i stap long swipe feed. Space raonem i blur — no katem sides blong wide foto.'
-          : language === 'en'
-            ? 'Crop to vertical — this is how it looks on the phone swipe feed. Drag to reposition, zoom to fill.'
-            : language === 'fr'
-              ? 'Cadrez en vertical — comme sur le fil mobile. Glissez et zoomez.'
-              : 'Crop vertical — olsem long phone feed. Drag mo zoom.',
+        title:
+          orientation === 'unknown'
+            ? language === 'en'
+              ? 'Preparing photo…'
+              : language === 'fr'
+                ? 'Préparation de la photo…'
+                : 'Preparem foto…'
+            : sourceIsLandscape
+              ? language === 'en'
+                ? 'Wide photo — shown in full'
+                : language === 'fr'
+                  ? 'Photo paysage — affichée en entier'
+                  : 'Wide foto — ful long screen'
+              : language === 'en'
+                ? 'Frame your photo'
+                : language === 'fr'
+                  ? 'Cadrez votre photo'
+                  : 'Frameem foto',
+        hint:
+          orientation === 'unknown'
+            ? language === 'en'
+              ? 'Checking whether this is a wide camera photo or a tall phone photo.'
+              : language === 'fr'
+                ? 'Vérification du format de la photo.'
+                : 'Checkem format blong foto.'
+            : sourceIsLandscape
+              ? language === 'en'
+                ? 'The whole photo stays visible on the swipe feed. Empty space is a blur of the same image — we do not crop the sides of wide camera shots.'
+                : language === 'fr'
+                  ? 'Toute la photo reste visible sur le fil. L’espace autour est un flou de la même image — les côtés ne sont pas coupés.'
+                  : 'Ful foto i stap long swipe feed. Space raonem i blur — no katem sides blong wide foto.'
+              : language === 'en'
+                ? 'Crop to vertical — this is how it looks on the phone swipe feed. Drag to reposition, zoom to fill.'
+                : language === 'fr'
+                  ? 'Cadrez en vertical — comme sur le fil mobile. Glissez et zoomez.'
+                  : 'Crop vertical — olsem long phone feed. Drag mo zoom.',
         zoom: language === 'en' ? 'Zoom' : language === 'fr' ? 'Zoom' : 'Zoom',
         cancel: language === 'en' ? 'Cancel' : language === 'fr' ? 'Annuler' : 'Kanselem',
         save: language === 'en' ? 'Use photo' : language === 'fr' ? 'Utiliser' : 'Yusem foto',
@@ -136,6 +158,7 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
       };
 
   const handleSave = async () => {
+    if (isPortrait && orientation === 'unknown') return;
     if (isPortrait && sourceIsLandscape) {
       setSaving(true);
       try {
@@ -173,6 +196,10 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
     }
   };
 
+  const showLandscapePreview = isPortrait && orientation === 'landscape';
+  const showCropper = !isPortrait || orientation === 'portrait';
+  const showMeasuring = isPortrait && orientation === 'unknown';
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && !saving && onClose()}>
       <DialogContent
@@ -188,45 +215,43 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
           <img
             src={imageSrc}
             alt=""
-            className="pointer-events-none absolute h-0 w-0 opacity-0"
+            className="pointer-events-none absolute h-px w-px opacity-0"
             onLoad={(e) => {
               const el = e.currentTarget;
-              setSourceSize({ width: el.naturalWidth, height: el.naturalHeight });
+              applyNaturalSize(el.naturalWidth, el.naturalHeight, setSourceSize);
             }}
           />
         ) : null}
 
-        {isPortrait && sourceIsLandscape ? (
+        {showMeasuring ? (
+          <div className="flex h-[min(52vh,320px)] items-center justify-center bg-neutral-950">
+            <Loader2 className="h-6 w-6 animate-spin text-white/70" />
+          </div>
+        ) : showLandscapePreview ? (
           <div className="bg-neutral-950 px-5 py-4 flex justify-center">
             <div className="relative w-[min(100%,240px)] aspect-[9/19.5] rounded-[1.6rem] overflow-hidden ring-1 ring-white/20 shadow-2xl">
               <FeedFitPhoto src={imageSrc} className="absolute inset-0 h-full w-full" priority />
             </div>
           </div>
-        ) : (
+        ) : showCropper ? (
           <>
             <div
               className={`relative w-full bg-gray-900 ${
                 isPortrait ? 'h-[min(68vh,440px)]' : 'h-[min(52vw,280px)]'
               }`}
             >
-              {cropperReady ? (
-                <Cropper
-                  image={imageSrc}
-                  crop={crop}
-                  zoom={zoom}
-                  aspect={cropAspect}
-                  cropShape="rect"
-                  showGrid
-                  objectFit="cover"
-                  onCropChange={setCrop}
-                  onZoomChange={setZoom}
-                  onCropComplete={onCropComplete}
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-white/70" />
-                </div>
-              )}
+              <Cropper
+                image={imageSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={cropAspect}
+                cropShape="rect"
+                showGrid
+                objectFit="cover"
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+              />
             </div>
 
             <div className="px-5 py-4 space-y-3 border-t border-gray-100">
@@ -244,7 +269,7 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
               </div>
             </div>
           </>
-        )}
+        ) : null}
 
         <DialogFooter className="px-5 pb-5 gap-2 sm:gap-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
@@ -253,7 +278,11 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
           <Button
             type="button"
             onClick={() => void handleSave()}
-            disabled={saving || (!sourceIsLandscape && !croppedAreaPixels)}
+            disabled={
+              saving ||
+              orientation === 'unknown' ||
+              (!sourceIsLandscape && !croppedAreaPixels)
+            }
             className="bg-teal-600 hover:bg-teal-700"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}

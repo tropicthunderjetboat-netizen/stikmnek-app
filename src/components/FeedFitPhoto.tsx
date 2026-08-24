@@ -43,9 +43,17 @@ export function FeedFitPhoto({
         decoding={priority ? 'sync' : 'async'}
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : 'auto'}
+        ref={(el) => {
+          if (el && el.complete && el.naturalWidth > 1) {
+            const next = el.naturalWidth > el.naturalHeight;
+            if (next !== contain) setContain(next);
+          }
+        }}
         onLoad={(e) => {
           const el = e.currentTarget;
-          setContain(el.naturalWidth > el.naturalHeight);
+          if (el.naturalWidth > 1 && el.naturalHeight > 1) {
+            setContain(el.naturalWidth > el.naturalHeight);
+          }
         }}
         className={`feed-photo-img ${contain ? 'feed-photo-img--contain' : ''} ${imgClassName}`}
       />

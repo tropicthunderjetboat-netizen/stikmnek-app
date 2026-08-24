@@ -12,7 +12,10 @@ function createImage(url: string): Promise<HTMLImageElement> {
     const image = new Image();
     image.addEventListener('load', () => resolve(image));
     image.addEventListener('error', (e) => reject(e));
-    image.setAttribute('crossOrigin', 'anonymous');
+    // crossOrigin on blob:/data: URLs makes the load fail in some browsers after a few photos.
+    if (!url.startsWith('blob:') && !url.startsWith('data:')) {
+      image.setAttribute('crossOrigin', 'anonymous');
+    }
     image.src = url;
   });
 }
@@ -65,7 +68,15 @@ export async function getImageNaturalSize(
 ): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    image.onload = () => {
+      const width = image.naturalWidth;
+      const height = image.naturalHeight;
+      if (width < 2 || height < 2) {
+        reject(new Error('Could not read image size'));
+        return;
+      }
+      resolve({ width, height });
+    };
     image.onerror = () => reject(new Error('Could not read image size'));
     image.src = src;
   });

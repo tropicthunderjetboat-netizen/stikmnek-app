@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import LogoCropDialog from '@/components/LogoCropDialog';
-import { getImageNaturalSize, isLandscapeSize } from '@/lib/cropImage';
 import { useAppContext } from '@/contexts/AppContext';
 import {
   AlertDialog,
@@ -284,6 +283,9 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photosRef = useRef(photos);
   photosRef.current = photos;
+  const cropQueueRef = useRef<{ src: string; fileName: string }[]>([]);
+  cropQueueRef.current = cropQueue;
+  const skipCropCloseRef = useRef(false);
   const allowReorder = allowReorderProp ?? maxPhotos > 1;
   const isSingleSlot = maxPhotos === 1;
   const portraitCrop = portraitCropProp ?? (!logoCrop && maxPhotos > 1);
@@ -700,47 +702,23 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
     }
 
     if (portraitCrop) {
-      const portraitQueue: { src: string; fileName: string }[] = [];
-      const landscapeFiles: File[] = [];
-      const landscapeReads: string[] = [];
+      // Always open the feed dialog. It decides wide vs tall from the real
+      // pixels — pre-classifying here failed after a couple of large photos.
+      const queue: { src: string; fileName: string }[] = [];
       for (let i = 0; i < filesToUpload.length; i++) {
-        const src = preReads[i];
-        if (!src) {
+        const src = preReads[i] || URL.createObjectURL(filesToUpload[i]);
+        if (!preReads[i] && !src) {
           toast.error(`Could not read "${filesToUpload[i].name}" — skipped.`);
           continue;
         }
-        let landscape = false;
-        try {
-          const size = await getImageNaturalSize(src);
-          landscape = isLandscapeSize(size.width, size.height);
-        } catch {
-          landscape = false;
-        }
-        if (landscape) {
-          landscapeFiles.push(filesToUpload[i]);
-          landscapeReads.push(src);
-        } else {
-          portraitQueue.push({ src, fileName: filesToUpload[i].name });
-        }
+        queue.push({ src, fileName: filesToUpload[i].name });
       }
-      if (landscapeFiles.length > 0) {
-        toast.message(
-          language === 'en'
-            ? 'Wide photos stay in full on the swipe feed (blurred fill around them).'
-            : language === 'fr'
-              ? 'Les photos paysage restent entières sur le fil (fond flou autour).'
-              : 'Wide foto i stap ful long swipe feed.',
-        );
-        await uploadFilesAfterCrop(landscapeFiles, landscapeReads);
-      }
-      if (portraitQueue.length === 0) {
-        if (landscapeFiles.length === 0) {
-          toast.error('Could not read selected images — try again.');
-        }
+      if (queue.length === 0) {
+        toast.error('Could not read selected images — try again.');
         return;
       }
-      setCropQueue(portraitQueue.slice(1));
-      setCropDialog(portraitQueue[0]);
+      setCropQueue(queue.slice(1));
+      setCropDialog(queue[0]);
       return;
     }
 
@@ -748,6 +726,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   }, [photos, maxPhotos, isSingleSlot, uploading, logoCrop, portraitCrop, uploadFilesAfterCrop, onPhotosChange, language]);
 
   const handleCropDialogClose = useCallback(() => {
+    if (skipCropCloseRef.current) return;
     setCropDialog(null);
     setCropQueue([]);
   }, []);
@@ -811,27 +790,28 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
         photosRef.current = next;
         onPhotosChange(next);
       }
-      // Advance queue or close — avoid unmounting mid-save (that would clear the queue via onClose).
-      await new Promise<void>((resolve) => {
-        setCropQueue((prev) => {
-          if (prev.length === 0) {
-            setCropDialog(null);
-            toast.success(
-              language === 'en'
-                ? 'Photo ready for the feed!'
-                : language === 'fr'
-                  ? 'Photo prête pour le fil !'
-                  : 'Foto i redi!',
-            );
-            resolve();
-            return prev;
-          }
-          const [nextCrop, ...rest] = prev;
-          setCropDialog(nextCrop);
-          resolve();
-          return rest;
-        });
-      });
+
+      const remaining = cropQueueRef.current;
+      if (remaining.length === 0) {
+        setCropDialog(null);
+        setCropQueue([]);
+        toast.success(
+          language === 'en'
+            ? 'Photo ready for the feed!'
+            : language === 'fr'
+              ? 'Photo prête pour le fil !'
+              : 'Foto i redi!',
+        );
+        return;
+      }
+
+      const [nextCrop, ...rest] = remaining;
+      skipCropCloseRef.current = true;
+      setCropQueue(rest);
+      setCropDialog(nextCrop);
+      window.setTimeout(() => {
+        skipCropCloseRef.current = false;
+      }, 0);
     },
     [uploadFile, onPhotosChange, language, cropDialog?.replaceIndex],
   );
@@ -1244,6 +1224,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
 
       {cropDialog && (
         <LogoCropDialog
+          key={cropDialog.src}
           open
           imageSrc={cropDialog.src}
           fileName={cropDialog.fileName}
