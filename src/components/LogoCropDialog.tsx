@@ -62,16 +62,16 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
     ? {
         title:
           language === 'en'
-            ? 'Photo fills the phone'
+            ? 'How it looks on the phone'
             : language === 'fr'
-              ? 'La photo remplit l’écran'
-              : 'Foto i fulumap phone',
+              ? 'Aperçu sur le téléphone'
+              : 'Olsem long phone',
         hint:
           language === 'en'
-            ? 'Any shape works. The photo fills the swipe card — extra edges are cropped, nothing sits in empty bars.'
+            ? 'Your photo is shown as uploaded. If it is not 9:16, the extra space is a blur around it — we do not crop or stretch it.'
             : language === 'fr'
-              ? 'Tous les formats conviennent. La photo remplit la carte — les bords en trop sont coupés, pas de bandes vides.'
-              : 'Eni shape i wok. Foto i fulumap swipe card — no empty bar.',
+              ? 'La photo s’affiche telle quelle. Si ce n’est pas du 9:16, l’espace autour est un flou — pas de recadrage ni d’étirement.'
+              : 'Foto i so olsem yu uploadem. Sapos i no 9:16, space raonem i blur — no crop, no stretch.',
         cancel: language === 'en' ? 'Cancel' : language === 'fr' ? 'Annuler' : 'Kanselem',
         save: language === 'en' ? 'Use photo' : language === 'fr' ? 'Utiliser' : 'Yusem foto',
       }
@@ -131,7 +131,7 @@ const LogoCropDialog: React.FC<LogoCropDialogProps> = ({
 
         {isFeedPhoto ? (
           <div className="bg-neutral-950 px-5 py-4 flex justify-center">
-            <div className="relative w-[min(100%,240px)] aspect-[9/19.5] rounded-[1.6rem] overflow-hidden ring-1 ring-white/20 shadow-2xl">
+            <div className="relative w-[min(100%,280px)] aspect-[9/16] rounded-2xl overflow-hidden ring-1 ring-white/20 shadow-2xl">
               <FeedFitPhoto src={imageSrc} className="absolute inset-0 h-full w-full" priority />
             </div>
           </div>

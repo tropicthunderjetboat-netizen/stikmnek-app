@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { formatVT, getPhotoDisplayUrl } from '@/lib/utils';
 import LogoCropDialog from '@/components/LogoCropDialog';
+import { FeedFitPhoto } from '@/components/FeedFitPhoto';
 import { pricingTiersFromDb } from '@/lib/pricingTiers';
 import { normalizeWebsiteForStorage } from '@/lib/urlHelpers';
 import {
@@ -2577,14 +2578,11 @@ const AdminPanel: React.FC = () => {
                                   photo.status === 'rejected' ? 'border-red-300' : 'border-yellow-300'
                                 }`}>
                                   {/* Photo */}
-                                  <div className="relative bg-gray-900 aspect-[9/19.5]">
-                                    <img
+                                  <div className="relative bg-neutral-950 aspect-[9/16]">
+                                    <FeedFitPhoto
                                       src={getPhotoDisplayUrl(photo, SUPABASE_URL) || photo.url || '/placeholder.svg'}
-                                      alt={`Photo ${idx + 1}`}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        (e.target as HTMLImageElement).src = '/placeholder.svg';
-                                      }}
+                                      className="absolute inset-0 h-full w-full"
+                                    />
                                     />
                                     {/* Main badge */}
                                     {photo.is_main && (
@@ -2616,7 +2614,7 @@ const AdminPanel: React.FC = () => {
                                       title="Adjust how this photo looks on the swipe feed"
                                     >
                                       <Crop className="w-3.5 h-3.5" />
-                                      Adjust for feed
+                                      Preview on phone
                                     </button>
                                     {photo.status === 'pending' ? (
                                       <div className="flex items-center gap-2">

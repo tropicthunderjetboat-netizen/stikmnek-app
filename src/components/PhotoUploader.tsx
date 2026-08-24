@@ -11,10 +11,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Star,
-  Crop,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import LogoCropDialog from '@/components/LogoCropDialog';
+import { FeedFitPhoto } from '@/components/FeedFitPhoto';
 import { useAppContext } from '@/contexts/AppContext';
 import {
   AlertDialog,
@@ -292,7 +292,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
   const resolvedSublabel =
     sublabel ??
     (portraitCrop
-      ? 'Photos fill the phone feed — any shape works. PNG, JPG up to 5MB. First photo = cover.'
+      ? 'Photos show as uploaded. If they are not 9:16, a blur/dark frame fills the phone around them. PNG, JPG up to 5MB. First photo = cover.'
       : logoCrop
         ? 'Drag & drop or click. Square crop for your logo.'
         : 'Drag & drop or click to browse. PNG, JPG up to 5MB each.');
@@ -1042,8 +1042,8 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
                 setDragPhotoIndex(null);
                 setDropTargetIndex(null);
               }}
-              className={`group relative rounded-xl overflow-hidden bg-gray-100 border transition-all ${
-                portraitCrop ? 'aspect-[9/19.5]' : 'aspect-square'
+              className={`group relative rounded-xl overflow-hidden bg-neutral-950 border transition-all ${
+                portraitCrop ? 'aspect-[9/16]' : 'aspect-square'
               } ${
                 dropTargetIndex === index && dragPhotoIndex !== null && dragPhotoIndex !== index
                   ? 'border-teal-500 ring-2 ring-teal-300 scale-[1.02]'
@@ -1052,13 +1052,20 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
                     : 'border-gray-200 hover:border-teal-300'
               } ${allowReorder && photos.length > 1 ? 'cursor-grab active:cursor-grabbing' : ''}`}
             >
-              <img
-                src={photo.url || photo.preview}
-                alt={photo.name}
-                className="w-full h-full object-cover pointer-events-none"
-                loading="lazy"
-                draggable={false}
-              />
+              {portraitCrop ? (
+                <FeedFitPhoto
+                  src={photo.url || photo.preview}
+                  className="absolute inset-0 h-full w-full pointer-events-none"
+                />
+              ) : (
+                <img
+                  src={photo.url || photo.preview}
+                  alt={photo.name}
+                  className="w-full h-full object-cover pointer-events-none"
+                  loading="lazy"
+                  draggable={false}
+                />
+              )}
 
               {allowReorder && photos.length > 1 && (
                 <div
@@ -1071,25 +1078,6 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
 
               {/* Overlay on hover / focus-within */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/45 group-focus-within:bg-black/45 transition-all flex flex-col items-center justify-center gap-1.5 p-2">
-                {portraitCrop && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCropQueue([]);
-                      setCropDialog({
-                        src: photo.url || photo.preview,
-                        fileName: photo.name || `photo-${index + 1}.jpg`,
-                        replaceIndex: index,
-                      });
-                    }}
-                    className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-all px-2 py-1 rounded-lg bg-white text-teal-800 text-[10px] font-semibold flex items-center gap-1 shadow"
-                    title="Adjust photo for the phone feed"
-                  >
-                    <Crop className="w-3 h-3" />
-                    Adjust
-                  </button>
-                )}
                 {allowReorder && index > 0 && (
                   <button
                     type="button"
@@ -1167,7 +1155,7 @@ const PhotoUploader: React.FC<PhotoUploaderProps> = ({
             <div
               onClick={handleClick}
               className={`rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center hover:border-teal-300 hover:bg-teal-50/30 transition-all cursor-pointer ${
-                portraitCrop ? 'aspect-[9/19.5]' : 'aspect-square'
+                portraitCrop ? 'aspect-[9/16]' : 'aspect-square'
               }`}
             >
               <Upload className="w-6 h-6 text-gray-300 mb-1" />

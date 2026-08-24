@@ -2562,8 +2562,8 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
             </label>
             <p className="text-sm text-gray-700 mb-2">
               {language === 'en'
-                ? 'At least one photo is required. Photos fill the phone feed — any shape works. First photo is your cover.'
-                : 'Au moins une photo est requise. Les photos remplissent le fil téléphone — tous les formats conviennent. La première est la couverture.'}
+                ? 'At least one photo is required. Photos show as uploaded. If they are not 9:16, a blur/dark frame fills the rest of the phone. First photo is your cover.'
+                : 'Au moins une photo est requise. Les photos s’affichent telles quelles. Si ce n’est pas du 9:16, un cadre flou/sombre complète l’écran. La première est la couverture.'}
             </p>
             <div className={fieldErrors.photos ? 'rounded-xl ring-2 ring-red-100 border border-red-200 p-1' : ''}>
               <PhotoUploader
@@ -2844,7 +2844,7 @@ const BusinessListingForm: React.FC<BusinessListingFormProps> = ({
             </div>
 
             <div className="flex-1 flex items-center justify-center px-6 pb-8 min-h-0">
-              <div className="relative w-full max-w-[320px] aspect-[9/19.5] rounded-[1.75rem] overflow-hidden border border-white/15 shadow-2xl bg-neutral-900">
+              <div className="relative w-full max-w-[320px] aspect-[9/16] rounded-[1.75rem] overflow-hidden border border-white/15 shadow-2xl bg-neutral-900">
                 {photos[0]?.url || photos[0]?.preview ? (
                   <FeedFitPhoto
                     src={photos[0].url || photos[0].preview}
