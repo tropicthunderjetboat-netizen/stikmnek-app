@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { Business } from '@/data/businesses';
+import { listingDiscountPercent, listingOfferBadgeText, type Business } from '@/data/businesses';
 import { effectiveProfileBusinessId } from '@/lib/businessOfferingMap';
 import { getEdgeAuthHeaders, supabase } from '@/lib/supabase';
 import { Eye, Heart, Loader2, Percent } from 'lucide-react';
@@ -28,14 +28,14 @@ const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({ selectedBusines
     return id !== String(profileId) ? id : null;
   }, [selectedBusiness, profileId]);
 
-  const discountPercent = useMemo(() => {
-    const orig = Number((selectedBusiness as any)?.originalPrice) || 0;
-    const deal = Number((selectedBusiness as any)?.dealPrice) || 0;
-    if (orig > 0 && deal > 0 && deal < orig) {
-      return Math.round(((orig - deal) / orig) * 100);
-    }
-    return 20;
-  }, [selectedBusiness]);
+  const discountPercent = useMemo(
+    () => listingDiscountPercent(selectedBusiness),
+    [selectedBusiness],
+  );
+  const offerLabel = useMemo(
+    () => listingOfferBadgeText(selectedBusiness),
+    [selectedBusiness],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -113,7 +113,11 @@ const DashboardAnalytics: React.FC<DashboardAnalyticsProps> = ({ selectedBusines
             <Percent className="h-5 w-5" />
           </div>
           <p className="text-sm font-semibold text-amber-950">
-            Your offer: Save {discountPercent}% with Pass
+            {discountPercent != null && discountPercent > 0
+              ? `Your offer: Save ${discountPercent}% with Pass`
+              : offerLabel
+                ? `Your offer: ${offerLabel}`
+                : 'No Pass discount — listed at regular price'}
           </p>
         </div>
       </div>

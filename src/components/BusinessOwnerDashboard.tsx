@@ -3,7 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { getEdgeAuthHeaders, supabase, SUPABASE_URL } from '@/lib/supabase';
 import { invokeEdgeFunctionWithRetry, RPC_INSERT_PENDING_TIMEOUT_MS } from '@/lib/edgeInvoke';
 import { toast } from 'sonner';
-import { categories, type Business, type Category } from '@/data/businesses';
+import { categories, listingDiscountPercent, listingOfferBadgeText, type Business, type Category } from '@/data/businesses';
 import {
   Store, Edit3, BarChart3, MessageSquare, Image, Power,
   Save, X, ChevronRight, TrendingUp, Users, DollarSign,
@@ -2504,38 +2504,22 @@ const BusinessOwnerDashboard: React.FC = () => {
                 profileCompanyName={profileCompanyMeta.name || selectedBusiness?.name || 'Business'}
                 profileLogoUrl={profileCompanyMeta.logo}
                 profileBusinessId={resolvedProfileBusinessId || selectedProfileId}
-                listingOptions={approvedListingsSameProfile.map((b) => {
-                  const orig = Number(b.originalPrice) || 0;
-                  const deal = Number(b.dealPrice) || 0;
-                  const discountPercent =
-                    orig > 0 && deal > 0 && deal < orig
-                      ? Math.round(((orig - deal) / orig) * 100)
-                      : null;
-                  return {
-                    id: b.id,
-                    name: b.name || 'Listing',
-                    image: b.image,
-                    isProfileRow: String(b.id) === String(selectedProfileId),
-                    discountPercent,
-                  };
-                })}
+                listingOptions={approvedListingsSameProfile.map((b) => ({
+                  id: b.id,
+                  name: b.name || 'Listing',
+                  image: b.image,
+                  isProfileRow: String(b.id) === String(selectedProfileId),
+                  discountPercent: listingDiscountPercent(b),
+                  offerLabel: listingOfferBadgeText(b),
+                }))}
                 selectedListingId={selectedBusinessId}
                 onSelectListing={setSelectedBusinessId}
                 reviewCount={businessReviews.length}
                 submissionBadge={submissionsBadge}
                 hasBusinessProfile={Boolean(resolvedProfileBusinessId)}
                 onSwitchTab={(tab) => setActiveTab(tab as DashboardTab)}
-                offerDiscountPercent={
-                  selectedBusiness?.originalPrice > 0 &&
-                  selectedBusiness?.dealPrice > 0 &&
-                  selectedBusiness.dealPrice < selectedBusiness.originalPrice
-                    ? Math.round(
-                        ((selectedBusiness.originalPrice - selectedBusiness.dealPrice) /
-                          selectedBusiness.originalPrice) *
-                          100,
-                      )
-                    : 20
-                }
+                offerDiscountPercent={listingDiscountPercent(selectedBusiness)}
+                offerLabel={listingOfferBadgeText(selectedBusiness)}
               />
             )}
             {activeTab === 'profile' && resolvedProfileBusinessId && (

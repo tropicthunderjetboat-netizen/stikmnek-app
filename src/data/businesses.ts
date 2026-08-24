@@ -157,6 +157,17 @@ export function effectiveListingOriginalPrice(b: Business): number {
   return 0;
 }
 
+/** Percent off for an active Pass deal, or null when the listing has no price discount. */
+export function listingDiscountPercent(b: Business): number | null {
+  if (!listingHasActiveDiscount(b)) return null;
+  const orig = effectiveListingOriginalPrice(b);
+  const deal = effectiveListingDealPrice(b);
+  if (orig > 0 && deal > 0 && deal < orig) {
+    return Math.round(((orig - deal) / orig) * 100);
+  }
+  return null;
+}
+
 /** True when there is a real StikmNek deal (deal strictly below standard list price). */
 export function listingHasActiveDiscount(b: Business): boolean {
   const deal = effectiveListingDealPrice(b);
@@ -178,7 +189,10 @@ export function listingHasActiveDiscount(b: Business): boolean {
 export function listingHasNonPriceOffer(b: Business): boolean {
   const label = String(b.discount ?? '').trim();
   if (!label) return false;
-  return !listingHasActiveDiscount(b);
+  if (listingHasActiveDiscount(b)) return false;
+  // Leftover "20% off" copy is not a real add-on when prices are not discounted.
+  if (/\d+\s*%/.test(label)) return false;
+  return true;
 }
 
 /** Offer badge to show on cards/details: price discount or free add-on text. */

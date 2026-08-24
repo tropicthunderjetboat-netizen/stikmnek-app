@@ -16,6 +16,8 @@ interface ListingOption {
   isProfileRow?: boolean;
   /** Discount % for the selected offer, when known */
   discountPercent?: number | null;
+  /** Badge text when there is a free add-on (no percent off) */
+  offerLabel?: string | null;
 }
 
 interface BusinessSimpleHubProps {
@@ -32,6 +34,8 @@ interface BusinessSimpleHubProps {
   onSwitchTab: (tab: string) => void;
   /** Pass discount shown on the selected listing */
   offerDiscountPercent?: number | null;
+  /** Non-percent offer text (e.g. free add-on) */
+  offerLabel?: string | null;
 }
 
 const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
@@ -46,6 +50,7 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
   hasBusinessProfile,
   onSwitchTab,
   offerDiscountPercent,
+  offerLabel,
 }) => {
   const { language, user } = useAppContext();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -67,7 +72,11 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
   const discount =
     offerDiscountPercent ??
     selected?.discountPercent ??
-    20;
+    null;
+  const headline =
+    offerLabel ??
+    selected?.offerLabel ??
+    null;
 
   useEffect(() => {
     let cancelled = false;
@@ -243,10 +252,17 @@ const BusinessSimpleHub: React.FC<BusinessSimpleHubProps> = ({
         </div>
         <div className="rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-5 shadow-sm">
           <p className="text-sm font-semibold text-amber-900">
-            {tr(
-              `Your offer: Save ${Math.round(discount)}% with Pass`,
-              `Votre offre : −${Math.round(discount)} % avec Pass`,
-            )}
+            {discount != null && discount > 0
+              ? tr(
+                  `Your offer: Save ${Math.round(discount)}% with Pass`,
+                  `Votre offre : −${Math.round(discount)} % avec Pass`,
+                )
+              : headline
+                ? tr(`Your offer: ${headline}`, `Votre offre : ${headline}`)
+                : tr(
+                    'No Pass discount — listed at regular price',
+                    'Pas de remise Pass — prix normal',
+                  )}
           </p>
           <p className="mt-1 text-xs text-amber-800/80">
             {tr('Listing is free forever. No scanning needed.', 'Annonce gratuite pour toujours. Pas de scan.')}
